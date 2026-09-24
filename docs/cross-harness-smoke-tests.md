@@ -2,7 +2,9 @@
 
 The four harnesses installed on the maintainer's host: claude-code, codex, hermes, kimi.
 Run these when a plugin's cross-harness configuration changes, and when recording a
-`verified` status in `harness_compatibility.json`. Capability facts per harness (what it
+`verified` status in `harness_compatibility_verification.json`. Generate the current view with
+`uv run --script scripts/generate_harness_compatibility.py` before reading
+`harness_compatibility.json`. Capability facts per harness (what it
 substitutes, where it discovers plugins, which env vars it exports) live in
 `plugins/development-harness/docs/work-ledger/measurements/harness-*.md` — on PR #3427's
 branch until it merges. Read the matching file before interpreting a failure; this doc
@@ -70,8 +72,9 @@ bundled skills/tools. Enablement check: `.codex/config.toml`
 appear. Official guidance: <https://developers.openai.com/codex/skills> and
 <https://developers.openai.com/codex/plugins/build>.
 
-No inline substitution — blocker counts are tracked in `harness_compatibility.json`
-(`blockers`) and issue #3445. Codex reads a root `plugin.json` as an Agent Plugins v1
+No inline substitution — before reading the generated blocker counts, run
+`uv run --script scripts/generate_harness_compatibility.py`, then inspect
+`harness_compatibility.json` (`blockers`) and issue #3445. Codex reads a root `plugin.json` as an Agent Plugins v1
 manifest when its `$schema` starts `https://agent-plugins.org/schemas/`, else falls back
 to `.codex-plugin/plugin.json` — one portable manifest can serve both codex and hermes.
 Substitution exists only in plugin hooks: hook processes get `PLUGIN_ROOT` +
@@ -121,10 +124,11 @@ Discovery roots and substitution facts: `harness-kimi.md` (work-ledger measureme
 
 ## Recording results
 
-Update the plugin's `verification.<harness>` entry in `harness_compatibility.json`:
-`status: verified`, the ISO date, and the issue/PR reference in `notes`. Objective fields
-are regenerated — run `uv run --script scripts/generate_harness_compatibility.py` after
-editing, and never hand-edit `manifests`/`components`/`blockers`.
+Update the plugin and harness entry in the tracked `harness_compatibility_verification.json` source
+with `status: verified`, the ISO date, and the issue/PR reference in `notes`. Store only completed
+results; omit unverified entries because the generator supplies them by default. Then run
+`uv run --script scripts/generate_harness_compatibility.py` and inspect the merged
+`harness_compatibility.json` view. Never hand-edit the generated view.
 
 ## Plugin-root resolution strategies
 
