@@ -121,8 +121,7 @@ Before a single `Write` call whose content may exceed 25,000 characters, read
 
 Before assigning a model or effort tier to a dispatched agent, read `rules/model-selection.md`.
 
-Before writing or editing Python, read `rules/python-development.md` for this repo's overrides on
-the Python skills, and load the skills it names.
+Before Python implementation, review, modernization, or debugging, read `rules/python-development.md`; it defines this repository's Python workflow routing and checkout-specific overrides.
 
 Before fixing any problem discovered during a session that the user did not ask about, read
 `rules/proactive-fix-gate.md` for the required gate.

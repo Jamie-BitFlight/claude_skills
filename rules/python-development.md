@@ -21,8 +21,8 @@ package's) that silently diverge — a split-brain, not a cleanup.
 
 ### Splitting a PEP 723 script
 
-Split a script that passes ~500 lines, per the File Size Policy in
-[`python-cli-architect.md`](plugins/python-engineering/agents/python-cli-architect.md). For how the
+Split a script that approaches or exceeds ~500 physical lines, per the shared Module Hygiene policy in
+[`standards-for-python-development`](plugins/python-engineering/skills/standards-for-python-development/SKILL.md). For how the
 resulting modules import each other, see `PEP723.md` in `python-engineering:python3-core`;
 `sam_schema/cli.py` is this repo's worked instance of the package-relative form.
 
@@ -46,10 +46,22 @@ symptom, same environment-resolution root cause), see
 
 ---
 
+## Python Workflow Routing
+
+Use the owning entry point for the task rather than loading shared standards as a substitute for a workflow:
+
+| Task | Entry point |
+|---|---|
+| Python implementation, refactoring, or behavioral change | `/python-engineering:orchestrate` |
+| Broad quality, technical-debt, Pythonic, ecosystem, or modernization audit | `/python-engineering:python-quality-audit` |
+| Bounded conventional code review | `/python-engineering:review` |
+| Debugging or unexpected Python behavior | `/python-engineering:debug` |
+
+These routes consume the shared `standards-for-python-development` policy and add the appropriate adversarial scope tracing, specialists, evidence gathering, or review behavior. Load the shared standards directly only when a caller specifically needs the policy reference rather than an execution workflow.
+
 ## Repo Overrides on the Python Skills
 
-Load `/python-engineering:standards-for-python-development` before Python work. It carries the
-craft. This repo adds two rules it cannot carry, because both are about this checkout's layout:
+The plugin carries the Python craft. This repo adds two rules it cannot carry, because both are about this checkout's layout:
 
 - Before writing a new shared module, read the PEP 723 dependency block of the scripts that will
   import it (`grep dependencies plugins/*/scripts/*.py`) and reuse what is declared.
