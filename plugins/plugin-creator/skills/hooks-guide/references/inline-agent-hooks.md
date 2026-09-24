@@ -18,7 +18,9 @@ SOURCE: [Create custom subagents](https://code.claude.com/docs/en/sub-agents.md)
 
 ## Supported Frontmatter Fields
 
-Only `name` and `description` are required. All other fields are optional.
+Project, user, and managed agents require `name` and `description`. Plugin agents have filename
+and generic-description fallbacks, but should provide both fields for reliable routing. All other
+fields are optional.
 
 | Field             | Required | Description                                                                                                                                                                                                                                                                 |
 | :---------------- | :------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

@@ -30,17 +30,17 @@ Use this as a compact example. See [the canonical subagent reference](../../skil
 
 | Field             | Type   | Purpose                                  | Constraints                              | Required |
 | ----------------- | ------ | ---------------------------------------- | ---------------------------------------- | -------- |
-| `name`            | string | Unique identifier                        | No leading `-`; cannot contain `:`        | Yes      |
-| `description`     | string | When to delegate to this agent           | Clear routing guidance                    | Yes      |
+| `name`            | string | Unique identifier                        | Recommended for plugin routing; required elsewhere | Scope-dependent |
+| `description`     | string | When to delegate to this agent           | Recommended for plugin routing; required elsewhere | Scope-dependent |
 | `tools`           | string/list | Allowlist of tools the agent can use | CSV string or YAML list                  | No       |
 | `disallowedTools` | string/list | Denylist of tools the agent cannot use | CSV string or YAML list                  | No       |
 | `model`           | string | Which model to use                       | sonnet, opus, haiku, or inherit          | No       |
 | `permissionMode`  | string | Permission behavior for tool usage       | See canonical reference; ignored in plugin agents | No |
-| `skills`          | string | Skills to load when agent is active      | Comma-separated skill names              | No       |
+| `skills`          | string/list | Skills to load when agent is active | CSV string or YAML list                  | No       |
 | `hooks`           | object | Scoped hooks for agent lifecycle         | Valid hook configuration object          | No       |
 | `color`           | string | Terminal output color for agent messages | Valid color name (cyan, green, yellow)   | No       |
 
-`tools` and `disallowedTools` accept CSV strings or YAML lists. Plugin agents ignore `hooks`, `mcpServers`, and `permissionMode`, and do not support `initialPrompt`.
+`tools`, `disallowedTools`, and `skills` accept CSV strings or YAML lists. Plugin agents ignore `hooks`, `mcpServers`, and `permissionMode`, and do not support `initialPrompt`. Plugin agents without valid `name` frontmatter fall back to the file path; invalid frontmatter also receives a generic description. Provide both fields for routing quality. Project, user, and managed agents require both fields to load.
 
 ## Validation
 
@@ -62,8 +62,8 @@ claude plugin validate ./path/to/plugin/
 
 | Error                           | Cause                     | Fix                                     |
 | ------------------------------- | ------------------------- | --------------------------------------- |
-| `name: Required`                | Missing name field        | Add `name` field to frontmatter         |
-| `description: Required`         | Missing description field | Add `description` with trigger keywords |
+| `name: Required`                | Missing name in a non-plugin agent | Add `name` field to frontmatter  |
+| `description: Required`         | Missing description in a non-plugin agent | Add routing description |
 | `model must be sonnet/opus/...` | Invalid model name        | Use valid model identifier              |
 
 ## Agent Location

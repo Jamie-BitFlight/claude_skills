@@ -207,6 +207,11 @@ Plugins can provide specialized subagents for specific tasks that Claude can inv
 - Claude can invoke agents automatically based on task context
 - Agents can be invoked manually by users
 - Plugin agents work alongside built-in Claude agents
+- Agent files in subdirectories of `agents/` load recursively; subfolder names become parts of the
+  scoped agent name.
+- A missing frontmatter `name` falls back to the file path. Frontmatter that does not parse falls
+  back to the file path plus a generic plugin description and ignores the invalid fields. Provide
+  valid `name` and `description` fields for stable names and accurate automatic routing.
 
 ### Plugin Agent Security Restrictions
 

@@ -68,12 +68,15 @@ Subagent files are Markdown files with YAML frontmatter. When multiple subagents
 
 SOURCE: <https://code.claude.com/docs/en/sub-agents.md> § Supported frontmatter fields (accessed 2026-05-28)
 
-Only `name` and `description` are required. All other fields are optional.
+Project, user, and managed agents require `name` and `description`; all other fields are optional.
+Plugin agents still load without valid `name` frontmatter by using the file path. If their
+frontmatter does not parse, they use a generic plugin description and ignore its fields. Supply
+both fields for stable identity and accurate routing even though plugin loading has fallbacks.
 
 | Field | Required | Description |
 |:------|:---------|:------------|
-| `name` | **Yes** | Unique identifier. Must not start with `-` or contain `:`. Hooks receive this as `agent_type`; filename need not match |
-| `description` | **Yes** | When Claude should delegate to this subagent. Write clearly — Claude uses this for routing. Include "use proactively" to encourage automatic delegation |
+| `name` | Scope-dependent | Required outside plugins. Plugin agents fall back to their file path. Must not start with `-` or contain `:`. Hooks receive this as `agent_type`; filename need not match |
+| `description` | Scope-dependent | Required outside plugins. Write clearly for plugin routing even though invalid plugin frontmatter gets a generic fallback. Include "use proactively" to encourage automatic delegation |
 | `tools` | No | CSV string or YAML list allowlist. Bare `Agent` enables depth-limited nested spawning in a subagent definition; parenthesized type lists apply only to `claude --agent`. |
 | `disallowedTools` | No | CSV string or YAML list denylist. |
 | `model` | No | `sonnet`, `opus`, `haiku`, `fable`, full model ID, or `inherit`. |

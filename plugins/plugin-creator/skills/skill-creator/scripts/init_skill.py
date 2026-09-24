@@ -13,8 +13,8 @@ Examples:
 from __future__ import annotations
 
 import logging
+import re
 import sys
-import unicodedata
 from io import TextIOWrapper
 from pathlib import Path
 
@@ -227,13 +227,10 @@ def validate_skill_name(skill_name: str) -> tuple[bool, str | None]:
     if not skill_name:
         return False, "Skill name cannot be empty"
 
-    skill_name = unicodedata.normalize("NFKC", skill_name)
     if len(skill_name) > MAX_SKILL_NAME_LENGTH:
         return (False, f"Skill name too long ({len(skill_name)} chars, max {MAX_SKILL_NAME_LENGTH})")
-    if skill_name != skill_name.lower():
-        return False, "Skill name must be lowercase"
-    if not all(character.isalnum() or character == "-" for character in skill_name):
-        return False, "Skill name must contain only Unicode letters, digits, and hyphens"
+    if not re.fullmatch(r"[a-z0-9-]+", skill_name):
+        return False, "Skill name must contain only lowercase ASCII letters, digits, and hyphens"
     if skill_name.startswith("-") or skill_name.endswith("-") or "--" in skill_name:
         return False, "Skill name cannot start/end with a hyphen or contain consecutive hyphens"
 
@@ -341,7 +338,7 @@ def main() -> None:
         print("Usage: init_skill.py <skill-name> --path <path>")
         print("\nSkill name requirements:")
         print("  - Hyphen-case identifier (e.g., 'data-analyzer')")
-        print("  - Unicode lowercase alphanumeric characters and hyphens only")
+        print("  - Lowercase ASCII letters, digits, and hyphens only")
         print("  - Max 64 characters")
         print("  - Must match directory name exactly")
         print("\nExamples:")

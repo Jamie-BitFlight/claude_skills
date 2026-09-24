@@ -134,22 +134,22 @@ These templates follow a structured contract pattern with standardized inputs/ou
 
 ## Complete Agent Frontmatter Reference
 
-### Required Fields
+### Routing Fields
 
-| Field         | Type   | Required | Description                                    | Example                                   |
-| ------------- | ------ | -------- | ---------------------------------------------- | ----------------------------------------- |
-| `name`        | string | Yes      | Cannot start with `-` or contain `:`; repository style may be tighter | `python-reviewer` |
-| `description` | string | Yes      | Clear delegation trigger and purpose | `"Review Python code for quality issues"` |
+| Field         | Type   | Project/user/managed | Plugin | Description | Example |
+| ------------- | ------ | -------------------- | ------ | ----------- | ------- |
+| `name`        | string | Required | Recommended; falls back to file path | Cannot start with `-` or contain `:`; repository style may be tighter | `python-reviewer` |
+| `description` | string | Required | Recommended for accurate routing; invalid frontmatter gets a generic fallback | Clear delegation trigger and purpose | `"Review Python code for quality issues"` |
 
 ### Optional Fields
 
 | Field             | Type   | Default     | Valid Values                                               | Description                             |
 | ----------------- | ------ | ----------- | ---------------------------------------------------------- | --------------------------------------- |
 | `model`           | string | `inherit`   | `sonnet`, `opus`, `haiku`, `fable`, `inherit`, or full model ID | Claude model to use                     |
-| `tools`           | string | (all tools) | Comma-separated: `Read, Grep, Glob, Bash, Edit, Write`. MCP tools: exact registered name, case-sensitive; `mcp__<server>__*` or `mcp__<server>` grants that server's whole tool set. An entry matching no live tool is dropped; an agent whose entries all resolve to nothing refuses to launch. | Tools available to agent |
-| `disallowedTools` | string | (none)      | Comma-separated tool names                                 | Tools explicitly forbidden              |
+| `tools`           | string/list | (all tools) | CSV string or YAML list: `Read, Grep, Glob, Bash, Edit, Write`. MCP tools: exact registered name, case-sensitive; `mcp__<server>__*` or `mcp__<server>` grants that server's whole tool set. An entry matching no live tool is dropped; an agent whose entries all resolve to nothing refuses to launch. | Tools available to agent |
+| `disallowedTools` | string/list | (none)      | CSV string or YAML list of tool names                      | Tools explicitly forbidden              |
 | `permissionMode`  | string | (inherit)   | `default`, `acceptEdits`, `auto`, `dontAsk`, `bypassPermissions`, `plan`, `manual` | Permission behavior; ignored for plugin agents |
-| `skills`          | string | (none)      | Comma-separated skill names                                | Skills to load                          |
+| `skills`          | string/list | (none) | CSV string or YAML list of skill names                     | Skills to load                          |
 | `color`           | string | (none)      | `red`, `blue`, `green`, `yellow`, `purple`, `orange`, `pink`, `cyan` | Visual distinction in UI |
 | `hooks`           | object | (none)      | Agent lifecycle hook configuration | Valid for project/user agents; ignored for plugin agents |
 

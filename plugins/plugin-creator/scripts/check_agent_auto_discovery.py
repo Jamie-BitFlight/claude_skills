@@ -5,9 +5,10 @@
 # ///
 """Regression guard: detect plugin.json files that mask auto-discovered components.
 
-Claude Code auto-discovers every ``.md`` file in a plugin's ``agents/`` and
+Claude Code auto-discovers ``.md`` files in a plugin's ``agents/`` and
 ``commands/`` directories only when the corresponding key is absent from
-``plugin.json``. Custom ``skills`` directories are additive to the default scan.
+``plugin.json``. Agent discovery is recursive. Custom ``skills`` directories
+are additive to the default scan.
 
 Writing the key (even to add a single entry) overrides auto-discovery: the
     declared path set becomes complete and every file not named in it
@@ -69,10 +70,11 @@ def _discover_default_files(plugin_dir: Path, subdir: str) -> set[str]:
     if not target.is_dir():
         return set()
 
+    candidates = target.rglob("*.md") if subdir == "agents" else target.iterdir()
     return {
-        f"./{subdir}/{p.name}"
-        for p in sorted(target.iterdir())
-        if p.is_file() and p.suffix == ".md" and not p.name.startswith(".")
+        f"./{subdir}/{p.relative_to(target).as_posix()}"
+        for p in sorted(candidates)
+        if p.is_file() and p.suffix == ".md" and not any(part.startswith(".") for part in p.relative_to(target).parts)
     }
 
 

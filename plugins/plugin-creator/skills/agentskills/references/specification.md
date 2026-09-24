@@ -72,7 +72,7 @@ allowed-tools: Bash(git:*) Bash(jq:*) Read
 
 | Field           | Required | Constraints                                                      |
 | --------------- | -------- | ---------------------------------------------------------------- |
-| `name`          | Yes      | Max 64 chars. Unicode lowercase alphanumeric characters and hyphens only. No leading/trailing/consecutive hyphens. Must match directory name. |
+| `name`          | Yes      | Max 64 chars. Lowercase ASCII letters (`a-z`), digits (`0-9`), and hyphens only. No leading/trailing/consecutive hyphens. Must match directory name. |
 | `description`   | Yes      | MUST be non-empty and at most 1024 chars. SHOULD describe what + when to use. |
 | `license`       | No       | License name or reference to bundled file.                       |
 | `compatibility` | No       | If provided, MUST be non-empty and at most 500 chars. Environment requirements. |
@@ -86,7 +86,7 @@ allowed-tools: Bash(git:*) Bash(jq:*) Read
 The required `name` field:
 
 - Must be 1-64 characters
-- May only contain Unicode lowercase alphanumeric characters and hyphens
+- May only contain lowercase ASCII letters (`a-z`), digits (`0-9`), and hyphens
 - Must not start or end with `-`
 - Must not contain consecutive hyphens (`--`)
 - Must match the parent directory name

@@ -183,7 +183,7 @@ model: {sonnet|opus|haiku|inherit}
 tools: {CSV or YAML list if restricting; use bare Agent to enable nested spawning}
 disallowedTools: {denylist if needed}
 permissionMode: {default|acceptEdits|auto|dontAsk|bypassPermissions|plan|manual}
-skills: {comma-separated skill names if needed}
+skills: {CSV string or YAML list of skill names if needed}
 mcpServers:
   {server-name references or inline definitions}
 memory: {user|project|local — if persistent learning needed}

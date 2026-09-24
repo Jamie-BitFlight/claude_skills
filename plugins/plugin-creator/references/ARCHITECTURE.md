@@ -169,7 +169,8 @@ skill-name/
 
 **Pydantic models**:
 - `SkillFrontmatter` - Claude Code runtime skills (runtime fields optional; extension fields preserved)
-- `AgentFrontmatter` - Agents (name, description required)
+- `AgentFrontmatter` - Agents (name and description required for project/user/managed loading;
+  recommended for plugin routing, which has filename and generic-description fallbacks)
 - `CommandFrontmatter` - Commands (description required)
 
 Portable package validation is owned by `skills/skill-creator/scripts/quick_validate.py`.

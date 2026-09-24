@@ -60,7 +60,7 @@ All fields are optional. Only `description` is recommended.
 | `context`                  | No          | `fork` runs in a fresh skill subagent, not a conversation fork. |
 | `agent`                    | No          | Subagent type when `context: fork`. Options: `Explore`, `Plan`, `general-purpose`, or custom. Default: `general-purpose`. |
 | `background`               | No          | Forks default to background; `false` waits in the foreground. |
-| `hooks`                    | No          | Hooks scoped to this skill's lifecycle. Events: `PreToolUse`, `PostToolUse`, `Stop`. |
+| `hooks`                    | No          | Hooks scoped to this skill's lifecycle. All hook events are supported; use the hooks reference for event-specific matchers and configuration. |
 | `paths`                    | No          | Path patterns associated with the skill. |
 | `shell`                    | No          | Shell configuration for skill commands. |
 | `metadata`                 | No          | String-keyed metadata. |

@@ -96,7 +96,7 @@ The portable Agent Skills specification defines `name`, `description`, `license`
 | `background`               | No          | boolean | —          | For forked skills, defaults to background; set `false` to wait in the foreground. |
 | `user-invocable`           | No          | boolean | —          | Set to `false` to hide from the `/` menu. Use for background knowledge users shouldn't invoke directly. Default: `true`.                              |
 | `disable-model-invocation` | No          | boolean | —          | Set to `true` to prevent Claude from automatically loading this skill. Use for workflows you want to trigger manually with `/name`. Default: `false`. |
-| `hooks`                    | No          | object  | —          | Hooks scoped to this skill's lifecycle. See [Hooks](/en/hooks) for configuration format. Events: `PreToolUse`, `PostToolUse`, `Stop`                  |
+| `hooks`                    | No          | object  | —          | Hooks scoped to this skill's lifecycle. All hook events are supported; see [Hooks](/en/hooks) for event-specific matchers and configuration. |
 | `paths`                    | No          | string or list | — | Path patterns associated with the skill. |
 | `shell`                    | No          | string  | —          | Shell configuration for skill commands. |
 | `metadata`                 | No          | object  | —          | String-keyed metadata. |
@@ -134,7 +134,7 @@ SOURCE: Anthropic skill-authoring best practices (docs.anthropic.com, accessed 2
 
 | Resource                   | Limit                                      | Notes                               |
 | -------------------------- | ------------------------------------------ | ----------------------------------- |
-| `name` field               | 64 chars                                   | Agent Skills package limit; Unicode lowercase alphanumeric characters and hyphens only |
+| `name` field               | 64 chars                                   | Agent Skills package limit; lowercase ASCII letters (`a-z`), digits (`0-9`), and hyphens only |
 | `description` field        | 1024 chars                                  | Agent Skills package limit          |
 | `<available_skills>` block | 2% of context window (fallback 16,000 chars) | Scales dynamically; separate from global context |
 | Skills before truncation   | ~34-36                                     | Varies by description complexity    |
@@ -270,7 +270,9 @@ Skills defined in `.claude/skills/` within directories added via `--add-dir` are
 
 Skills can define hooks in frontmatter to respond to events during the skill's lifecycle. Use `Skill(skill: "plugin-creator:hooks-guide")` for complete hook documentation.
 
-### Hook Events
+### Common Hook Events
+
+All hook events are supported. These are common examples:
 
 - `PreToolUse`: Before tool executes
 - `PostToolUse`: After successful execution

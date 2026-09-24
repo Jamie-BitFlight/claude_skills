@@ -234,7 +234,7 @@ flowchart TD
 
 Skills can define hooks in frontmatter to respond to events during the skill's lifecycle:
 
-**Events:**
+**Common events (all hook events are supported):**
 
 - `PreToolUse` - Before tool executes
 - `PostToolUse` - After successful execution

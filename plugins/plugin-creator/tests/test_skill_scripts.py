@@ -160,21 +160,21 @@ class TestInitSkillScaffolder:
         assert not is_valid
         assert err is not None
 
-    def test_unicode_lowercase_name_is_accepted(self) -> None:
+    def test_non_ascii_name_is_rejected(self) -> None:
         from init_skill import validate_skill_name
 
         is_valid, err = validate_skill_name("données-分析")
 
-        assert is_valid
-        assert err is None
+        assert not is_valid
+        assert err is not None
 
-    def test_name_length_is_checked_after_nfkc_normalization(self) -> None:
+    def test_combining_character_name_is_rejected(self) -> None:
         from init_skill import validate_skill_name
 
         is_valid, err = validate_skill_name("e\u0301" * 33)
 
-        assert is_valid
-        assert err is None
+        assert not is_valid
+        assert err is not None
 
     def test_duplicate_directory_returns_none(self, tmp_path: Path) -> None:
         """init_skill returns None when the target directory already exists.
@@ -514,13 +514,14 @@ class TestQuickValidateBrokenFixtures:
         assert not valid
         assert any(kw in message for kw in ("hyphen-case", "MyUpperCaseSkill"))
 
-    def test_unicode_lowercase_alphanumeric_name_passes(self, tmp_path: Path) -> None:
+    def test_non_ascii_name_fails(self, tmp_path: Path) -> None:
         from quick_validate import validate_skill
 
         skill_dir = _make_minimal_valid_skill(tmp_path, "données-分析")
 
         valid, message = validate_skill(skill_dir)
-        assert valid, message
+        assert not valid
+        assert "lowercase ASCII letters, digits, and hyphens" in message
 
     @pytest.mark.parametrize("compatibility", ["", "   "])
     def test_empty_compatibility_fails(self, tmp_path: Path, compatibility: str) -> None:
@@ -709,6 +710,23 @@ def test_single_agent_path_string_is_accepted(tmp_path: Path) -> None:
     plugin_json.write_text('{"agents": "./custom/reviewer.md"}\n')
 
     assert _check_one_plugin(plugin_json) == []
+
+
+def test_explicit_agent_paths_cannot_mask_nested_default_agents(tmp_path: Path) -> None:
+    from check_agent_auto_discovery import _check_one_plugin
+
+    plugin_dir = tmp_path / "plugin"
+    (plugin_dir / ".claude-plugin").mkdir(parents=True)
+    (plugin_dir / "agents" / "review").mkdir(parents=True)
+    (plugin_dir / "agents" / "reviewer.md").write_text("# Reviewer\n")
+    (plugin_dir / "agents" / "review" / "security.md").write_text("# Security\n")
+    plugin_json = plugin_dir / ".claude-plugin" / "plugin.json"
+    plugin_json.write_text('{"agents": ["./agents/reviewer.md"]}\n')
+
+    violations = _check_one_plugin(plugin_json)
+
+    assert len(violations) == 1
+    assert "./agents/review/security.md" in violations[0]
 
 
 @pytest.mark.parametrize("entry", [1, None, {"path": "./agents/reviewer.md"}])

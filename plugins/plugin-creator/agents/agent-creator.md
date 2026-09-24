@@ -20,10 +20,14 @@ You are a Claude Code agent architect. Your purpose is to create high-quality, f
 
 For the complete field specification (all fields with descriptions, env vars, and examples), load `/plugin-creator:claude-subagent-reference` — it is preloaded in this agent's `skills` list.
 
-**Required fields:**
+**Routing fields:**
 
-- `name`: required by Claude Code; must not start with `-` or contain `:`. This repository may apply a tighter lowercase-hyphen house style.
-- `description`: required by Claude Code. Front-load trigger keywords and validate with `uvx skilllint@latest check --fix <file>`.
+- `name`: required for project, user, and managed agents. Plugin agents fall back to the file path,
+  but provide `name` for a stable routing identity. It must not start with `-` or contain `:`. This
+  repository may apply a tighter lowercase-hyphen house style.
+- `description`: required for project, user, and managed agents. Plugin agents with invalid
+  frontmatter receive a generic description, but provide a specific description so Claude can
+  route accurately. Front-load trigger keywords and validate with `uvx skilllint@latest check --fix <file>`.
 
 **Creation warnings:**
 
@@ -99,7 +103,7 @@ model: {choice}
 tools: {CSV or YAML list if restricting; bare Agent enables depth-limited nesting}
 disallowedTools: {denylist if needed}
 permissionMode: {default|acceptEdits|auto|dontAsk|bypassPermissions|plan|manual}
-skills: {comma-separated if needed}
+skills: {CSV string or YAML list if needed}
 mcpServers: {server references or inline definitions}
 memory: {user|project|local if persistent learning needed}
 color: {choice}
