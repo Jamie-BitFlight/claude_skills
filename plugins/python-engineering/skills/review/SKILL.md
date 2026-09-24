@@ -6,6 +6,10 @@ argument-hint: '[path or scope]'
 
 # Review
 
+Use this skill for a bounded conventional code review of the requested Python scope.
+
+For a broad audit asking how the code could be more Pythonic, smaller, lower-maintenance, modernized, replaced by ecosystem libraries, or aligned with large-project practices, use `python-engineering:python-quality-audit` instead. That entryway fans out StinkySnake, SnakePolish, ecosystem, project-practice, and removal/debt research and synthesizes an actionable report.
+
 Review the requested Python scope with these priorities.
 
 ## Input
