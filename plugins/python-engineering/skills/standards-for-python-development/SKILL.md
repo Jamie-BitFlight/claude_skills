@@ -30,7 +30,7 @@ For every change, preserve unrelated behavior and APIs. Trace the demonstrated c
 
 ### 1.1 Type Safety & Modern Patterns
 - **Native Types**: Use Python 3.11+ native type hints (`list[str]`, `dict[str, int]`, `str | None`) instead of legacy `typing` imports (`List`, `Dict`, `Optional`, `Union`).
-- **`Any` Boundary Policy**: Prefer precise types. Contain `Any`, broad `object`, and unchecked `cast()` at explicit dynamic or external boundaries and convert to stronger internal types as soon as practical. A narrowly justified `Any` is preferable to dishonest or excessively complex typing when a third-party API, plugin protocol, decorator, or deliberately dynamic interface cannot be expressed accurately. Document or locally suppress the exception at that boundary; do not spread it through the typed core.
+- **`Any` Boundary Policy**: Prefer precise types. Contain `Any`, broad `object`, and unchecked `cast()` at explicit dynamic or external boundaries and convert to stronger internal types as soon as practical. A narrowly justified `Any` is preferable to dishonest or excessively complex typing when a third-party API, plugin protocol, decorator, or deliberately dynamic interface cannot be expressed accurately. **Localize policy exceptions by file**: put the ingest/parser/adapter methods or classes that genuinely require the exception in a dedicated boundary module and configure the linter/type checker exception for that file. Do not scatter inline suppressions through otherwise strongly typed modules. The exception file is an architectural boundary and should expose typed outputs to the rest of the system.
 - **Data Structures**: Prefer Pydantic `BaseModel` when runtime validation/serialization materially benefits a boundary or agent-facing JSON contract. Prefer dataclasses for typed internal value objects and `TypedDict` for typed mapping shapes when runtime validation is unnecessary. Preserve a coherent existing choice rather than migrating shapes without a demonstrated benefit.
 - **Duck Typing**: Use `typing.Protocol` for structural subtyping instead of ABCs where appropriate.
 - **Narrowing**: Use `TypeIs` (PEP 742, Python 3.13+) for bidirectional type narrowing. Use `TypeGuard` only when targeting Python < 3.13 without `typing_extensions`.
@@ -88,8 +88,8 @@ For every change, preserve unrelated behavior and APIs. Trace the demonstrated c
 - **Local Variable Scope**: Short names are acceptable for local variables with a lifetime
   under 5 lines (loop indices, comprehension variables, short closures). Expand acronyms
   when the variable is referenced beyond 5 lines of its definition.
-- **Public by Default**: Name new functions, modules, variables, and import aliases without a
-  leading underscore. Add privacy once a caller needs it.
+- **No Cargo-Cult Privacy**: A leading underscore is an architectural claim that an identifier is intentionally non-public. Do not add one merely because a helper, local function, module constant, import alias, or implementation detail "looks private." Treat speculative privacy like premature optimization and YAGNI: require a concrete boundary or collision it protects.
+- **Public by Default**: Name new functions, modules, variables, and import aliases without a leading underscore. Introduce an underscore only when an established API boundary, framework convention, name-mangling requirement, or concrete collision makes privacy meaningful.
 - **An Existing Underscore Is a Finding**: Establish what it defends against before keeping it.
   Bind the bare name instead and see whether the module already binds it; if nothing collides,
   the prefix is habit — drop it. A dotted import needs an alias because `import a.b` binds only
