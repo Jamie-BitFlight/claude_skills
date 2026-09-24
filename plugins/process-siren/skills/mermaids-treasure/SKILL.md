@@ -48,15 +48,15 @@ Load only references needed by the current diagram branch.
 
 ### Flowchart References
 
-[Node Shapes](./references/node-shapes.md) — All node shape syntaxes — classic bracket notation and v11.3.0+ `@{ shape: ... }` notation. Includes the complete shape catalog with semantic names, short names, and aliases. Load when constructing nodes or choosing appropriate shapes.
+[Node Shapes](./references/node-shapes.md) — Load for node syntax or shape selection.
 
-[Edge Syntax](./references/edge-syntax.md) — All edge/link types — solid, dotted, thick, invisible, circle, cross, and multi-directional arrows. Covers edge IDs, animations, text labels, chaining, and the minimum length table. Load when connecting nodes or styling edges.
+[Edge Syntax](./references/edge-syntax.md) — Load for connections, labels, edge types, or edge styling.
 
-[Subgraphs and Layout](./references/subgraphs-and-layout.md) — Subgraph declaration, explicit IDs, nested direction control, direction limitation for external links. Also covers diagram direction codes, Markdown strings, special character escaping, entity codes, and comments. Load when grouping nodes or controlling layout.
+[Subgraphs and Layout](./references/subgraphs-and-layout.md) — Load for grouping, layout, direction, or escaping.
 
-[Styling and Configuration](./references/styling-and-config.md) — Node styling, link styling, classDef, CSS classes, click interactivity, tooltips, FontAwesome icons, custom icons, renderer selection (dagre/elk), and line curve configuration. Load when styling diagrams or adding interactive elements.
+[Styling and Configuration](./references/styling-and-config.md) — Load for styling, configuration, renderer, or interactivity.
 
-[Flowchart Construction](./references/flowchart-construction.md) — 6-phase element selection process: direction, shape, edge, label, grouping, styling. Decision trees for flowchart construction. Load when building a flowchart from scratch.
+[Flowchart Construction](./references/flowchart-construction.md) — Load when choosing flowchart elements from scratch.
 
 ### Other Diagram Types
 
