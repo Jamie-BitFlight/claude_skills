@@ -12,10 +12,26 @@ are indexed in its References table.
 
 ## 1. Shared Development Standards
 
+### 1.0 Applicability and precedence
+
+These are strong defaults for new Python work, not a mandate to redesign a coherent existing project.
+
+Apply constraints in this order:
+
+1. Explicit user requirements and safety/security constraints.
+2. The target repository's supported Python versions, public contracts, architecture, dependencies, CI, formatter/linter/type-checker configuration, and established local conventions.
+3. Framework/library ecosystem conventions.
+4. These plugin defaults.
+
+Do not introduce a dependency, abstraction, architectural layer, compatibility change, or broad modernization solely to satisfy a default below. When existing project practice is coherent and safe, preserve it. When it conflicts with correctness, security, an explicit requirement, or its own declared contract, surface the conflict and make the smallest justified change.
+
+For every change, preserve unrelated behavior and APIs. Trace the demonstrated change surface, then modify only what the requirement and affected contracts need; do not opportunistically modernize adjacent code.
+
+
 ### 1.1 Type Safety & Modern Patterns
 - **Native Types**: Use Python 3.11+ native type hints (`list[str]`, `dict[str, int]`, `str | None`) instead of legacy `typing` imports (`List`, `Dict`, `Optional`, `Union`).
-- **`Any` Boundary Policy**: `Any`, broad `object`, and unchecked `cast()` belong only in dedicated validator, parser, adapter, or boundary modules, where unknown-shape external data enters. Those modules validate and convert raw input into strongly typed internal objects immediately, so the typed core never receives an unvalidated payload. Everywhere else, replace `Any` with a specific type, `TypeVar`, `Generic`, or `Protocol`. A narrow lint exception for `Any` belongs to a boundary module or nowhere.
-- **Data Structures**: Prefer a Pydantic `BaseModel` for structured data — CLI output, tool payloads, parsed file records. `TypedDict` (with `NotRequired`) and `dataclasses` (with `slots=True, frozen=True`) are the right shape in a confirmed stdlib-only context. Typing lane selection follows what a file already imports, so an existing `@dataclass` is never reconsidered on its own — choose the shape when adding or touching it.
+- **`Any` Boundary Policy**: Prefer precise types. Contain `Any`, broad `object`, and unchecked `cast()` at explicit dynamic or external boundaries and convert to stronger internal types as soon as practical. A narrowly justified `Any` is preferable to dishonest or excessively complex typing when a third-party API, plugin protocol, decorator, or deliberately dynamic interface cannot be expressed accurately. Document or locally suppress the exception at that boundary; do not spread it through the typed core.
+- **Data Structures**: Prefer Pydantic `BaseModel` when runtime validation/serialization materially benefits a boundary or agent-facing JSON contract. Prefer dataclasses for typed internal value objects and `TypedDict` for typed mapping shapes when runtime validation is unnecessary. Preserve a coherent existing choice rather than migrating shapes without a demonstrated benefit.
 - **Duck Typing**: Use `typing.Protocol` for structural subtyping instead of ABCs where appropriate.
 - **Narrowing**: Use `TypeIs` (PEP 742, Python 3.13+) for bidirectional type narrowing. Use `TypeGuard` only when targeting Python < 3.13 without `typing_extensions`.
 - **Modern Operators**: Utilize the walrus operator (`:=`) and `match-case` statements where they improve readability.
@@ -26,12 +42,12 @@ are indexed in its References table.
 - **Version Lifecycle** (SOURCE: <https://devguide.python.org/versions>, accessed 2026-03-23): 3.10 EOL 2026-10, 3.11 security-only until 2027-10, 3.12 security-only until 2028-10, 3.13 bugfix until 2029-10, 3.14 bugfix until 2030-10. When choosing a `requires-python` floor, prefer versions still in bugfix status.
 
 ### 1.2 Architecture & Design
-- **Layered Architecture**: Separate concerns into clear boundaries: CLI → Core Logic → Services → Display/UI.
-- **Shared Models**: Define data models, constants, and exceptions in a `shared/` or `models/` directory.
-- **Dependency Injection**: Use `Protocol` classes to define expected interfaces for external services, allowing easy mocking.
-- **SOLID**: Apply SOLID as active design guidance while writing, not as a checklist run afterwards.
-- **Factory Patterns**: Use a factory for complex object construction rather than a long constructor.
-- **Module Hygiene**: Keep functions under 50 lines, avoid deep nesting (>3 levels), prevent circular imports, and define `__all__` in public modules.
+- **Boundaries**: Separate concerns where they change for different reasons. For CLI applications, a useful default is CLI → Core Logic → Services → Output boundary; do not manufacture layers that contain no independent responsibility.
+- **Models**: Keep shared domain models/constants/exceptions in an obvious stable module when multiple consumers need them; do not create a `shared/` directory merely to satisfy the pattern.
+- **Dependency Injection**: Use direct parameters first. Introduce `Protocol` boundaries when multiple implementations, external services, testing seams, or architectural isolation justify them.
+- **SOLID**: Use SOLID as design pressure toward cohesive responsibilities, explicit dependencies, substitutable contracts, and small interfaces. Do not add indirection merely to demonstrate a principle.
+- **Construction**: Prefer direct construction while it remains clear. Introduce factories/builders when construction policy is complex, repeated, conditional, or needs isolation.
+- **Module Hygiene**: Keep functions and modules small enough that their behavior and dependencies remain understandable. Long functions, deep nesting, large files, circular imports, and sprawling public surfaces are investigation triggers, not numeric failures. Split by responsibility when doing so improves cohesion or comprehension.
 - **Code Smells**: Treat a smell as a design signal to investigate and follow back to the design that produced it, not as noise to suppress.
 
 ### 1.3 Error Handling & Security
@@ -52,10 +68,10 @@ are indexed in its References table.
   - Never hardcode secrets.
 
 ### 1.4 Performance
-- **O(1) Lookups**: Use `set` for membership testing instead of `list`.
-- **I/O**: Use async patterns (`asyncio`, `httpx`) for I/O-bound operations. Avoid synchronous I/O in async contexts.
-- **Caching**: Cache repeated expensive function calls.
-- **String Building**: Avoid string concatenation in loops; use `.join()` or list comprehensions.
+- **Data structures**: Choose structures for semantics first and complexity second; use sets for repeated membership checks when ordering/duplicates are irrelevant.
+- **I/O**: Use async/concurrency when the workload and surrounding architecture benefit from overlapping I/O; do not convert synchronous code merely because the work is I/O-bound. Never block an existing async event loop with avoidable synchronous I/O.
+- **Caching**: Cache only demonstrated repeated expensive work when invalidation, memory, and concurrency semantics are understood.
+- **Performance**: Prefer clear idiomatic code until measurement identifies a material bottleneck; optimize the measured path and retain a benchmark when performance is a contract.
 
 ### 1.5 Identifier Naming
 
@@ -84,12 +100,9 @@ are indexed in its References table.
   exemption is the same signal at file scale.
 
 ### 1.6 Script Dependencies
-Default to Typer + Rich declared in a PEP 723 inline block: less code to write, better output, and
-a single-file executable that `uv` resolves at launch. The cost is network access on first run.
+For a new human-facing CLI where third-party dependencies are acceptable, Typer + Rich are the preferred defaults. For a CLI shipped inside an Agent Skill or plugin, prefer a stable compact JSON contract and do not add Rich for command output. For existing projects, preserve their coherent CLI framework and dependency policy.
 
-Choose stdlib-only — manual `argparse`, manual formatting, plainer output — for a confirmed
-deployment restriction such as an air-gapped or locked-down environment, never as a default
-posture.
+Before adding any dependency, establish that it materially reduces complexity or strengthens the required contract enough to justify installation, compatibility, supply-chain, and maintenance cost. Use stdlib when it already solves the problem clearly; choose stdlib-only when deployment constraints require it.
 
 For inline-block syntax, shebang form, and how a script that outgrows one file imports its own
 modules, see `PEP723.md`.
@@ -100,20 +113,18 @@ modules, see `PEP723.md`.
 
 ### 1.8 Testing & Documentation
 - **Test-First (TDD)**: Write failing tests against defined interfaces before implementing logic.
-- **Framework**: Use `pytest` with `pytest-mock` (avoid `unittest.mock`).
+- **Framework**: Prefer `pytest` for new projects. Preserve an existing coherent test framework. Prefer fakes, dependency injection, `monkeypatch`, or `pytest-mock` according to the test seam; do not add `pytest-mock` solely to replace working `unittest.mock` usage.
 - **Coverage**: Cover changed behavior, public contracts, boundaries, regressions, and meaningful failure paths. Respect an existing repository coverage gate; do not invent a percentage target when none exists. Inspect uncovered changed branches for risk. Use mutation testing for critical logic when it materially strengthens confidence.
 - **Test Quality**:
   - Follow the AAA (Arrange-Act-Assert) pattern.
   - Test names must describe behavior, not implementation (e.g., `test_process_payment_when_insufficient_funds_returns_declined`).
   - Tests must be isolated and independent.
 - **Test Failure Mindset**: Treat every test failure as a potential bug discovery, not an annoyance. Use a dual-hypothesis approach (Test is wrong vs. Implementation is wrong). Never automatically change a test to match the implementation.
-- **Docstrings**: Use Google-style docstrings (Args/Returns/Raises) for all public functions and classes.
-- **Sync Docs**: Ensure `CLAUDE.md` and architecture documents are updated when adding new commands or modules.
+- **Docstrings**: For new public APIs, prefer concise Google-style docstrings when the signature and name do not already communicate the contract or when behavior, errors, units, side effects, or invariants need explanation. Follow an established project documentation style.
+- **Sync Docs**: Update documentation, examples, architecture records, changelog/release notes, and generated artifacts when the changed contract has consumers there; follow the repository's established documentation and release conventions.
 
 ### 1.9 Tooling Defaults
-`uv` for dependency management, `ruff` for linting and formatting, `ty` for type checking,
-`pytest` for tests, `hatchling` as the build backend. Keep a checker or build backend the project
-already runs in its hooks or CI.
+`uv` for dependency management, `ruff` for linting and formatting, `ty` for type checking, `pytest` for tests, and `hatchling` as the build backend are defaults for new projects. Existing project tooling is authoritative when it is coherent and supported; use the commands and configuration actually enforced by hooks/CI rather than adding parallel tooling.
 
 ---
 
