@@ -72,9 +72,7 @@ completion on it.
 
 ## Comprehension and Cohesion
 
-Keep source files and functions small enough that their behavior, dependencies, and invariants can be understood together. Large files, long functions, and deep nesting are signals to inspect cohesion, not automatic failures.
-
-Split when responsibilities change independently, callers benefit from a stable boundary, or an agent/human can no longer trace the relevant behavior reliably in one unit. Do not split cohesive code merely to satisfy a line count. For PEP 723 scripts, only the executable entry script carries the shebang and inline dependency block; extracted local modules remain ordinary modules.
+Keep Python source files under ~500 physical lines by default, counting docstrings. When a file approaches or exceeds that boundary, actively decompose it by cohesive responsibility before adding more code. Preserve a larger existing file only when a split would materially reduce cohesion or create a worse dependency boundary, and state that rationale. Long functions and deep nesting also trigger decomposition review. For PEP 723 scripts, only the executable entry script carries the shebang and inline dependency block; extracted local modules remain ordinary modules.
 
 
 ## Quality Gate (MANDATORY before reporting done)
