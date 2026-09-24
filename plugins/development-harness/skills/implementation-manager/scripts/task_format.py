@@ -3,8 +3,10 @@
 Provides common functions for detecting, parsing, and updating YAML frontmatter
 in task files. Used by both implementation_manager.py and task_status_hook.py.
 
-STATUS_MAP, TASK_ID_PATTERN, VALID_STATUSES and VALID_COMPLEXITIES are defined in
-sam_schema/core/models.py; normalize_status is defined below and consumes STATUS_MAP.
+This module defines its own deprecated STATUS_MAP and normalize_status below. They are not a
+copy of sam_schema/core/models.py's STATUS_MAP: each maps keys the other does not. Use
+sam_schema for new work; TASK_ID_PATTERN, VALID_STATUSES and VALID_COMPLEXITIES come from
+there already.
 """
 
 from __future__ import annotations
