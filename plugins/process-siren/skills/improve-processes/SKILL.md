@@ -166,17 +166,63 @@ High risk does not mean "write more." It means choose the required resolution, m
 
 #### Optional Baseline Agent Behavior Sampling
 
-When a process is large, growing complex, or appears to restate behavior agents may already infer reliably, optionally measure baseline behavior before retaining that instruction load. This is a refinement option, not a mandatory gate.
+When a process is large, growing complex, or appears to restate behavior agents may already infer reliably, optionally measure baseline behavior before retaining that instruction load. This is a refinement method, not a mandatory gate or prescribed tool. Adapt execution to whatever isolated-agent, shell, harness, SDK, or API capability exists in the environment.
 
-1. Create multiple representative hypothetical scenarios in which the process/capability would be used.
-2. Run at least 10 isolated, single-response LLM queries across available models or harnesses where practical. Give each only the scenario and desired outcome — do not expose the target process instructions or desired step sequence.
-3. Normalize and compare returned step sequences to identify high-consensus behavior, variable decisions, common omissions, and unsafe variants.
-4. Compare consensus with the ProcessModel's required contracts and invariants. Consensus measures likely inference, not correctness.
-5. Compress high-consensus behavior only when it is compatible with required invariants and the consequence of inference failure is acceptable. Retain a short confirmation when useful for sequence/context.
-6. Specify exact or preferred behavior for high-variance decisions. For consequential high-variance nodes, expand locally and validate the child procedure.
-7. Record the scenarios, model/harness diversity, sample count, observed consensus/variance, and resulting instruction decision as evidence. Do not claim universality from the sample.
+The experiment asks **what an otherwise capable agent naturally does**, not whether it can reproduce the process being evaluated. Scenario design therefore matters as much as sample size.
 
-Sampling may use isolated subcommands in Claude Code, Codex, another agent harness, or direct LLM API calls through an available SDK. Tool choice is environmental; absence of a convenient harness does not block normal resolution review.
+##### Scenario design
+
+Create several realistic situations that exercise the same underlying capability under different incidental details. Each prompt should contain only information the agent would naturally have at that point in real execution:
+
+- state the situation, available evidence/resources, constraints that genuinely exist, and desired outcome;
+- ask what steps/actions the agent would take next;
+- vary names, ordering, surrounding context, and non-essential details so repeated wording does not manufacture consensus;
+- include ordinary cases plus relevant boundary/failure cases when those are part of the capability;
+- keep the desired outcome constant enough that returned approaches remain comparable;
+- make each query independent and single-response where practical so previous samples cannot anchor later ones.
+
+Do **not** expose the target process, its step names, preferred ordering, expected safeguards, implementation-specific vocabulary, or the hypothesis being tested unless that information would genuinely exist in the real scenario. Avoid leading constructions such as "make sure to", "safely", "correctly", "without losing data", "following best practices", named techniques, or questions that enumerate candidate actions. Such wording can cue the behavior whose spontaneous presence is being measured.
+
+Prefer neutral prompts such as:
+
+```text
+You are in <concrete situation>. You have <resources/evidence actually available>.
+Your desired outcome is <observable outcome>.
+What steps would you take?
+```
+
+rather than:
+
+```text
+How would you safely perform <task> while ensuring you verify X, preserve Y,
+and recover if Z fails?
+```
+
+The second prompt has already supplied much of the process and cannot measure whether agents infer those steps independently.
+
+##### Sampling and interpretation
+
+1. Run at least 10 isolated responses across available models/harnesses where practical. Prefer model and harness diversity over repeated samples from one configuration when the question is what agents generally infer.
+2. Preserve raw responses before interpretation. Normalize them into comparable semantic steps without forcing differently expressed actions into the same category.
+3. Identify high-consensus behavior, variable decisions, common omissions, ordering differences, and unsafe variants. Look across scenarios as well as models: behavior that appears only under one wording may be prompt-sensitive rather than common knowledge.
+4. Compare observations with the ProcessModel's required contracts and invariants. Consensus measures likely inference, not correctness or safety.
+5. Treat absence carefully. A step omitted from a concise answer may be implicit rather than behavior the agent would omit during execution. When that distinction materially affects compression, use a scenario that makes the decision observable rather than asking a leading follow-up.
+6. Compress high-consensus behavior only when it satisfies required invariants and the consequence of inference failure is acceptable. A short confirmation may remain useful for sequencing or contract boundaries.
+7. Specify exact/preferred behavior for high-variance decisions. For consequential high-variance nodes, locally expand and validate the child procedure.
+8. Record scenarios, prompt wording, model/harness diversity, sample count, normalization decisions, observed consensus/variance, unsafe variants, and the resulting instruction decision. Do not claim universality from the sample.
+
+##### Bias checks
+
+Before using the sample, ask:
+
+- Would a respondent know the preferred process merely from vocabulary or facts included in the prompt?
+- Does the prompt imply that a particular safeguard, ordering, tool, or failure mode should be considered?
+- Are scenarios diverse enough that consensus is not an artifact of one framing?
+- Did normalization erase meaningful differences between responses?
+- Are we mistaking common model training patterns for requirements of this specific system?
+- Would removing the instruction still be acceptable if a future capable model chose a different but contract-compatible path?
+
+If these checks fail, redesign the scenarios rather than treating the resulting consensus as evidence for compression.
 
 ### Claims Are the Unit of Validation
 
