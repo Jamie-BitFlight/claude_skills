@@ -2,13 +2,15 @@
 
 ## Rediscover the lifecycle
 
-1. Observe worktree and Git-dir rebase metadata, `HEAD`, named refs, unmerged entries, status, and replay progress.
-2. For continue, rebind target name, goal, completion predicate, result and publication destinations, authority,
+1. Find the exact worktree and Git dir containing active metadata; bind both and remain there.
+2. Observe their metadata, `HEAD`, named refs, unmerged entries, status, and replay progress.
+3. For continue, rebind target name, goal, completion predicate, result and publication destinations, authority,
    saved-entry identity, and worker facts required by the remaining path.
-3. For abort, rebind only the pre-replay restoration state, saved-entry identity, and required worker facts.
-4. Compare rebound names with recorded or observable OIDs. Pause before any mutation needing an absent or
+4. For abort, rebind only the pre-replay restoration state, saved-entry identity, and required worker facts.
+5. Compare rebound names with recorded or observable OIDs. Pause before any mutation needing an absent or
    inconsistent fact.
-5. Use current Git state plus current request and task context. Promise recovery only for facts now observable or
+6. Immediately before continue or abort, reobserve the same worktree/Git-dir metadata and bound saved entry.
+7. Use current Git state plus current request and task context. Promise recovery only for facts now observable or
    explicitly rebound, and keep lifecycle state in Git rather than a new lifecycle file.
 
 ## Stop with observed state

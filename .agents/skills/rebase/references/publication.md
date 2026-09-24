@@ -1,6 +1,6 @@
 # Publication
 
-Enter only after start/continue bound authority, remote, destination ref, and initial OID before dependent mutation.
+One attempt starts only after start/continue bound authority, remote, destination ref, and initial OID.
 
 1. Fetch the exact remote destination and compare its observed OID with the initially bound destination OID.
 2. If it moved, inventory every new destination commit and assign each an evidence-backed disposition.
@@ -15,4 +15,5 @@ git push --force-with-lease=<destination-ref>:<observed-destination-oid> \
   <remote> <result-ref>:<destination-ref>
 ```
 
-After a lease rejection or destination mismatch, return to remote reconciliation and repeat the final observation.
+- A rejection or movement after one reconciliation/final observation stops external mutation and is reported.
+- Another reconciliation/push attempt requires a new explicit decision and authority for that one attempt.

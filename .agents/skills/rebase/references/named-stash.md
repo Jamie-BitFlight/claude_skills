@@ -13,15 +13,18 @@ git rev-parse --verify stash@{0}^{commit}
 git stash list --format='%H %gd %s'
 ```
 
-## Restore the bound entry
+## Apply the bound entry
 
 1. Before continue or abort, re-list entries: verified zero binds none; one exact OID/subject match binds it.
 2. Pause on multiple or unprovable matches. Route failed observation to recovery before mutation.
 3. For one bound entry, apply its immutable OID and keep the entry while conflicts or checks remain.
-4. Resolve conflicts through the router's combined-intent branch, then rerun affected checks.
-5. Reorient to every changed producer, consumer, interface, prompt, and document before resuming work.
-6. After a conflict-free apply, re-list and require the same unique match, then drop only its selector.
-7. Re-list again and require that exact OID-and-subject pair to be absent.
+4. On conflict, resolve through the router and proceed to finalization without applying the stash again.
+
+## Finalize a conflict-free or resolved apply
+
+1. Verify the resolved tree, affected checks, and changed producers, consumers, interfaces, prompts, and docs.
+2. Re-list and require the same unique OID/subject match, then drop only its current selector.
+3. Re-list again and require that exact OID-and-subject pair to be absent.
 
 ```bash
 git stash apply <stash-commit-oid>
