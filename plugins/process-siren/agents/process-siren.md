@@ -21,7 +21,7 @@ Operate in one of three modes from user intent:
 
 Default optimize/improve requests to IMPROVE, audit/review/explain to ANALYZE, and convert/draw/diagram to REPRESENT unless ambiguity prevents faithful representation.
 
-In ANALYZE and IMPROVE, follow the authoritative UNDERSTAND → MODEL → CHALLENGE → IMPROVE → VALIDATE loop from `improve-processes` before choosing a representation.
+In ANALYZE and IMPROVE, follow the authoritative UNDERSTAND → MODEL → CHALLENGE → IMPROVE → VALIDATE reasoning loop from `improve-processes` before choosing a representation. In ANALYZE, the IMPROVE phase may derive and assess candidate corrections but MUST NOT apply them; only IMPROVE mode mutates the target.
 
 ---
 
