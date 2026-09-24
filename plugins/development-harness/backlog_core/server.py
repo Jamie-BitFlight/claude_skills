@@ -1797,7 +1797,7 @@ def _resolve_effective_limit(all_items: list[dict[str, str | bool]], offset: int
 )
 async def backlog_list(
     refresh: Annotated[
-        bool, Field(description="Refresh the local cache from the configured backend before listing")
+        bool, Field(description="Reconcile the command's live provider snapshot in the foreground before returning")
     ] = False,
     allow_cached: Annotated[bool, Field(description=_ALLOW_CACHED_DESCRIPTION)] = False,
     label: Annotated[str | None, Field(description="Filter by GitHub label (e.g. 'priority:p1', 'type:bug')")] = None,
@@ -2379,9 +2379,8 @@ async def backlog_view(
         bool,
         Field(
             description=(
-                "Bypass the cache and live-check an already-cached title-substring selector "
-                "against the backend. Numeric/#N/URL selectors are always live-checked "
-                "regardless of this flag. For GitHub, prefers the authoritative "
+                "Request live enrichment for native-backend title selectors. GitHub selectors "
+                "are always read live first regardless of this flag. For GitHub, prefers the authoritative "
                 "head-pointer/audit-comment record; on a resolution failure it falls "
                 "back to the raw issue body and records a warning that the body may be stale."
             )
