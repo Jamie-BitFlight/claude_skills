@@ -47,7 +47,7 @@ For every change, preserve unrelated behavior and APIs. Trace the demonstrated c
 - **Dependency Injection**: Use direct parameters first. Introduce `Protocol` boundaries when multiple implementations, external services, testing seams, or architectural isolation justify them.
 - **SOLID**: Use SOLID as design pressure toward cohesive responsibilities, explicit dependencies, substitutable contracts, and small interfaces. Do not add indirection merely to demonstrate a principle.
 - **Construction**: Prefer direct construction while it remains clear. Introduce factories/builders when construction policy is complex, repeated, conditional, or needs isolation.
-- **Module Hygiene**: Keep functions and modules small enough that their behavior and dependencies remain understandable. Long functions, deep nesting, large files, circular imports, and sprawling public surfaces are investigation triggers, not numeric failures. Split by responsibility when doing so improves cohesion or comprehension.
+- **Module Hygiene**: Keep Python source files under ~500 physical lines as the default design constraint, counting docstrings because they consume the same reader/agent context. Approaching or exceeding ~500 LOC requires active decomposition analysis: prefer splitting by cohesive responsibility before adding more code. Preserve a larger existing file only when splitting would materially reduce cohesion or create a worse boundary, and record that rationale. Long functions, deep nesting, circular imports, and sprawling public surfaces likewise trigger design review.
 - **Code Smells**: Treat a smell as a design signal to investigate and follow back to the design that produced it, not as noise to suppress.
 
 ### 1.3 Error Handling & Security
