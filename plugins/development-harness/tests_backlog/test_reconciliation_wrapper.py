@@ -44,7 +44,8 @@ class _SyncProviderStub(InMemoryBackend):
         self.requests = []
         self.result = ReconcileResult()
 
-    def reconcile(self, request: ReconcileRequest) -> ReconcileResult:
+    def reconcile(self, request: ReconcileRequest, *, snapshot: ProviderSnapshot | None = None) -> ReconcileResult:
+        del snapshot
         self.requests.append(request)
         return self.result
 
@@ -102,7 +103,7 @@ def test_refresh_wrapper_surfaces_a_dead_lettered_entry(tmp_path: Path, monkeypa
     backend = GitHubBackend(cache=cache)
     monkeypatch.setattr(
         backend,
-        "_fetch_snapshot",
+        "fetch_snapshot",
         lambda request: ProviderSnapshot(items=[], sync_started_at="2026-08-12T01:00:00Z", pages_fetched=1),
     )
     monkeypatch.setattr(
@@ -149,15 +150,15 @@ def test_label_refresh_does_not_forward_unfiltered_cached_references(sync_provid
     assert sync_provider.requests == [ReconcileRequest(scope=scope, label="review")]
 
 
-def test_unscoped_refresh_forwards_cached_references(sync_provider) -> None:
+def test_unscoped_refresh_does_not_turn_cached_references_into_provider_scope(sync_provider) -> None:
     # Given: a cached issue available for an unscoped refresh
     sync_provider.put_work_item(_linked_item("#11"))
 
     # When: an unscoped refresh is requested
     refresh_local_cache_from_github()
 
-    # Then: existing targeted fallback behavior remains intact
-    assert sync_provider.requests == [ReconcileRequest(scope=ReconcileScope.INCREMENTAL, references=["#11"])]
+    # Then: cached provider rows do not define the live request scope.
+    assert sync_provider.requests == [ReconcileRequest(scope=ReconcileScope.INCREMENTAL)]
 
 
 def test_list_wrapper_forwards_label_to_reconciliation(sync_provider) -> None:
@@ -189,8 +190,8 @@ def test_sync_wrapper_reconciles_linked_items(sync_provider, monkeypatch: pytest
 
     # Then: its stable output maps provider patches and forwards dry-run scope
     request = sync_provider.requests[0]
-    assert request.scope == ReconcileScope.LINKED
-    assert request.references == ["#7"]
+    assert request.scope == ReconcileScope.INCREMENTAL
+    assert request.references == []
     assert request.dry_run is True
     assert result["created"] == 3
     assert result["pushed"] == 2
@@ -245,7 +246,8 @@ def test_grooming_persists_before_targeted_reconciliation(sync_provider) -> None
         events.append("put")
         original_put(updated)
 
-    def record_reconcile(request: ReconcileRequest) -> ReconcileResult:
+    def record_reconcile(request: ReconcileRequest, *, snapshot: ProviderSnapshot | None = None) -> ReconcileResult:
+        del snapshot
         events.append("reconcile")
         sync_provider.requests.append(request)
         return ReconcileResult()
