@@ -139,6 +139,36 @@ flowchart TD
     FixD --> Convert
 ```
 
+## Canonical Process Model
+
+Use one lightweight semantic model as the handoff between understanding, improvement, validation, and representation. Populate only fields relevant at the current resolution.
+
+```text
+ProcessModel
+  purpose; scope; resolution; parent_constraints[]
+  actors[]; states[]; actions[]; transitions[]
+  inputs[]; outputs[]; resources[]
+  goals[]; invariants[]; assumptions[]; failure_modes[]
+  claims[] { claim; failure_excluded; resolution; assumptions[]; falsifier; validation_method; status; evidence[] }
+  uncertainties[] { classification; evidence; consequence }
+  boundaries[] { caller_assumptions[]; callee_guarantees[]; state_crossing_boundary[]; partial_failure_behavior; recovery_owner }
+  residual_risks[]
+```
+
+Mermaid, tests, TLA+, Lean, and prose consume or project this model; do not build parallel interpretations for each representation.
+
+### Result Contract
+
+Return one overall status plus per-claim status:
+
+- **READY** — usable at requested resolution; required claims have sufficient evidence.
+- **IMPROVED** — authorized corrections applied; affected claims revalidated sufficiently.
+- **BLOCKED_INTENT** — progress requires a decision that creates/alters intent or policy.
+- **UNVALIDATED** — usable model, but required claims lack necessary tooling/evidence.
+- **INVALID** — evidence shows a required claim fails and no intent-preserving correction has resolved it.
+
+Every result records evidence, assumptions, residual uncertainty, and validation boundaries.
+
 ## Process and System Improvement Loop
 
 Treat process improvement as recursive systems engineering, not diagram cleanup. At each useful resolution: establish purpose, model behavior, extract falsifiable claims, challenge them, improve defects that can be resolved without inventing intent, validate with the least-formal sufficient method, and feed failures back into improvement.
@@ -216,7 +246,7 @@ Do not treat every unknown as blocking. Classify uncertainty:
 - **ASSUMED** — continuation requires an assumption; state it explicitly and do not present it as verified.
 - **OUT OF SCOPE** — deliberately excluded; record the boundary.
 
-Only UNKNOWN + INTENT-DEPENDENT gaps block autonomous improvement.
+Only UNKNOWN + INTENT-DEPENDENT gaps block autonomous improvement. UNKNOWN + RESOLVABLE gaps require investigation first; they are not grounds to stop and ask the user.
 
 ### Claims Are the Unit of Validation
 
@@ -262,6 +292,14 @@ Treat validation failures as first-class evidence. Translate a failing execution
 
 Do not modify a process merely to satisfy a bad model. Diagnose the source of the mismatch first.
 
+### System Boundary Pass
+
+For every material boundary inspect who calls it, what it calls, state crossing the boundary, caller assumptions, callee guarantees, partial-failure behavior, and recovery ownership. Cross-boundary contradictions are gaps even when each local process is internally coherent.
+
+### Change-Impact Validation
+
+After improvement, map changed actors, states, actions, transitions, resources, assumptions, and contracts to dependent claims. Revalidate affected claims/interfaces. Do not rerun unrelated validation without reason or assume prior evidence applies to a changed dependency.
+
 ### Authority Boundary
 
 Improve directly only when the correction follows from established purpose, goals, invariants, constraints, or other evidence. If multiple legitimate behaviors remain and choosing among them would create policy or alter intent, explain the alternatives and consequences and ask the user.
@@ -281,20 +319,6 @@ An improved process/system is ready only when its required claims have sufficien
 
 Mermaid is one projection of this semantic model, not the semantic model itself.
 
-## Practical Improvement Framework
+## Improvement Techniques
 
-Apply in sequence when rebuilding a weak process:
-
-```mermaid
-flowchart TD
-    S1["1. Rewrite outcome as one measurable sentence"] --> S2
-    S2["2. Replace abstract verbs with concrete actions"] --> S3
-    S3["3. Add decision gates — If X, then Y"] --> S4
-    S4["4. Define inputs and outputs for each step"] --> S5
-    S5["5. Remove steps that do not change state"] --> S6
-    S6["6. Add at least one correct execution example"] --> S7
-    S7["7. Add at least one failure example"] --> S8
-    S8["8. Stress-test: what happens at each edge case?"] --> S9
-    S9["9. Time the walkthrough — can a novice follow in 5 minutes?"] --> S10
-    S10["10. Confirm auditable — can execution be traced after the fact?"] --> Done(["Improved process ready"])
-```
+Use these inside CHALLENGE/IMPROVE, not as a second workflow: rewrite outcomes measurably; replace abstract verbs with concrete actions; make guards observable; define inputs/outputs; remove or rewrite no-op work; exercise success and failure examples; stress edge cases; minimize cognitive load; ensure execution is auditable. The authoritative workflow remains UNDERSTAND → MODEL → CHALLENGE → IMPROVE → VALIDATE.
