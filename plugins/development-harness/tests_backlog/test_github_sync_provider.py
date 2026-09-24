@@ -29,6 +29,7 @@ from backlog_core.models import (
     ReconcileRequest,
     ReconcileScope,
 )
+from backlog_core.reconciliation import synchronized_fingerprint
 from sam_schema.core.artifact_registry_client import ArtifactRegistryClient, PlanIndexUnavailableError
 from sam_schema.core.plan_id_index import PlanIndexEntry, _serialize_index_yaml
 
@@ -210,6 +211,31 @@ def test_github_sync_provider_publishes_body_change_as_audit_comment() -> None:
     backend._update_issues_graphql_batch.assert_not_called()
     backend._fetch_issue_graphql.assert_not_called()
     backend._fetch_issues_graphql.assert_not_called()
+
+
+def test_reconcile_fetches_and_applies_patches_to_supplied_repository(tmp_path: Path) -> None:
+    contents = _InMemoryContents()
+    backend = GitHubBackend(repo="default/repository", cache=FileCache(tmp_path), contents=contents)
+    repository = MagicMock(full_name="supplied/repository")
+    provider_item = BacklogItem(title="Issue 1", description="provider body", issue="#1")
+    pending_item = provider_item.model_copy(deep=True)
+    pending_item.metadata.sync_fingerprint = synchronized_fingerprint(provider_item)
+    pending_item.description = "pending body"
+    backend.put_work_item(pending_item)
+    issue = _issue(1)
+    issue["body"] = backend.render_issue_body(provider_item)
+    backend.get_github = MagicMock(return_value=repository)
+    backend._fetch_issues_graphql = MagicMock(return_value=[issue])
+    backend._fetch_targeted_issues = MagicMock(return_value={"#1": issue})
+    backend._add_comment_graphql = MagicMock(return_value=AddedCommentNode(id="comment-1", database_id=None))
+
+    result = backend.reconcile(ReconcileRequest(scope=ReconcileScope.INITIAL, repo="supplied/repository"))
+
+    assert result.provider_patches == 1
+    assert [entry.args for entry in backend.get_github.call_args_list] == [
+        ("supplied/repository",),
+        ("supplied/repository",),
+    ]
 
 
 def test_github_sync_provider_continues_after_audit_comment_failure() -> None:

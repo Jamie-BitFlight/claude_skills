@@ -129,7 +129,7 @@ class _ReconcileProvider(Protocol):
     """
 
     def fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot: ...
-    def _apply_patches(self, patches: list[ProviderPatch]) -> list[PatchResult]: ...
+    def _apply_patches(self, patches: list[ProviderPatch], repo: str = "") -> list[PatchResult]: ...
 
 
 class _GitHubWorkItemSync:
@@ -212,19 +212,23 @@ class _GitHubWorkItemSync:
             items=list(items_by_identity.values()), sync_started_at=sync_started_at, pages_fetched=1
         )
 
-    def apply_patches(self, patches: list[ProviderPatch]) -> list[PatchResult]:
+    def apply_patches(self, patches: list[ProviderPatch], repo: str = "") -> list[PatchResult]:
         """Apply optimistic GitHub body patches and return one outcome per patch.
+
+        Args:
+            patches: Provider patches derived from the reconciliation snapshot.
+            repo: Repository slug used to fetch that snapshot.
 
         Returns:
             Patch results indexed by the stable provider reference.
         """
         if not patches:
             return []
-        repo = self._issues.get_github()
-        owner, repo_name = repo.full_name.split("/", 1)
+        repository = self._issues.get_github(repo)
+        owner, repo_name = repository.full_name.split("/", 1)
         try:
             current_by_reference = self._issues._fetch_targeted_issues(
-                repo, owner, repo_name, [patch.reference for patch in patches]
+                repository, owner, repo_name, [patch.reference for patch in patches]
             )
         except BacklogError as exc:
             return [
@@ -246,7 +250,7 @@ class _GitHubWorkItemSync:
                 )
                 continue
             try:
-                current, head_record, root = self.work_item_version(repo, owner, repo_name, issue)
+                current, head_record, root = self.work_item_version(repository, owner, repo_name, issue)
             except ContentConflictError as exc:
                 results.append(
                     PatchResult(
@@ -283,7 +287,7 @@ class _GitHubWorkItemSync:
                 continue
             try:
                 added_comment = self._issues._add_comment_graphql(
-                    repo, issue["id"], render_work_item_comment(current.revision, patch.body)
+                    repository, issue["id"], render_work_item_comment(current.revision, patch.body)
                 )
                 if not added_comment.id:
                     results.append(
@@ -589,7 +593,9 @@ class _GitHubReconciliation:
                 cache_results.append(ActionResult(key=action.key, phase=action.phase, status="applied"))
 
         patch_results = (
-            self._provider._apply_patches(plan.provider_patches) if effective_request.apply_local_patches else []
+            self._provider._apply_patches(plan.provider_patches, effective_request.repo)
+            if effective_request.apply_local_patches
+            else []
         )
         applied_revisions = {
             result.reference: result.revision for result in patch_results if result.status == "applied"

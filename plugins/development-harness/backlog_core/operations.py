@@ -867,7 +867,12 @@ def _rename_item_title(item: BacklogItem, title: str, repo: str = "", output: Ou
 
 
 def _update_item_description(
-    item: BacklogItem, description: str, output: Output | None = None, *, snapshot: ProviderSnapshot | None = None
+    item: BacklogItem,
+    description: str,
+    repo: str = "",
+    output: Output | None = None,
+    *,
+    snapshot: ProviderSnapshot | None = None,
 ) -> bool:
     """Update the backend-owned item description and reconcile immediately.
 
@@ -893,7 +898,7 @@ def _update_item_description(
     if not reference:
         return False
     update_item_metadata(reference, {"description": description}, output=out, base_item=item)
-    _reconcile_item(item, out, snapshot=snapshot)
+    _reconcile_item(item, out, repo=repo, snapshot=snapshot)
     return True
 
 
@@ -1314,7 +1319,9 @@ def _check_ac_overlap(item: BacklogItem, output: Output) -> None:
         output.warn(_AC_OVERLAP_MSG)
 
 
-def _reconcile_item(item: BacklogItem, output: Output, *, snapshot: ProviderSnapshot | None = None) -> None:
+def _reconcile_item(
+    item: BacklogItem, output: Output, *, repo: str = "", snapshot: ProviderSnapshot | None = None
+) -> None:
     """Trigger an immediate targeted reconcile for one item's queued mutation.
 
     Shared by the write paths that must not leave their mutation sitting in
@@ -1336,6 +1343,7 @@ def _reconcile_item(item: BacklogItem, output: Output, *, snapshot: ProviderSnap
             persisted by the caller before this call.
         output: Output aggregator that receives a reconciled/queued/
             unsupported status message.
+        repo: Repository slug used for the command's provider observation.
         snapshot: Compatible live decision snapshot, when one was obtained.
 
     Raises:
@@ -1353,7 +1361,7 @@ def _reconcile_item(item: BacklogItem, output: Output, *, snapshot: ProviderSnap
         output.info(f"Queued {item.issue} for provider reconciliation.")
         return
     try:
-        request = ReconcileRequest(scope=ReconcileScope.TARGETED, references=[item.issue])
+        request = ReconcileRequest(scope=ReconcileScope.TARGETED, repo=repo, references=[item.issue])
         result = backend.reconcile(request, snapshot=snapshot) if snapshot is not None else backend.reconcile(request)
     except CacheStateCorruptError:
         # A corrupted local cache state file needs operator attention — never
@@ -1412,7 +1420,7 @@ def _handle_update_groomed(
         base_item=item,
     )
     out.info(f"Updated {item.reference} with groomed content")
-    _reconcile_item(item, out, snapshot=snapshot)
+    _reconcile_item(item, out, repo=repo, snapshot=snapshot)
 
 
 def _handle_batch_groomed(
@@ -1477,7 +1485,7 @@ def _handle_batch_groomed(
     if SectionKey.ACCEPTANCE_CRITERIA.value in written:
         _check_ac_overlap(item, out)
 
-    _reconcile_item(batch_item, out, snapshot=snapshot)
+    _reconcile_item(batch_item, out, repo=repo, snapshot=snapshot)
 
     return written
 
@@ -1902,7 +1910,7 @@ def refresh_local_cache_from_github(
     """Reconcile provider items through the configured backend.
 
     Args:
-        repo: Provider repository slug retained for wrapper compatibility.
+        repo: Provider repository used for snapshot fetch and patch application.
         label: Optional label name to restrict the fetch.
         output: Optional ``Output`` accumulator for messages.
         full_refresh: Request an initial provider snapshot instead of an
@@ -1926,7 +1934,9 @@ def refresh_local_cache_from_github(
     scope = ReconcileScope.INITIAL if full_refresh else ReconcileScope.INCREMENTAL
     references: list[str] = []
     result = backend.reconcile(
-        ReconcileRequest(scope=scope, label=label or "", references=references, apply_local_patches=apply_local_patches)
+        ReconcileRequest(
+            scope=scope, repo=repo, label=label or "", references=references, apply_local_patches=apply_local_patches
+        )
     )
     if progress_callback is not None:
         progress_callback(result.fetched_items, result.fetched_items)
@@ -2418,7 +2428,9 @@ def _read_list_decision(
     """
     read = _decision_context(repo=repo, allow_cached=allow_cached, output=output).all()
     if refresh and isinstance(backend, SyncProvider):
-        request = ReconcileRequest(scope=ReconcileScope.INCREMENTAL, label=label or "", apply_local_patches=True)
+        request = ReconcileRequest(
+            scope=ReconcileScope.INCREMENTAL, repo=repo, label=label or "", apply_local_patches=True
+        )
         result = (
             backend.reconcile(request, snapshot=read.provider_snapshot)
             if read.provider_snapshot is not None
@@ -4135,12 +4147,12 @@ def sync_items(
     backend = get_config().backend
     if isinstance(backend, SyncProvider):
         pending_items = (
-            require_github_extras(backend, "pending_work_items").pending_work_items()
+            require_github_extras(backend, "pending_work_items").pending_work_items(repo)
             if getattr(backend, "supports_github_extras", False)
             else backend.list_work_items()
         )
         create_result = sync_create_missing_issues(pending_items, repo, dry_run, output=out)
-        result = backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, dry_run=dry_run))
+        result = backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, repo=repo, dry_run=dry_run))
         out.info(
             f"Reconciled linked items: {result.fetched_pages} pages, {result.fetched_items} items, "
             f"{result.local_updates} local updates, {result.provider_patches} patches, {result.no_ops} no-ops, "
@@ -4611,7 +4623,7 @@ def update_item(
         result["renamed_to"] = title
 
     if description is not None:
-        _update_item_description(item, description, output=out, snapshot=target.provider_snapshot)
+        _update_item_description(item, description, repo=repo, output=out, snapshot=target.provider_snapshot)
         result["description_updated"] = True
 
     has_groomed = groomed or groomed_file or groomed_content or (section and content) or (sections is not None)
@@ -4755,7 +4767,7 @@ def groom_item(
 # ---------------------------------------------------------------------------
 
 
-def _reconcile_strike(item: BacklogItem, snapshot: ProviderSnapshot | None, output: Output) -> None:
+def _reconcile_strike(item: BacklogItem, snapshot: ProviderSnapshot | None, output: Output, *, repo: str = "") -> None:
     """Reconcile one queued strike against its command observation."""
     if not item.issue:
         return
@@ -4767,7 +4779,9 @@ def _reconcile_strike(item: BacklogItem, snapshot: ProviderSnapshot | None, outp
         output.info(f"  Queued {item.issue} for provider reconciliation.")
         return
     try:
-        backend.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, references=[item.issue]), snapshot=snapshot)
+        backend.reconcile(
+            ReconcileRequest(scope=ReconcileScope.TARGETED, repo=repo, references=[item.issue]), snapshot=snapshot
+        )
     except CacheStateCorruptError:
         raise
     except BacklogError:
@@ -4845,7 +4859,7 @@ def strike_entry(
     backend = get_config().backend
     backend.put_work_item(item)
     out.info(f"Struck entry {entry_id} in {item.reference}")
-    _reconcile_strike(item, target_decision.provider_snapshot, out)
+    _reconcile_strike(item, target_decision.provider_snapshot, out, repo=repo)
 
     return {"title": item.title, "entry_id": entry_id, "struck": True, **out.to_dict()}
 
@@ -4877,7 +4891,9 @@ def normalize_items(
             get_config().backend.put_work_item(item)
         backend = get_config().backend
         if isinstance(backend, SyncProvider) and read.provider_snapshot is not None:
-            backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL), snapshot=read.provider_snapshot)
+            backend.reconcile(
+                ReconcileRequest(scope=ReconcileScope.INCREMENTAL, repo=repo), snapshot=read.provider_snapshot
+            )
     updated = len(items)
     out.info(f"Normalized {updated} item(s)" + (" [dry-run]" if dry_run else ""))
     return {"normalized": updated, "dry_run": dry_run, **out.to_dict()}
@@ -4991,7 +5007,7 @@ def pull_by_selector(
     reference = f"#{int(issue_num_str)}"
     backend = get_config().backend
     if isinstance(backend, SyncProvider):
-        request = ReconcileRequest(scope=ReconcileScope.TARGETED, references=[reference], include_diff=diff)
+        request = ReconcileRequest(scope=ReconcileScope.TARGETED, repo=repo, references=[reference], include_diff=diff)
         snapshot = decision.provider_snapshot
         if snapshot is None and getattr(backend, "supports_github_extras", False):
             snapshot = context.snapshot_for(request)
@@ -5025,7 +5041,7 @@ def pull_items(
     out = output or Output()
     backend = get_config().backend
     items = (
-        require_github_extras(backend, "pending_work_items").pending_work_items()
+        require_github_extras(backend, "pending_work_items").pending_work_items(repo)
         if getattr(backend, "supports_github_extras", False)
         else backend.list_work_items()
     )
@@ -5039,7 +5055,7 @@ def pull_items(
         sync_create_missing_issues(items, repo, dry_run, output=out)
         # Re-parse after migration to pick up updated issue numbers
         items = (
-            require_github_extras(backend, "pending_work_items").pending_work_items()
+            require_github_extras(backend, "pending_work_items").pending_work_items(repo)
             if getattr(backend, "supports_github_extras", False)
             else backend.list_work_items()
         )
@@ -5054,6 +5070,7 @@ def pull_items(
         result = backend.reconcile(
             ReconcileRequest(
                 scope=ReconcileScope.LINKED,
+                repo=repo,
                 references=list(dict.fromkeys(item.issue for item in candidates)),
                 dry_run=dry_run,
                 force=force,

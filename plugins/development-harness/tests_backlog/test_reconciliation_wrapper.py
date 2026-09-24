@@ -260,7 +260,9 @@ def test_grooming_persists_before_targeted_reconciliation(sync_provider) -> None
 
     # Then: the provider-owned record is durable before one targeted reconcile
     assert events == ["put", "reconcile"]
-    assert sync_provider.requests[-1] == ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#7"])
+    assert sync_provider.requests[-1] == ReconcileRequest(
+        scope=ReconcileScope.TARGETED, repo="unused", references=["#7"]
+    )
 
 
 def test_batch_grooming_reconciles_once(sync_provider) -> None:
@@ -275,7 +277,7 @@ def test_batch_grooming_reconciles_once(sync_provider) -> None:
     # "Plan" is not a canonical section name, so it normalises to an unknown__ key.
     # "Research" IS canonical (see rendering.SECTION_HEADING).
     assert written == ["unknown__plan", "research"]
-    assert sync_provider.requests == [ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#7"])]
+    assert sync_provider.requests == [ReconcileRequest(scope=ReconcileScope.TARGETED, repo="unused", references=["#7"])]
 
 
 def test_local_grooming_uses_native_storage_without_sync(monkeypatch: pytest.MonkeyPatch) -> None:

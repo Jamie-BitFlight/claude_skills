@@ -809,7 +809,7 @@ def test_github_reconcile_retains_mutation_queued_after_plan_construction(tmp_pa
     )
     newer = planned.model_copy(update={"description": "newer body"})
 
-    def queue_newer_mutation(_patches: list[ProviderPatch]) -> list[PatchResult]:
+    def queue_newer_mutation(_patches: list[ProviderPatch], _repo: str = "") -> list[PatchResult]:
         backend.put_work_item(newer)
         return [PatchResult(provider_id="node-1", reference="#1", status="applied", revision="rev-2")]
 

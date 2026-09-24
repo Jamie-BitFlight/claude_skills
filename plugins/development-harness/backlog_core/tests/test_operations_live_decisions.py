@@ -91,7 +91,8 @@ class _LiveBackend(InMemoryBackend):
             items = list(by_reference.values())
         return ProviderSnapshot(items=items, sync_started_at="2026-09-24T00:00:00+00:00")
 
-    def pending_work_items(self) -> list[BacklogItem]:
+    def pending_work_items(self, repo: str = "") -> list[BacklogItem]:
+        del repo
         return [item.model_copy(deep=True) for item in self.pending_items]
 
     def list_work_items(self) -> list[BacklogItem]:
@@ -270,6 +271,16 @@ def test_command_snapshot_uses_supplied_repository(mocker: MockerFixture) -> Non
     operations.view_item("#7", repo="supplied/repository")
 
     assert backend.snapshot_requests[0].repo == "supplied/repository"
+
+
+def test_command_reconciliation_uses_supplied_repository(mocker: MockerFixture) -> None:
+    backend = _LiveBackend([BacklogItem(title="live title", issue="#7", priority="P1")])
+    _configure(mocker, backend)
+
+    operations.update_item("#7", description="updated", repo="supplied/repository")
+
+    assert backend.snapshot_requests[0].repo == "supplied/repository"
+    assert backend.reconciliations[0][0].repo == "supplied/repository"
 
 
 def test_live_empty_list_has_no_cache_ambiguity_warning(mocker: MockerFixture) -> None:

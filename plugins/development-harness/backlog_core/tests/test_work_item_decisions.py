@@ -88,8 +88,9 @@ class DecisionBackend(InMemoryBackend):
             items = self.live_items
         return ProviderSnapshot(items=items, sync_started_at="2026-09-24T00:00:00+00:00")
 
-    def pending_work_items(self) -> list[BacklogItem]:
+    def pending_work_items(self, repo: str = "") -> list[BacklogItem]:
         """Return queued local intent independently from provider observations."""
+        del repo
         return [item.model_copy(deep=True) for item in self.pending_items]
 
     def list_work_items(self) -> list[BacklogItem]:
@@ -205,6 +206,26 @@ def test_journal_entries_remain_separate_from_live_reads_and_supply_mutation_con
     assert target.pending.description == "queued edit"
     assert target.mutation_base == target.pending
     assert all(item.issue != "#8" for item in read.provider_items)
+
+
+def test_supplied_repository_excludes_default_repository_pending_intent(tmp_path: Path, mocker: MockerFixture) -> None:
+    backend = GitHubBackend(repo="default/repository", cache=FileCache(tmp_path))
+    backend.put_work_item(BacklogItem(title="default pending", description="wrong repo", issue="#7"))
+    mocker.patch.object(
+        backend,
+        "fetch_snapshot",
+        return_value=ProviderSnapshot(
+            items=[provider_item("#7", "supplied live")], sync_started_at="2026-09-24T00:00:00+00:00"
+        ),
+    )
+    context = WorkItemDecisionContext(backend, repo="supplied/repository")
+
+    target = context.select("#7", purpose="mutation")
+
+    assert target.provider is not None
+    assert target.provider.title == "supplied live"
+    assert target.pending is None
+    assert target.mutation_base == target.provider
 
 
 def test_title_selection_joins_pending_intent_by_selected_provider_reference() -> None:

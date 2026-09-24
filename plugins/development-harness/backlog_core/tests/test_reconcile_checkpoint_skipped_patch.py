@@ -61,7 +61,8 @@ class _FakeReconcileProvider:
         self.fetch_snapshot_calls.append(request)
         return self._snapshot
 
-    def _apply_patches(self, patches: list[ProviderPatch]) -> list[PatchResult]:
+    def _apply_patches(self, patches: list[ProviderPatch], repo: str = "") -> list[PatchResult]:
+        del repo
         self.apply_patches_calls.append(patches)
         return [
             PatchResult(
