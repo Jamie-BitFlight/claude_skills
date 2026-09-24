@@ -279,7 +279,8 @@ With this plugin installed, Claude will:
 - Apply the `${CLAUDE_PLUGIN_ROOT}` environment variable in hook paths rather than hardcoding absolute paths
 - Check skill complexity with token-based thresholds and recommend `references/` extraction or splitting before a skill exceeds Claude's context budget
 - Route refactoring task types to the correct specialist: `SKILL_SPLIT` tasks to `/refactor-skill`, `AGENT_OPTIMIZE` tasks to the `subagent-refactorer` agent, `DOC_IMPROVE` tasks to the `ai-doc-optimizer` agent
-- Require `name:` in all skill and agent frontmatter per the agentskills.io specification
+- Require `name:` in portable skill packages per the Agent Skills specification and in agent
+  frontmatter per the [Claude Code subagent documentation](https://code.claude.com/docs/en/sub-agents#supported-frontmatter-fields)
 
 ### Automatic Behaviors
 
@@ -380,22 +381,27 @@ Claude will assess whether the skill needs splitting (multiple independent domai
 
 ### What `claude plugin validate` checks
 
-The command validates direct skill, agent, and command paths plus project/user/plugin roots. Plugin-root validation parses default directories, accepts a root `SKILL.md`, and skips symlinks with warnings. Manifest-declared component paths receive existence-only checks; their files are not read. Internal markdown links remain the local checker's responsibility.
+The command validates plugin, project, and user roots plus named skill, agent, and command
+directories. `.claude-plugin/plugin.json` is optional when a plugin uses default component
+locations. Claude Code v2.1.233 and later can validate a component directory without a manifest.
+Plugin-root validation parses default directories and skips symlinks with warnings;
+manifest-declared component paths receive existence-only checks, so their files are not read. A
+plugin-root `SKILL.md` requires a separate validation run against the containing `skills` directory.
+Internal markdown links remain the local checker's responsibility.
 
-SOURCE: <https://code.claude.com/docs/en/plugins-reference> (accessed 2026-09-24)
+- When `.claude-plugin/plugin.json` exists, its JSON syntax is valid
+- When a manifest exists, required field `name` is present and kebab-case
+- Manifest component paths start with `./`
+- `agents` accepts one agent file path as a string or multiple file paths as an array; declaring it replaces the default `agents/` scan
+- Referenced files exist
+
+SOURCE: <https://code.claude.com/docs/en/plugin-marketplaces#validate-a-plugin-or-a-directory-without-a-manifest> (accessed 2026-09-24)
 
 ### Marketplace archive boundaries
 
 Archive sources require HTTPS, reject HTTP/loopback/link-local/cloud-metadata hosts, cap archives at 256 MiB, require `.claude-plugin/` at archive root or one top-level folder, and optionally verify `sha256`. Relative marketplace sources stay below the marketplace root, use forward slashes, and cannot contain `../`.
 
 SOURCE: <https://code.claude.com/docs/en/plugin-marketplaces> (accessed 2026-09-24)
-
-- `plugin.json` exists in `.claude-plugin/`
-- JSON syntax is valid
-- Required field `name` is present and kebab-case
-- All paths start with `./`
-- `agents` accepts one agent file path as a string or multiple file paths as an array; declaring it replaces the default `agents/` scan
-- Referenced files exist
 
 ### Common errors and fixes
 

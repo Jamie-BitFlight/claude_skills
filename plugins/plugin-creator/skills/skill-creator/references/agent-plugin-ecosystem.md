@@ -84,10 +84,10 @@ SOURCE: <https://developers.openai.com/plugins/build/plugins.md>,
 ## Hook Semantics Are Host-Specific
 
 - Claude Code: plugin hooks are discovered from `hooks/hooks.json` and run when the plugin is
-  enabled. Skill-frontmatter hooks support `PreToolUse`, `PostToolUse`, and `Stop` and are added for
-  the rest of the session after that skill is invoked. Matching handlers run in parallel. Hooks run
-  with the user's system permissions, so review plugin code before enabling it; workspace trust
-  gates project hook configuration.
+  enabled. Skill-frontmatter hooks use the same format as settings hooks, support all Claude Code
+  hook events, and are added for the rest of the session after that skill is invoked. Matching
+  handlers run in parallel. Hooks run with the user's system permissions, so review plugin code
+  before enabling it; workspace trust gates project hook configuration.
 - OpenAI Codex: matching hooks from all active files run, and multiple matching command handlers
   launch concurrently. Plugin hooks require per-definition trust. Current Codex supports command
   and MCP-tool handlers; parsed `prompt` and `agent` handlers are skipped. Codex event coverage and

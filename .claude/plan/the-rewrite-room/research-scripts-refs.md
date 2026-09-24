@@ -29,14 +29,9 @@
 - Outputs: Normalized markdown files (in-place)
 - Validators: NO — normalizer/formatter only
 
-### fix_tool_formats.py
-- Path: plugins/plugin-creator/scripts/fix_tool_formats.py
-- Language: Python (stdlib only, no PEP 723 deps)
-- Invocation: `uv run plugins/plugin-creator/scripts/fix_tool_formats.py` (no args; scans predefined paths)
-- Purpose: Fix invalid tool format patterns in frontmatter. Converts YAML list format and JSON array format to comma-separated strings across ~/.claude and ~/repos.
-- Inputs: None (scans ~/.claude/agents, ~/.claude/commands, ~/.claude/skills, ~/repos/**/agents, ~/repos/**/commands, ~/repos/**/skills)
-- Outputs: Fixed markdown files in-place
-- Validators: YES — format fixer and validator for tools field
+### Retired tool-format fixer
+- Historical purpose: The deleted `fix_tool_formats.py` script scanned Claude capability files and converted YAML or JSON tool lists to comma-separated strings.
+- Status: Removed after runtime-specific tool formats replaced the blanket conversion rule. This entry records the former inventory item; there is no current executable or invocation.
 
 ### auto_sync_manifests.py
 - Path: plugins/plugin-creator/scripts/auto_sync_manifests.py

@@ -244,9 +244,10 @@ Plugins can provide event handlers that respond to Claude Code events automatica
 **Format**: JSON configuration with event matchers and actions
 
 Claude auto-discovers plugin-wide hooks from `hooks/hooks.json`. These hooks are active whenever
-the plugin is enabled. Skill-frontmatter hooks are different: only `PreToolUse`, `PostToolUse`, and
-`Stop` are supported there, and invoking the skill adds them for the rest of the session. Matching
-handlers run in parallel, so one handler cannot prevent another matching handler from starting.
+the plugin is enabled. Skill-frontmatter hooks use the same format as settings hooks, support all
+hook events in Claude Code, and are added for the rest of the session after the skill is invoked.
+Matching handlers run in parallel, so one handler cannot prevent another matching handler from
+starting.
 Hook commands run with the user's system permissions; review plugin hook code before enabling it.
 
 **Hook configuration**:
@@ -621,7 +622,7 @@ You can pin to a specific branch, tag, or commit:
 
 | Field | Type   | Description                                                           |
 | ----- | ------ | --------------------------------------------------------------------- |
-| `url` | string | Required. Full git repository URL (must end with `.git`)              |
+| `url` | string | Required. Full git repository URL (`https://` or `git@`); `.git` suffix is optional |
 | `ref` | string | Optional. Git branch or tag (defaults to repository default branch)   |
 | `sha` | string | Optional. Full 40-character git commit SHA to pin to an exact version |
 
