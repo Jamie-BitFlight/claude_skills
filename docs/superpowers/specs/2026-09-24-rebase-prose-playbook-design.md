@@ -22,7 +22,7 @@ The rewritten model-invoked skill begins with this exact discovery metadata:
 ```markdown
 ---
 name: rebase
-description: "Handles an explicit request to start a Git rebase of a named source ref onto a named target, or to continue or abort an active rebase. Publishes the rewritten result only when that same start or continue request grants explicit force-push authority and binds the exact destination before the lifecycle completes. Excludes merge-based branch updates, repository settings for forge rebase-and-merge, pull-request or merge-request merges, and any standalone push requested after or outside an active rebase lifecycle."
+description: Start a local Git rebase when the user explicitly requests replay of a named source ref onto a named target, or continue or abort an active rebase. Use only when local history replay will start or is active; do not use for merge-based branch updates, repository merge settings, pull-request or merge-request merging, or push-only requests.
 ---
 
 **Keywords**: rebase, git rebase, history replay, rebase conflict, continue rebase, abort rebase, git worktree, rewritten history, authorized force-with-lease publication
@@ -52,10 +52,11 @@ Activation is validated in isolated harness runs. Every row requires a recorded 
 | Standalone push | Force-push a branch with no rebase lifecycle named | Do not activate | `PASS` |
 | Post-completion publication | Force-push the result after the rebase lifecycle has already completed | Do not activate | `PASS` |
 
-Activation does not grant publication authority. Positive start/continue publication cases bind the
-exact remote, destination ref, initial destination OID, and explicit authority before the dependent
-mutation. Active rebase state and earlier pushes never imply authority. Publication is not a new invocation after a
-rebase completes; it is a stage of the same start/continue lifecycle.
+Publication is not an activation branch. Start/continue publication cases activate because local history
+replay will start or is active. Once loaded for that replay lifecycle, the router owns publication only when
+the same request already binds the exact remote, destination ref, initial destination OID, and explicit
+authority before the dependent mutation. Activation, active rebase state, and earlier pushes never imply
+publication authority. A push-only request after or outside the replay lifecycle does not activate the skill.
 
 ## Design principles
 
