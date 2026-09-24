@@ -32,7 +32,7 @@ runtime with `mcp__plugin_dh_backlog__profile_list()`. Layer 1 plugins do **not*
 | — | Specialist agents (found by `profile_list()`) |
 | — | Stack review skills (`dh:code-review-{stack}`) |
 | — | Quality gate commands (found in the repository's pre-commit config, CI workflow, or build config) |
-| — | Language standards skills (e.g., `python-engineering:modernpython`) |
+| — | Language engineering entrypoints (e.g., `python-engineering:orchestrate`; broad Python quality/modernization audits use `python-engineering:python-quality-audit`) |
 
 ---
 
