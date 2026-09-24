@@ -417,7 +417,7 @@ ${CLAUDE_PLUGIN_ROOT}/skills/skill-creator/scripts/init_skill.py my-skill --path
 
 **What the script does:**
 
-- Validates portable skill names (lowercase, hyphens, max 64 chars)
+- NFKC-normalizes and validates portable skill names (lowercase Unicode alphanumeric characters and hyphens, max 64 characters after normalization)
 - Creates skill directory at specified path
 - Generates SKILL.md template with proper frontmatter and TODO placeholders
 - Creates `scripts/`, `references/`, `assets/` directories
@@ -488,7 +488,7 @@ These patterns appear when skill content is drafted from training data or genera
 
 Write the YAML frontmatter. All fields are optional, but `description` is strongly recommended:
 
-- `name`: Optional in Claude Code. The skill name defaults to the directory name if omitted. Portable packages require it, cap it at 64 characters, apply the portable name grammar, and require directory equality.
+- `name`: Optional in Claude Code. The skill name defaults to the directory name if omitted. Portable packages require NFKC normalization, cap the normalized value at 64 characters, allow lowercase Unicode alphanumeric characters and hyphens, reject case-changing or malformed-hyphen names, and compare against the NFKC-normalized directory name.
 - `description`: Optional but strongly recommended in Claude Code. If omitted, uses the first non-empty markdown line. Portable packages require it and cap it at 1024 characters.
   - Include both what the Skill does and specific triggers/contexts for when to use it.
   - Include all "when to use" information here - Not in the body. The body is only loaded after triggering, so "When to Use This Skill" sections in the body are not helpful to Claude.

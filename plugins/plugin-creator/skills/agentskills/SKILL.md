@@ -54,7 +54,7 @@ allowed-tools: Bash(git:*) Bash(jq:*) Read
 
 | Field           | Required | Max Length | Constraints                                                      |
 | --------------- | -------- | ---------- | ---------------------------------------------------------------- |
-| `name`          | Yes      | 64 chars   | Lowercase ASCII letters (`a-z`), digits (`0-9`), and hyphens. No leading/trailing/consecutive hyphens. Must match directory name. |
+| `name`          | Yes      | 64 chars   | NFKC-normalized lowercase Unicode alphanumeric characters and hyphens. No leading/trailing/consecutive hyphens. Must match the NFKC-normalized directory name. |
 | `description`   | Yes      | 1024 chars | MUST be non-empty. SHOULD describe what + when to use and SHOULD include useful keywords. |
 | `license`       | No       | —          | License name or reference to bundled file.                       |
 | `compatibility` | No       | 500 chars  | If provided, MUST be non-empty. Environment requirements (products, packages, network). |
@@ -63,14 +63,19 @@ allowed-tools: Bash(git:*) Bash(jq:*) Read
 
 ### Name Validation Rules
 
-- 1-64 characters
-- Lowercase ASCII letters (`a-z`), digits (`0-9`), and hyphens only
+- NFKC-normalize before applying every rule below
+- 1-64 characters after normalization
+- Lowercase Unicode alphanumeric characters and hyphens only; reject a name if lowercasing changes it
 - Must not start or end with `-`
 - Must not contain consecutive hyphens (`--`)
-- Must match the parent directory name
+- Must match the NFKC-normalized parent directory name
 
 Valid: `pdf-processing`, `data-analysis`, `code-review`
 Invalid: `PDF-Processing` (uppercase), `-pdf` (leading hyphen), `pdf--processing` (consecutive)
+
+**Source note:** Agent Skills prose is ambiguous about portable character scope; this reference
+follows official `skills-ref` executable Unicode behavior. See the
+[Name Field source note](./references/specification.md#name-field) for primary sources.
 
 ### Description Guidelines
 

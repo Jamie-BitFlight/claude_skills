@@ -4,10 +4,11 @@
 
 - Claude Code runtime: every field is optional. An omitted `name` uses the directory name; an
   omitted `description` uses the first non-empty markdown line.
-- Portable Agent Skills: `name` and `description` are required. `name` is 1-64 lowercase ASCII
-  letters (`a-z`), digits (`0-9`), or hyphens, with no leading, trailing, or consecutive hyphen,
-  and must match the directory exactly. `description` must be non-empty and at most 1024
-  characters; describing both what the skill does and when to use it is a SHOULD, not a MUST.
+- Portable Agent Skills: `name` and `description` are required. NFKC-normalize `name` first, then
+  require 1-64 lowercase Unicode alphanumeric characters or hyphens, with no leading, trailing, or
+  consecutive hyphen. Reject names changed by lowercasing. Compare the normalized name with the
+  NFKC-normalized directory name. `description` must be non-empty and at most 1024 characters;
+  describing both what the skill does and when to use it is a SHOULD, not a MUST.
 - `allowed-tools`: Claude Code accepts a space- or comma-separated string or YAML list. Portable
   Agent Skills accepts a space-separated string only and marks the field experimental. In Claude
   Code it pre-approves listed tools rather than restricting all other tools.

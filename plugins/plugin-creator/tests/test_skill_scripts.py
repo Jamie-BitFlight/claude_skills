@@ -147,34 +147,43 @@ class TestInitSkillScaffolder:
         assert not is_valid
         assert err is not None
 
-    def test_invalid_name_leading_hyphen_is_rejected(self) -> None:
-        """validate_skill_name rejects names that start with a hyphen.
+    @pytest.mark.parametrize("name", ["-bad-start", "bad-end-", "bad--middle"])
+    def test_invalid_name_hyphen_placement_is_rejected(self, name: str) -> None:
+        """validate_skill_name rejects leading, trailing, or consecutive hyphens.
 
         Tests: Edge-case in the regex guard.
-        How: Call validate_skill_name with a leading-hyphen name.
+        How: Call validate_skill_name with malformed hyphen placement.
         Why: Allows the test to catch regressions to the regex pattern.
         """
         from init_skill import validate_skill_name
 
-        is_valid, err = validate_skill_name("-bad-start")
+        is_valid, err = validate_skill_name(name)
         assert not is_valid
         assert err is not None
 
-    def test_non_ascii_name_is_rejected(self) -> None:
+    def test_lowercase_unicode_name_is_accepted(self) -> None:
         from init_skill import validate_skill_name
 
         is_valid, err = validate_skill_name("données-分析")
 
-        assert not is_valid
-        assert err is not None
+        assert is_valid
+        assert err is None
 
-    def test_combining_character_name_is_rejected(self) -> None:
+    def test_name_length_is_checked_after_nfkc_normalization(self) -> None:
         from init_skill import validate_skill_name
 
-        is_valid, err = validate_skill_name("e\u0301" * 33)
+        is_valid, err = validate_skill_name("ﬀ" * 33)
 
         assert not is_valid
         assert err is not None
+
+    def test_init_skill_writes_nfkc_normalized_name(self, tmp_path: Path) -> None:
+        from init_skill import init_skill
+
+        result = init_skill("cafe\u0301", str(tmp_path))
+
+        assert result == tmp_path / "café"
+        assert _parse_frontmatter(result / "SKILL.md")["name"] == "café"
 
     def test_duplicate_directory_returns_none(self, tmp_path: Path) -> None:
         """init_skill returns None when the target directory already exists.
@@ -514,14 +523,51 @@ class TestQuickValidateBrokenFixtures:
         assert not valid
         assert any(kw in message for kw in ("hyphen-case", "MyUpperCaseSkill"))
 
-    def test_non_ascii_name_fails(self, tmp_path: Path) -> None:
+    def test_lowercase_unicode_name_passes(self, tmp_path: Path) -> None:
         from quick_validate import validate_skill
 
         skill_dir = _make_minimal_valid_skill(tmp_path, "données-分析")
 
         valid, message = validate_skill(skill_dir)
+        assert valid, message
+
+    def test_unicode_uppercase_name_fails(self, tmp_path: Path) -> None:
+        from quick_validate import validate_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "НАВЫК")
+
+        valid, message = validate_skill(skill_dir)
         assert not valid
-        assert "lowercase ASCII letters, digits, and hyphens" in message
+        assert "lowercase" in message
+
+    def test_non_alphanumeric_unicode_name_fails(self, tmp_path: Path) -> None:
+        from quick_validate import validate_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "技能_分析")
+
+        valid, message = validate_skill(skill_dir)
+        assert not valid
+        assert "Unicode alphanumeric characters and hyphens" in message
+
+    def test_nfkc_normalized_name_matches_directory(self, tmp_path: Path) -> None:
+        from quick_validate import validate_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "café")
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text(skill_md.read_text().replace("name: café", "name: cafe\u0301"), encoding="utf-8")
+
+        valid, message = validate_skill(skill_dir)
+        assert valid, message
+
+    def test_name_length_is_checked_after_nfkc_normalization(self, tmp_path: Path) -> None:
+        from quick_validate import validate_skill
+
+        expanded_name = "ﬀ" * 33
+        skill_dir = _make_minimal_valid_skill(tmp_path, expanded_name)
+
+        valid, message = validate_skill(skill_dir)
+        assert not valid
+        assert "66 characters" in message
 
     @pytest.mark.parametrize("compatibility", ["", "   "])
     def test_empty_compatibility_fails(self, tmp_path: Path, compatibility: str) -> None:
@@ -670,22 +716,19 @@ class TestQuickValidateBrokenFixtures:
         assert not valid
         assert "long" in message.lower() or str(MAX_NAME_LENGTH) in message or "maximum" in message.lower()
 
-    def test_name_with_consecutive_hyphens_fails(self, tmp_path: Path) -> None:
-        """Name with consecutive hyphens is rejected.
+    @pytest.mark.parametrize("name", ["-bad-start", "bad-end-", "bad--middle"])
+    def test_name_with_invalid_hyphen_placement_fails(self, tmp_path: Path, name: str) -> None:
+        """Names with leading, trailing, or consecutive hyphens are rejected.
 
-        Tests: Consecutive-hyphen guard in _validate_name().
+        Tests: Hyphen-placement guards in _validate_name().
         """
         from quick_validate import validate_skill
 
-        skill_dir = tmp_path / "bad--hyphens"
-        skill_dir.mkdir()
-        (skill_dir / "SKILL.md").write_text(
-            "---\nname: bad--hyphens\ndescription: fine\n---\n\n# Skill\n", encoding="utf-8"
-        )
+        skill_dir = _make_minimal_valid_skill(tmp_path, name)
 
         valid, message = validate_skill(skill_dir)
         assert not valid
-        assert any(kw in message.lower() for kw in ("consecutive", "hyphen", "bad--hyphens"))
+        assert "hyphen" in message.lower()
 
 
 def test_custom_skill_paths_do_not_mask_default_skills(tmp_path: Path) -> None:

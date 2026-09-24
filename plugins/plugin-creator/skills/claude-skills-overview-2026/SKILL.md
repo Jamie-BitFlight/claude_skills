@@ -134,7 +134,7 @@ SOURCE: Anthropic skill-authoring best practices (docs.anthropic.com, accessed 2
 
 | Resource                   | Limit                                      | Notes                               |
 | -------------------------- | ------------------------------------------ | ----------------------------------- |
-| `name` field               | 64 chars                                   | Agent Skills package limit; lowercase ASCII letters (`a-z`), digits (`0-9`), and hyphens only |
+| `name` field               | 64 chars after NFKC normalization          | Agent Skills package limit; lowercase Unicode alphanumeric characters and hyphens only |
 | `description` field        | 1024 chars                                  | Agent Skills package limit          |
 | `<available_skills>` block | 2% of context window (fallback 16,000 chars) | Scales dynamically; separate from global context |
 | Skills before truncation   | ~34-36                                     | Varies by description complexity    |

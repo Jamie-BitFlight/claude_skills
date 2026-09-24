@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import re
 import sys
+import unicodedata
 from pathlib import Path
 
 from ruamel.yaml import YAML
@@ -111,16 +112,18 @@ def _validate_name(frontmatter: dict) -> str | None:
     if not isinstance(name, str):
         return f"Name must be a string, got {type(name).__name__}"
 
-    name = name.strip()
+    name = unicodedata.normalize("NFKC", name.strip())
     if not name:
         return "Name is required for a portable skill package"
 
-    if not re.fullmatch(r"[a-z0-9-]+", name):
-        return f"Name '{name}' may contain only lowercase ASCII letters, digits, and hyphens"
-    if name.startswith("-") or name.endswith("-") or "--" in name:
-        return f"Name '{name}' cannot start/end with hyphen or contain consecutive hyphens"
     if len(name) > MAX_NAME_LENGTH:
         return f"Name is too long ({len(name)} characters). Maximum is 64 characters."
+    if name != name.lower():
+        return f"Name '{name}' must be lowercase"
+    if name.startswith("-") or name.endswith("-") or "--" in name:
+        return f"Name '{name}' cannot start/end with hyphen or contain consecutive hyphens"
+    if not all(character.isalnum() or character == "-" for character in name):
+        return f"Name '{name}' may contain only Unicode alphanumeric characters and hyphens"
 
     return None
 
@@ -174,8 +177,9 @@ def validate_skill(skill_path: str | Path) -> tuple[bool, str]:
     if name_err:
         return False, name_err
 
-    name = result["name"].strip()
-    if name != skill_path.name:
+    name = unicodedata.normalize("NFKC", result["name"].strip())
+    directory_name = unicodedata.normalize("NFKC", skill_path.name)
+    if name != directory_name:
         return False, f"Name '{result['name'].strip()}' must match parent directory '{skill_path.name}'"
 
     desc_err = _validate_description(result)
