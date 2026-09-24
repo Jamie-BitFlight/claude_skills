@@ -22,7 +22,7 @@ git stash list --format='%H %gd %s'
 
 ## Finalize a conflict-free or resolved apply
 
-1. Verify the resolved tree, affected checks, and changed producers, consumers, interfaces, prompts, and docs.
+1. Verify the resolved tree, repository-required checks, and checks for changed producers/consumers/interfaces.
 2. Re-list and require the same unique OID/subject match, then drop only its current selector.
 3. Re-list again and require that exact OID-and-subject pair to be absent.
 

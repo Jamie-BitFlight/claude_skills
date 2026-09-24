@@ -6,7 +6,7 @@ One attempt starts only after start/continue bound authority, remote, destinatio
 2. If it moved, inventory every new destination commit and assign each an evidence-backed disposition.
 3. Integrate every compatible remote intent; route semantic conflicts through the router's combined-intent branch.
 4. Reorient across direct overlaps and affected producers, consumers, interfaces, prompts, and documentation.
-5. Rerun the full selected validation set, then fetch and observe the exact destination again.
+5. Rerun repository-required checks plus checks for changed producers/consumers/interfaces, then fetch again.
 6. Push only when that final OID still equals the reconciled destination OID and authority remains explicit.
 7. Tie the lease to that final observation; lease syntax supplies safety, never publication authority.
 

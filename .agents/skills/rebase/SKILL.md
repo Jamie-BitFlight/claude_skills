@@ -8,7 +8,7 @@ description: Start a local Git rebase when the user explicitly requests replay o
 ```mermaid
 flowchart TD
     Start([Agent receives explicit start, continue, or abort request]) --> Kind{Request?}
-    Kind -->|Start| Bind[Agent: bind exact refs/OIDs, goal predicate, destinations, authority, worker facts]; Kind -->|Continue or abort| Active["`Agent: read [active recovery](./references/active-rebase-recovery.md); bind metadata-owning worktree/Git dir`"]
+    Kind -->|Start| Bind[Agent: from request/task context bind exact refs/OIDs, requested observable history/ref relation, destinations, authority, worker facts]; Kind -->|Continue or abort| Active["`Agent: read [active recovery](./references/active-rebase-recovery.md); bind metadata-owning worktree/Git dir`"]
     Bind --> BindResult{All dependent facts observed or explicitly bound?}
     BindResult -->|Yes| Satisfied{No active rebase; S/T unchanged; ancestry-only; T ancestor of S?}; BindResult -->|Missing or ambiguous| Decision; BindResult -->|Failure or unobservable| Recover
     Satisfied -->|Yes; destinations equal required result; read-only| NoChange[Agent: record no-change evidence]; Satisfied -->|No or transformation goal| Locate
@@ -26,7 +26,7 @@ flowchart TD
     Owner -->|Unknown or unreachable| Decision
     Wait --> WaitResult{Observed wait outcome?}; WaitResult -->|Checkpoint met or worker ended/failed without writer| Operation; WaitResult -->|Still running and cannot pause/end| Decision
     WaitResult -->|Failure or unobservable| Recover
-    Operation -->|Start| Prepare[Agent: observe status; checkpoint all work when permitted]; Operation -->|Continue or abort| ActiveGuard[Agent: reobserve same owner metadata and saved-entry identity]
+    Operation -->|Start| Prepare[Agent: observe status; checkpoint only task-authorized changes after worker checkpoint]; Operation -->|Continue or abort| ActiveGuard[Agent: reobserve same owner metadata and saved-entry identity]
     ActiveGuard --> ActiveGuardResult{Owning worktree/Git-dir metadata unchanged?}
     ActiveGuardResult -->|Continue| Stop{Current active-rebase state?}; ActiveGuardResult -->|Abort| Abort["`Agent: read [active recovery](./references/active-rebase-recovery.md); abort in bound owner and restore pre-state`"]
     ActiveGuardResult -->|No, failure, or unobservable| Recover
@@ -40,7 +40,7 @@ flowchart TD
     Account --> AccountResult{Every moved commit has one evidence-backed disposition?}
     AccountResult -->|All classified; no supported conflict| Next; AccountResult -->|Unclassified or conflicting| Decision
     AccountResult -->|Failure or unobservable| Recover
-    Next{Reobserved start path?} -->|Replay required| Shape; Next -->|No-replay publication; predicate true| Current[Agent: bind current result OID R]
+    Next{Reobserved start path?} -->|Replay required| Shape; Next -->|No-replay publication; bound goal relation true| Current[Agent: bind current result OID R]
     Next -->|Failure or unobservable| Recover
     Current --> CurrentResult{Named result ref resolves to R?}; CurrentResult -->|Yes| Saved; CurrentResult -->|No or unobservable| Recover
     Shape{Merge in fresh replay set?} -->|Yes| History["`Agent: read [history shape](./references/history-shape.md); choose state-specific disposition`"]
@@ -53,7 +53,7 @@ flowchart TD
     Stop -->|Metadata active; resolution staged or no conflict| ContinueReplay[Agent: continue the bound active replay]
     Stop -->|Other failure or unobservable| Recover
     StartReplay --> ReplayResult{Replay operation result?}; ContinueReplay --> ReplayResult; Skip --> ReplayResult; Preserve --> ReplayResult
-    ReplayResult -->|Metadata/unmerged absent; R bound; result ref and predicate match| Saved{Lifecycle saved entry?}
+    ReplayResult -->|Metadata/unmerged absent; R bound; result ref and bound goal relation match| Saved{Lifecycle saved entry?}
     ReplayResult -->|Unmerged entries| ReplayConflict["`Agent: read [conflict and ambiguity](./references/conflict-and-ambiguity.md); resolve replay intent`"]
     ReplayResult -->|Topology, equivalent, or empty| History; ReplayResult -->|Other failure or unobservable| Recover
     ReplayConflict --> ReplayIntent{Exactly one outcome preserves compatible intent, passes checks, and is staged?}
@@ -72,13 +72,13 @@ flowchart TD
     RestoreIntent -->|Failure or unobservable| Recover
     RestoreFinish --> RestoreFinishResult{Checks zero, no unmerged entries, exact entry absent?}; RestoreFinishResult -->|Yes| FinishMode; RestoreFinishResult -->|No or unobservable| Recover
     FinishMode -->|Explicit abort| OrientAbort[Agent: inventory interactions; verify restored assumptions]
-    FinishMode -->|Start or continue| Orient[Agent: inventory interactions; run required and covering checks]
-    Orient --> VerifyResult{Every selected command zero; no unmerged entries; intersections recorded?}
+    FinishMode -->|Start or continue| Orient[Agent: run repository-required checks plus checks for changed producers/consumers/interfaces]
+    Orient --> VerifyResult{All those checks zero; no unmerged entries; intersections recorded?}
     VerifyResult -->|Yes| Publish{Publication bound and authorized?}
-    VerifyResult -->|One goal-consistent correction| Correct[Agent: correct changed interaction]; VerifyResult -->|Missing intent or incompatible corrections| Decision
+    VerifyResult -->|Failure attributable to replay; one correction within bound goal| Correct[Agent: apply that correction]; VerifyResult -->|Not attributable, outside goal, missing intent, or alternatives| Decision
     VerifyResult -->|Failure or unobservable| Recover
     Correct --> CorrectResult{Correction applied?}
-    CorrectResult -->|Yes; rerun every selected check| Orient; CorrectResult -->|Failure or unobservable| Recover
+    CorrectResult -->|Yes; rerun repository and changed-interaction checks| Orient; CorrectResult -->|Failure or unobservable| Recover
     Publish -->|No| Handoff; Publish -->|Yes| Remote["`Agent: read [publication](./references/publication.md); reconcile one authorized attempt`"]
     Remote --> RemoteResult{Remote stage result?}
     RemoteResult -->|Final fetch unchanged; exact lease OID current| Push[Agent: perform authorized exact-lease push]
@@ -97,12 +97,12 @@ flowchart TD
     OrientAbort --> Handoff; LeaseStop --> Handoff
     Handoff[Agent: check acquired worker obligation] --> Worker{Worker obligation?}
     Worker -->|None| Terminal{Observed path predicate?}; Worker -->|Acquired| Deliver[Agent: deliver summary and resume/stop decision]
-    Worker -->|Unknown or unobservable| Pending([No terminal claim; worker obligation unresolved])
+    Worker -->|Unknown or unobservable| Pending([Agent: stop mutation; preserve repo; report last worker state, handoff attempt, missing ack/observation; no completion])
     Deliver --> HandoffResult{Acknowledged summary/resume, or worker observed stopped with handoff?}
     HandoffResult -->|Yes| Terminal; HandoffResult -->|No or unobservable| Pending
     Terminal -->|Abort request and restored pre-state| Aborted([Aborted and restored])
     Terminal -->|Start/continue; post-push destination resolves to R| Published([Published completion])
-    Terminal -->|Start/continue; result ref resolves to R; predicate true; no publication| Local([Local completion])
+    Terminal -->|Start/continue; result ref resolves to R; bound goal relation true; no publication| Local([Local completion])
     Terminal -->|No-change evidence complete| NoChangeDone([No change]); Terminal -->|Metadata absent; no mutation| NoActiveDone([No active rebase])
     Terminal -->|Decision report complete| Paused([Paused for decision]); Terminal -->|Stopped-state report complete| Stopped([Stopped with observed state])
     Terminal -->|Inconsistent or unobservable| Recover
