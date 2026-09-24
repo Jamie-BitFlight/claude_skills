@@ -30,12 +30,11 @@ _CODEX_PLUGIN_ROOT_PLACEHOLDER = "${CLAUDE_PLUGIN_ROOT}/"
 # Interface fields a maintainer may hand-tune to read better than the derived default. Re-synced
 # only when missing/empty on the existing manifest. Every other computed field is a pure, always
 # up-to-date derivation of Claude source data with no independent curated meaning of its own:
-# "shortDescription"/"longDescription" are truncated/verbatim copies of "description",
-# "developerName" mirrors "author.name", and "capabilities" reflects the plugin's actual
-# directory structure (skills/, hooks.json, etc.) — preserving a stale copy of any of these would
-# silently mask real source-of-truth changes (for example, the SHORT_DESCRIPTION_LIMIT
-# truncation) behind a manifest that looks "already set".
-_PRESERVED_INTERFACE_FIELDS = ("displayName", "category")
+# "longDescription" is a verbatim copy of "description", "developerName" mirrors
+# "author.name", and "capabilities" reflects the plugin's actual directory structure (skills/,
+# hooks.json, etc.) — preserving a stale copy of any of these would silently mask real
+# source-of-truth changes behind a manifest that looks "already set".
+_PRESERVED_INTERFACE_FIELDS = ("displayName", "shortDescription", "category")
 
 
 class UnexpandablePlaceholderError(ValueError):
@@ -181,7 +180,8 @@ def _merge_interface(existing_interface: object, computed_interface: dict) -> di
     Fields listed in ``_PRESERVED_INTERFACE_FIELDS`` keep a non-empty hand-set value from the
     existing manifest and only fall back to the computed default when missing or empty.
     ``defaultPrompt`` has no computed default and is carried over verbatim when present. Every
-    other computed field (currently ``capabilities``) always takes the freshly derived value.
+    other computed field (currently ``longDescription``, ``developerName``, and
+    ``capabilities``) always takes the freshly derived value.
 
     Returns:
         The merged interface object to write to the Codex manifest.
