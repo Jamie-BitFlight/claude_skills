@@ -211,6 +211,22 @@ The second prompt has already supplied much of the process and cannot measure wh
 7. Specify exact/preferred behavior for high-variance decisions. For consequential high-variance nodes, locally expand and validate the child procedure.
 8. Record scenarios, prompt wording, model/harness diversity, sample count, normalization decisions, observed consensus/variance, unsafe variants, and the resulting instruction decision. Do not claim universality from the sample.
 
+##### Compression validation
+
+Baseline sampling discovers candidate prior knowledge; it does not by itself justify deleting instructions. Before examining sample results, record the contract-relevant invariants, unacceptable outcomes, and material decision points that compression must preserve so success criteria cannot drift toward outputs that merely look plausible.
+
+When compression is material, optionally validate the candidate instruction set against the fuller version:
+
+1. Run the same representative scenarios with the full and compressed instructions under comparable tools/environment.
+2. Include held-out scenarios that were not used to decide what to compress; do not tune only to the discovery scenarios.
+3. Repeat selected scenario/model combinations when practical. Separate within-model stochastic variation, consistent cross-model disagreement, and sensitivity to scenario wording — each is a different reason behavior may need explicit instruction.
+4. Where practical, compare outputs or execution traces without telling the evaluator which instruction variant produced them. Judge against the pre-recorded contract rather than preference for brevity or the newer version.
+5. If the harness exposes execution traces, inspect actions, navigation, tool use, omissions, and recovery behavior as well as the final answer. A model mentioning a safeguard is weaker evidence than observing it perform the safeguard when required.
+6. Observe the benefit of compression where available: instruction/context reduction, task success, unsafe or contract-violating behavior, execution time, and unnecessary tool/work expansion. No fixed metric or tooling is required.
+7. Restore or specify behavior when compression causes a contract-relevant regression. Retain compression when behavior remains within the contract across the evidence collected.
+
+Cross-model evidence should reflect the models the process is expected to support. Behavior consistently inferred by stronger models but missed by a supported weaker model is not safely redundant for that deployment context.
+
 ##### Bias checks
 
 Before using the sample, ask:
