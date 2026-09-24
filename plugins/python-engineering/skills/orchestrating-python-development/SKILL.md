@@ -46,7 +46,7 @@ Prose above the diagram carries detail that would clutter the nodes. Before dele
 
 Before the Implement step, check whether the deployment environment is restricted (no internet, no uv). If yes, use `python-engineering:python3-stdlib-only` instead of `python-engineering:python-cli-architect`.
 
-When the task involves display/output/interaction code, step 1.5 invokes `python-engineering:designing-ui-for-cli` to produce a user-confirmed shape brief before tests are written. The brief inputs the architecture's command tree and outputs surface design (colour strategy, status vocabulary, output hierarchy) that the architect references during step 3. This gate is interactive with the user — run it before any automated execution phase, since the shape-brief AskUserQuestion cannot block automated execution once one starts.
+When the task involves human-facing presentation or interaction, step 1.5 invokes `python-engineering:designing-ui-for-cli` to produce a user-confirmed shape brief before tests are written. Agent-only JSON stdout is an automation contract, not a UI surface, and bypasses this gate. Mixed-audience commands take this gate for their explicit human presentation mode. The brief inputs the architecture's command tree and outputs surface design (colour strategy, status vocabulary, output hierarchy) that the architect references during step 3. This gate is interactive with the user — run it before any automated execution phase, since the shape-brief AskUserQuestion cannot block automated execution once one starts.
 
 The adversarial design step reads the actual codebase, not the architecture spec, and challenges the approach against real code. It identifies gotchas, alternative approaches, and which specialist skills apply. Pass the architecture file path and affected module paths — the agent reads further from there. It produces a behavioral validation plan (Phases 1–3) that the architect receives alongside the implementation brief.
 
@@ -57,7 +57,7 @@ flowchart TD
     S3{"3. Implement<br>Default: python-engineering:python-cli-architect<br>Restricted env only: python-engineering:python3-stdlib-only<br>Context: tests/ path, load python-engineering:typer-and-rich for python-cli-demo.py<br>Output: implementation that makes all tests pass"}
     S4["4. Review<br>subagent_type=python-engineering:code-reviewer<br>Context: implementation file paths, tests/ path<br>Output: review findings with file:line references, improvement suggestions"]
     S5["5. Validate<br>Run: /python-engineering:shebangpython on each script<br>Run: Activate holistic-linting skill<br>Run: uv run pytest (verify changed behavior and configured project coverage gate)<br>Check: CI config for additional validators<br>Pass criteria: all tests green, linting clean, coverage threshold met"]
-    S1Q{"Display, output, or<br>interaction code in scope?"}
+    S1Q{"Human-facing presentation<br>or interaction in scope?"}
     S1B["1.5 UI Design<br>Skill: python-engineering:designing-ui-for-cli<br>Context: architecture file path, surfaces in scope<br>Output: shape brief (user-confirmed)"]
     S1 -->|"Output: interfaces, layout, CLI command tree"| S1Q
     S_AD["Adversarial Solution Design<br>subagent_type=python-engineering:adversarial-solution-design<br>Context: architecture file path, affected module paths<br>Output: solution brief + validation plan + TDD recommendation"]
@@ -112,7 +112,7 @@ flowchart TD
     S6["6. Review<br>subagent_type=python-engineering:code-reviewer<br>Context: changed file paths, requirements doc path<br>Output: quality assessment against acceptance criteria, improvement list"]
     S7["7. Validate<br>Run: uv run pytest (verify no regressions, changed behavior and configured project coverage gate)<br>Run: Activate holistic-linting skill<br>Run: /python-engineering:modernpython on changed files<br>Pass criteria: all tests green, no regressions, linting clean"]
     S1 -->|"Output: requirements doc, acceptance criteria"| S2
-    S2Q{"Display, output, or<br>interaction code in scope?"}
+    S2Q{"Human-facing presentation<br>or interaction in scope?"}
     S2B["2.5 UI Design<br>Skill: python-engineering:designing-ui-for-cli<br>Context: architecture file path, surfaces in scope<br>Output: shape brief (user-confirmed)"]
     S2 -->|"Output: design with integration points"| S2Q
     S2Q -->|"No"| S_AD2
