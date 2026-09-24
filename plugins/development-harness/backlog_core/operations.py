@@ -4461,6 +4461,38 @@ def _apply_non_in_progress_status(
         result["error"] = f"Unrecognized status value: {status!r}"
 
 
+def _apply_verified_status(
+    item: BacklogItem,
+    verified: bool,
+    has_integer_issue: bool,
+    repo: str,
+    result: dict[str, str | int | bool | list[str]],
+    output: Output,
+    *,
+    live_provider_target: bool,
+) -> None:
+    """Apply a live verified label or persist its queued status intent."""
+    if not verified:
+        return
+    if not live_provider_target:
+        update_item_metadata(
+            item.reference, {"metadata": {"status": "verified"}}, output=output, base_item=item, repo=repo
+        )
+        result["verified"] = True
+        return
+    if not has_integer_issue:
+        # verified label requires a numeric issue ID — no-op for backends
+        # that use string IDs or for items with no issue reference.
+        result["verified"] = True
+        return
+    try:
+        apply_status_verified(item, repo, output=output)
+    except GithubException as e:
+        result["error"] = str(e)
+        return
+    result["verified"] = True
+
+
 def _apply_issue_status_labels(
     item: BacklogItem,
     status: str | None,
@@ -4532,18 +4564,9 @@ def _apply_issue_status_labels(
         # verified check below too, rather than reporting a no-op "verified".
         return
 
-    if verified and live_provider_target:
-        if not has_integer_issue:
-            # verified label requires a numeric issue ID — no-op for backends
-            # that use string IDs or for items with no issue reference.
-            result["verified"] = True
-            return
-        try:
-            apply_status_verified(item, repo, output=output)
-        except GithubException as e:
-            result["error"] = str(e)
-            return
-        result["verified"] = True
+    _apply_verified_status(
+        item, verified, has_integer_issue, repo, result, output, live_provider_target=live_provider_target
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -4648,6 +4671,7 @@ def update_item(
     sections: dict[str, str] | None = None,
     allow_cached: bool = False,
     _context: WorkItemDecisionContext | None = None,
+    _target: DecisionTarget | None = None,
 ) -> dict[str, str | int | bool | list[str] | dict[str, str | int | bool]]:
     """Update item: add Plan, set status:in-progress, apply verified label, or write groomed content.
 
@@ -4680,7 +4704,7 @@ def update_item(
     """
     out = output or Output()
     context = _context or _decision_context(repo=repo, allow_cached=allow_cached, output=out)
-    target = context.select(selector, purpose="mutation")
+    target = _target or context.select(selector, purpose="mutation")
     item = target.mutation_base
     if not item:
         raise ItemNotFoundError(selector)
@@ -4815,6 +4839,7 @@ def groom_item(
             sections=sections,
             allow_cached=allow_cached,
             _context=context,
+            _target=target,
         )
     else:
         # No content to write — skip update_item to avoid stdin read in _resolve_groomed_content.

@@ -215,7 +215,9 @@ authoritative and does not activate fallback.
 Provider snapshot baselines and incremental checkpoints are repository-scoped,
 matching the pending-intent journal. Legacy unscoped snapshot/checkpoint state
 belongs only to the backend's configured/default repository, so existing
-single-repository caches remain readable without migration.
+single-repository caches remain readable without migration. Explicit cached
+fallback retains the command-supplied repository when it reads those baselines;
+it does not route the fallback through the backend's configured/default listing.
 
 `operations.list_items` reports `from_cache` and `has_pending_writes`
 independently. Normal successful GitHub reads set `from_cache=False` even when

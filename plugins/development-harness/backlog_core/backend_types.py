@@ -371,6 +371,13 @@ class ContentProvider(Protocol):
 
 
 @runtime_checkable
+class RepositoryScopedCachedListing(Protocol):
+    """Optional repository-aware listing over a provider-private cache."""
+
+    def cached_work_items(self, repo: str = "") -> list[BacklogItem]: ...
+
+
+@runtime_checkable
 class GitHubExtras(Protocol):
     """GitHub-specific surface only ``GitHubBackend`` implements.
 

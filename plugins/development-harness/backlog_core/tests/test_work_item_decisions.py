@@ -98,6 +98,11 @@ class DecisionBackend(InMemoryBackend):
         self.cached_list_calls += 1
         return [item.model_copy(deep=True) for item in self.cached_items]
 
+    def cached_work_items(self, repo: str = "") -> list[BacklogItem]:
+        """Expose repository-aware fallback through the provider-cache seam."""
+        del repo
+        return self.list_work_items()
+
 
 def test_all_memoizes_one_bulk_snapshot_and_never_uses_cached_provider_rows() -> None:
     backend = DecisionBackend(
@@ -156,6 +161,32 @@ def test_cached_fallback_withholds_rows_overlaid_by_the_pending_journal(tmp_path
     assert target.pending is not None
     assert target.pending.title == "queued title"
     assert target.mutation_base == target.pending
+
+
+def test_cached_fallback_selects_the_requested_repository_baseline(tmp_path: Path, mocker: MockerFixture) -> None:
+    """Repository B fallback never selects repository A's equal issue number."""
+    repo_a = "owner/repository-a"
+    repo_b = "owner/repository-b"
+    backend = GitHubBackend(repo=repo_a, cache=FileCache(tmp_path))
+    backend.reconcile(
+        ReconcileRequest(scope=ReconcileScope.INITIAL, repo=repo_a, apply_local_patches=False),
+        snapshot=ProviderSnapshot(
+            items=[provider_item("#7", "repository A item")], sync_started_at="2026-01-01T00:00:00+00:00"
+        ),
+    )
+    backend.reconcile(
+        ReconcileRequest(scope=ReconcileScope.INITIAL, repo=repo_b, apply_local_patches=False),
+        snapshot=ProviderSnapshot(
+            items=[provider_item("#7", "repository B item")], sync_started_at="2026-02-01T00:00:00+00:00"
+        ),
+    )
+    mocker.patch.object(backend, "fetch_snapshot", side_effect=BackendUnavailableError("offline"))
+
+    target = WorkItemDecisionContext(backend, repo=repo_b, allow_cached=True).select("#7", purpose="mutation")
+
+    assert target.provider is not None
+    assert target.provider.title == "repository B item"
+    assert target.provider_snapshot is None
 
 
 def test_select_memoizes_one_targeted_snapshot_for_equivalent_exact_references() -> None:

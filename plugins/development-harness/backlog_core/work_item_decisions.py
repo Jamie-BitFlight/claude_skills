@@ -7,7 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from ._capability_gates import require_github_extras
-from .backend_types import GitHubExtras, WorkItemBackend
+from .backend_types import GitHubExtras, RepositoryScopedCachedListing, WorkItemBackend
 from .models import (
     BacklogError,
     BacklogItem,
@@ -182,10 +182,13 @@ class WorkItemDecisionContext:
             pending_identities = {
                 identity for item in self._pending() for identity in (item.reference, item.issue) if identity
             }
+            cached_items = (
+                self.backend.cached_work_items(self.repo)
+                if isinstance(self.backend, RepositoryScopedCachedListing)
+                else self.backend.list_work_items()
+            )
             provider_items = [
-                item
-                for item in self.backend.list_work_items()
-                if not pending_identities.intersection((item.reference, item.issue))
+                item for item in cached_items if not pending_identities.intersection((item.reference, item.issue))
             ]
             self._cached = CommandWorkItems(provider_items=provider_items, from_cache=True)
         return self._cached

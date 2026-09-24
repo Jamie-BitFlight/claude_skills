@@ -473,13 +473,13 @@ class _GitHubReconciliation:
         # against.
         self._last_snapshot_shortfall: bool = False
 
-    def list_work_items(self) -> list[BacklogItem]:
+    def list_work_items(self, repo: str = "") -> list[BacklogItem]:
         """List work items from the provider-private cache.
 
         Returns:
             Persisted work items.
         """
-        return [record.item for record in self.load_records(repo=self._default_repo)]
+        return [record.item for record in self.load_records(repo=repo or self._default_repo)]
 
     def has_synced_snapshot(self) -> bool:
         """Report whether a durable, honest provider snapshot has ever completed.
