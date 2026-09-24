@@ -3,8 +3,8 @@
 > **Audience: contributor/developer.** This document describes package seams, ownership, and
 > implementation constraints for maintainers; consumer setup and usage belong in the plugin docs.
 >
-> **Status: desired architecture.** Runtime work-item and content operations must resolve one
-> configured backend through `create_backend()`; remote-provider cache construction is
+> **Status: desired architecture.** Runtime work-item and content operations must resolve through
+> the composition boundary created by `create_backend()`; remote-provider cache construction is
 > factory-owned. Legacy Markdown/YAML parsing and independently selected artifact providers are
 > permitted only in explicit migration tooling, never in `operations.py` or `server.py`.
 
@@ -17,10 +17,11 @@ The package owns backlog business logic and exposes it through two thin wrappers
 
 ## Storage Ownership and File Cache
 
-The configured backend is the only storage boundary visible to the CLI, MCP server, and operations
-layer for runtime work-item and content operations. Work items, grooming, plans, artifact manifests,
-and artifact content are accessed through that backend's protocols. Migration tooling may read
-legacy local representations through the explicit exceptions described below.
+The configured-primary-plus-overlay composition boundary is the only storage boundary visible to
+the CLI, MCP server, and operations layer for runtime work-item and content operations. Work items,
+grooming, Plans, artifact manifests, and artifact content are accessed through the routed backend's
+protocols. Migration tooling reads legacy local representations only through the explicit
+exceptions described below.
 
 Backends fall into two storage categories:
 
@@ -82,9 +83,9 @@ backlog.py            ← imports from operations (thin CLI wrapper)
 The required storage dependency direction is:
 
 ```text
-CLI / MCP → operations → configured backend protocol
-                         ├─ remote provider → remote API + private FileCache → yaml_io
-                         └─ local provider  → native store only
+CLI / MCP → operations → composition boundary → routed backend protocols
+                                                ├─ remote provider → remote API + private FileCache → yaml_io
+                                                └─ local provider  → native store only
 ```
 
 Direct dependencies from `operations.py`, `server.py`, or general parsing helpers to `file_cache.py`,
@@ -712,7 +713,8 @@ implementation details.
 
 - `WorkItemBackend` — `@runtime_checkable` Protocol defining the provider-neutral work-item
   contract. Optional provider capabilities use separate protocols such as `SyncProvider` and
-  `ContentProvider` and `BranchBackend`.
+  `ContentProvider` and `BranchBackend`. Its adapter-owned `status()` result contains stable
+  `availability` plus an extensible provider-specific `details` object.
 - `SyncProvider` — optional one-method `reconcile(request) -> ReconcileResult` capability implemented
   only by remote-capable backends.
 - `WorkItemBackend.batch_fetch_statuses()` and `view_enrich_from_github()` return Pydantic
@@ -720,7 +722,7 @@ implementation details.
   `unavailable_reason` fields are the sole source for live-read provenance. Credential resolution
   remains private to the provider; `operations.py` neither imports provider clients nor infers an
   attempted request from an identifier.
-- `ContentProvider` — logical plan/artifact capability implemented by the configured backend:
+- `ContentProvider` — logical Plan/artifact capability implemented by the routed backend:
 
   ```python
   class ContentProviderError(Exception):
@@ -818,12 +820,15 @@ implementation details.
   `owner_reference: str | None = None`. For update, `None` preserves ownership, a non-empty string
   reassigns it, and explicit `""` unlinks it. For create, `None` normalizes to unlinked `""`.
   The operation rejects `issue` together with any non-`None` owner reference, stringifies `issue`
-  for numeric providers, and otherwise passes the opaque value unchanged, supporting both numeric
-  and opaque provider IDs.
-- `BacklogConfig` — dataclass wrapping only the active backend instance; passed by dependency
-  injection to `operations.py` and `server.py`. It does not expose a cache object.
+  for numeric providers, and otherwise passes the opaque value unchanged. This preserves existing
+  callers while allowing Beads and future provider IDs.
+- `BacklogConfig` — dataclass wrapping the configured primary plus the reserved local SQLite
+  overlay; passed by dependency injection to `operations.py` and `server.py`. It does not expose a
+  cache object.
 - `create_backend(name)` — sole composition root for backend storage. It resolves the configured
-  provider, creates a `FileCache` for remote-capable providers, and injects it into that provider.
+  primary plus the reserved local SQLite overlay once, then exposes the selected protocol adapters
+  to operations. The overlay reuses `dh_paths.state_root() / "backlog.sqlite3"`. The composition
+  root creates a `FileCache` for remote-capable providers and injects it into that provider.
   GitHub also privately composes its issue adapter, authoritative Contents API store, and read-only
   legacy Gist/index migration stores behind `ContentProvider`; their provider wire formats do not
   escape the backend.
@@ -834,7 +839,7 @@ implementation details.
 
 **Rendering utilities via protocol dispatch**: Rendering methods (`section_heading`,
 `render_groomed_section`, `section_display_title`) are part of the `WorkItemBackend` protocol
-surface. Callers access rendering through the active backend rather than importing directly from
+surface. Callers access rendering through the routed backend rather than importing directly from
 `github_sync`. Shared rendering logic lives in `rendering.py` and is used by backend implementations.
 
 **Imports from other modules**: `from .models import ...` (type annotations only, under
@@ -871,12 +876,13 @@ protocols.
 - `backends/beads_backend.py` — local `BeadsBackend`: native Beads/Dolt storage through `bd`. No
   `FileCache` and no backlog YAML access.
 
-Backend selection is resolved once via `create_backend()`; consumers access only
-`get_config().backend`. Remote backends may import `file_cache.py`; local backends must not.
+Backend composition is resolved once via `create_backend()`; consumers ask the resulting boundary
+for the route selected by a Work Brief or Plan address. Remote backends may import
+`file_cache.py`; local backends must not.
 
 ### Provider-owned artifacts and plans
 
-The configured backend is also the single routing decision for plans, grooming, artifact manifests,
+The composition boundary is the single routing decision for Plans, grooming, artifact manifests,
 and artifact content. A backend may implement these capabilities through internal provider-specific
 components, but callers must not independently choose a second artifact or filesystem provider.
 
@@ -885,7 +891,11 @@ mutation rules as work-item content. For Beads, SQLite, and Memory, those values
 backend storage only. Unsupported capabilities fail explicitly through the selected backend; they
 must not fall back to YAML or another provider.
 
-`operations.py` and `server.py` must obtain artifact capabilities from the configured backend and
+Plan creation atomically binds the Plan ID to its selected backend and Work Brief reference. Plans,
+Tasks, grooming content, artifacts, concerns, gates, and completion follow that binding and fail
+closed when it cannot be resolved.
+
+`operations.py` and `server.py` must obtain artifact capabilities from the composition boundary and
 must not call `create_artifact_provider()` or select `LocalFilesystemArtifactProvider`. Any
 independent provider factory or local fallback retained for migration is permitted only within
 explicit migration tooling.
@@ -953,10 +963,10 @@ updates, or a second caller-selected provider. Offline writes continue through t
 
 ## Module: operations.py
 
-**Responsibility**: Provider-neutral orchestration over the configured backend. Each public function
+**Responsibility**: Provider-neutral orchestration over the routed backend. Each public function
 returns a structured result and takes an optional `output: Output` parameter. Operations may combine
 business rules and pure transformations, but all persistence, provider communication, cache access,
-and artifact access go through `get_config().backend`.
+and artifact access go through the composition boundary.
 
 **Exports**: `add_item`, `list_items`, `view_item`, `sync_items`, `close_item`, `resolve_item`, `update_item`, `groom_item`, `normalize_items`, `pull_items`, `update_item_metadata`, `pull_single_issue`, `refresh_local_cache_from_github`, `sync_create_missing_issues`, `sync_push_groomed_content`
 
@@ -971,12 +981,17 @@ artifact providers. All persistence, provider communication, cache access, and a
 must cross the configured backend boundary. Migration-only access does not define a permitted
 runtime dependency.
 
+Shared operations keep creation distinct from update and accept an optional requested reference.
+The provider either honors it or creates its canonical reference with a warning. Collision
+detection and create-only failure live at this shared operation/provider boundary, so callers do
+not recreate the rule.
+
 The same restriction applies to `reconciliation.py`: reconciliation classifies snapshots and asks
 the provider to persist outcomes; it does not own filesystem storage.
 
 ---
 
-## Selector Resolution — Beads Nanoid Support
+## Selector resolution and provider routing
 
 All seven beads-capable tools in `server.py` (`backlog_view`, `backlog_close`, `backlog_resolve`,
 `backlog_update`, `backlog_groom`, `backlog_strike_entry`, `backlog_pull`) accept a beads nanoid
@@ -990,6 +1005,13 @@ Resolution is handled by `find_item` in `parsing.py`. The resolution order is:
 4. Title substring — case-insensitive; raises `AmbiguousSelectorError` when multiple distinct items match
 
 The string-ID path fires when the selector is not a URL, `#N`, or bare integer. No additional routing logic is needed in `server.py` — the selector string passes through to `find_item` unchanged. GitHub URL detection is a regex operation (`GITHUB_ISSUE_URL_RE`) — no GitHub token or API call is involved at any point in selector resolution.
+
+Before ordinary selector lookup, the composition router consumes only the reserved `brief~`
+prefix. It sends that reference to the local SQLite overlay with no remote fallback. Every other
+identifier remains opaque and uses the configured primary backend; identifier-shape guesses do not
+select providers.
+
+SOURCE: `parsing.py:find_item` (string-ID path at `# String-ID exact match` comment), `parsing.py:parse_issue_selector`, commit `f6438cac` (2026-06-19)
 
 ---
 

@@ -43,6 +43,12 @@ Body is **empty** when un-groomed and no extra details. When present, body conta
 - **Files** — when applicable
 - **## Groomed (YYYY-MM-DD)** — when groomed (see below)
 
+An interactively normalized Work Brief persists its terminal grilling record inside the existing
+`sections["groomed"]` / `GroomedData` content represented by `## Groomed`; it does not create a
+top-level Entry-bearing section or a parallel provenance document. The orchestrator reads the
+persisted record back and verifies complete conversion before deleting the scratch source. After
+that gate, `GroomedData` is the sole durable copy.
+
 Do **not** duplicate `title`, `description`, `source`, `added`, `priority`, `type`, `issue` in the body — they live in frontmatter.
 
 ---
@@ -60,6 +66,11 @@ Do **not** duplicate `title`, `description`, `source`, `added`, `priority`, `typ
 ---
 
 ## Groomed Sections (Body, under ## Groomed)
+
+Work Brief grilling provenance carries the settled decisions, answered and intentionally
+unresolved questions, evidence references, and concerns needed by discovery, architecture, and
+planning. Place that content in the applicable existing groomed subsections below; “grilling
+provenance” is ownership of the record, not a new subsection name.
 
 | Section | Purpose | Required |
 |---------|---------|----------|
