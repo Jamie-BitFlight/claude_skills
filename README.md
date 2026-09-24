@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./assets/claude-skills-overview.svg" alt="Diagram showing engineering workflows routed through Claude Skills to skills, specialist agents, hooks, and MCP tools." width="100%" />
+</p>
+
 # Claude Skills
 
 A marketplace of opinionated Agent Skills, specialist agents, hooks, and engineering workflows for Claude Code.
@@ -16,7 +20,7 @@ The collection is built around a simple idea: **agents should follow the enginee
 /plugin install dh@jamie-bitflight-skills
 ```
 
-Browse the [plugin directory](./plugins) or install one of the systems below.
+Browse the [marketplace manifest](./.claude-plugin/marketplace.json) or install one of the systems below.
 
 ## Start with these
 
@@ -98,7 +102,17 @@ Install name: `dh`.
 | [Twelve-Factor App](./plugins/twelve-factor-app) | `twelve-factor-app` | Twelve-factor architecture guidance |
 | [Brainstorming](./plugins/brainstorming-skill) | `brainstorming-skill` | Structured brainstorming techniques |
 
-Additional plugins live under [`plugins/`](./plugins). Individual plugin READMEs are the authoritative usage guides.
+### Session tooling and external/upstream plugins
+
+| Plugin | Install name | Purpose |
+| --- | --- | --- |
+| [dot-dash](./plugins/dot-dash) | `dot-dash` | Browser dashboard for live Claude Code sessions, transcript streaming and prompt injection |
+| [Frustration Analyzer](./plugins/frustration-analyzer) | `frustration-analyzer` | Find instruction-following failures across Claude/Codex sessions and render a shareable receipt |
+| [RTFP](./plugins/rtfp) | `rtfp` | Find and render the strongest instruction-following failure from a Claude Code session |
+| [Hallucination Detector](https://github.com/bitflight-devops/hallucination-detector) | `hallucination-detector` | External plugin for evidence-first handling of ungrounded claims |
+| Astral upstream | `astral` | Pinned upstream Astral Claude Code plugin bundle from `astral-sh/claude-code-plugins` |
+
+The [marketplace manifest](./.claude-plugin/marketplace.json) is the authoritative inventory, including externally sourced plugins. Individual plugin READMEs are the authoritative usage guides.
 
 ## How the collection works
 
