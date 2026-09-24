@@ -15,9 +15,7 @@ AI agents reading prose instructions in SKILL.md, CLAUDE.md, and agent files mus
 - "Handle the usual cases" — which cases? what is usual?
 - "When done..." — done by what signal?
 
-Mermaid flowcharts eliminate these ambiguities. Every branch is an explicit labeled edge. Every
-decision is a diamond node with an observable condition. Every path ends at a named terminal
-state. An agent following a Mermaid diagram traces exactly one path without inferring anything.
+Mermaid can make process structure materially less ambiguous by expressing relevant transitions, guards, actors, and terminal states explicitly. It does not eliminate uncertainty or require deterministic behavior: the semantic model may intentionally permit multiple valid next states, and unresolved intent remains explicit rather than being invented by the diagram.
 
 ## Before and After
 
