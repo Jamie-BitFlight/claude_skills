@@ -369,24 +369,40 @@ def test_repo_skill_workspace_copies_the_complete_skill_tree(tmp_path: Path, mon
         activation.isolated.cleanup_workspace(workspace)
 
 
-def test_repo_skill_resolution_requires_the_installed_root_and_command(tmp_path: Path) -> None:
-    """A response passes only when both installed paths came through the real turn."""
+def test_repo_skill_resolution_requires_installed_root_skill_and_reference(tmp_path: Path) -> None:
+    """A response passes only when all installed paths came through the real turn."""
     skill_file = tmp_path / ".agents" / "skills" / "rebase" / "SKILL.md"
     skill_file.parent.mkdir(parents=True)
     skill_file.write_text("skill\n", encoding="utf-8")
+    reference_file = skill_file.parent / "references" / "publication.md"
+    reference_file.parent.mkdir()
+    reference_file.write_text("publication\n", encoding="utf-8")
     installed = activation.InstalledSkill(skill_file, Path(".agents/skills/rebase/SKILL.md"), "a", "b")
     root = str(skill_file.parent)
 
     assert activation.require_repo_skill_resolution(
-        f"SKILL_ROOT={root}\nCOMMAND={root}/scripts/rebase_plan.py", installed
-    ) == (True, True)
+        f"SKILL_ROOT={root}\nSKILL_FILE={skill_file}\nREFERENCE={reference_file}", installed
+    ) == (True, True, True)
     with pytest.raises(activation.HarnessError, match="did not resolve"):
-        activation.require_repo_skill_resolution(f"SKILL_ROOT={root}", installed)
+        activation.require_repo_skill_resolution(f"SKILL_ROOT={root}\nSKILL_FILE={skill_file}", installed)
     with pytest.raises(activation.HarnessError, match="did not resolve"):
-        activation.require_repo_skill_resolution(f"COMMAND={root}/scripts/rebase_plan.py", installed)
+        activation.require_repo_skill_resolution(f"SKILL_ROOT={root}\nREFERENCE={reference_file}", installed)
     with pytest.raises(activation.HarnessError, match="did not resolve"):
         activation.require_repo_skill_resolution(
-            f"Paths:\nSKILL_ROOT={root}\nCOMMAND={root}/scripts/rebase_plan.py", installed
+            f"SKILL_ROOT={root}\nSKILL_FILE={skill_file}\nREFERENCE={tmp_path / 'source' / 'publication.md'}", installed
+        )
+
+    reference_file.unlink()
+    with pytest.raises(activation.HarnessError, match="reference"):
+        activation.require_repo_skill_resolution(
+            f"SKILL_ROOT={root}\nSKILL_FILE={skill_file}\nREFERENCE={reference_file}", installed
+        )
+
+    reference_file.write_text("publication\n", encoding="utf-8")
+    skill_file.unlink()
+    with pytest.raises(activation.HarnessError, match="skill file"):
+        activation.require_repo_skill_resolution(
+            f"SKILL_ROOT={root}\nSKILL_FILE={skill_file}\nREFERENCE={reference_file}", installed
         )
 
 
@@ -458,6 +474,9 @@ def test_main_uses_repo_skill_consumer_and_writes_sanitized_evidence(
     skill_file = project_dir / ".agents" / "skills" / "rebase" / "SKILL.md"
     skill_file.parent.mkdir(parents=True)
     skill_file.write_text("skill\n", encoding="utf-8")
+    reference_file = skill_file.parent / "references" / "publication.md"
+    reference_file.parent.mkdir()
+    reference_file.write_text("publication\n", encoding="utf-8")
     workspace = activation.isolated.ValidationWorkspace(
         root=workspace_root,
         mode="repo-skill-copy",
@@ -487,7 +506,7 @@ def test_main_uses_repo_skill_consumer_and_writes_sanitized_evidence(
         },
         installation_kind="repo-scoped-skill-copy",
     )
-    response = f"SKILL_ROOT={skill_file.parent}\nCOMMAND={skill_file.parent}/scripts/rebase_plan.py"
+    response = f"SKILL_ROOT={skill_file.parent}\nSKILL_FILE={skill_file}\nREFERENCE={reference_file}"
     captured: dict[str, object] = {}
     monkeypatch.setattr(
         activation,
@@ -524,7 +543,9 @@ def test_main_uses_repo_skill_consumer_and_writes_sanitized_evidence(
     assert captured["installation_kind"] == "repo-scoped-skill-copy"
     assert captured["installed_skill"] == ".agents/skills/rebase/SKILL.md"
     assert captured["skill_root_matched"] is True
-    assert captured["instructed_command_path_matched"] is True
+    assert captured["instructed_skill_file_path_matched"] is True
+    assert captured["instructed_reference_path_matched"] is True
+    assert "instructed_command_path_matched" not in captured
     assert captured["proxy"] == {
         "transport": "portkey",
         "configuration_names": ["OPENAI_API_BASE", "PORTKEY_API_BASE", "PORTKEY_API_KEY", "PORTKEY_MODEL"],
@@ -532,3 +553,4 @@ def test_main_uses_repo_skill_consumer_and_writes_sanitized_evidence(
     serialized = json.dumps(captured)
     assert str(workspace_root) not in serialized
     assert "must-not-persist" not in serialized
+    assert "scripts/rebase_plan.py" not in serialized

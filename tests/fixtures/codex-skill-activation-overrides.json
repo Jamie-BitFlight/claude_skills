@@ -17,7 +17,8 @@
       },
       "injection": {
         "evidence_file": "tests/fixtures/rebase-codex-consumer-evidence.json",
-        "instructed_command_path_matched": true,
+        "instructed_reference_path_matched": true,
+        "instructed_skill_file_path_matched": true,
         "skill_root_matched": true
       },
       "safety": {
@@ -26,11 +27,11 @@
         "sandbox": "read-only"
       }
     },
-    "expected_outcome": "The real Codex consumer activates the installed repo-scoped rebase skill and reports its injected absolute skill_root and resolved rebase_plan.py command without executing commands or reading the authoring checkout.",
+    "expected_outcome": "The real Codex consumer activates the installed repo-scoped rebase skill and reports its injected absolute skill_root, installed SKILL.md, and references/publication.md paths without executing commands or reading the authoring checkout.",
     "safety_class": "READ_ONLY",
     "status": "PASSED",
     "task_source": "tests/fixtures/codex-skill-activation-overrides.json",
-    "task_text": "Read only. Do not run commands and do not access any source checkout. Using only the Codex-supplied skill_root for the explicitly selected rebase skill, report exactly two lines: SKILL_ROOT=<absolute loaded skill directory> and COMMAND=<that directory>/scripts/rebase_plan.py."
+    "task_text": "Read only. Do not run commands and do not access any source checkout. Using only the Codex-supplied skill_root for the explicitly selected rebase skill, report exactly three lines: SKILL_ROOT=<absolute loaded skill directory>, SKILL_FILE=<that directory>/SKILL.md, and REFERENCE=<that directory>/references/publication.md."
   },
   "rwr:audit": {
     "chain": [],
