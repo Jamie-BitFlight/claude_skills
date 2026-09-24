@@ -1,0 +1,163 @@
+{
+  "skill_name": "rebase",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Rebase my local feature/payments branch onto origin/main. Keep the result local; do not push. Before changing anything, state the exact observations that govern the route.",
+      "expected_output": "The rebase skill takes the explicit start route, binds the named refs and safety state, and completes locally without publication.",
+      "assertions": [
+        "Treats feature/payments as the source and origin/main as the target instead of guessing different refs.",
+        "Observes source and target OIDs, active-rebase state, worktree attachment, working-tree status, and worker ownership before mutation.",
+        "Starts replay only after the bound refs remain stable and the owning worktree is safe.",
+        "Verifies the requested history relationship and result ref after replay.",
+        "Does not push because publication was not authorized."
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Continue the rebase that is already active. The conflict resolution is staged in the worktree that owns the rebase metadata. Do not push.",
+      "expected_output": "The active lifecycle is recovered and continued in its owning worktree without starting a fresh rebase or publishing.",
+      "assertions": [
+        "Rediscovers and binds the exact worktree and Git dir that own the active metadata.",
+        "Rebinds the remaining lifecycle contract and reobserves the same metadata immediately before continuing.",
+        "Uses the active-state continue route and never starts a fresh replay.",
+        "Verifies metadata and unmerged entries are absent before local completion.",
+        "Does not push because publication was not authorized."
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Abort the active rebase and restore the exact pre-rebase state, including the saved local work associated with this replay. Do not publish anything.",
+      "expected_output": "The active lifecycle is recovered, aborted in its owner, and restored to its bound pre-replay state.",
+      "assertions": [
+        "Locates the metadata-owning worktree and binds the pre-replay OID before aborting.",
+        "Reobserves the active metadata and exact saved-entry identity immediately before mutation.",
+        "Aborts in the bound owner and verifies HEAD or the source ref equals the pre-replay OID.",
+        "Restores and drops only the uniquely bound saved entry after checks pass.",
+        "Performs no publication."
+      ],
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Rebase feature/payments onto origin/main, then publish that same replay result to origin feature/payments. I authorize one force-with-lease push for this lifecycle.",
+      "expected_output": "Publication remains part of the explicitly authorized start lifecycle and uses an exact observed lease for one attempt.",
+      "assertions": [
+        "Binds the publication remote, destination ref, initial destination OID, and one-attempt authority before replay.",
+        "Publishes only the verified result of this same start lifecycle after repository and interaction checks pass.",
+        "Fetches the exact destination before publication and reconciles compatible destination movement when required.",
+        "Uses force-with-lease tied to the final observed destination OID, never an unqualified force push.",
+        "Stops on lease rejection or later movement unless a new explicit decision and one-attempt authority are supplied."
+      ],
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Merge origin/main into feature/payments so the branch contains the latest main commits.",
+      "expected_output": "The request is routed away from the rebase skill because it asks for a merge-based branch update.",
+      "assertions": [
+        "Does not activate or execute the rebase workflow.",
+        "Identifies the requested operation as a merge-based update.",
+        "Does not rewrite local history or force-push."
+      ],
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "Configure our GitHub repository so pull requests allow rebase merging but disallow merge commits.",
+      "expected_output": "The request is routed to forge settings rather than local history replay.",
+      "assertions": [
+        "Does not activate or execute the rebase workflow.",
+        "Recognizes repository merge-method configuration as forge administration.",
+        "Performs no local Git history mutation."
+      ],
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "Use GitHub's rebase-and-merge option to merge pull request 42.",
+      "expected_output": "The request is routed to pull-request merging rather than the local rebase skill.",
+      "assertions": [
+        "Does not activate or execute the local rebase workflow.",
+        "Recognizes this as a forge pull-request merge action.",
+        "Does not run a local rebase or local force-push."
+      ],
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "The branch was rewritten earlier. Force-push its current tip to origin now; no rebase is active and I am not asking to start one.",
+      "expected_output": "The standalone publication request is routed away from the rebase skill.",
+      "assertions": [
+        "Does not activate or execute the rebase workflow.",
+        "Recognizes that the request is push-only and outside a bound replay lifecycle.",
+        "Does not infer publication authority from an earlier unrelated rewrite."
+      ],
+      "files": []
+    },
+    {
+      "id": 9,
+      "prompt": "Continue my rebase. The current directory has no rebase metadata, but another linked worktree may own it and the original target name is missing from the handoff.",
+      "expected_output": "Recovery searches for the lifecycle owner, rebinds observable facts, and stops before mutation when the remaining contract is incomplete.",
+      "assertions": [
+        "Searches linked worktrees and Git dirs for the exact active metadata owner.",
+        "Reports observed HEAD, refs, progress, unmerged entries, status, and saved-entry state from the owner.",
+        "Rebinds facts from current Git state and current task context without inventing the missing target.",
+        "Stops before continue or abort when the required target contract remains absent or inconsistent."
+      ],
+      "files": []
+    },
+    {
+      "id": 10,
+      "prompt": "Rebase my branch onto the latest branch and make the history look right.",
+      "expected_output": "Ambiguous source, target, and outcome stop the workflow before repository mutation.",
+      "assertions": [
+        "Names the missing source ref, target ref, and observable result relationship.",
+        "Does not guess what 'my branch', 'latest branch', or 'look right' means.",
+        "Reports the supported alternatives and the facts needed to choose among them.",
+        "Performs no rebase, stash, worktree creation, ref update, or push."
+      ],
+      "files": []
+    },
+    {
+      "id": 11,
+      "prompt": "Continue the active rebase. The stopped commit and target both changed the same validation rule for different compatible reasons; preserve both intents if one tested resolution can do so.",
+      "expected_output": "Conflict handling traces both intents and selects a resolution only when exactly one tested outcome preserves all compatible intent.",
+      "assertions": [
+        "Identifies the affected producers, consumers, interfaces, prompts, documentation, and observable behavior.",
+        "Enumerates semantic outcome classes and preserves every intent compatible with the bound replay goal.",
+        "Tests supported outcomes with repository-required and interaction-specific checks.",
+        "Continues only when exactly one staged outcome preserves compatible intent and passes checks.",
+        "Does not choose by ours/theirs labels, apparent recency, or side names."
+      ],
+      "files": []
+    },
+    {
+      "id": 12,
+      "prompt": "Rebase feature/payments onto origin/main. That branch is attached to another worktree where an automation worker is still writing, and the worker cannot currently acknowledge a pause.",
+      "expected_output": "Worktree and worker ownership prevent mutation until a safe checkpoint and handoff are observed.",
+      "assertions": [
+        "Binds the exact attached worktree and Git dir instead of creating a competing worktree.",
+        "Requests a worker pause when supported and waits once for a checkpoint, end, or command result.",
+        "Performs no checkpoint, stash, replay, ref update, or push while the writer remains active or ownership is unknown.",
+        "Reports the last observed worker state and preserves the repository when no acknowledgement is observable.",
+        "Completes only after any acquired worker handoff obligation is acknowledged or the worker is observed stopped."
+      ],
+      "files": []
+    },
+    {
+      "id": 13,
+      "prompt": "Continue the rebase, but inspection confirms there is no active rebase metadata in the bound worktree or its Git dir.",
+      "expected_output": "The absent active lifecycle produces a read-only no-active-rebase result.",
+      "assertions": [
+        "Confirms metadata absence in both the bound worktree and Git dir.",
+        "Reports that no active rebase exists and records the observation.",
+        "Does not start a fresh rebase in response to a continue request.",
+        "Performs no stash, worktree creation, ref update, commit, or push."
+      ],
+      "files": []
+    }
+  ]
+}
