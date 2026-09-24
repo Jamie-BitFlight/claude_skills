@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
@@ -26,6 +27,8 @@ from backlog_core.models import (
 )
 
 if TYPE_CHECKING:
+    from unittest.mock import MagicMock
+
     from pytest_mock import MockerFixture
 
 
@@ -295,3 +298,66 @@ def test_live_empty_list_has_no_cache_ambiguity_warning(mocker: MockerFixture) -
     assert result["items"] == []
     assert result["from_cache"] is False
     assert result["warnings"] == []
+
+
+_DIRECT_PROVIDER_ROUTES = ("add", "title", "plan", "status", "mark-groomed", "close", "resolve")
+
+
+def _run_mutation_and_capture_direct_provider_call(
+    mocker: MockerFixture, backend: _LiveBackend, route: str, *, allow_cached: bool
+) -> MagicMock:
+    """Run one route while replacing only its external provider side effect."""
+    _configure(mocker, backend)
+    repository = SimpleNamespace(full_name="owner/repository")
+    mocker.patch.object(operations, "try_get_github", return_value=repository)
+    mocker.patch.object(operations, "_fetch_issue_graphql", return_value={"id": "node-7"})
+    provider_calls = {
+        "add": mocker.patch.object(operations, "create_issue_for_item", return_value=99),
+        "title": mocker.patch.object(operations, "_update_issue_graphql"),
+        "plan": mocker.patch.object(operations, "_add_comment_graphql"),
+        "status": mocker.patch.object(operations, "apply_status_in_progress"),
+        "mark-groomed": mocker.patch.object(operations, "apply_status_groomed"),
+        "close": mocker.patch.object(operations, "close_github_issue"),
+        "resolve": mocker.patch.object(operations, "resolve_github_issue"),
+    }
+
+    if route == "add":
+        operations.add_item("new item", "new description", "P1", force=True, allow_cached=allow_cached)
+    elif route == "title":
+        operations.update_item("#7", title="renamed", allow_cached=allow_cached)
+    elif route == "plan":
+        operations.update_item("#7", plan="P7", allow_cached=allow_cached)
+    elif route == "status":
+        operations.update_item("#7", status="in-progress", allow_cached=allow_cached)
+    elif route == "mark-groomed":
+        operations.groom_item("#7", mark_groomed=True, allow_cached=allow_cached)
+    elif route == "close":
+        operations.close_item("#7", "wontfix", force=True, allow_cached=allow_cached)
+    else:
+        operations.resolve_item("#7", "completed", force=True, allow_cached=allow_cached)
+    return provider_calls[route]
+
+
+@pytest.mark.parametrize("route", _DIRECT_PROVIDER_ROUTES)
+def test_cached_fallback_queues_without_direct_provider_side_effect(mocker: MockerFixture, route: str) -> None:
+    """Explicit fallback never mutates a provider selected from cached state."""
+    cached = BacklogItem(title="cached title", issue="#7", priority="P1")
+    backend = _LiveBackend([], cached_items=[cached])
+    backend.live_error = BackendUnavailableError("offline")
+
+    provider_call = _run_mutation_and_capture_direct_provider_call(mocker, backend, route, allow_cached=True)
+
+    provider_call.assert_not_called()
+    assert backend.writes
+
+
+@pytest.mark.parametrize("route", _DIRECT_PROVIDER_ROUTES[1:])
+def test_pending_only_tombstone_queues_without_direct_provider_side_effect(mocker: MockerFixture, route: str) -> None:
+    """A live tombstone plus pending intent is not a live provider target."""
+    pending = BacklogItem(title="pending title", issue="#7", priority="P1")
+    backend = _LiveBackend([], pending_items=[pending])
+
+    provider_call = _run_mutation_and_capture_direct_provider_call(mocker, backend, route, allow_cached=False)
+
+    provider_call.assert_not_called()
+    assert backend.writes

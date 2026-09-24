@@ -106,7 +106,7 @@ from .section_registry import SectionKey, resolve_section_name
 from .status_registry import STATUS_LABEL_PREFIX, StatusLabel
 from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS, get_sync_state
 from .timestamps import now_iso
-from .work_item_decisions import CommandWorkItems, WorkItemDecisionContext
+from .work_item_decisions import CommandWorkItems, DecisionTarget, WorkItemDecisionContext
 
 _SAM_SUCCESSFUL_STATUSES: frozenset[str] = SAM_CORE_SUCCESSFUL_STATUSES | {"closed", "done"}
 _SAM_PLAN_PAGE_SIZE: Final = 100
@@ -162,6 +162,18 @@ def _decision_context(
 def _pending_decision_items(context: WorkItemDecisionContext) -> list[BacklogItem]:
     """Return the context's memoized pending intent for safety checks."""
     return context._pending()
+
+
+def _has_live_provider_target(target: DecisionTarget) -> bool:
+    """Whether direct provider side effects are valid for a selected mutation.
+
+    Returns:
+        True for native backends or a GitHub target observed live.
+    """
+    backend = get_config().backend
+    return not getattr(backend, "supports_github_extras", False) or (
+        target.provider is not None and target.provider_snapshot is not None
+    )
 
 
 def _put_work_item(item: BacklogItem, repo: str = "") -> None:
@@ -833,7 +845,9 @@ def _create_issue_and_update_item(item: BacklogItem, repo: str, output: Output |
         return issue_num
 
 
-def _rename_item_title(item: BacklogItem, title: str, repo: str = "", output: Output | None = None) -> bool:
+def _rename_item_title(
+    item: BacklogItem, title: str, repo: str = "", output: Output | None = None, *, live_provider_target: bool = True
+) -> bool:
     """Update the backend-owned item title. Syncs to GitHub issue title if linked.
 
     Returns:
@@ -855,7 +869,7 @@ def _rename_item_title(item: BacklogItem, title: str, repo: str = "", output: Ou
     update_item_metadata(reference, {"name": title}, output=out, base_item=item, repo=repo)
 
     issue_ref = item.issue
-    if issue_ref:
+    if issue_ref and live_provider_target:
         if get_config().backend.issue_id_type == "string":
             # String-ID backend (e.g. beads): issue ref is a nanoid, not a GitHub number.
             # Backend-owned title was already updated above; no GitHub sync needed.
@@ -917,7 +931,9 @@ def _update_item_description(
     return True
 
 
-def _apply_plan_to_item(item: BacklogItem, plan: str, repo: str = "", output: Output | None = None) -> bool:
+def _apply_plan_to_item(
+    item: BacklogItem, plan: str, repo: str = "", output: Output | None = None, *, live_provider_target: bool = True
+) -> bool:
     """Apply plan update through GitHub and the configured backend.
 
     Posts a plan comment on the linked GitHub Issue before updating the backend-owned record.
@@ -943,7 +959,7 @@ def _apply_plan_to_item(item: BacklogItem, plan: str, repo: str = "", output: Ou
 
     # GH-first: post plan reference as a comment on the linked issue
     issue_ref = item.issue
-    if issue_ref:
+    if issue_ref and live_provider_target:
         if get_config().backend.issue_id_type == "string":
             # String-ID backend (e.g. beads): issue ref is a nanoid, not a GitHub number.
             # Local plan metadata was already updated above; no GitHub sync needed.
@@ -1239,7 +1255,7 @@ def _write_groomed_to_item(
         base_item: Already selected pending/provider content to mutate.
         repo: Repository that owns the selected work item.
     """
-    item = base_item.model_copy(deep=True) if base_item is not None else _work_item(reference)
+    item = base_item if base_item is not None else _work_item(reference)
     today_str = today()
     item.metadata.groomed = today_str
 
@@ -1479,7 +1495,7 @@ def _handle_batch_groomed(
     # when a YAML write targets a .md filepath and a subsequent backend read on
     # that same path incorrectly re-parses it as Markdown, losing prior sections.
     written: list[str] = []
-    batch_item = item.model_copy(deep=True)
+    batch_item = item
     today_str = today()
     batch_item.metadata.groomed = today_str
     for section_name, content in sections.items():
@@ -1840,6 +1856,7 @@ def add_item(
 
     out = output or Output()
     context = _decision_context(repo=repo, allow_cached=allow_cached, output=out)
+    observed = context.all()
 
     _check_for_duplicates(context, title, description, force, out)
 
@@ -1859,7 +1876,10 @@ def add_item(
         files=files,
         suggested_location=suggested_location,
     )
-    issue_ref = _try_create_backend_issue_ref(item_data, repo, out)
+    can_create_provider_item = not getattr(context.backend, "supports_github_extras", False) or (
+        observed.provider_snapshot is not None
+    )
+    issue_ref = _try_create_backend_issue_ref(item_data, repo, out) if can_create_provider_item else ""
     item_reference = issue_ref or _resolve_reference(context, priority, slug)
 
     # Build and persist the backend-owned work item. Reuse item_data.title, not the
@@ -4227,6 +4247,7 @@ def close_item(
     item = target.mutation_base
     if not item:
         raise ItemNotFoundError(selector)
+    live_provider_target = _has_live_provider_target(target)
     provider_item = target.provider
     issue_ref = provider_item.issue if provider_item is not None else item.issue
     if issue_ref and not force:
@@ -4272,7 +4293,7 @@ def close_item(
     )
 
     out.info(f'Backlog item "{item.title}" closed ({reason}).')
-    if issue_ref and target.provider_snapshot is not None:
+    if issue_ref and live_provider_target:
         close_github_issue(issue_ref, reason, reference=reference, comment=comment, repo=repo, output=out)
     elif issue_ref:
         out.info(f"Queued {issue_ref} for provider reconciliation.")
@@ -4318,6 +4339,7 @@ def resolve_item(
     item = target.mutation_base
     if not item:
         raise ItemNotFoundError(selector)
+    live_provider_target = _has_live_provider_target(target)
     provider_item = target.provider
     issue_ref = provider_item.issue if provider_item is not None else item.issue
     if issue_ref and not force:
@@ -4353,7 +4375,7 @@ def resolve_item(
     update_item_metadata(reference, {"metadata": metadata}, output=out, base_item=item, repo=repo)
 
     out.info(f'Backlog item "{item.title}" resolved.')
-    if issue_ref and target.provider_snapshot is not None:
+    if issue_ref and live_provider_target:
         resolve_github_issue(
             issue_ref,
             summary=summary,
@@ -4373,7 +4395,13 @@ def resolve_item(
 
 
 def _apply_non_in_progress_status(
-    item: BacklogItem, status: str, repo: str, result: dict[str, str | int | bool | list[str]], output: Output
+    item: BacklogItem,
+    status: str,
+    repo: str,
+    result: dict[str, str | int | bool | list[str]],
+    output: Output,
+    *,
+    live_provider_target: bool = True,
 ) -> None:
     """Handle every status value other than "in-progress" for _apply_issue_status_labels.
 
@@ -4389,6 +4417,7 @@ def _apply_non_in_progress_status(
         repo: GitHub repo slug (e.g. ``"owner/repo"``).
         result: Partial result dict mutated in place with ``"status"`` / ``"error"`` keys.
         output: Output aggregator for info/warning messages.
+        live_provider_target: Whether direct provider label mutation is valid.
     """
     is_string_id_backend = get_config().backend.issue_id_type == "string"
     has_integer_issue = parse_issue_number(item.issue) is not None
@@ -4406,12 +4435,17 @@ def _apply_non_in_progress_status(
                 result["status"] = "blocked"
             else:
                 result["error"] = "Cannot set status='blocked': item has no backend reference"
-        elif has_integer_issue:
+        elif has_integer_issue and live_provider_target:
             try:
                 apply_status_blocked(item, repo, output=output)
             except GithubException as e:
                 result["error"] = str(e)
                 return
+            result["status"] = "blocked"
+        elif has_integer_issue:
+            update_item_metadata(
+                item.reference, {"metadata": {"status": "blocked"}}, output=output, base_item=item, repo=repo
+            )
             result["status"] = "blocked"
         else:
             result["error"] = "Cannot set status='blocked': item has no issue reference"
@@ -4434,6 +4468,8 @@ def _apply_issue_status_labels(
     repo: str,
     result: dict[str, str | int | bool | list[str]],
     output: Output,
+    *,
+    live_provider_target: bool = True,
 ) -> None:
     """Apply status changes for the item.
 
@@ -4460,6 +4496,7 @@ def _apply_issue_status_labels(
         repo: GitHub repo slug (e.g. ``"owner/repo"``).
         result: Partial result dict mutated in place with ``"status"`` / ``"verified"`` / ``"error"`` keys.
         output: Output aggregator for info/warning messages.
+        live_provider_target: Whether direct provider label mutation is valid.
     """
     has_integer_issue = parse_issue_number(item.issue) is not None
     is_string_id_backend = get_config().backend.issue_id_type == "string"
@@ -4478,20 +4515,24 @@ def _apply_issue_status_labels(
                 update_item_metadata(
                     item.reference, {"metadata": {"status": "in-progress"}}, output=output, base_item=item, repo=repo
                 )
-        elif has_integer_issue:
+        elif has_integer_issue and live_provider_target:
             apply_status_in_progress(item, repo, output=output)
+        elif has_integer_issue:
+            update_item_metadata(
+                item.reference, {"metadata": {"status": "in-progress"}}, output=output, base_item=item, repo=repo
+            )
         result["status"] = "in-progress"
     elif status:
         # Unlike "in-progress" above, these outcomes don't all require a
         # backend target — terminal-status/unrecognized-value rejection is
         # pure validation, so run it even when no_backend_target is True.
-        _apply_non_in_progress_status(item, status, repo, result, output)
+        _apply_non_in_progress_status(item, status, repo, result, output, live_provider_target=live_provider_target)
     elif no_backend_target:
         # No status change requested and nothing to write to: skip the
         # verified check below too, rather than reporting a no-op "verified".
         return
 
-    if verified:
+    if verified and live_provider_target:
         if not has_integer_issue:
             # verified label requires a numeric issue ID — no-op for backends
             # that use string IDs or for items with no issue reference.
@@ -4643,15 +4684,22 @@ def update_item(
     item = target.mutation_base
     if not item:
         raise ItemNotFoundError(selector)
+    live_provider_target = _has_live_provider_target(target)
 
     result: dict[str, str | int | bool | list[str]] = {"title": item.title}
 
     if title:
-        _rename_item_title(item, title, repo, output=out)
+        _rename_item_title(item, title, repo, output=out, live_provider_target=live_provider_target)
         result["renamed_to"] = title
 
     if description is not None:
-        _update_item_description(item, description, repo=repo, output=out, snapshot=target.provider_snapshot)
+        _update_item_description(
+            item,
+            description,
+            repo=repo,
+            output=out,
+            snapshot=target.provider_snapshot if live_provider_target else None,
+        )
         result["description_updated"] = True
 
     has_groomed = groomed or groomed_file or groomed_content or (section and content) or (sections is not None)
@@ -4670,21 +4718,24 @@ def update_item(
             reason=reason,
             append=append,
             sections=sections,
-            snapshot=target.provider_snapshot,
+            snapshot=target.provider_snapshot if live_provider_target else None,
         )
 
     if plan:
-        _apply_plan_to_item(item, plan, repo, output=out)
+        _apply_plan_to_item(item, plan, repo, output=out, live_provider_target=live_provider_target)
         out.info(f"  Plan: {plan}")
         result["plan"] = plan
 
-    if not item.issue and (not title or status or verified):
+    if live_provider_target and not item.issue and (not title or status or verified):
         issue_num = _create_issue_and_update_item(item, repo, output=out)
         if issue_num:
             out.info(f"  Issue: #{issue_num}")
             result["issue_num"] = issue_num
 
-    _apply_issue_status_labels(item, status, verified, repo, result, out)
+    _apply_issue_status_labels(item, status, verified, repo, result, out, live_provider_target=live_provider_target)
+
+    if item.issue and not live_provider_target:
+        out.info(f"Queued {item.issue} for provider reconciliation.")
 
     changes = _extract_changes(result)
     return {**result, "changes": changes, **out.to_dict()}
@@ -4744,6 +4795,7 @@ def groom_item(
     item = target.mutation_base
     if item is None:
         raise ItemNotFoundError(selector)
+    live_provider_target = _has_live_provider_target(target)
     if has_input:
         result = update_item(
             selector=selector,
@@ -4785,12 +4837,14 @@ def groom_item(
                 )
                 result["mark_groomed_applied"] = True
                 out.info("  Status: groomed (local)")
-            if fresh_item.issue:
+            if fresh_item.issue and live_provider_target:
                 try:
                     apply_status_groomed(fresh_item, repo, output=out)
                 except GithubException as e:
                     out.warn(f"  GitHub label update failed: {e}")
                     result["mark_groomed_label_error"] = str(e)
+            elif fresh_item.issue:
+                out.info(f"Queued {fresh_item.issue} for provider reconciliation.")
     return result
 
 

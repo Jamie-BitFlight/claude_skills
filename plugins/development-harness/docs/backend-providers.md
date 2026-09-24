@@ -212,6 +212,11 @@ fallback carries a warning and `from_cache=True`. A successful live observation,
 including an empty snapshot or an exact selector that does not exist, is
 authoritative and does not activate fallback.
 
+Provider snapshot baselines and incremental checkpoints are repository-scoped,
+matching the pending-intent journal. Legacy unscoped snapshot/checkpoint state
+belongs only to the backend's configured/default repository, so existing
+single-repository caches remain readable without migration.
+
 `operations.list_items` reports `from_cache` and `has_pending_writes`
 independently. Normal successful GitHub reads set `from_cache=False` even when
 the private journal has pending mutations. `has_pending_writes=True` reports
