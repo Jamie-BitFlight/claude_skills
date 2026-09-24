@@ -30,12 +30,6 @@
       "prompt": "The code changed in ten commits without docs changes. Find the drift.",
       "expected_output": "Does not infer drift from commit separation alone; demonstrates a claim that became false/incomplete first.",
       "files": []
-    },
-    {
-      "id": 6,
-      "prompt": "DH dispatch: item_id=381, project_root=/repo. Audit documentation drift and register the result.",
-      "expected_output": "Runs the same conformance process, registers an audit-report artifact using item_id 381, returns the DH STATUS contract, and does not write the report to a private filesystem path.",
-      "files": []
     }
   ]
 }
