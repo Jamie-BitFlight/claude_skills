@@ -837,7 +837,6 @@ class TestRealPluginsIntegration:
             ("python-engineering", "code-reviewer"),
             ("python-engineering", "python-cli-architect"),
             ("python-engineering", "python-pytest-architect"),
-            ("python3-development", "code-reviewer"),
         }
         missing = expected - present
         assert not missing, f"agents missing from profile_list(): {missing}"

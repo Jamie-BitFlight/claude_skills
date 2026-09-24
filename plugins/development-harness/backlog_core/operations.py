@@ -1041,7 +1041,7 @@ def _apply_groomed_entries(
         section.entries.append(Entry(id=now_iso(), content=groomed_content))
 
 
-def _normalize_section_key(name: str, *, output: Output | None = None) -> str:
+def _normalize_section_key(name: str) -> str:
     """Return the canonical storage key for a section name.
 
     Resolves the name through :func:`~.section_registry.resolve_section_name`
@@ -1055,10 +1055,15 @@ def _normalize_section_key(name: str, *, output: Output | None = None) -> str:
     Names that resolve to neither the registry nor the alias map fall through
     to :func:`heading_to_unknown_key` — the same normaliser
     ``github_sync.parse_issue_body`` applies to an unrecognised ``## Heading``
-    parsed back from a GitHub issue body. That fallback is reported (see
+    parsed back from a GitHub issue body. Callers that go on to persist the
+    section report that fallback afterwards (see
     :func:`_warn_unregistered_section`) so a genuinely new, permanently
     unregistered section name is visible immediately instead of silently
-    accumulating — the direct root cause #2970 exists to close.
+    accumulating — the direct root cause #2970 exists to close. This function
+    only derives the key, so it stays silent: one of its callers is a read-side
+    gate that decides whether an overlap check applies and writes nothing, and
+    announcing a save from here announced that gate's key derivation as a save
+    that had not happened.
 
     Without this, a local write of e.g. ``"Files"`` stored the key verbatim
     while a GitHub round-trip of the same rendered heading produced
@@ -1076,10 +1081,6 @@ def _normalize_section_key(name: str, *, output: Output | None = None) -> str:
 
     Args:
         name: Section name as provided by the caller (e.g. ``"RT-ICA"`` or ``"Custom Analysis"``).
-        output: Optional ``Output`` aggregator. When provided, a fallback to
-            ``unknown__`` is also recorded as a warning visible to the caller
-            (MCP response / CLI output) in addition to the stderr diagnostic
-            :func:`_warn_unregistered_section` always emits.
 
     Returns:
         Canonical storage key, e.g. ``"rt_ica"`` for a canonical section or
@@ -1131,39 +1132,23 @@ def _normalize_section_key(name: str, *, output: Output | None = None) -> str:
         stripped = name.removeprefix("unknown__")
         recovered = resolve_section_name(stripped) or resolve_section_name(reconstruct_unknown_heading(name))
         return recovered if recovered is not None else name
-    key = heading_to_unknown_key(name)
-    # #3370: heading_to_unknown_key() itself now folds to a canonical key
-    # when the unknown__ key's reconstructed heading is registered (e.g.
-    # ":EFFORT" -> "effort") -- that is not a fallback, so warning about an
-    # "unregistered section" here would be false: the section IS registered.
-    if key.startswith("unknown__"):
-        _warn_unregistered_section(name, output)
-    return key
+    return heading_to_unknown_key(name)
 
 
-def _warn_unregistered_section(name: str, output: Output | None) -> None:
+def _warn_unregistered_section(name: str, key: str, output: Output | None) -> None:
     """Tell the calling agent its section name is non-standard.
 
-    The only reader is the agent that called the write, on both channels —
-    stderr and ``Output.warnings``. It is in another repository, on a project
-    of its own, with no access to this plugin's source and no reason to change
-    it. So the message answers only what bears on that agent's task: the write
-    succeeded, and a later read must use the same name verbatim.
-
-    Everything else about this condition is a design-time concern for this
-    plugin — the registry, the ``unknown__`` key, which names are canonical,
-    who should register one. None of it reaches that agent as anything but
-    noise, and an instruction to act on it takes the agent out of its task.
-    Those belong in this repository's own authoring-time checks.
+    Called only after *key* is persisted. The warning names the reconstructed
+    display spelling that a later section read can retrieve.
 
     Args:
         name: The caller-supplied section name that did not resolve.
+        key: The storage key *name* was persisted under.
         output: Optional ``Output`` aggregator to also receive the warning.
     """
-    message = (
-        f"Section {name!r} saved. It is not one of this tool's standard section names, so "
-        f"anything reading it back must ask for {name!r} exactly."
-    )
+    retrievable = reconstruct_unknown_heading(key)
+    saved = f"Section {name!r} saved." if retrievable == name else f"Section {name!r} saved as {retrievable!r}."
+    message = f"{saved} Use section={retrievable!r} to read it back."
     print(message, file=sys.stderr)
     if output is not None:
         output.warn(message)
@@ -1191,9 +1176,9 @@ def _write_groomed_to_item(
         groomed_content: The text to write into the section.
         section_name: Named section to update.  When ``None`` the top-level
             ``groomed`` section (stored as ``GroomedData``) is updated.
-        output: Optional ``Output`` aggregator, forwarded to
-            :func:`_normalize_section_key` so an unregistered-name fallback
-            is visible in the caller's response, not only on stderr.
+        output: Optional ``Output`` aggregator. An unregistered-name fallback
+            is recorded on it once the write lands, so the caller sees it in
+            its own response and not only on stderr.
         entry_id: Optional ID used to locate an existing entry for update.
         replace_section: When ``True``, strike all existing entries and add
             the new content as a replacement.  Requires ``reason``.
@@ -1213,7 +1198,7 @@ def _write_groomed_to_item(
         groomed_data.subsections["content"] = groomed_content.strip()
         item.sections["groomed"] = groomed_data
     else:
-        section_key = _normalize_section_key(section_name, output=output)
+        section_key = _normalize_section_key(section_name)
         existing_section = item.sections.get(section_key)
         section = existing_section if isinstance(existing_section, Section) else Section()
         _apply_groomed_entries(
@@ -1228,6 +1213,8 @@ def _write_groomed_to_item(
         item.sections[section_key] = section
 
     get_config().backend.put_work_item(item)
+    if section_name is not None and section_key.startswith("unknown__"):
+        _warn_unregistered_section(section_name, section_key, output)
 
 
 def _write_groomed_to_reference(
@@ -1421,7 +1408,7 @@ def _handle_batch_groomed(
     today_str = today()
     batch_item.metadata.groomed = today_str
     for section_name, content in sections.items():
-        section_key = _normalize_section_key(section_name, output=out)
+        section_key = _normalize_section_key(section_name)
         existing_section = batch_item.sections.get(section_key)
         section = existing_section if isinstance(existing_section, Section) else Section()
         _apply_groomed_entries(
@@ -1430,6 +1417,9 @@ def _handle_batch_groomed(
         batch_item.sections[section_key] = section
         written.append(section_key)
     get_config().backend.put_work_item(batch_item)
+    for section_name, section_key in zip(sections, written, strict=True):
+        if section_key.startswith("unknown__"):
+            _warn_unregistered_section(section_name, section_key, out)
     out.info(f"Updated {item.reference} with {len(written)} groomed section(s)")
 
     # Check the actual normalized keys just written (`written`), not a
