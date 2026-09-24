@@ -117,9 +117,10 @@ flowchart TD
     S2Q -->|"Yes"| S2B
     S2B -->|"Output: confirmed shape brief"| S_AD2
     S_AD2["Adversarial Solution Design<br>subagent_type=python-engineering:adversarial-solution-design<br>Context: architecture spec path, affected module paths<br>Output: solution brief + validation plan + TDD recommendation"]
-    S_AD2 -->|"Output: solution brief, validation plan"| S4
-    S4 -->|"Output: new feature implementation"| S5
-    S5 -->|"Output: tests for new feature + integration tests"| S6
+    S_AD2 -->|"TDD REQUIRED/RECOMMENDED"| S5
+    S_AD2 -->|"TDD OPTIONAL/NOT_APPLICABLE"| S4
+    S5 -->|"Failing tests written first"| S4
+    S4 -->|"Output: implementation satisfying tests"| S6
     S6 -->|"Output: quality assessment, improvement list"| S7
 ```
 
@@ -156,7 +157,7 @@ Decision criterion for "Tests exist and pass?": first run `uv run pytest --co -q
 
 ```mermaid
 flowchart TD
-    S1{"Tests exist and pass?<br>Run: uv run pytest --co -q<br>Yes: test items listed, exit 0<br>No: empty output or exit non-zero"}
+    S1{"Tests exist and pass?<br>Collect: uv run pytest --co -q<br>Execute: uv run pytest<br>Yes: items collected AND suite exit 0<br>No: no items or suite non-zero"}
     S1a["Write Tests First<br>subagent_type=python-engineering:python-pytest-architect<br>Context: file paths to be refactored, current behavior description<br>Output: tests/ capturing current behavior (all must pass before refactoring)"]
     S2["Refactor<br>subagent_type=python-engineering:python-cli-architect<br>Context: file paths to refactor, tests/ path<br>Constraint: must not break existing tests — run uv run pytest after each change<br>Output: refactored implementation with same external behavior"]
     S3["Validate<br>Run: uv run pytest (coverage must equal or exceed pre-refactor baseline)<br>Pass criteria: all tests green, coverage maintained or improved"]
