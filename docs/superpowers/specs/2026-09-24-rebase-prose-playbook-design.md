@@ -356,7 +356,7 @@ flowchart TD
     OrientAbort --> Handoff; LeaseStop --> Handoff
     Handoff[Agent: check acquired worker obligation] --> Worker{Worker obligation?}
     Worker -->|None| Terminal{Observed path predicate?}; Worker -->|Acquired| Deliver[Agent: deliver summary and resume/stop decision]
-    Worker -->|Unknown or unobservable| Pending([Agent: stop mutation; report last worker state, attempted handoff, missing observation; no completion])
+    Worker -->|Unknown or unobservable| Pending([Agent: stop mutation; preserve repo; report last worker state, handoff attempt, missing ack/observation; no completion])
     Deliver --> HandoffResult{Acknowledged summary/resume, or worker observed stopped with handoff?}
     HandoffResult -->|Yes| Terminal; HandoffResult -->|No or unobservable| Pending
     Terminal -->|Abort request and restored pre-state| Aborted([Aborted and restored])
