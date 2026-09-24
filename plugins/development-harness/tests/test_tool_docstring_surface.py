@@ -13,8 +13,8 @@ reach: it reads this plugin's tools, not its repository.
 
 The set of names a description *may* use is derived from the repository rather than
 listed here, so it cannot go stale: skill and agent names from their directories, CLI
-commands and flags from the Typer decorators, and tool names plus every field of every
-advertised schema from the live servers. A description is read the way a consumer
+commands and flags from the Typer decorators, and tool names plus every field and enum value
+of every advertised schema from the live servers. A description is read the way a consumer
 receives it -- ``list_tools()`` output, not the source docstring -- which is also how
 tools mounted from a submodule get checked at all. FastMCP drops a Google-style section
 before advertising, so the section assertion below now guards against that changing rather
@@ -29,11 +29,13 @@ import re
 from pathlib import Path
 
 import pytest
-from backlog_core.server import mcp as _backlog_mcp
-from sam_schema.server import mcp as _sam_mcp
+from backlog_core.server import mcp as backlog_mcp
+from fastmcp.tools import Tool
+from pydantic import JsonValue, TypeAdapter
+from sam_schema.server import mcp as sam_mcp
 
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
-_SERVERS = (("backlog_core/server.py", _backlog_mcp), ("sam_schema/server.py", _sam_mcp))
+_SERVERS = (("backlog_core/server.py", backlog_mcp), ("sam_schema/server.py", sam_mcp))
 
 _SECTION = re.compile(r"^\s*(Returns|Raises|Args|Attributes|Yields):\s*$", re.MULTILINE)
 _BEHIND_THE_SURFACE = (
@@ -45,19 +47,27 @@ _BEHIND_THE_SURFACE = (
 
 # A value rendered into the text at runtime is a value, not a symbol: ``{plan_id}`` reaches
 # the consumer as the id itself.
-_PLACEHOLDER = re.compile(r"\{[^{}]*\}")
+PLACEHOLDER = re.compile(r"\{[^{}]*\}")
 # Two shapes carry a symbol name that plain English does not: an underscore, and a second
 # capital hump. One hump is not enough -- ``Check`` opens a sentence and also names a class.
-_IDENTIFIER_SHAPED = re.compile(r"[A-Za-z0-9]+_[A-Za-z0-9_]+|[A-Z][a-z]+[A-Z][A-Za-z0-9]*")
+IDENTIFIER_SHAPED = re.compile(r"[A-Za-z0-9]+_[A-Za-z0-9_]+|[A-Z][a-z]+[A-Z][A-Za-z0-9]*")
 
 # Names that originate outside this repository, so no walk of it can enumerate them: an
 # environment variable GitHub defines, GitHub's Projects V2 API, and the GraphQL query
 # language. Each is something the consumer sets or talks to directly.
-_EXTERNAL_NAMES = frozenset({"github_token", "projectv2", "graphql"})
+EXTERNAL_NAMES = frozenset({"github_token", "projectv2", "graphql"})
+JSON_VALUE_ADAPTER = TypeAdapter(JsonValue)
 
 
-def _nameable() -> dict[str, set[str]]:
-    """Every name a consumer can act on, read off the repository that defines it."""
+def collect_consumer_surface(live_tools: list[tuple[str, Tool]]) -> dict[str, set[str]]:
+    """Read every consumer-visible name from its defining repository surface.
+
+    Args:
+        live_tools: Source-module and live-tool pairs from both MCP servers.
+
+    Returns:
+        Consumer-visible names grouped by their declaring surface.
+    """
     commands: set[str] = set()
     flags: set[str] = set()
     for module in (_PLUGIN_ROOT / "sam_schema").glob("*.py"):
@@ -67,22 +77,29 @@ def _nameable() -> dict[str, set[str]]:
             for decorator in node.decorator_list:
                 if not (isinstance(decorator, ast.Call) and getattr(decorator.func, "attr", None) == "command"):
                     continue
-                commands.add(node.name)
-                commands.update(
-                    a.value for a in decorator.args if isinstance(a, ast.Constant) and isinstance(a.value, str)
-                )
+                explicit_names = {
+                    value.value
+                    for value in [
+                        *decorator.args,
+                        *(keyword.value for keyword in decorator.keywords if keyword.arg == "name"),
+                    ]
+                    if isinstance(value, ast.Constant) and isinstance(value.value, str)
+                }
+                commands.update(explicit_names or {node.name.replace("_", "-")})
                 for argument in [*node.args.args, *node.args.kwonlyargs]:
-                    flags.add(argument.arg)
-                    for sub in ast.walk(argument.annotation) if argument.annotation else ():
-                        if isinstance(sub, ast.Constant) and isinstance(sub.value, str) and sub.value.startswith("-"):
-                            flags.add(sub.value.lstrip("-"))
+                    explicit_flags = {
+                        sub.value.lstrip("-")
+                        for sub in (ast.walk(argument.annotation) if argument.annotation else ())
+                        if isinstance(sub, ast.Constant) and isinstance(sub.value, str) and sub.value.startswith("-")
+                    }
+                    flags.update(explicit_flags or {argument.arg.replace("_", "-")})
 
     tools: set[str] = set()
-    fields: set[str] = set()
-    for _, server in _SERVERS:
-        for tool in asyncio.run(server.list_tools()):
-            tools.add(tool.name)
-            _collect_properties([tool.parameters, tool.output_schema], fields)
+    schema_terms: set[str] = set()
+    for _, tool in live_tools:
+        tools.add(tool.name)
+        collect_schema_terms(JSON_VALUE_ADAPTER.validate_python(tool.parameters), schema_terms)
+        collect_schema_terms(JSON_VALUE_ADAPTER.validate_python(tool.output_schema), schema_terms)
 
     return {
         "skills": {p.name for p in (_PLUGIN_ROOT / "skills").iterdir() if p.is_dir()},
@@ -90,47 +107,54 @@ def _nameable() -> dict[str, set[str]]:
         "cli commands": commands,
         "cli flags": flags,
         "tool names": tools,
-        "schema fields": fields,
+        "schema fields and values": schema_terms,
     }
 
 
-def _collect_properties(node: object, into: set[str]) -> None:
+def collect_schema_terms(node: JsonValue, into: set[str]) -> None:
+    """Collect every nested JSON Schema property name and constrained string value.
+
+    Args:
+        node: Validated JSON Schema value to traverse.
+        into: Set receiving discovered property names and constrained values.
+    """
     if isinstance(node, dict):
         if isinstance(properties := node.get("properties"), dict):
             into.update(properties)
+        if isinstance(enum := node.get("enum"), list):
+            into.update(value for value in enum if isinstance(value, str))
+        if isinstance(const := node.get("const"), str):
+            into.add(const)
         for value in node.values():
-            _collect_properties(value, into)
+            collect_schema_terms(value, into)
     elif isinstance(node, list):
         for value in node:
-            _collect_properties(value, into)
+            collect_schema_terms(value, into)
 
 
-def _vocabulary() -> set[str]:
-    words = set(_EXTERNAL_NAMES)
-    for group in _nameable().values():
-        for name in group:
-            words.add(name.lower())
-            words.update(word.lower() for word in re.split(r"[-_.]", name) if word)
-    return words
+def test_explicit_typer_command_excludes_implementation_function_name() -> None:
+    """An explicit Typer name, not its Python function name, is consumer-visible."""
+    commands = CONSUMER_SURFACE["cli commands"]
+
+    assert "get" in commands
+    assert "active_task_get" not in commands
 
 
-def _descriptions() -> list[tuple[str, str, str]]:
-    found = [
-        (relative, tool.name, tool.description or "")
-        for relative, server in _SERVERS
-        for tool in asyncio.run(server.list_tools())
-    ]
-    assert len(found) >= 48, f"expected the full tool surface, found {len(found)}"
-    return found
+LIVE_TOOLS = [(relative, tool) for relative, server in _SERVERS for tool in asyncio.run(server.list_tools())]
+
+CONSUMER_SURFACE = collect_consumer_surface(LIVE_TOOLS)
+
+VOCABULARY = set(EXTERNAL_NAMES)
+for names in CONSUMER_SURFACE.values():
+    for name in names:
+        VOCABULARY.add(name.lower())
+        VOCABULARY.update(word.lower() for word in re.split(r"[-_.]", name) if word)
+
+DESCRIPTIONS = [(relative, tool.name, tool.description or "") for relative, tool in LIVE_TOOLS]
+assert len(DESCRIPTIONS) >= 48, f"expected the full tool surface, found {len(DESCRIPTIONS)}"
 
 
-_VOCABULARY = _vocabulary()
-
-
-_DESCRIPTIONS = _descriptions()
-
-
-@pytest.mark.parametrize(("relative", "tool", "doc"), _DESCRIPTIONS, ids=[f"{r}::{t}" for r, t, _ in _DESCRIPTIONS])
+@pytest.mark.parametrize(("relative", "tool", "doc"), DESCRIPTIONS, ids=[f"{r}::{t}" for r, t, _ in DESCRIPTIONS])
 def test_tool_description_stays_on_the_consumer_surface(relative: str, tool: str, doc: str) -> None:
     section = _SECTION.search(doc)
     assert section is None, (
@@ -145,10 +169,10 @@ def test_tool_description_stays_on_the_consumer_surface(relative: str, tool: str
             f"tool names, tool parameters, CLI commands, skills and agents -- name one of those instead."
         )
     unknown = sorted({
-        t for t in _IDENTIFIER_SHAPED.findall(_PLACEHOLDER.sub(" ", doc)) if t.lower() not in _VOCABULARY
+        token for token in IDENTIFIER_SHAPED.findall(PLACEHOLDER.sub(" ", doc)) if token.lower() not in VOCABULARY
     })
     assert not unknown, (
         f"{relative}::{tool} names {unknown}, which is neither ordinary English nor any skill, agent, CLI "
-        f"command, CLI flag, tool name or advertised schema field this repository defines. Say it in terms "
+        f"command, CLI flag, tool name, or advertised schema term this repository defines. Say it in terms "
         f"of this tool and its parameters, keeping whatever the sentence was telling the consumer."
     )

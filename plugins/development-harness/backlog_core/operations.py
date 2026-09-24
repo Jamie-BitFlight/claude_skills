@@ -1138,27 +1138,8 @@ def _normalize_section_key(name: str) -> str:
 def _warn_unregistered_section(name: str, key: str, output: Output | None) -> None:
     """Tell the calling agent its section name is non-standard.
 
-    Called only once *key* has been persisted, so "saved" is true when the
-    message is read.
-
-    The only reader is the agent that called the write, on both channels —
-    stderr and ``Output.warnings``. It is in another repository, on a project
-    of its own, with no access to this plugin's source and no reason to change
-    it. So the message answers only what bears on that agent's task: the write
-    succeeded, and the one name a later read must ask for.
-
-    That name is not always the one the caller wrote. *key* drops every
-    character outside ``[a-z0-9]``, and a read resolves the section by the
-    heading rebuilt from *key*, so ``"Cost & Latency"`` comes back only as
-    ``"Cost Latency"``. Naming the caller's spelling instead would send the
-    agent to fetch a section that answers nothing, and an agent that asked for
-    what it just wrote and got nothing concludes the write was lost.
-
-    Everything else about this condition is a design-time concern for this
-    plugin — the registry, the ``unknown__`` key, which names are canonical,
-    who should register one. None of it reaches that agent as anything but
-    noise, and an instruction to act on it takes the agent out of its task.
-    Those belong in this repository's own authoring-time checks.
+    Called only after *key* is persisted. The warning names the reconstructed
+    display spelling that a later section read can retrieve.
 
     Args:
         name: The caller-supplied section name that did not resolve.
@@ -1167,10 +1148,7 @@ def _warn_unregistered_section(name: str, key: str, output: Output | None) -> No
     """
     retrievable = reconstruct_unknown_heading(key)
     saved = f"Section {name!r} saved." if retrievable == name else f"Section {name!r} saved as {retrievable!r}."
-    message = (
-        f"{saved} It is not one of this tool's standard section names, so "
-        f"anything reading it back must ask for {retrievable!r} exactly."
-    )
+    message = f"{saved} Use section={retrievable!r} to read it back."
     print(message, file=sys.stderr)
     if output is not None:
         output.warn(message)
@@ -1429,11 +1407,8 @@ def _handle_batch_groomed(
     batch_item = _work_item(item.reference)
     today_str = today()
     batch_item.metadata.groomed = today_str
-    unregistered: list[tuple[str, str]] = []
     for section_name, content in sections.items():
         section_key = _normalize_section_key(section_name)
-        if section_key.startswith("unknown__"):
-            unregistered.append((section_name, section_key))
         existing_section = batch_item.sections.get(section_key)
         section = existing_section if isinstance(existing_section, Section) else Section()
         _apply_groomed_entries(
@@ -1442,8 +1417,9 @@ def _handle_batch_groomed(
         batch_item.sections[section_key] = section
         written.append(section_key)
     get_config().backend.put_work_item(batch_item)
-    for section_name, section_key in unregistered:
-        _warn_unregistered_section(section_name, section_key, out)
+    for section_name, section_key in zip(sections, written, strict=True):
+        if section_key.startswith("unknown__"):
+            _warn_unregistered_section(section_name, section_key, out)
     out.info(f"Updated {item.reference} with {len(written)} groomed section(s)")
 
     # Check the actual normalized keys just written (`written`), not a

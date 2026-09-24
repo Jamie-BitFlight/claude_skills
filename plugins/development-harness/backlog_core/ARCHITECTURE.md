@@ -314,11 +314,11 @@ section name (from `backlog_groom`'s `section=`/`sections={}` MCP parameters) th
 `resolve_section_name` before persisting — a resolvable alias or legacy `unknown__` form always
 persists under its resolved canonical key, never under the alias spelling and never under
 `unknown__`. A name that resolves to neither the registry nor the alias map falls back to
-`heading_to_unknown_key` (`rendering.py`) as before, but that fallback now also calls
-`operations._warn_unregistered_section`, which prints a diagnostic to stderr unconditionally (this
-is forensic output per AGENTS.md "CLI and script output — agent-only, never human-facing", not
-primary output) and records the same fact on the caller's `Output.warnings` when one is provided —
-so a new, permanently unregistered name is visible immediately instead of silently accumulating.
+`heading_to_unknown_key` (`rendering.py`) as before. After the backend successfully persists that
+fallback, the owning single- or batch-write path calls `operations._warn_unregistered_section`,
+which prints a diagnostic to stderr and records the same warning on the caller's `Output.warnings`
+when one is provided. The persisted content remains intact, and the warning names the reconstructed
+display spelling that a later section read can retrieve.
 `github_sync._parse_groomed_section` applies the identical `resolve_subsection_name` resolution to
 `### subsection` headings parsed from a GitHub issue body — the write boundary for subsections.
 `github_sync.parse_issue_body`'s top-level `## Section` heading lookup and the public

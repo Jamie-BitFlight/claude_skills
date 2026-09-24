@@ -130,7 +130,7 @@ def test_unregistered_section_name_emits_stderr_diagnostic(
     plugin's design-time concerns: not the registry, not the unknown__ key,
     and no instruction to change anything here.
     """
-    _mock_no_github(mocker)
+    disable_github(mocker)
     novel_name = "Never Before Seen Diagnostic Probe"
     key = ops._normalize_section_key(novel_name)
     assert key.startswith("unknown__")
@@ -143,8 +143,8 @@ def test_unregistered_section_name_emits_stderr_diagnostic(
 
     captured = capsys.readouterr()
     assert novel_name in captured.err
-    assert "exactly" in captured.err
-    for leak in ("section_registry", "SectionKey", "_SECTION_DISPLAY", "register", key):
+    assert "Use section=" in captured.err
+    for leak in ("section_registry", "SectionKey", "_SECTION_DISPLAY", "register", "consumer", "namespace", key):
         assert leak not in captured.err, f"message leaks a design-time concern: {leak!r}"
 
 
@@ -155,7 +155,7 @@ def test_unregistered_section_name_records_output_warning(mocker: MockerFixture)
     Why: An MCP caller reads Output.warnings, not stderr — both channels must
          carry the diagnostic (see ARCHITECTURE.md "Module: section_registry.py").
     """
-    _mock_no_github(mocker)
+    disable_github(mocker)
     novel_name = "Another Never Before Seen Probe"
     out = Output()
     title = "Novel name warning"
@@ -176,7 +176,7 @@ def test_registered_section_name_emits_no_stderr_diagnostic(
     Why: Proves the diagnostic fires only on a genuine fallback, not on every
          write — a diagnostic that fires unconditionally would be noise, not signal.
     """
-    _mock_no_github(mocker)
+    disable_github(mocker)
     out = Output()
     title = "Registered name quiet"
     ops.add_item(title=title, priority="P1", description="Test", output=out)
@@ -198,28 +198,39 @@ def test_registered_section_name_emits_no_stderr_diagnostic(
 # first three come back under a different spelling, the fourth is unchanged.
 # Parametrizing over both proves the message names a retrievable spelling in
 # either case rather than echoing whatever the caller wrote.
-_UNREGISTERED_NAMES = ["Diffusion/Images", "Cost & Latency", "RFC-2119 Notes", "Grooming Drift"]
+UNREGISTERED_NAMES = ["Diffusion/Images", "Cost & Latency", "RFC-2119 Notes", "Grooming Drift"]
 
 
-def _mock_no_github(mocker: MockerFixture) -> None:
+def disable_github(mocker: MockerFixture) -> None:
+    """Keep section warning tests on the in-memory backend surface.
+
+    Args:
+        mocker: Pytest mock fixture used to disable GitHub enrichment.
+    """
     mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=False)
     mocker.patch("backlog_core.operations.try_get_github", return_value=None)
 
 
-def _name_the_message_says_to_use(message: str) -> str:
+def message_readback_name(message: str) -> str:
     """Return the section name *message* instructs a later read to ask for.
 
     Reads the instruction the way its audience does — the last name the
     sentence quotes — so this stays valid for any rewording that still ends by
     naming one spelling. The quote must not sit against a word character, or a
     contraction in the prose ("tool's") would open a spurious span.
+
+    Args:
+        message: Warning text emitted after an unregistered section write.
+
+    Returns:
+        The final quoted section spelling named by the warning.
     """
     quoted = re.findall(r"(?<!\w)'([^']*)'(?!\w)", message)
     assert quoted, f"message names no section at all: {message!r}"
     return quoted[-1]
 
 
-@pytest.mark.parametrize("name", _UNREGISTERED_NAMES)
+@pytest.mark.parametrize("name", UNREGISTERED_NAMES)
 def test_unregistered_section_round_trips_under_the_name_the_message_gives(name: str, mocker: MockerFixture) -> None:
     """Reading back with the name the diagnostic gives returns the content written.
 
@@ -231,7 +242,7 @@ def test_unregistered_section_round_trips_under_the_name_the_message_gives(name:
          layer will not return makes an agent conclude the write was lost, so
          the round trip — not the wording — is what has to hold.
     """
-    _mock_no_github(mocker)
+    disable_github(mocker)
     setup = Output()
     title = f"Message round trip {name}"
     ops.add_item(title=title, priority="P1", description="Test", output=setup)
@@ -241,7 +252,7 @@ def test_unregistered_section_round_trips_under_the_name_the_message_gives(name:
 
     warnings = [w for w in write.warnings if repr(name) in w]
     assert len(warnings) == 1, f"expected one warning naming {name!r}, got {write.warnings}"
-    asked = _name_the_message_says_to_use(warnings[0])
+    asked = message_readback_name(warnings[0])
 
     result = ops.view_item(selector=title, section=asked, output=Output())
     contents = [
@@ -264,7 +275,7 @@ def test_no_save_is_announced_when_the_write_fails(mocker: MockerFixture, capsys
          computation announced the save before the write was attempted, so a
          backend failure left the caller told only that the write succeeded.
     """
-    _mock_no_github(mocker)
+    disable_github(mocker)
     setup = Output()
     title = "Announce only on success"
     ops.add_item(title=title, priority="P1", description="Test", output=setup)

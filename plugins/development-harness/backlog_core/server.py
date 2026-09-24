@@ -3490,9 +3490,6 @@ async def artifact_read(
 ) -> Annotated[dict[str, object], _wire_schema(ArtifactReadResponse)]:
     """Read provider-owned logical content for a registered artifact.
 
-    The configured backend resolves the artifact from ``item_id``, ``artifact_type``
-    and ``artifact_id``. No local artifact file is read.
-
     Omitting ``artifact_id`` returns the most recently registered entry of the type.
     Supplying it addresses one specific entry.
 
@@ -4138,8 +4135,8 @@ async def dispatch_create_plan(
 
     ``plan`` is the typed plan itself, stored atomically through the configured
     content backend, and validated for structural integrity after writing unless
-    ``validate`` is false. On the GitHub backend, writing a genuinely new plan (not
-    byte-identical to what's stored) is unsupported and returns an error.
+    ``validate`` is false. On GitHub, online writes succeed only when byte-identical
+    to the stored plan. Offline writes may be queued and later rejected during replay.
 
     ``errors`` and ``warnings`` carry the plan's validation results, not this call's
     own output. ``milestone_number`` is absent when the plan already exists.

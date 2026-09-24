@@ -56,9 +56,9 @@ def _load(
 ) -> dict:
     """Compile an agent definition into a loadable profile.
 
-    Finds the agent ``agent_name`` names, reads its frontmatter and instruction
+    Finds the agent named by ``agent_name``, reads its frontmatter and instruction
     body, and returns a profile ready for context injection into a task-worker.
-    Skills come back as raw name strings for the caller to load itself.
+    Skills are returned as raw name strings for the caller to load.
 
     Args:
         agent_name: Agent name in bare or plugin-qualified form.
