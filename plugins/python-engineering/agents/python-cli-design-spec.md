@@ -20,6 +20,8 @@ not HOW (implementation belongs to `python-cli-architect`).
 
 Before starting your task, activate `Skill(skill="python-engineering:specialist-skill-routing")`.
 
+For every CLI, classify the primary consumer before selecting presentation technology. A tool implemented inside an Agent Skill or plugin is agent-facing by default: specify compact JSON stdout, preferably serialized directly from a Pydantic response model with `model_dump_json()`, diagnostics on stderr, and no Rich output dependency. Human-facing CLIs may specify Rich presentation. Mixed-audience designs keep JSON as the stable automation contract and make human presentation explicit.
+
 ## Architecture vs Implementation Boundary
 
 **Produce** — system structure, component relationships, technology stack with justification,
