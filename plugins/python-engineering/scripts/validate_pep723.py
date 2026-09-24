@@ -160,37 +160,32 @@ def extract_imports(content: str) -> set[str]:
 
 
 def extract_pep723_dependencies(content: str) -> tuple[bool, set[str]]:
-    """Extract dependencies from PEP 723 metadata block.
-
-    Handles both Unix (LF) and Windows (CRLF) line endings.
-
-    Args:
-        content: File content to parse
-
-    Returns:
-        Tuple of (has_pep723_block, set_of_normalized_package_names)
-    """
-    # Normalize line endings to handle Windows CRLF
+    """Parse PEP 723 metadata and return normalized declared distribution names."""
     normalized_content = content.replace("\r\n", "\n")
-
-    pep723_match = re.search(r"# /// script\n(.*?)\n# ///", normalized_content, re.DOTALL)
-    if not pep723_match:
+    match = re.search(r"^# /// script\n(.*?)^# ///$", normalized_content, re.MULTILINE | re.DOTALL)
+    if not match:
         return False, set()
 
-    deps_match = re.search(r"dependencies\s*=\s*\[(.*?)\]", pep723_match.group(1), re.DOTALL)
-    if not deps_match:
+    metadata_lines: list[str] = []
+    for line in match.group(1).splitlines():
+        if not line.startswith("#"):
+            return True, set()
+        text = line[1:]
+        metadata_lines.append(text[1:] if text.startswith(" ") else text)
+
+    try:
+        metadata = tomllib.loads("\n".join(metadata_lines))
+    except tomllib.TOMLDecodeError:
         return True, set()
 
-    deps_text = deps_match.group(1)
-    # Extract package names from dependency strings
-    dependencies = set()
-    for match in re.finditer(r'"([^"><=!\s]+)', deps_text):
-        pkg = match.group(1)
-        # Normalize package names (e.g., GitPython -> gitpython)
-        dependencies.add(pkg.lower().replace("-", "_").replace(".", "_"))
-
+    dependencies: set[str] = set()
+    for requirement in metadata.get("dependencies", []):
+        if not isinstance(requirement, str):
+            continue
+        name_match = re.match(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)", requirement)
+        if name_match:
+            dependencies.add(name_match.group(1).lower().replace("-", "_").replace(".", "_"))
     return True, dependencies
-
 
 def normalize_import_to_package(import_name: str) -> str:
     """Map import names to package names.
@@ -225,6 +220,17 @@ def normalize_import_to_package(import_name: str) -> str:
 
     normalized = import_name.lower().replace("-", "_").replace(".", "_")
     return mappings.get(import_name, normalized)
+
+
+def local_import_names(file_path: Path) -> set[str]:
+    """Return top-level module names importable from the script's local directory."""
+    names: set[str] = set()
+    for child in file_path.parent.iterdir():
+        if child.is_file() and child.suffix == ".py":
+            names.add(child.stem)
+        elif child.is_dir() and (child / "__init__.py").exists():
+            names.add(child.name)
+    return names
 
 
 def is_part_of_package(file_path: Path) -> bool:
