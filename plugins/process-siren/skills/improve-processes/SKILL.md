@@ -69,8 +69,8 @@ Recursive analysis must descend in **system resolution**, not recursively reinvo
 1. **UNDERSTAND** — establish purpose, scope, evidence, desired outcomes, constraints, and current resolution.
 2. **MODEL** — extract actors, state, actions, inputs, outputs, decisions, resources, assumptions, goals, invariants, failure paths, and terminal states.
 3. **CHALLENGE** — identify ambiguity, contradictions, missing transitions, undefined ownership, unreachable states, hidden assumptions, missing failure handling, and unverifiable claims. Ask what observation would falsify each important claim.
-4. **IMPROVE** — correct gaps derivable from established intent. Escalate only changes that create or alter policy, goals, or other intent.
-5. **VALIDATE** — select the cheapest sufficient validator per claim, gather evidence, and feed counterexamples or failures back into CHALLENGE. Stop when required claims are supported or remaining uncertainty requires an explicit human decision.
+4. **IMPROVE** — before material change, declare the change contract and preserve the smallest useful baseline; then correct gaps derivable from established intent. Escalate only changes that create or alter policy, goals, or other intent.
+5. **VALIDATE** — test the candidate against the predeclared contract, compare relevant before/after evidence, select the cheapest sufficient validator per claim, and feed counterexamples or regressions back into CHALLENGE. Stop when required claims are supported or remaining uncertainty requires an explicit human decision.
 
 ### Authoritative Loop
 
@@ -138,6 +138,45 @@ Do not treat every unknown as blocking. Classify uncertainty:
 - **OUT OF SCOPE** — deliberately excluded; record the boundary.
 
 Only UNKNOWN + INTENT-DEPENDENT gaps block autonomous improvement. UNKNOWN + RESOLVABLE gaps require investigation first; they are not grounds to stop and ask the user.
+
+### Evidence-Driven Improvement
+
+Scale improvement evidence with consequence and uncertainty; do not impose a benchmark on trivial, reversible edits.
+
+Before a **material behavior change**, record a small change contract before examining the candidate result:
+
+- targeted claim/property and current failure or evidence;
+- expected improvement;
+- invariants/contracts that must remain true;
+- observable success criterion;
+- unacceptable regressions;
+- smallest useful baseline of current behavior, cost, friction, or counterexample.
+
+Then improve and validate the **delta**, not merely whether the candidate appears reasonable. Reuse comparable scenarios/evidence against before and after states where practical. For substantial redesigns, include representative success, failure, boundary, and some held-out scenarios that did not drive the change.
+
+When subjective judgment remains, independent evaluation is preferred where practical: use a fresh agent/context, and hide old/new identity during comparison when knowing which is the candidate could bias judgment. This is an optional strengthening technique, not a required harness architecture.
+
+If execution traces are available, inspect actual navigation, actions, tool use, backtracking, handoffs, omissions, and recovery — not only final prose. Measure only dimensions relevant to the improvement claim, such as correctness, elapsed work, steps, tool calls, human decisions, resource use, recovery quality, interruptions, or context/instruction load.
+
+Classify a failed or disappointing change before editing again. Useful diagnostic classes include:
+
+- **requirement** — the desired behavior/constraint is wrong, contradictory, or incomplete;
+- **knowledge/evidence** — required facts are unavailable or unsupported;
+- **decision/judgment** — the process leaves a consequential choice under-specified;
+- **process/transition** — sequencing, state transition, guard, or terminal behavior is defective;
+- **interface/contract** — caller/callee assumptions or guarantees conflict;
+- **reliability/recovery** — retries, rollback, partial failure, or recovery are inadequate;
+- **observability** — success, failure, or state cannot be determined reliably;
+- **representation** — the underlying process is sound but its instructions/diagram communicate it incorrectly;
+- **validation/model** — the validator, scenario, assumptions, or formal model do not faithfully test the intended claim.
+
+Use the diagnosis to choose the next correction; do not add generic rules in response to an unidentified failure.
+
+Rigor is proportional:
+
+- routine/reversible change → direct improvement plus proportionate check;
+- material behavior change → predeclared change contract + baseline + before/after comparison;
+- consequential, irreversible, destructive, interruptive, or security-sensitive change → higher local resolution plus appropriate independent/adversarial and claim-level validation where practical.
 
 ### Altitude and Resolution Review
 
