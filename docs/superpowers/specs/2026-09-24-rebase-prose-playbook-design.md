@@ -26,6 +26,7 @@ description: Start a local Git rebase when the user explicitly requests replay o
 ---
 
 **Keywords**: rebase, git rebase, history replay, rebase conflict, continue rebase, abort rebase, git worktree, rewritten history, authorized force-with-lease publication
+
 ```
 
 Keep the description on one line because Claude Code displays multiline YAML descriptions
@@ -156,13 +157,14 @@ and replay progress. It does not prove the target ref name, completion goal, det
 destination, publication destination or authority, or worker obligation. `ORIG_HEAD` is supporting
 evidence only; later commands may replace it.
 
-- **Start:** bind exact source and target names/OIDs, requested history shape, an observable
-  completion predicate for the goal, result destination when distinct, and any publication
-  destination and authority.
+- **Start:** from the explicit request and task context, bind exact source and target names/OIDs,
+  requested history shape, the observable history/ref relation that proves the goal, result
+  destination when distinct, and any publication destination and authority.
 - **Continue:** inspect active Git state first. Explicitly rebind every target name, goal,
-  observable completion predicate, destination, authority, stash association, or worker obligation
-  needed by the remaining path and compare rebound names with recorded OIDs where possible. Bind the
-  exact worktree and Git dir that own the active metadata and remain there.
+  observable history/ref relation from the current request/task context, destination, authority,
+  stash association, or worker obligation needed by the remaining path and compare rebound names
+  with recorded OIDs where possible. Bind the exact worktree and Git dir that own the active
+  metadata and remain there.
 - **Abort:** inspect active identity, lifecycle stash, and worker obligations before abort removes
   metadata. Bind and remain in its owning worktree/Git dir. Rebind only facts needed to restore
   unfinished work and coordinate the worker; target, goal, and publication authority are not
@@ -190,7 +192,8 @@ multiple/unprovable matches pause, and observation failure enters recovery.
 - No mutation begins while an observed worker command can write the selected worktree.
 - Dirty work has a known restoration route before replay starts.
 - An expected named saved entry remains identifiable and preserved until its restoration succeeds.
-- Every stage failure or unobservable result enters recovery; no blind retry crosses the gate.
+- Every stage failure or unobservable result enters recovery except unresolved worker handoff, which
+  stops mutation and produces its non-completion report; no blind retry crosses either gate.
 - Worker delivery/resumption is required only when a worker exists; reorientation is always required.
 - Compatible intentions survive conflict resolution; side labels and apparent recency do not
   select the outcome.
@@ -209,9 +212,10 @@ multiple/unprovable matches pause, and observation failure enters recovery.
   worker acknowledged pause after its command or its task ended. A foreground coordinator has no
   outstanding command. One wait observes checkpoint success, worker failure/end, a still-running
   non-interruptible command, or observation failure; it never retries silently.
-- **Preparation complete:** the index/worktree, including untracked files, is empty; or the
-  checkpoint commit contains every observed change and the index/worktree is then empty. Otherwise,
-  a named save is required only when the changes cannot be committed at the checkpoint.
+- **Preparation complete:** the index/worktree, including untracked files, is empty; or the worker
+  checkpoint holds, the current task explicitly authorizes committing every included change, the
+  checkpoint commit contains every observed change, and the index/worktree is then empty. Otherwise,
+  a named save is required only when those commit conditions do not hold.
 - **Intent disposition complete:** every affected commit/hunk/intent is preserved, already
   equivalent, superseded by the bound goal, or incompatible, with support from task text, patch or
   commit evidence, affected contracts, or passing validation. Unclassified or conflicting
@@ -225,6 +229,9 @@ multiple/unprovable matches pause, and observation failure enters recovery.
   unmerged entries, bound stash presence, worktree status, and each failed observation.
 - **Worker obligation discharged:** every acquired worker receives an acknowledged world-change
   summary and resume/stop decision, or is observed stopped and receives the stopped-state handoff.
+- **Pending handoff report complete:** coordinator-issued mutations stopped; preserve repository
+  state; report the worker's last observed command/state, attempted summary and resume/stop decision,
+  missing acknowledgement or observation, and that completion is not claimed.
 
 ### Ordinary no-change predicate
 
@@ -242,12 +249,13 @@ than replay or `No change`.
 | Terminal | Observable signal |
 |---|---|
 | No change | The ordinary no-change predicate holds, no mutation ran, and any worker obligation is discharged. |
-| Local completion | A start/continue lifecycle completed; active metadata and unmerged entries are absent; the named result ref resolves to observed result OID `R` and the bound completion predicate holds; lifecycle stash is absent or restored/removed; every selected validation and reorientation intersection passed; worker delivery evidence exists only when a worker exists. |
+| Local completion | A start/continue lifecycle completed; active metadata and unmerged entries are absent; the named result ref resolves to observed result OID `R` and the bound completion predicate holds; lifecycle stash is absent or restored/removed; repository-required and changed-interaction checks passed; worker delivery evidence exists only when a worker exists. |
 | Published completion | Local completion holds; the authorized exact-lease push exited zero; a post-push fetch shows the exact destination OID equals result OID `R`. |
 | Aborted and restored | Active metadata and unmerged entries are absent; source/`HEAD` equals the bound pre-replay OID; lifecycle saved work is restored/removed; reorientation completed; worker delivery evidence exists only when a worker exists. |
 | Paused for decision | The report names the exact missing fact or incompatible semantic outcomes and their evidence; no further mutation runs; any worker obligation is discharged. |
 | Stopped with observed state | Coordinator-issued mutations stopped; the stopped-state report is complete; any worker obligation is discharged. |
 | No active rebase | Worktree and Git-dir active-rebase metadata are absent; no mutation ran; any worker obligation is discharged. |
+| Pending worker handoff | The pending-handoff report is complete; repository state is preserved; no completion is claimed. |
 
 ## Decision router
 
@@ -259,7 +267,7 @@ skill-relative links, and terminals without ordinary Git syntax.
 ```mermaid
 flowchart TD
     Start([Agent receives explicit start, continue, or abort request]) --> Kind{Request?}
-    Kind -->|Start| Bind[Agent: bind exact refs/OIDs, goal predicate, destinations, authority, worker facts]; Kind -->|Continue or abort| Active["`Agent: read [active recovery](./references/active-rebase-recovery.md); bind metadata-owning worktree/Git dir`"]
+    Kind -->|Start| Bind[Agent: from request/task context bind exact refs/OIDs, requested observable history/ref relation, destinations, authority, worker facts]; Kind -->|Continue or abort| Active["`Agent: read [active recovery](./references/active-rebase-recovery.md); bind metadata-owning worktree/Git dir`"]
     Bind --> BindResult{All dependent facts observed or explicitly bound?}
     BindResult -->|Yes| Satisfied{No active rebase; S/T unchanged; ancestry-only; T ancestor of S?}; BindResult -->|Missing or ambiguous| Decision; BindResult -->|Failure or unobservable| Recover
     Satisfied -->|Yes; destinations equal required result; read-only| NoChange[Agent: record no-change evidence]; Satisfied -->|No or transformation goal| Locate
@@ -277,7 +285,7 @@ flowchart TD
     Owner -->|Unknown or unreachable| Decision
     Wait --> WaitResult{Observed wait outcome?}; WaitResult -->|Checkpoint met or worker ended/failed without writer| Operation; WaitResult -->|Still running and cannot pause/end| Decision
     WaitResult -->|Failure or unobservable| Recover
-    Operation -->|Start| Prepare[Agent: observe status; checkpoint all work when permitted]; Operation -->|Continue or abort| ActiveGuard[Agent: reobserve same owner metadata and saved-entry identity]
+    Operation -->|Start| Prepare[Agent: observe status; checkpoint only task-authorized changes after worker checkpoint]; Operation -->|Continue or abort| ActiveGuard[Agent: reobserve same owner metadata and saved-entry identity]
     ActiveGuard --> ActiveGuardResult{Owning worktree/Git-dir metadata unchanged?}
     ActiveGuardResult -->|Continue| Stop{Current active-rebase state?}; ActiveGuardResult -->|Abort| Abort["`Agent: read [active recovery](./references/active-rebase-recovery.md); abort in bound owner and restore pre-state`"]
     ActiveGuardResult -->|No, failure, or unobservable| Recover
@@ -323,13 +331,13 @@ flowchart TD
     RestoreIntent -->|Failure or unobservable| Recover
     RestoreFinish --> RestoreFinishResult{Checks zero, no unmerged entries, exact entry absent?}; RestoreFinishResult -->|Yes| FinishMode; RestoreFinishResult -->|No or unobservable| Recover
     FinishMode -->|Explicit abort| OrientAbort[Agent: inventory interactions; verify restored assumptions]
-    FinishMode -->|Start or continue| Orient[Agent: inventory interactions; run required and covering checks]
-    Orient --> VerifyResult{Every selected command zero; no unmerged entries; intersections recorded?}
+    FinishMode -->|Start or continue| Orient[Agent: run repository-required checks plus checks for changed producers/consumers/interfaces]
+    Orient --> VerifyResult{All those checks zero; no unmerged entries; intersections recorded?}
     VerifyResult -->|Yes| Publish{Publication bound and authorized?}
-    VerifyResult -->|One goal-consistent correction| Correct[Agent: correct changed interaction]; VerifyResult -->|Missing intent or incompatible corrections| Decision
+    VerifyResult -->|Failure attributable to replay; one correction within bound goal| Correct[Agent: apply that correction]; VerifyResult -->|Not attributable, outside goal, missing intent, or alternatives| Decision
     VerifyResult -->|Failure or unobservable| Recover
     Correct --> CorrectResult{Correction applied?}
-    CorrectResult -->|Yes; rerun every selected check| Orient; CorrectResult -->|Failure or unobservable| Recover
+    CorrectResult -->|Yes; rerun repository and changed-interaction checks| Orient; CorrectResult -->|Failure or unobservable| Recover
     Publish -->|No| Handoff; Publish -->|Yes| Remote["`Agent: read [publication](./references/publication.md); reconcile one authorized attempt`"]
     Remote --> RemoteResult{Remote stage result?}
     RemoteResult -->|Final fetch unchanged; exact lease OID current| Push[Agent: perform authorized exact-lease push]
@@ -348,7 +356,7 @@ flowchart TD
     OrientAbort --> Handoff; LeaseStop --> Handoff
     Handoff[Agent: check acquired worker obligation] --> Worker{Worker obligation?}
     Worker -->|None| Terminal{Observed path predicate?}; Worker -->|Acquired| Deliver[Agent: deliver summary and resume/stop decision]
-    Worker -->|Unknown or unobservable| Pending([No terminal claim; worker obligation unresolved])
+    Worker -->|Unknown or unobservable| Pending([Agent: stop mutation; report last worker state, attempted handoff, missing observation; no completion])
     Deliver --> HandoffResult{Acknowledged summary/resume, or worker observed stopped with handoff?}
     HandoffResult -->|Yes| Terminal; HandoffResult -->|No or unobservable| Pending
     Terminal -->|Abort request and restored pre-state| Aborted([Aborted and restored])
@@ -420,7 +428,7 @@ conflict resolution `UNVALIDATED`.
 
 | Validation row | Cases and `PASS` predicate | Target record |
 |---|---|---|
-| Skill discovery and package shape | `skilllint` accepts required `name`/`description`; the exact local keyword entry precedes the router; `step-by-step.md` is absent; every router reference is direct, one level deep, and loads only on its node. | `PASS` |
+| Skill discovery and package shape | `skilllint` accepts required `name`/`description`; the exact local keyword entry precedes the router; `step-by-step.md` is absent; every router reference is direct, one level deep, and the agent reads it only on its reached node. | `PASS` |
 | Named refs are not silently substituted | Start, continue, replay, correction, and no-replay publication cases use literal named refs while tempting related refs remain unselected; each correction/publication case reobserves exact source/target before mutation. | `PASS` |
 | Publication requires separate authority and active lifecycle | Start/continue treatment does not push without authority; with authority and destination bound, it enters remote reconciliation. Post-completion publication does not activate. | `PASS` |
 | Final comparison and exact lease preserve new work | Remote advances after initial observation; stale lease cannot overwrite it; integration/revalidation preserves compatible remote intent; final remote equals local result. | `PASS` |
@@ -456,10 +464,10 @@ The design is implemented when:
 - `SKILL.md` contains only required `name`/`description` frontmatter, the exact local keyword entry,
   and the authoritative Mermaid router;
 - the Mermaid process body stays at most 100 lines, with discovery metadata outside that budget;
-- `references/step-by-step.md` is absent and direct one-level node references load only when reached;
+- `references/step-by-step.md` is absent and the agent reads direct one-level node references only when reached;
 - reference notes and fixed processes respect the hard 120/1,024-character budgets without losing
   required signal;
-- each rule has one authoritative home and each reference loads only under its stated condition;
+- each rule has one authoritative home and the agent reads each reference only under its stated condition;
 - every fact required by a mutation is proven from Git or explicitly rebound; missing or
   inconsistent facts pause before that mutation;
 - the Mermaid router parses successfully;
