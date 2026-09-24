@@ -1,6 +1,6 @@
 ---
 name: standards-for-python-development
-description: "Shared Python 3.11+ development rules — type safety and the boundary policy for `Any` (ty, native generics, Protocol, TypeIs, Pydantic), layered architecture and SOLID, error handling, security, performance, identifier naming, PEP 723 script dependencies, Rich/Typer output, tooling defaults (uv, ruff, ty, hatchling, pytest), and testing requirements (80% coverage, TDD). Activates when any Python skill or agent needs the shared rules for implementation, code review, refactoring, or test authoring."
+description: "Shared Python 3.11+ development rules — type safety and the boundary policy for `Any` (ty, native generics, Protocol, TypeIs, Pydantic), layered architecture and SOLID, error handling, security, performance, identifier naming, PEP 723 script dependencies, Rich/Typer output, tooling defaults (uv, ruff, ty, hatchling, pytest), and testing requirements (behavioral coverage, TDD). Activates when any Python skill or agent needs the shared rules for implementation, code review, refactoring, or test authoring."
 user-invocable: false
 ---
 
@@ -101,7 +101,7 @@ modules, see `PEP723.md`.
 ### 1.8 Testing & Documentation
 - **Test-First (TDD)**: Write failing tests against defined interfaces before implementing logic.
 - **Framework**: Use `pytest` with `pytest-mock` (avoid `unittest.mock`).
-- **Coverage**: Maintain a minimum of 80% test coverage, ensuring edge cases are handled. Critical paths require 95%+ coverage and mutation testing.
+- **Coverage**: Cover changed behavior, public contracts, boundaries, regressions, and meaningful failure paths. Respect an existing repository coverage gate; do not invent a percentage target when none exists. Inspect uncovered changed branches for risk. Use mutation testing for critical logic when it materially strengthens confidence.
 - **Test Quality**:
   - Follow the AAA (Arrange-Act-Assert) pattern.
   - Test names must describe behavior, not implementation (e.g., `test_process_payment_when_insufficient_funds_returns_declined`).
