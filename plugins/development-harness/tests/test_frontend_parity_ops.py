@@ -195,7 +195,8 @@ async def test_backlog_list_allow_cached_forwarding_parity(
 
     cli_args = ["backlog", "list", *(["--allow-cached"] if allow_cached else [])]
     _invoke_cli(cli_args)
-    await call_mcp_tool(backlog_mcp, "backlog_list", {"allow_cached": allow_cached})
+    mcp_args = {"allow_cached": True} if allow_cached else {}
+    await call_mcp_tool(backlog_mcp, "backlog_list", mcp_args)
 
     assert calls == [("cli", allow_cached), ("mcp", allow_cached)]
 
