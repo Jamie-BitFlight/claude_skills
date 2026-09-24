@@ -315,6 +315,10 @@ Skill(skill="python-engineering:test-failure-mindset")
 
 ---
 
+## Optional external specialists
+
+Cross-plugin specialists are preferred accelerators, not hidden prerequisites. Before dispatching a named external agent or skill, verify that capability is available. If it is unavailable, preserve the required outcome using this plugin's own discovery, testing, review, or lint workflow. Report a blocker only when the missing capability provides something the local workflow cannot establish safely.
+
 ## Agent Routing (For Orchestrators)
 
 If you are an orchestrator agent, delegate to these specialized agents based on the task phase:
