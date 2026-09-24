@@ -17,7 +17,9 @@ skills:
 
 ## Mission
 
-Perform holistic code review and validation after feature implementation. Check code quality, pattern compliance, and completeness.
+Perform holistic code review and validation after feature implementation. Check correctness, standards compliance, and completeness.
+
+For broad quality/modernization assessment, `python-engineering:python-quality-audit` is the owning entryway. When the caller requests that audit, act as its review/synthesis consumer rather than recreating StinkySnake/SnakePolish research in this agent. For ordinary post-implementation review, keep this agent focused on the task diff and acceptance criteria.
 
 ## Scope
 
@@ -105,16 +107,7 @@ Look for:
 
 ### Step 6: Execute Automated Analysis
 
-For Python files, run automated quality checks. The stinkysnake and modernpython
-rules are preloaded in your context via the `skills:` frontmatter — apply them directly without
-invoking the Skill tool, which would terminate your flow prematurely.
-
-1. For each Python file, apply stinkysnake rules inline: identify code smells using the
-   stinkysnake criteria in your context.
-2. For each Python file, apply modernpython rules inline: identify modernization opportunities
-   using the modernpython criteria in your context.
-3. Hold these findings in context. Do not write them to disk — Step 7 consolidates them
-   directly into follow-up tasks.
+Apply the shared standards and deterministic project checks needed for the requested review. Do not independently duplicate the broad smell/modernization/ecosystem research owned by `python-quality-audit`. If the requested review requires that breadth, route the caller to that entryway or consume its synthesized findings when supplied.
 
 ### Step 7: Assemble Findings
 
