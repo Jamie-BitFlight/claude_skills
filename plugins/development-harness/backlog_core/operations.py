@@ -164,6 +164,15 @@ def _pending_decision_items(context: WorkItemDecisionContext) -> list[BacklogIte
     return context._pending()
 
 
+def _put_work_item(item: BacklogItem, repo: str = "") -> None:
+    """Persist one work item with repository identity when GitHub-backed."""
+    backend = get_config().backend
+    if repo and getattr(backend, "supports_github_extras", False):
+        require_github_extras(backend, "put_work_item").put_work_item(item, repo)
+    else:
+        backend.put_work_item(item)
+
+
 def get_github(repo: str = "", timeout: int = 15) -> Repository:
     """Return authenticated PyGithub Repository via the active backend.
 
@@ -709,6 +718,7 @@ def _apply_updates_to_item(
     set_synced: bool,
     *,
     base_item: BacklogItem | None = None,
+    repo: str = "",
 ) -> None:
     item = base_item if base_item is not None else _work_item(reference)
     for key, value in updates.items():
@@ -724,7 +734,7 @@ def _apply_updates_to_item(
             setattr(item.metadata, key, str(value))
     if set_synced:
         item.metadata.last_synced = now_iso()
-    get_config().backend.put_work_item(item)
+    _put_work_item(item, repo)
 
 
 def update_item_metadata(
@@ -734,6 +744,7 @@ def update_item_metadata(
     output: Output | None = None,
     *,
     base_item: BacklogItem | None = None,
+    repo: str = "",
 ) -> dict[str, str | bool | list[str]]:
     """Update a work item through its opaque backend reference.
 
@@ -743,7 +754,7 @@ def update_item_metadata(
         Dict with compatibility filepath and updated flag plus output messages.
     """
     out = output or Output()
-    _apply_updates_to_item(reference, updates, set_synced, base_item=base_item)
+    _apply_updates_to_item(reference, updates, set_synced, base_item=base_item, repo=repo)
     return {"filepath": reference, "updated": True, **out.to_dict()}
 
 
@@ -813,7 +824,11 @@ def _create_issue_and_update_item(item: BacklogItem, repo: str, output: Output |
             # subsequent reconcile's title-equality acknowledge check fails, so this
             # item's pending mutations never drain (#2963).
             update_item_metadata(
-                reference, {"name": item.title, "metadata": {"issue": f"#{issue_num}"}}, output=out, base_item=item
+                reference,
+                {"name": item.title, "metadata": {"issue": f"#{issue_num}"}},
+                output=out,
+                base_item=item,
+                repo=repo,
             )
         return issue_num
 
@@ -837,7 +852,7 @@ def _rename_item_title(item: BacklogItem, title: str, repo: str = "", output: Ou
     reference = item.reference
     if not reference:
         return False
-    update_item_metadata(reference, {"name": title}, output=out, base_item=item)
+    update_item_metadata(reference, {"name": title}, output=out, base_item=item, repo=repo)
 
     issue_ref = item.issue
     if issue_ref:
@@ -897,7 +912,7 @@ def _update_item_description(
     reference = item.reference
     if not reference:
         return False
-    update_item_metadata(reference, {"description": description}, output=out, base_item=item)
+    update_item_metadata(reference, {"description": description}, output=out, base_item=item, repo=repo)
     _reconcile_item(item, out, repo=repo, snapshot=snapshot)
     return True
 
@@ -924,7 +939,7 @@ def _apply_plan_to_item(item: BacklogItem, plan: str, repo: str = "", output: Ou
     reference = item.reference
     if not reference:
         return False
-    update_item_metadata(reference, {"metadata": {"plan": plan}}, output=out, base_item=item)
+    update_item_metadata(reference, {"metadata": {"plan": plan}}, output=out, base_item=item, repo=repo)
 
     # GH-first: post plan reference as a comment on the linked issue
     issue_ref = item.issue
@@ -1199,6 +1214,7 @@ def _write_groomed_to_item(
     added_date: str = "0000-00-00",
     append: bool = False,
     base_item: BacklogItem | None = None,
+    repo: str = "",
 ) -> None:
     """Write groomed content into a backend-owned work item.
 
@@ -1221,6 +1237,7 @@ def _write_groomed_to_item(
         append: When ``True``, always append a new entry rather than updating
             by id.
         base_item: Already selected pending/provider content to mutate.
+        repo: Repository that owns the selected work item.
     """
     item = base_item.model_copy(deep=True) if base_item is not None else _work_item(reference)
     today_str = today()
@@ -1247,7 +1264,7 @@ def _write_groomed_to_item(
         )
         item.sections[section_key] = section
 
-    get_config().backend.put_work_item(item)
+    _put_work_item(item, repo)
     if section_name is not None and section_key.startswith("unknown__"):
         _warn_unregistered_section(section_name, section_key, output)
 
@@ -1264,6 +1281,7 @@ def _write_groomed_to_reference(
     added_date: str = "0000-00-00",
     append: bool = False,
     base_item: BacklogItem | None = None,
+    repo: str = "",
 ) -> None:
     """Merge groomed content into a backend-owned work item.
 
@@ -1282,6 +1300,7 @@ def _write_groomed_to_reference(
         append: When ``True``, always append a new entry rather than updating
             by id.
         base_item: Already selected pending/provider content to mutate.
+        repo: Repository that owns the selected work item.
     """
     _write_groomed_to_item(
         reference,
@@ -1294,6 +1313,7 @@ def _write_groomed_to_reference(
         added_date=added_date,
         append=append,
         base_item=base_item,
+        repo=repo,
     )
 
 
@@ -1418,6 +1438,7 @@ def _handle_update_groomed(
         added_date=added_date,
         append=append,
         base_item=item,
+        repo=repo,
     )
     out.info(f"Updated {item.reference} with groomed content")
     _reconcile_item(item, out, repo=repo, snapshot=snapshot)
@@ -1470,7 +1491,7 @@ def _handle_batch_groomed(
         )
         batch_item.sections[section_key] = section
         written.append(section_key)
-    get_config().backend.put_work_item(batch_item)
+    _put_work_item(batch_item, repo)
     for section_name, section_key in zip(sections, written, strict=True):
         if section_key.startswith("unknown__"):
             _warn_unregistered_section(section_name, section_key, out)
@@ -1864,7 +1885,7 @@ def add_item(
     )
     if issue_ref:
         item_to_write.metadata.last_synced = now_iso()
-    get_config().backend.put_work_item(item_to_write)
+    _put_work_item(item_to_write, repo)
 
     # Report the stored title, not the raw argument. When a real GitHub issue was
     # created, gh_client.create_issue_for_item prefixed item_data.title with the
@@ -2697,7 +2718,7 @@ def link_followup(
     if not reference:
         msg = f"Item {selector!r} has no file_path — cannot persist followup_to"
         raise BacklogError(msg)
-    update_item_metadata(reference, {"metadata": {"followup_to": followup_to}}, output=out, base_item=item)
+    update_item_metadata(reference, {"metadata": {"followup_to": followup_to}}, output=out, base_item=item, repo=repo)
     out.info(f"  Linked follow-up: {item.title} -> {followup_to or '(cleared)'}")
     return {"title": item.title, "followup_to": followup_to, **out.to_dict()}
 
@@ -3985,7 +4006,11 @@ def sync_create_missing_issues(
         reference = item.reference
         if reference:
             update_item_metadata(
-                reference, {"name": item.title, "metadata": {"issue": f"#{issue_num}"}}, output=out, base_item=item
+                reference,
+                {"name": item.title, "metadata": {"issue": f"#{issue_num}"}},
+                output=out,
+                base_item=item,
+                repo=repo,
             )
 
     return {"created": created, **out.to_dict()}
@@ -4103,6 +4128,7 @@ def close_item(
         },
         output=out,
         base_item=item,
+        repo=repo,
     )
 
     out.info(f'Backlog item "{item.title}" closed ({reason}).')
@@ -4184,7 +4210,7 @@ def resolve_item(
     metadata: dict[str, object] = {"status": "done", "priority": "completed"}
     if plan:
         metadata["plan"] = plan
-    update_item_metadata(reference, {"metadata": metadata}, output=out, base_item=item)
+    update_item_metadata(reference, {"metadata": metadata}, output=out, base_item=item, repo=repo)
 
     out.info(f'Backlog item "{item.title}" resolved.')
     if issue_ref and target.provider_snapshot is not None:
@@ -4234,7 +4260,9 @@ def _apply_non_in_progress_status(
             # for a genuinely unissued item — reference_is_title_derived() is the
             # correct "no real backend reference yet" check instead of `not item.reference`.
             if not reference_is_title_derived(item):
-                update_item_metadata(item.reference, {"metadata": {"status": "blocked"}}, output=output, base_item=item)
+                update_item_metadata(
+                    item.reference, {"metadata": {"status": "blocked"}}, output=output, base_item=item, repo=repo
+                )
                 result["status"] = "blocked"
             else:
                 result["error"] = "Cannot set status='blocked': item has no backend reference"
@@ -4308,7 +4336,7 @@ def _apply_issue_status_labels(
             # string-ID backends, so write status locally to keep the view current.
             if item.reference:
                 update_item_metadata(
-                    item.reference, {"metadata": {"status": "in-progress"}}, output=output, base_item=item
+                    item.reference, {"metadata": {"status": "in-progress"}}, output=output, base_item=item, repo=repo
                 )
         elif has_integer_issue:
             apply_status_in_progress(item, repo, output=output)
@@ -4609,7 +4637,11 @@ def groom_item(
         else:
             if fresh_item.reference:
                 update_item_metadata(
-                    fresh_item.reference, {"metadata": {"status": "groomed"}}, output=out, base_item=fresh_item
+                    fresh_item.reference,
+                    {"metadata": {"status": "groomed"}},
+                    output=out,
+                    base_item=fresh_item,
+                    repo=repo,
                 )
                 result["mark_groomed_applied"] = True
                 out.info("  Status: groomed (local)")
@@ -4716,8 +4748,7 @@ def strike_entry(
     target.struck_at = struck_at
     target.struck_reason = reason
 
-    backend = get_config().backend
-    backend.put_work_item(item)
+    _put_work_item(item, repo)
     out.info(f"Struck entry {entry_id} in {item.reference}")
     _reconcile_strike(item, target_decision.provider_snapshot, out, repo=repo)
 
@@ -4748,7 +4779,7 @@ def normalize_items(
         return {"normalized": 0, **out.to_dict()}
     if not dry_run:
         for item in items:
-            get_config().backend.put_work_item(item)
+            _put_work_item(item, repo)
         backend = get_config().backend
         if isinstance(backend, SyncProvider) and read.provider_snapshot is not None:
             backend.reconcile(

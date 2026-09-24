@@ -61,6 +61,7 @@ class _LiveBackend(InMemoryBackend):
         self.snapshot_requests: list[ReconcileRequest] = []
         self.reconciliations: list[tuple[ReconcileRequest, ProviderSnapshot | None]] = []
         self.writes: list[BacklogItem] = []
+        self.write_repos: list[str] = []
         self.cached_list_calls = 0
         self.cached_get_calls = 0
         self.live_error: BackendUnavailableError | None = None
@@ -106,8 +107,9 @@ class _LiveBackend(InMemoryBackend):
                 return item.model_copy(deep=True)
         raise KeyError(reference)
 
-    def put_work_item(self, item: BacklogItem) -> None:
+    def put_work_item(self, item: BacklogItem, repo: str = "") -> None:
         self.writes.append(item.model_copy(deep=True))
+        self.write_repos.append(repo)
 
     def reconcile(self, request: ReconcileRequest, *, snapshot: ProviderSnapshot | None = None) -> ReconcileResult:
         self.reconciliations.append((request, snapshot))
@@ -280,6 +282,7 @@ def test_command_reconciliation_uses_supplied_repository(mocker: MockerFixture) 
     operations.update_item("#7", description="updated", repo="supplied/repository")
 
     assert backend.snapshot_requests[0].repo == "supplied/repository"
+    assert backend.write_repos == ["supplied/repository"]
     assert backend.reconciliations[0][0].repo == "supplied/repository"
 
 
