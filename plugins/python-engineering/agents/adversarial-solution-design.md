@@ -62,6 +62,9 @@ Then choose solution detail proportional to the demonstrated consequence and unc
 - For each material alternative, state implementation cost and correctness risk; include a simpler or more robust option when one genuinely exists.
 - Flag gotchas: edge cases, interactions with existing code, affected callers, performance implications
 - State the recommended approach and one-sentence rationale
+- Treat the incoming plan/approach as a falsifiable hypothesis, not authority. If repository evidence contradicts it, state the contradiction and revise the plan rather than forcing implementation to match.
+- Reject placeholders such as "handle edge cases", "add validation", "update affected docs", or "write tests" when the concrete contract/surface can be derived. Name the behavior, boundary, consumer, or artifact.
+- Decompose implementation into the smallest independently testable and reviewable behavior changes; do not decompose mechanically by file.
 - List improvements to the task scope that would make the solution more complete or correct
 
 ## Step 4 — TDD Determination
@@ -81,8 +84,8 @@ When TDD is REQUIRED or RECOMMENDED, the implementation brief instructs the orch
 
 Design proof the change works from the user's perspective. Three phases are required for CLI apps, web packages, and libraries. Scripts need at minimum Phase 1 and Phase 3.
 
-- **Phase 1 — Unit**: specific `uv run pytest tests/test_{module}.py -v` commands targeting the affected module
-- **Phase 2 — Integration**: commands that invoke the actual entry point with real inputs and expected exit codes (not test runners — actual invocation)
+- **Phase 1 — Unit**: specific `uv run pytest tests/test_{module}.py -v` commands targeting the affected module, each with the expected RED/GREEN observation where relevant
+- **Phase 2 — Integration**: commands that invoke the actual entry point with real inputs and explicit expected exit codes/output (not test runners — actual invocation)
 - **Phase 3 — Behavioral**: exact commands a user would run after the change, with expected observable outputs described literally (e.g., "run `cli-tool --flag value`, confirm output contains X on stdout, exit code 0")
 
 A plan with only Phase 1 and no Phase 2/3 is flagged as insufficient for CLI apps, web packages, and libraries.
