@@ -46,7 +46,7 @@ from . import models, sync_engine
 from .artifact_manifest_store import artifact_content_reference, load_manifest as load_manifest_record, publish_artifact
 from .artifact_registry import ArtifactRegistry
 from .backend_protocol import get_config
-from .backend_types import ContentProvider, SyncProvider
+from .backend_types import ContentProvider, SnapshotCheckpointProvider, SyncProvider
 from .disclosure_handler import BacklogViewDisclosureHandler, DisclosureRequest, DisclosureRequestParser
 from .disclosure_types import DisclosureMode, DisclosureParamError
 from .dispatch_state import DispatchStateManager
@@ -147,6 +147,11 @@ from .tool_responses import (
     SamTaskLookupResult,
     SyncNowResponse,
     SyncStatusResponse,
+)
+
+_ALLOW_CACHED_DESCRIPTION = (
+    "After a live provider read fails, permit a warned fallback to cached provider records. "
+    "Live data is always attempted first."
 )
 
 if TYPE_CHECKING:
@@ -1217,6 +1222,33 @@ def _register_bg_task(task: asyncio.Task[None]) -> None:
     task.add_done_callback(_log_sync_task_exc)
 
 
+def _launch_background_sync(*, full_refresh: bool = False) -> asyncio.Task[None] | None:
+    """Atomically launch the singleton maintenance worker."""
+    state = get_sync_state()
+    if not isinstance(get_config().backend, SyncProvider) or not state.try_start():
+        return None
+    sync = (
+        sync_engine._startup_sync_loop(state, full_refresh=True)
+        if full_refresh
+        else sync_engine._startup_sync_loop(state)
+    )
+    task = asyncio.create_task(sync)
+    _register_bg_task(task)
+    return task
+
+
+def _schedule_maintenance_if_checkpoint_absent() -> bool:
+    """Schedule non-blocking MCP maintenance only for a cold remote cache."""
+    backend = get_config().backend
+    if (
+        not _startup_sync_enabled()
+        or not isinstance(backend, SnapshotCheckpointProvider)
+        or backend.has_synced_snapshot()
+    ):
+        return False
+    return _launch_background_sync() is not None
+
+
 def _read_enabled_from_config_file(yaml_parser: object, config_path: object) -> bool | None:
     """Read ``backlog.startup_sync.enabled`` from one config file.
 
@@ -1306,18 +1338,19 @@ async def _backlog_lifespan(_server: object) -> AsyncGenerator[dict[str, object]
     Yields:
         Empty lifespan context dict.
     """
-    state = get_sync_state()
     # Guard 1 — kill-switch: skip entirely when disabled in config.
     # Guard 2 — re-entry (FastMCP #1115): try_start() is an atomic check-and-set;
     #   if RUNNING is already set (second lifespan entry) we skip create_task so
     #   only one background sync task runs per process lifetime.
     global _active_startup_sync_task  # ruff: ignore[global-statement]
-    if _startup_sync_enabled() and isinstance(get_config().backend, SyncProvider) and state.try_start():
-        bg_task: asyncio.Task[None] | None = asyncio.create_task(sync_engine._startup_sync_loop(state))
-        _register_bg_task(bg_task)
-        # Store module-level reference so a re-entrant lifespan (FastMCP #1115)
-        # cancels the same task on teardown rather than creating a dangling one.
-        _active_startup_sync_task = bg_task
+    if _startup_sync_enabled():
+        bg_task = _launch_background_sync()
+        if bg_task is not None:
+            # Store module-level reference so a re-entrant lifespan (FastMCP #1115)
+            # cancels the same task on teardown rather than creating a dangling one.
+            _active_startup_sync_task = bg_task
+        else:
+            bg_task = _active_startup_sync_task
     else:
         bg_task = _active_startup_sync_task
     try:
@@ -1419,19 +1452,14 @@ async def sync_now(
         state.last_error = ""
         state.retry_count = 0
 
-    # Atomically claim the sync slot.  try_start() sets status=RUNNING synchronously
-    # (no await), closing the check-then-create race that would otherwise let two
-    # concurrent sync_now calls — or a sync_now racing the startup loop — each launch
-    # a duplicate sync worker.
-    if not state.try_start():
+    # The launcher atomically claims the sync slot before creating the worker.
+    if _launch_background_sync(full_refresh=full_refresh) is None:
         return SyncNowResponse.model_validate({
             "triggered": False,
             "sync_state": state.to_dict(),
             "messages": ["A sync is already in progress. Returning current progress."],
         })
 
-    bg_sync_task = asyncio.create_task(sync_engine._startup_sync_loop(state, full_refresh=full_refresh))
-    _register_bg_task(bg_sync_task)
     return SyncNowResponse.model_validate({
         "triggered": True,
         "sync_state": state.to_dict(),
@@ -1479,6 +1507,7 @@ async def backlog_add(
         str, Field(description="Item type: Feature, Bug, Refactor, Docs, or Chore", alias="type")
     ] = "Feature",
     force: Annotated[bool, Field(description="Skip content-based duplicate check")] = False,
+    allow_cached: Annotated[bool, Field(description=_ALLOW_CACHED_DESCRIPTION)] = False,
 ) -> Annotated[dict[str, object], _wire_schema(BacklogAddResponse)]:
     """Add a new item through the configured backend and optionally create its native issue.
 
@@ -1503,6 +1532,7 @@ async def backlog_add(
             source=source,
             type_=type_,
             force=force,
+            allow_cached=allow_cached,
             output=out,
         )
         return _respond(BacklogAddResponse, {**result, **out.to_dict()})
@@ -1769,18 +1799,7 @@ async def backlog_list(
     refresh: Annotated[
         bool, Field(description="Refresh the local cache from the configured backend before listing")
     ] = False,
-    allow_cached: Annotated[
-        bool,
-        Field(
-            description=(
-                "Opt into serving items/count from a provider-private cache even when its state "
-                "cannot be confirmed complete (never synced, or a checkpoint over a partial/corrupted "
-                "snapshot set). Default False is fail-safe: a low-confidence cache listing returns "
-                "items=null, count=null plus from_cache/has_pending_writes instead of an ambiguous "
-                "items=[], count=0 an unaware caller could misread as a confirmed-empty backlog."
-            )
-        ),
-    ] = False,
+    allow_cached: Annotated[bool, Field(description=_ALLOW_CACHED_DESCRIPTION)] = False,
     label: Annotated[str | None, Field(description="Filter by GitHub label (e.g. 'priority:p1', 'type:bug')")] = None,
     section: Annotated[
         str | None, Field(description="Filter by priority section: P0, P1, P2, or Ideas (case-insensitive)")
@@ -1961,8 +1980,8 @@ async def backlog_list(
     data that was not live. Treat a filtered listing as incomplete when the filter is
     named there.
 
-    ``items`` and ``count`` are both absent when a cached listing cannot be confirmed
-    complete. Pass ``allow_cached=True`` to take the cached listing anyway.
+    Live provider data is attempted first. Pass ``allow_cached=True`` only to permit
+    a warned cache fallback after that live attempt fails.
     """
     out = Output()
     try:
@@ -1992,6 +2011,7 @@ async def backlog_list(
             {"error": str(e), "retryable": _retryable(e), "backend": backend_status.model_dump(), **out.to_dict()},
         )
 
+    _schedule_maintenance_if_checkpoint_absent()
     sync_state_block, sync_warnings = _build_sync_state_block(get_sync_state())
 
     if result.get("items") is None:
@@ -2290,7 +2310,7 @@ def _build_over_budget_view(
 
 
 def _execute_disclosure_or_passthrough(
-    selector: str, req: DisclosureRequest, refresh: bool = False
+    selector: str, req: DisclosureRequest, refresh: bool = False, allow_cached: bool = False
 ) -> dict[str, object] | None:
     """Execute a non-PASSTHROUGH progressive disclosure request synchronously.
 
@@ -2316,6 +2336,7 @@ def _execute_disclosure_or_passthrough(
         refresh: Forwarded to ``BacklogViewDisclosureHandler.handle()`` so
             map/navigate/extract calls get the same bypass-cache live check
             as the passthrough path.
+        allow_cached: Permit warned cached fallback after a live read failure.
 
     Returns:
         Serialised response dict for MAP/NAVIGATE/EXTRACT, None for PASSTHROUGH
@@ -2325,7 +2346,7 @@ def _execute_disclosure_or_passthrough(
     if req.mode == DisclosureMode.PASSTHROUGH:
         return None  # safety net — caller should never reach this branch
     try:
-        response = BacklogViewDisclosureHandler().handle(selector, req, refresh=refresh)
+        response = BacklogViewDisclosureHandler().handle(selector, req, refresh=refresh, allow_cached=allow_cached)
         return response.model_dump()
     except OrdinalNotFoundError as exc:
         return {
@@ -2481,6 +2502,7 @@ async def backlog_view(
             ),
         ),
     ] = 0,
+    allow_cached: Annotated[bool, Field(description=_ALLOW_CACHED_DESCRIPTION)] = False,
 ) -> Annotated[dict[str, object], _wire_schema(BacklogViewResponse)]:
     r"""View a single backlog item or GitHub issue in detail.
 
@@ -2516,12 +2538,14 @@ async def backlog_view(
         disclosure_req = DisclosureRequestParser().parse(map=map, navigate=navigate, head=head, skip_tokens=skip_tokens)
         if disclosure_req.mode != DisclosureMode.PASSTHROUGH:
             disclosure_result = await asyncio.to_thread(
-                _execute_disclosure_or_passthrough, selector, disclosure_req, refresh
+                _execute_disclosure_or_passthrough, selector, disclosure_req, refresh, allow_cached
             )
     except DisclosureParamError as exc:
         disclosure_result = {"error": str(exc), "retryable": _retryable(exc), "invalid_params": exc.invalid_params}
 
     if disclosure_result is not None:
+        if "error" not in disclosure_result:
+            _schedule_maintenance_if_checkpoint_absent()
         return _respond(BacklogViewResponse, disclosure_result, exclude_none=False, exclude_unset=True)
     # ---- PASSTHROUGH: falls through to legacy code below -----------------------
 
@@ -2545,8 +2569,10 @@ async def backlog_view(
             section=section,
             output=out,
             refresh=refresh,
+            allow_cached=allow_cached,
         )
         full_response = result.model_dump()
+        _schedule_maintenance_if_checkpoint_absent()
         if not summary:
             # Normalise an empty ``sections=[]`` to "no section filter" (equivalent
             # to None) so the falsy-vs-None handling is consistent everywhere
@@ -2692,6 +2718,7 @@ async def backlog_link_followup(
             )
         ),
     ],
+    allow_cached: Annotated[bool, Field(description=_ALLOW_CACHED_DESCRIPTION)] = False,
 ) -> Annotated[dict[str, object], _wire_schema(BacklogLinkFollowupResponse)]:
     """Link a follow-up backlog item to its originating plan or task.
 
@@ -2701,7 +2728,7 @@ async def backlog_link_followup(
     out = Output()
     try:
         result = await asyncio.to_thread(
-            operations.link_followup, selector=selector, followup_to=followup_to, output=out
+            operations.link_followup, selector=selector, followup_to=followup_to, allow_cached=allow_cached, output=out
         )
         return _respond(BacklogLinkFollowupResponse, {**result, **out.to_dict()})
     except BacklogError as e:
@@ -2727,6 +2754,7 @@ async def backlog_list_followups(
             )
         ),
     ],
+    allow_cached: Annotated[bool, Field(description=_ALLOW_CACHED_DESCRIPTION)] = False,
 ) -> Annotated[dict[str, object], _wire_schema(BacklogListFollowupsResponse)]:
     """List backlog items linked as follow-ups to the given origin.
 
@@ -2735,7 +2763,10 @@ async def backlog_list_followups(
     """
     out = Output()
     try:
-        result = await asyncio.to_thread(operations.list_followups, followup_to=followup_to, output=out)
+        result = await asyncio.to_thread(
+            operations.list_followups, followup_to=followup_to, allow_cached=allow_cached, output=out
+        )
+        _schedule_maintenance_if_checkpoint_absent()
         return _respond(BacklogListFollowupsResponse, {**result, **out.to_dict()})
     except BacklogError as e:
         return _respond(BacklogListFollowupsResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
@@ -2769,6 +2800,7 @@ async def backlog_close(
     comment: Annotated[str, Field(description="Additional context about why this item is being closed")] = "",
     cleanup: Annotated[bool, Field(description="Reserved; currently has no effect")] = False,
     force: Annotated[bool, Field(description="Close even if open PRs reference the issue")] = False,
+    allow_cached: Annotated[bool, Field(description=_ALLOW_CACHED_DESCRIPTION)] = False,
 ) -> Annotated[dict[str, object], _wire_schema(BacklogCloseResponse)]:
     """Dismiss a backlog item without completing it and close it on the configured backend.
 
@@ -2785,6 +2817,7 @@ async def backlog_close(
             comment=comment,
             cleanup=cleanup,
             force=force,
+            allow_cached=allow_cached,
             output=out,
         )
         return _respond(BacklogCloseResponse, {**result, **out.to_dict()})
@@ -2818,6 +2851,7 @@ async def backlog_resolve(
     findings: Annotated[str | None, Field(description="Retrospective learnings from this work")] = None,
     cleanup: Annotated[bool, Field(description="Reserved; currently has no effect")] = False,
     force: Annotated[bool, Field(description="Resolve even if open PRs reference the issue")] = False,
+    allow_cached: Annotated[bool, Field(description=_ALLOW_CACHED_DESCRIPTION)] = False,
 ) -> Annotated[dict[str, object], _wire_schema(BacklogResolveResponse)]:
     """Mark a backlog item as DONE (completed) and close it on the configured backend.
 
@@ -2840,6 +2874,7 @@ async def backlog_resolve(
             findings=findings or "",
             cleanup=cleanup,
             force=force,
+            allow_cached=allow_cached,
             output=out,
         )
         return _respond(BacklogResolveResponse, {**result, **out.to_dict()})
@@ -2919,6 +2954,7 @@ async def backlog_update(
             "May be a no-op depending on the active backend — check the returned messages."
         ),
     ] = False,
+    allow_cached: Annotated[bool, Field(description=_ALLOW_CACHED_DESCRIPTION)] = False,
 ) -> Annotated[dict[str, object], _wire_schema(BacklogUpdateResponse)]:
     """Update a backlog item: attach a plan, set status, or write groomed content.
 
@@ -2940,6 +2976,7 @@ async def backlog_update(
             replace_section=replace_section,
             reason=reason,
             verified=verified,
+            allow_cached=allow_cached,
         )
         return _respond(BacklogUpdateResponse, {**result, **out.to_dict()})
     except BacklogError as e:
@@ -3022,6 +3059,7 @@ async def backlog_groom(
             )
         ),
     ] = False,
+    allow_cached: Annotated[bool, Field(description=_ALLOW_CACHED_DESCRIPTION)] = False,
 ) -> Annotated[dict[str, object], _wire_schema(BacklogGroomResponse)]:
     """Write groomed content through the configured backend and sync its linked GitHub issue.
 
@@ -3050,6 +3088,7 @@ async def backlog_groom(
             append=append,
             sections=sections,
             mark_groomed=mark_groomed,
+            allow_cached=allow_cached,
         )
         return _respond(BacklogGroomResponse, {**result, **out.to_dict()})
     except BacklogError as e:
@@ -3068,11 +3107,14 @@ async def backlog_groom(
 async def backlog_normalize(
     ctx: Context,
     dry_run: Annotated[bool, Field(description="Preview normalization changes without modifying files")] = False,
+    allow_cached: Annotated[bool, Field(description=_ALLOW_CACHED_DESCRIPTION)] = False,
 ) -> Annotated[dict[str, object], _wire_schema(BacklogNormalizeResponse)]:
     """Normalize all work items through the configured backend."""
     out = Output()
     try:
-        result = await asyncio.to_thread(operations.normalize_items, dry_run=dry_run, output=out)
+        result = await asyncio.to_thread(
+            operations.normalize_items, dry_run=dry_run, allow_cached=allow_cached, output=out
+        )
         return _respond(BacklogNormalizeResponse, {**result, **out.to_dict()})
     except BacklogError as e:
         return _respond(BacklogNormalizeResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
@@ -3192,6 +3234,7 @@ async def backlog_get_sam_tasks(
     refresh_cache: Annotated[
         bool, Field(description="Compatibility flag; the configured provider owns refresh")
     ] = True,
+    allow_cached: Annotated[bool, Field(description=_ALLOW_CACHED_DESCRIPTION)] = False,
 ) -> Annotated[dict[str, object], _wire_schema(SamTaskLookupResult)]:
     """Return SAM tasks owned by a configured-backend work item.
 
@@ -3200,8 +3243,13 @@ async def backlog_get_sam_tasks(
     out = Output()
     try:
         result = await asyncio.to_thread(
-            operations.get_sam_tasks, parent_issue_number=parent_issue_number, refresh_cache=refresh_cache, output=out
+            operations.get_sam_tasks,
+            parent_issue_number=parent_issue_number,
+            refresh_cache=refresh_cache,
+            allow_cached=allow_cached,
+            output=out,
         )
+        _schedule_maintenance_if_checkpoint_absent()
         return _respond(SamTaskLookupResult, {**result, **out.to_dict()})
     except BacklogError as e:
         return _respond(SamTaskLookupResult, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
@@ -3595,6 +3643,7 @@ async def backlog_strike_entry(
     ],
     reason: Annotated[str, Field(description="Human-readable reason for striking the entry")],
     section: Annotated[str | None, Field(description="Optional section name to scope the search within")] = None,
+    allow_cached: Annotated[bool, Field(description=_ALLOW_CACHED_DESCRIPTION)] = False,
 ) -> Annotated[dict[str, object], _wire_schema(BacklogStrikeEntryResponse)]:
     """Strike (retract) an entry block within a backlog item.
 
@@ -3605,7 +3654,13 @@ async def backlog_strike_entry(
     out = Output()
     try:
         result = await asyncio.to_thread(
-            operations.strike_entry, selector=selector, entry_id=entry_id, reason=reason, section=section, output=out
+            operations.strike_entry,
+            selector=selector,
+            entry_id=entry_id,
+            reason=reason,
+            section=section,
+            allow_cached=allow_cached,
+            output=out,
         )
         return _respond(BacklogStrikeEntryResponse, {**result, **out.to_dict()})
     except BacklogError as e:
