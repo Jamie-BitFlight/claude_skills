@@ -72,7 +72,7 @@ jobs:
 
       - name: Run ruff
         run: |
-          uv run ruff check src/ tests/
+          uv run ruff check --no-fix src/ tests/
           uv run ruff format --check src/ tests/
 
       - name: Run type check (ty default; swap to mypy if hooks/CI run mypy — not merely [tool.mypy])
@@ -131,7 +131,7 @@ jobs:
       - uses: astral-sh/setup-uv@v4
       - run: uv python install 3.11
       - run: uv sync --all-extras
-      - run: uv run ruff check src/ tests/
+      - run: uv run ruff check --no-fix src/ tests/
       - run: uv run ruff format --check src/ tests/
       - run: uv run ty check src/ tests/
       - run: uv run pytest tests/ --cov=src --cov-report=term-missing
@@ -242,7 +242,7 @@ default:
 lint:
   stage: lint
   script:
-    - uv run ruff check src/ tests/
+    - uv run ruff check --no-fix src/ tests/
     - uv run ruff format --check src/ tests/
     - uv run ty check src/ tests/
 
