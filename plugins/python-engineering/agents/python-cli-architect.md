@@ -34,7 +34,8 @@ Pick the testing mode from the task's context.
 
 **Standalone script, no existing suite** (a refactor, a fix, a new script): write tests alongside
 the implementation, in `tests/` relative to the script, following `python3-test-design` — naming
-`test_{function}_{scenario}_{expected_result}`, AAA structure, 80% coverage minimum.
+`test_{function}_{scenario}_{expected_result}`, AAA structure. Cover the changed behavior,
+boundaries, and meaningful failure paths; do not invent a percentage target.
 
 **Project where tests already exist** — you are one step of a larger TDD workflow: run the suite
 first, write no new feature tests, and fix anything your change broke before reporting done.
