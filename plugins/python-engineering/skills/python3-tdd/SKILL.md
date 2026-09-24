@@ -27,12 +27,13 @@ Task: $ARGUMENTS
 - Load `python3-testing` for fixture patterns and test structure
 - Tests must fail initially (RED)
 - AAA pattern; behavioral naming
-- Run `uv run pytest -v` — confirm failures
+- Run the smallest relevant pytest target and confirm RED
+- Record the expected failure reason before running it; RED is valid only when the observed failure demonstrates the missing behavior. A syntax/import/fixture failure or a test that already passes does not establish the requirement.
 
 ### 3. Implement to Pass
 
 - Minimal code to make tests pass (GREEN)
-- Run `uv run pytest -v` after each change
+- Run the smallest relevant pytest target after each change and compare the observed result with the expected GREEN result
 - Refactor only while tests stay green
 
 ### 4. Verify
