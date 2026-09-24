@@ -102,6 +102,9 @@ def test_reproduction():
 
 ## Phase 3: Hypothesis Formation
 
+Test one causal hypothesis at a time. State the observation that would confirm or refute it, then run the smallest experiment that changes one variable. If the result contradicts the hypothesis, discard or revise the hypothesis; do not accumulate speculative fixes.
+
+
 ```text
 ## Hypothesis List
 
@@ -130,6 +133,9 @@ H2: [Description of potential cause]
 ---
 
 ## Phase 4: Systematic Investigation
+
+For each experiment, record expected result before execution and compare it with the actual result. A mismatch is new evidence about the hypothesis or the assumed contract, not permission to patch until the command turns green.
+
 
 Trace the data flow:
 
