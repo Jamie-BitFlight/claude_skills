@@ -84,6 +84,13 @@ def _seed_items(items: list[BacklogItem]) -> None:
         get_config().backend.put_work_item(item)
 
 
+def _seed_provider_items(items: list[BacklogItem]) -> None:
+    from backlog_core.backend_protocol import get_config
+
+    backend = cast("Any", get_config().backend)
+    backend.provider_items.extend(item.model_copy(deep=True) for item in items)
+
+
 def _stored_item(reference: Path | str) -> BacklogItem:
     from backlog_core.backend_protocol import get_config
 
@@ -105,6 +112,22 @@ def _provider_plan(local: BacklogItem, provider: ProviderItem) -> ReconcilePlan:
         ProviderSnapshot(items=[provider], sync_started_at="2026-08-13T00:00:00Z", pages_fetched=1),
         ReconcileRequest(scope=ReconcileScope.LINKED, references=[provider.reference]),
     )
+
+
+class TestProviderMemoryBackendSeparation:
+    def test_unlinked_local_intent_is_pending_not_live(self) -> None:
+        """An unlinked local row is pending intent, never a live provider fact."""
+        from backlog_core.backend_protocol import get_config
+
+        backend = get_config().backend
+        pending = BacklogItem(title="Pending only", reference="p2-pending-only", priority="P2")
+        backend.put_work_item(pending)
+
+        snapshot = cast("Any", backend).fetch_snapshot(ReconcileRequest(scope=ReconcileScope.INCREMENTAL))
+        pending_items = cast("Any", backend).pending_work_items()
+
+        assert snapshot.items == []
+        assert [(item.reference, item.issue) for item in pending_items] == [("p2-pending-only", "")]
 
 
 def _write_item(
@@ -1167,6 +1190,7 @@ class TestListItemsFiltering:
         item_with_issue.metadata.labels = ["status:in-progress"]
         item_with_issue.metadata.milestone = "v2"
         _seed_items([item_with_issue])
+        _seed_provider_items([item_with_issue])
         backend = get_config().backend
         fetch = mocker.spy(backend, "fetch_snapshot")
 
@@ -1676,6 +1700,7 @@ class TestApplyIssueStatusLabelsBeads:
 class TestViewItem:
     """view_item returns ViewItemResult for local items and raises for unknowns."""
 
+    @pytest.mark.usefixtures("plain_memory_backend")
     def test_view_item_returns_view_item_result_type(self, mocker: MockerFixture) -> None:
         """Verify view_item returns a ViewItemResult instance, not a raw dict.
 
@@ -1697,6 +1722,7 @@ class TestViewItem:
         assert isinstance(result.messages, list)
         assert isinstance(result.warnings, list)
 
+    @pytest.mark.usefixtures("plain_memory_backend")
     def test_view_item_known_title_returns_result(self, mocker: MockerFixture) -> None:
         """Verify view_item returns ViewItemResult with title field for a known item.
 
@@ -1726,6 +1752,7 @@ class TestViewItem:
         with pytest.raises(ItemNotFoundError):
             view_item("Nonexistent Item That Does Not Exist")
 
+    @pytest.mark.usefixtures("plain_memory_backend")
     def test_view_item_offset_limit_paginates_body(self, mocker: MockerFixture) -> None:
         """Verify view_item applies offset and limit to body text.
 
@@ -1746,6 +1773,7 @@ class TestViewItem:
         # Only 2 lines returned starting from line 1
         assert len(body_lines) <= 2
 
+    @pytest.mark.usefixtures("plain_memory_backend")
     def test_view_item_no_pagination_returns_full_body(self, mocker: MockerFixture) -> None:
         """Verify view_item returns full body when offset and limit are both 0.
 
@@ -1764,6 +1792,7 @@ class TestViewItem:
 
         assert result.body_truncated is False
 
+    @pytest.mark.usefixtures("plain_memory_backend")
     def test_view_item_returns_section_entries(self, mocker: MockerFixture) -> None:
         """view_item response includes sections dict with entry metadata.
 
@@ -1793,6 +1822,7 @@ class TestViewItem:
         assert decision["num_entries"] == 2
         assert len(decision["entries"]) == 2
 
+    @pytest.mark.usefixtures("plain_memory_backend")
     def test_view_item_yaml_fallback_shows_display_title_for_canonical_section(self, mocker: MockerFixture) -> None:
         """view_item's YAML-only fallback shows the display title, not the raw storage key (#2962).
 
@@ -1841,7 +1871,10 @@ class TestViewItem:
         from backlog_core.backend_protocol import get_config
 
         fake_dir: Path = models.get_backlog_dir()
-        _write_item(fake_dir, title="Refreshable Title Item", priority="P1", topic="refreshable-title", issue="#77")
+        path = _write_item(
+            fake_dir, title="Refreshable Title Item", priority="P1", topic="refreshable-title", issue="#77"
+        )
+        _seed_provider_items([_stored_item(path)])
         backend = get_config().backend
         fetch = mocker.spy(backend, "fetch_snapshot")
         mock_enrich = mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=True)
@@ -1860,7 +1893,8 @@ class TestViewItem:
         from backlog_core.backend_protocol import get_config
 
         fake_dir: Path = models.get_backlog_dir()
-        _write_item(fake_dir, title="Cached Title Item", priority="P1", topic="cached-title-item", issue="#88")
+        path = _write_item(fake_dir, title="Cached Title Item", priority="P1", topic="cached-title-item", issue="#88")
+        _seed_provider_items([_stored_item(path)])
         backend = get_config().backend
         fetch = mocker.spy(backend, "fetch_snapshot")
         mock_enrich = mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=True)
@@ -1878,7 +1912,10 @@ class TestViewItem:
         from backlog_core.backend_protocol import get_config
 
         fake_dir: Path = models.get_backlog_dir()
-        _write_item(fake_dir, title="Numeric Selector Item", priority="P1", topic="numeric-selector-item", issue="#55")
+        path = _write_item(
+            fake_dir, title="Numeric Selector Item", priority="P1", topic="numeric-selector-item", issue="#55"
+        )
+        _seed_provider_items([_stored_item(path)])
         backend = get_config().backend
         fetch = mocker.spy(backend, "fetch_snapshot")
         mock_enrich = mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=True)
@@ -1922,6 +1959,7 @@ class TestViewItem:
         )
         mock_enrich.assert_not_called()
 
+    @pytest.mark.usefixtures("plain_memory_backend")
     def test_view_item_refresh_true_no_identifier_appends_no_warning_without_call(self, mocker: MockerFixture) -> None:
         """Cached item with no resolvable id + refresh=True: no call, no warning, no raise.
 
@@ -1950,7 +1988,7 @@ class TestViewItem:
 
         mock_enrich.assert_not_called()
         assert result.warnings == []
-        assert result.status_source == "live"
+        assert result.status_source == "cache"
         assert result.unavailable_capabilities == []
 
 
@@ -2022,6 +2060,7 @@ class TestCloseItem:
             ),
         )
         get_config().backend.put_work_item(item)
+        _seed_provider_items([item])
         mock_close_github_issue = mocker.patch("backlog_core.operations.close_github_issue")
         mocker.patch("backlog_core.operations.check_open_prs_for_issue", return_value=[])
 
@@ -2051,7 +2090,8 @@ class TestCloseItem:
         from backlog_core.models import BacklogError
 
         fake_dir: Path = models.get_backlog_dir()
-        _write_item(fake_dir, title="PR Blocked Close", priority="P1", topic="pr-blocked-close", issue="#5")
+        path = _write_item(fake_dir, title="PR Blocked Close", priority="P1", topic="pr-blocked-close", issue="#5")
+        _seed_provider_items([_stored_item(path)])
         mocker.patch(
             "backlog_core.operations.check_open_prs_for_issue",
             return_value=[PullRequestRef(number=10, title="WIP: feature", url="https://github.com/t/10")],
@@ -2075,7 +2115,10 @@ class TestCloseItem:
         from backlog_core.models import BacklogError
 
         fake_dir: Path = models.get_backlog_dir()
-        _write_item(fake_dir, title="PR Warning Text Close", priority="P1", topic="pr-warning-text-close", issue="#5")
+        path = _write_item(
+            fake_dir, title="PR Warning Text Close", priority="P1", topic="pr-warning-text-close", issue="#5"
+        )
+        _seed_provider_items([_stored_item(path)])
         mocker.patch(
             "backlog_core.operations.check_open_prs_for_issue",
             return_value=[PullRequestRef(number=10, title="WIP: feature", url="https://github.com/t/10")],
@@ -2100,7 +2143,8 @@ class TestCloseItem:
         import backlog_core.models as models
 
         fake_dir: Path = models.get_backlog_dir()
-        _write_item(fake_dir, title="Force Close Item", priority="P1", topic="force-close-item", issue="#6")
+        path = _write_item(fake_dir, title="Force Close Item", priority="P1", topic="force-close-item", issue="#6")
+        _seed_provider_items([_stored_item(path)])
         mocker.patch(
             "backlog_core.operations.check_open_prs_for_issue",
             return_value=[PullRequestRef(number=11, title="WIP", url="https://github.com/t/11")],
@@ -2183,7 +2227,8 @@ class TestResolveItem:
         from backlog_core.models import BacklogError
 
         fake_dir: Path = models.get_backlog_dir()
-        _write_item(fake_dir, title="PR Blocked Resolve", priority="P1", topic="pr-blocked-resolve", issue="#8")
+        path = _write_item(fake_dir, title="PR Blocked Resolve", priority="P1", topic="pr-blocked-resolve", issue="#8")
+        _seed_provider_items([_stored_item(path)])
         mocker.patch(
             "backlog_core.operations.check_open_prs_for_issue",
             return_value=[PullRequestRef(number=20, title="Fix: something", url="https://github.com/t/20")],
@@ -2202,7 +2247,8 @@ class TestResolveItem:
         import backlog_core.models as models
 
         fake_dir: Path = models.get_backlog_dir()
-        _write_item(fake_dir, title="Force Resolve Item", priority="P1", topic="force-resolve-item", issue="#9")
+        path = _write_item(fake_dir, title="Force Resolve Item", priority="P1", topic="force-resolve-item", issue="#9")
+        _seed_provider_items([_stored_item(path)])
         mocker.patch(
             "backlog_core.operations.check_open_prs_for_issue",
             return_value=[PullRequestRef(number=21, title="WIP", url="https://github.com/t/21")],
@@ -2380,7 +2426,8 @@ class TestUpdateItemTitleAndDescription:
         from backlog_core.operations import update_item
 
         fake_dir: Path = models.get_backlog_dir()
-        _write_item(fake_dir, title="Linked Item", topic="linked-item", issue="42")
+        path = _write_item(fake_dir, title="Linked Item", topic="linked-item", issue="42")
+        _seed_provider_items([_stored_item(path)])
 
         mock_repo = mocker.Mock()
         mock_repo.full_name = "owner/repo"
@@ -2453,7 +2500,8 @@ class TestUpdateItemTitleAndDescription:
         from backlog_core.operations import update_item
 
         fake_dir: Path = models.get_backlog_dir()
-        _write_item(fake_dir, title="Desc GitHub Item", topic="desc-gh-item", issue="99")
+        path = _write_item(fake_dir, title="Desc GitHub Item", topic="desc-gh-item", issue="99")
+        _seed_provider_items([_stored_item(path)])
         mock_try_gh = mocker.patch("backlog_core.operations.try_get_github")
 
         update_item(selector="Desc GitHub Item", description="Local only description.")
@@ -2480,7 +2528,8 @@ class TestUpdateItemTitleAndDescription:
         from backlog_core.operations import update_item
 
         fake_dir: Path = models.get_backlog_dir()
-        _write_item(fake_dir, title="Reconcile Desc Item", topic="reconcile-desc-item", issue="#123")
+        path = _write_item(fake_dir, title="Reconcile Desc Item", topic="reconcile-desc-item", issue="#123")
+        _seed_provider_items([_stored_item(path)])
 
         result = update_item(selector="Reconcile Desc Item", description="Amended description.")
 
@@ -2488,7 +2537,7 @@ class TestUpdateItemTitleAndDescription:
         backend = cast("Any", get_config().backend)
         assert backend.reconcile_requests[-1] == ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#123"])
 
-    def test_update_item_description_without_issue_skips_reconcile(self, plain_memory_backend: InMemoryBackend) -> None:
+    def test_update_item_description_without_issue_skips_reconcile(self, mocker: MockerFixture) -> None:
         """update_item with description= on an item with no linked issue never reconciles.
 
         Tests: _update_item_description -> _reconcile_item's early return when
@@ -2504,10 +2553,15 @@ class TestUpdateItemTitleAndDescription:
 
         fake_dir: Path = models.get_backlog_dir()
         _write_item(fake_dir, title="No Issue Desc Item", topic="no-issue-desc-item", issue="")
+        backend = get_config().backend
+        assert isinstance(backend, SyncProvider)
+        reconcile = mocker.spy(backend, "reconcile")
 
-        update_item(selector="No Issue Desc Item", description="Still local only.")
+        result = update_item(selector="No Issue Desc Item", description="Still local only.")
 
-        assert get_config().backend is plain_memory_backend
+        assert result.get("description_updated") is True
+        assert _stored_item(fake_dir / "p1-no-issue-desc-item.md").description == "Still local only."
+        reconcile.assert_not_called()
 
     def test_update_item_description_refreshes_callers_item_object(self) -> None:
         """_update_item_description refreshes the item object it was handed.
@@ -2537,6 +2591,7 @@ class TestUpdateItemTitleAndDescription:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("plain_memory_backend")
 class TestListItemsFilterSection:
     """list_items(section=...) filters items by priority section (case-insensitive)."""
 
@@ -3023,6 +3078,7 @@ class TestBuildListEntryTypeTopicFields:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("plain_memory_backend")
 class TestBuildItemBody:
     """_build_item_body returns searchable text from description and section entries."""
 
@@ -3644,9 +3700,10 @@ class TestGroomItemMarkGroomed:
 
         backlog_dir = m.get_backlog_dir()
         # Use .yaml file so parse_backlog() re-finds the item after save_item converts it
-        _write_item_yaml(
+        filepath = _write_item_yaml(
             backlog_dir, title="Mark Groomed Github", priority="P1", topic="mark-groomed-github", issue="#123"
         )
+        _seed_provider_items([_stored_item(filepath)])
 
         out = Output()
         result = ops.groom_item(
@@ -3679,6 +3736,7 @@ class TestGroomItemMarkGroomed:
         filepath = _write_item(
             backlog_dir, title="Mark Groomed False", priority="P1", topic="mark-groomed-false", issue="#456"
         )
+        _seed_provider_items([_stored_item(filepath)])
 
         out = Output()
         result = ops.groom_item(
@@ -3711,9 +3769,10 @@ class TestGroomItemMarkGroomed:
 
         backlog_dir = m.get_backlog_dir()
         # Use .yaml file so parse_backlog() re-finds the item after save_item converts it
-        _write_item_yaml(
+        filepath = _write_item_yaml(
             backlog_dir, title="Mark Groomed Batch", priority="P1", topic="mark-groomed-batch", issue="#789"
         )
+        _seed_provider_items([_stored_item(filepath)])
 
         out = Output()
         result = ops.groom_item(
@@ -3745,6 +3804,7 @@ class TestGroomItemMarkGroomed:
         filepath = _write_item(
             backlog_dir, title="Mark Groomed Error", priority="P1", topic="mark-groomed-error", issue="#999"
         )
+        _seed_provider_items([_stored_item(filepath)])
 
         out = Output()
         result = ops.groom_item(
@@ -4179,6 +4239,7 @@ class TestEntryIdReadWriteInvariant:
 
         assert body_parsed_ids == structured_ids == [f"{shared_id}-0", f"{shared_id}-1"]
 
+    @pytest.mark.usefixtures("plain_memory_backend")
     def test_view_item_duplicate_stored_ids_are_addressable_by_groom_item(self, mocker: MockerFixture) -> None:
         """An id view_item returns for a duplicate-id structured section must update via groom_item.
 
