@@ -76,12 +76,13 @@ class ProviderMemoryBackend(InMemoryBackend):
 
     def __init__(self) -> None:
         super().__init__()
+        self.provider_items: list[BacklogItem] = []
         self.reconcile_requests: list[ReconcileRequest] = []
         self.snapshot_requests: list[ReconcileRequest] = []
         self.reconcile_result = ReconcileResult()
 
     def fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot:
-        """Expose native test records through the live-provider contract."""
+        """Return explicitly seeded provider rows without consulting local intent."""
         self.snapshot_requests.append(request)
         items = [
             ProviderItem(
@@ -94,7 +95,7 @@ class ProviderMemoryBackend(InMemoryBackend):
                 revision=item.metadata.updated_at or f"test-{item.issue}",
                 milestone=item.metadata.milestone,
             )
-            for item in self.list_work_items()
+            for item in self.provider_items
         ]
         if request.scope in {ReconcileScope.LINKED, ReconcileScope.TARGETED}:
             by_reference = {item.reference: item for item in items}
@@ -117,9 +118,9 @@ class ProviderMemoryBackend(InMemoryBackend):
         return ProviderSnapshot(items=items, sync_started_at="2026-09-24T00:00:00+00:00", pages_fetched=1)
 
     def pending_work_items(self, repo: str = "") -> list[BacklogItem]:
-        """Return no queued provider writes for the in-memory fixture."""
+        """Return unlinked local intent separately from live provider rows."""
         del repo
-        return []
+        return [item.model_copy(deep=True) for item in self.list_work_items() if not item.issue]
 
     def put_work_item(self, item: BacklogItem, repo: str = "") -> None:
         """Accept the repository parameter required by GitHub-shaped tests."""
