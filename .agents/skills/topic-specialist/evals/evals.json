@@ -1,0 +1,35 @@
+{
+  "skill_name": "topic-specialist",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Does tool X support configuration Y in version 4.2? I need the answer before changing our CI.",
+      "expected_output": "Verifies the version-specific contract from authoritative documentation or version-pinned source, states the applicable scope, and does not rely on recall.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "The official docs say option Z works on Windows, but this pinned release's source seems Unix-only. Work out what is actually true.",
+      "expected_output": "Preserves the contradiction, distinguishes documented contract from implementation evidence, checks version/platform-specific paths, and narrows the conclusion instead of choosing a source by preference.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Research how this library resolves its cache directory. The answer is in its official API documentation; I do not need implementation internals.",
+      "expected_output": "Uses the authoritative documentation without mechanically reading unrelated README, source entry points, and issues.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Verify the behavior of this undocumented environment variable from the library source and tests, then update our existing skill with the durable finding.",
+      "expected_output": "Uses version-pinned implementation evidence, challenges relevant alternate paths, reads the complete target skill before editing, and updates one authoritative location without appending duplicate prose.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Find out why the maintainers chose this retry policy.",
+      "expected_output": "Treats implementation as behavior rather than proof of intent and seeks primary design, issue, discussion, or commit evidence; reports intent as unresolved if that evidence is unavailable.",
+      "files": []
+    }
+  ]
+}
