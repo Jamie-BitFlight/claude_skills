@@ -22,7 +22,7 @@ The rewritten model-invoked skill begins with this exact discovery metadata:
 ```markdown
 ---
 name: rebase
-description: "Start a Git rebase when the user explicitly requests replay of a named source ref onto a named target, or continue or abort an active rebase. When a start or continue request explicitly grants force-push authority, also publish that same rebase lifecycle's rewritten result. Do not use for merge-based branch updates, forge merge-method settings, pull-request or merge-request merging, or standalone pushes after or outside an active rebase lifecycle."
+description: "Handles an explicit request to start a Git rebase of a named source ref onto a named target, or to continue or abort an active rebase. Publishes the rewritten result only when that same start or continue request grants explicit force-push authority and binds the exact destination before the lifecycle completes. Excludes merge-based branch updates, repository settings for forge rebase-and-merge, pull-request or merge-request merges, and any standalone push requested after or outside an active rebase lifecycle."
 ---
 
 **Keywords**: rebase, git rebase, history replay, rebase conflict, continue rebase, abort rebase, git worktree, rewritten history, authorized force-with-lease publication
