@@ -34,9 +34,7 @@ development agents copy it verbatim without applying current conventions.
 
 ## Output Artifact
 
-Write the finished spec to `.tmp/scratch/plans/{slug}.md` in the project root — the same
-`.claude/` convention `python-engineering:create-feature-task` uses for
-`.claude/tasks/{feature-name}.md`. Create `.claude/specs/` if it does not exist. `{slug}` is
+Write the finished spec to the output path supplied by the caller. If none is supplied, write to `.tmp/scratch/plans/{slug}.md` in the project root and create `.tmp/scratch/plans/` if needed. Do not use `.claude/` for disposable agent output. `{slug}` is
 a kebab-case slug derived from the feature name in your dispatch prompt (or from the
 requirements themselves if none was given — state the chosen slug in your STATUS output).
 
