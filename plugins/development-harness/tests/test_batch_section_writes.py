@@ -121,17 +121,15 @@ class TestHandleBatchGroomedLocalWrites:
         item = BacklogItem(title="No File Item")
         assert item.reference != ""
 
-    def test_raises_key_error_when_item_not_in_backend(self) -> None:
-        """An item with a healed but never-persisted reference surfaces a KeyError.
-
-        This is the backend's standard "reference not found" contract (see
-        ``InMemoryBackend.get_work_item`` / ``SQLiteBackend.get_work_item``),
-        unchanged by reference self-healing — the item now always has a
-        valid reference, but nothing was ever stored under it.
-        """
+    def test_never_persisted_item_is_written_from_supplied_base(self) -> None:
+        """A supplied mutation base avoids a stale backend reload before the write."""
         item = BacklogItem(title="No File Item")
-        with pytest.raises(KeyError):
-            ops._handle_batch_groomed(item, {"Plan": "Some content."}, repo="owner/repo")
+        ops._handle_batch_groomed(item, {"Plan": "Some content."}, repo="owner/repo")
+
+        stored = get_config().backend.get_work_item(item.reference)
+        section = stored.sections["unknown__plan"]
+        assert isinstance(section, models.Section)
+        assert "Some content." in section.entries[0].content
 
     def test_returns_list_of_written_section_names(self, tmp_path: Path, mocker: MockerFixture) -> None:
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
@@ -212,7 +210,7 @@ class TestHandleBatchGroomedGithubSync:
 
         ops._handle_batch_groomed(item, {"Decision": "The decision is X."}, repo="owner/repo")
 
-        assert backend.requests == [ReconcileRequest(scope="targeted", references=["#77"])]
+        assert backend.requests == [ReconcileRequest(scope="targeted", repo="owner/repo", references=["#77"])]
 
     def test_all_local_writes_precede_reconciliation(self, tmp_path: Path, mocker: MockerFixture) -> None:
         backend = _use_sync_backend()

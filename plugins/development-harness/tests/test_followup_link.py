@@ -21,7 +21,7 @@ from tests.helpers import call_mcp_tool
 # ---------------------------------------------------------------------------
 
 
-def test_link_followup_persists_and_list_followups_queries(write_test_item) -> None:
+def test_link_followup_persists_and_list_followups_queries(write_test_item, plain_memory_backend) -> None:
     from backlog_core.operations import link_followup, list_followups
 
     write_test_item("Origin item", priority="P1", description="the origin")
@@ -53,7 +53,7 @@ def test_link_followup_persists_and_list_followups_queries(write_test_item) -> N
     assert empty["count"] == 0
 
 
-def test_link_followup_missing_item_raises(write_test_item) -> None:
+def test_link_followup_missing_item_raises(write_test_item, plain_memory_backend) -> None:
     """link_followup raises ItemNotFoundError for an unknown selector."""
     from backlog_core.models import ItemNotFoundError
     from backlog_core.operations import link_followup
@@ -63,7 +63,7 @@ def test_link_followup_missing_item_raises(write_test_item) -> None:
         link_followup("nonexistent-item-title", "P1")
 
 
-def test_link_followup_clear_then_query(write_test_item) -> None:
+def test_link_followup_clear_then_query(write_test_item, plain_memory_backend) -> None:
     """Passing an empty followup_to clears the link; list_followups excludes it."""
     from backlog_core.operations import link_followup, list_followups
 

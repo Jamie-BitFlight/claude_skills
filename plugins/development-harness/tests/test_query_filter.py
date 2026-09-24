@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
 
+import pytest
 from backlog_core.backend_protocol import get_config
 from backlog_core.models import BacklogItem, IssueStatus
 from backlog_core.operations import list_items
@@ -37,6 +38,7 @@ def _titles(result: dict) -> list[str]:
     return [str(it["title"]) for it in items]
 
 
+@pytest.mark.usefixtures("plain_memory_backend")
 class TestFilterByKey:
     """Core ``filter_by_key`` behaviour on ``list_items``."""
 
@@ -87,6 +89,7 @@ class TestFilterByKey:
         assert result["items"] == []
 
 
+@pytest.mark.usefixtures("plain_memory_backend")
 class TestFilterByKeyNoRegression:
     """Existing type/topic/status filters must keep working alongside filter_by_key."""
 
