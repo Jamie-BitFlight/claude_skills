@@ -190,12 +190,6 @@ SKILL.md → examples.md
 SKILL.md → advanced.md → details.md → actual info
 ```
 
-### Structure Longer Reference Files
-
-For files >100 lines, include a table of contents at the top so the agent can see the full scope when previewing.
-
----
-
 ## Workflows and Feedback Loops
 
 ### Use Workflows for Complex Tasks
@@ -234,20 +228,10 @@ Common pattern: Run validator, fix errors, repeat.
 
 ## Content Guidelines
 
-### Use Current Patterns; Preserve Legacy in Labeled Sections
+### Use Current Patterns
 
-Use current methods as the default. When documenting deprecated approaches, keep them in a clearly labeled legacy section so agents know not to prefer them:
-
-```markdown
-## Current method
-Use the v2 API endpoint: `api.example.com/v2/messages`
-
-## Old patterns
-<details>
-<summary>Legacy v1 API (deprecated 2025-08)</summary>
-The v1 API used: `api.example.com/v1/messages`
-</details>
-```
+Document the current executable method. Remove superseded instructions unless a live branch still
+requires them; route that branch explicitly when it exists.
 
 ### Use Consistent Terminology
 
@@ -482,7 +466,7 @@ Use the BigQuery:bigquery_schema tool to retrieve table schemas.
 | Assuming tools/packages are installed | Silent failures | List required packages; verify availability |
 | Vague descriptions ("Helps with documents") | Poor discovery | Specific with triggers: "Extracts text from PDFs. Use when…" |
 | Deeply nested references (SKILL → A → B → C) | Claude may partially read and miss info | Flat structure: SKILL links directly to each reference |
-| Date-conditional logic ("If before Aug 2025…") | Becomes wrong over time | Current method as default; legacy in labeled `<details>` section |
+| Date-conditional logic ("If before Aug 2025…") | Becomes wrong over time | Current executable method only |
 | Mixed terminology ("endpoint" / "URL" / "route") | Claude infers equivalence incorrectly | One term per concept throughout |
 
 ---
@@ -496,7 +480,7 @@ Use the BigQuery:bigquery_schema tool to retrieve table schemas.
 - [ ] Description uses clear imperative activation guidance
 - [ ] SKILL.md body passes token-count validation (run `uvx skilllint@latest check <skill-path>` and follow its sizing guidance)
 - [ ] Additional details in separate files (if needed)
-- [ ] Current patterns as default; legacy in clearly labeled section
+- [ ] Every documented branch has a current execution path
 - [ ] Consistent terminology throughout
 - [ ] Examples are concrete, not abstract
 - [ ] File references one level deep
@@ -529,5 +513,5 @@ Use the BigQuery:bigquery_schema tool to retrieve table schemas.
 | Assuming tools are installed | List required packages in SKILL.md; verify availability |
 | Vague descriptions ("Helps with documents") | Specific descriptions with triggers: "Extracts text from PDFs. Use when…" |
 | Deeply nested references (SKILL → A → B → C) | Flat structure: SKILL links directly to each reference |
-| Conditional logic on dates/versions | Current method as default; legacy in labeled section |
+| Conditional logic on dates/versions | Current executable method only |
 | Mixed terminology | One term per concept throughout |

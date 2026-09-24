@@ -13,7 +13,7 @@ SOURCE: Anthropic skill-authoring best practices (docs.anthropic.com, accessed 2
 - [ ] Additional detail lives in separate reference files under `references/` — not inline in SKILL.md
 - [ ] Content is written for Claude, not humans — instructions over explanations
 - [ ] Every instruction justifies its token cost — no padding, no restating what Claude already knows
-- [ ] No time-sensitive information (specific version numbers, "as of [date]" statements) — or isolated in an explicit "Legacy / Old Patterns" section
+- [ ] No time-sensitive or superseded instructions without a live execution branch
 - [ ] Consistent terminology throughout — same term for the same concept, every time
 - [ ] Examples are concrete, not abstract
 - [ ] File references are one level deep — ``references/file.md`` not ``references/subdir/file.md``
@@ -29,8 +29,8 @@ SOURCE: Anthropic skill-authoring best practices (docs.anthropic.com, accessed 2
 - [ ] Claude Code-only frontmatter is checked against the runtime field rules rather than portable package constraints
 - [ ] Frontmatter validated with `uvx skilllint@latest check --fix <file>` — auto-fixes YAML formatting issues
 - [ ] Reference files sit one level deep under `references/` — not in subdirectories
-- [ ] Long reference files (100+ lines) have a Table of Contents at the top
-- [ ] All file references use markdown link syntax with `./` prefix: ``references/file.md``
+- [ ] Every disclosed reference has a trigger-bearing pointer from its entrypoint
+- [ ] Relative markdown links resolve from the file that contains them
 - [ ] All code fences have a language specifier
 
 ---

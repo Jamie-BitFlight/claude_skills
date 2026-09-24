@@ -592,7 +592,7 @@ SOURCE: [`core/src/agent-teams-service.ts` line 39](https://github.com/langmarta
 
 ## Subagent File Location
 
-Subagent (Task tool spawned) sessions follow a naming convention separate from main sessions:
+Subagent sessions follow a naming convention separate from main sessions:
 
 ```text
 # Top-level subagent (no parent session context):

@@ -20,7 +20,7 @@ Output: `.plugin-creator/plans/{plugin-name}/feature-context-{slug}.md` — feat
 
 ## Researcher 1 — Existing Solutions
 
-Spawned as `subagent_type="plugin-creator:plugin-assessor"`.
+Dispatch as `plugin-creator:plugin-assessor`.
 
 Context to include in the prompt: plugin concept, feature context from Researcher 0.
 
@@ -34,7 +34,7 @@ Output: `.plugin-creator/plans/{plugin-name}/research-1-existing.md`
 
 ## Researcher 2 — Claude Code Features
 
-Spawned as `subagent_type="plugin-creator:plugin-assessor"`.
+Dispatch as `plugin-creator:plugin-assessor`.
 
 Context to include in the prompt: plugin concept, feature context from Researcher 0.
 
@@ -48,7 +48,7 @@ Output: `.plugin-creator/plans/{plugin-name}/research-2-features.md`
 
 ## Researcher 3 — Architecture Patterns
 
-Spawned as `subagent_type="plugin-creator:plugin-assessor"`.
+Dispatch as `plugin-creator:plugin-assessor`.
 
 Context to include in the prompt: plugin concept, feature context from Researcher 0.
 
@@ -62,7 +62,7 @@ Output: `.plugin-creator/plans/{plugin-name}/research-3-architecture.md`
 
 ## Researcher 4 — Pitfalls and Official Docs
 
-Spawned as `subagent_type="general-purpose"`.
+Dispatch as the harness-native `general-purpose` agent.
 
 Context to include in the prompt: plugin concept, feature context from Researcher 0.
 

@@ -8,8 +8,8 @@ user-invocable: true
 
 Hooks execute custom commands, HTTP calls, MCP tool calls, LLM prompts, or agent verifiers in response to Claude Code events. Use for automation, validation, formatting, and security.
 
-For JSON input/output schemas, activate `Skill(skill: "plugin-creator:hooks-io-api")`.
-For working examples and patterns, activate `Skill(skill: "plugin-creator:hooks-patterns")`.
+For JSON input/output schemas, activate `/plugin-creator:hooks-io-api`.
+For working examples and patterns, activate `/plugin-creator:hooks-patterns`.
 
 ---
 

@@ -25,9 +25,9 @@ flowchart TD
     Start([Task arrives]) --> Q1{User names a specific agent?}
     Q1 -->|Yes — explicit instruction| Override["Use exactly the agent named<br>Explicit instruction overrides all routing tables"]
     Q1 -->|No| Q2{Task type?}
-    Q2 -->|Domain research or reasoning| CG["plugin-assessor agent<br>subagent_type='plugin-creator:plugin-assessor'"]
+    Q2 -->|Domain research or reasoning| CG["Dispatch plugin-creator:plugin-assessor"]
     Q2 -->|Read-only codebase exploration| Explore["Explore agent — inherited model<br>read-only discovery"]
-    Q2 -->|Official docs fetch or analysis| GP["general-purpose agent<br>subagent_type='general-purpose'"]
+    Q2 -->|Official docs fetch or analysis| GP["Dispatch harness-native general-purpose agent"]
     Q2 -->|Schema validation| Scripts[Validation scripts]
     Q2 -->|Quality review| Assessor["plugin-assessor agent"]
     Q2 -->|Documentation writing| Docs["plugin-docs-writer agent"]
@@ -116,16 +116,9 @@ Last Updated: {ISO timestamp}
 
 **Spawn independent agents simultaneously to maximize throughput.**
 
-**4-Way Parallel Research Pattern:**
-
-```text
-# Spawn all four researchers in a single message:
-
-Agent(subagent_type="plugin-creator:plugin-assessor", prompt="EXISTING PLUGINS: Search plugins/ and ~/.claude/skills/ for similar functionality...")
-Agent(subagent_type="plugin-creator:plugin-assessor", prompt="CLAUDE CODE FEATURES: What plugin capabilities exist? Dynamic context, hooks, MCP, LSP...")
-Agent(subagent_type="plugin-creator:plugin-assessor", prompt="ARCHITECTURE PATTERNS: How do well-structured plugins organize skills, agents, references...")
-Agent(subagent_type="general-purpose", prompt="PITFALLS: Fetch official docs, identify common mistakes, schema gotchas...")
-```
+**4-Way Parallel Research Pattern:** dispatch three `plugin-creator:plugin-assessor` agents for
+existing solutions, Claude Code features, and architecture patterns, plus one harness-native
+general-purpose agent for official-documentation pitfalls. Submit all four dispatches together.
 
 **All four run concurrently. Merge results into research-FINDINGS.md before planning.**
 
@@ -176,7 +169,7 @@ flowchart TD
 
 <plugin_concept>$ARGUMENTS</plugin_concept>
 
-If the plugin concept above or the conversation context indicates anything other than creating a new plugin from scratch (for example: improving, fixing, validating, refactoring, auditing, adding a component to, or working on an existing plugin), load `plugin-lifecycle` instead: `Skill(skill="plugin-creator:plugin-lifecycle")`. Do not proceed further in this skill.
+If the plugin concept above or the conversation context indicates anything other than creating a new plugin from scratch (for example: improving, fixing, validating, refactoring, auditing, adding a component to, or working on an existing plugin), route through `/plugin-creator:plugin-lifecycle`. Do not proceed further in this skill.
 
 If no plugin concept is provided and the intent is not yet clear, STOP and ask: "Are you creating a new plugin from scratch, or working on an existing one?" Route to `plugin-lifecycle` for existing; continue here for new.
 
@@ -280,51 +273,14 @@ Date: {ISO timestamp}
 
 <research_phase>
 
-**Spawn 4 parallel researchers in a single message.** Each investigates a different domain:
+**Dispatch four researchers together.** Give each the plugin name and one exclusive output:
 
-```text
-# Launch all four simultaneously:
-
-Agent(subagent_type="plugin-creator:plugin-assessor", prompt="
-RESEARCHER 1: EXISTING SOLUTIONS
-Search for plugins/skills similar to {plugin-name}:
-- plugins/ directory
-- ~/.claude/skills/
-- GitHub repos with Claude Code plugins
-REPORT: What exists, gaps to fill, patterns to follow/avoid
-Write findings to .plugin-creator/plans/{plugin-name}/research-1-existing.md")
-
-Agent(subagent_type="plugin-creator:plugin-assessor", prompt="
-RESEARCHER 2: CLAUDE CODE FEATURES
-What capabilities should this plugin use?
-- Dynamic context injection (!command)
-- Subagent execution (context: fork)
-- Hooks (which events?)
-- MCP/LSP integration opportunities
-REPORT: Recommended features with rationale
-Write findings to .plugin-creator/plans/{plugin-name}/research-2-features.md")
-
-Agent(subagent_type="plugin-creator:plugin-assessor", prompt="
-RESEARCHER 3: ARCHITECTURE PATTERNS
-How do well-structured plugins organize?
-- Skill directory structure
-- Reference file patterns
-- Agent definitions
-- Hook configurations
-REPORT: Recommended structure based on similar plugins
-Write findings to .plugin-creator/plans/{plugin-name}/research-3-architecture.md")
-
-Agent(subagent_type="general-purpose", prompt="
-RESEARCHER 4: PITFALLS & OFFICIAL DOCS
-Fetch https://code.claude.com/docs/en/plugins-reference.md
-Fetch https://code.claude.com/docs/en/skills.md
-IDENTIFY:
-- Current schema requirements and accepted list forms
-- Common mistakes
-- Deprecations or new features
-REPORT: Gotchas to avoid, schema requirements
-Write findings to .plugin-creator/plans/{plugin-name}/research-4-pitfalls.md")
-```
+| Agent | Scope | Output |
+|---|---|---|
+| `plugin-creator:plugin-assessor` | Existing plugins and skills in local scopes and GitHub; gaps and reusable patterns | `.plugin-creator/plans/{plugin-name}/research-1-existing.md` |
+| `plugin-creator:plugin-assessor` | Current Claude Code capabilities relevant to the plugin | `.plugin-creator/plans/{plugin-name}/research-2-features.md` |
+| `plugin-creator:plugin-assessor` | Skill, reference, agent, and hook organization patterns | `.plugin-creator/plans/{plugin-name}/research-3-architecture.md` |
+| harness-native general-purpose agent | Current official plugin and skill docs; schema requirements and pitfalls | `.plugin-creator/plans/{plugin-name}/research-4-pitfalls.md` |
 
 **Merge all 4 reports into `research-FINDINGS.md` before proceeding to Design.**
 
@@ -363,50 +319,45 @@ Date: {ISO timestamp}
 
 ### 2a. Generate Plan with XML Task Specs
 
-**Delegate to Plan agent:**
+**Dispatch the harness-native Plan agent with:**
 
-```
-Agent(
-  agent="Plan",
-  prompt="Design plugin: {plugin-name}
+```text
+Design plugin: {plugin-name}
 
-  INPUTS:
-  - User preferences: {from discuss-CONTEXT.md}
-  - Research findings: {from research-FINDINGS.md}
+INPUTS:
+- User preferences: {from discuss-CONTEXT.md}
+- Research findings: {from research-FINDINGS.md}
 
-  OUTPUT: XML task specifications for atomic implementation:
+OUTPUT: XML task specifications for atomic implementation:
 
-  <task id='1' type='auto'>
-    <name>Create plugin.json manifest</name>
-    <files>.claude-plugin/plugin.json</files>
-    <action>Create manifest with name, version, description. Skills under ./skills/ are auto-discovered. Add a skills field only for custom skill directories; those paths load alongside the default skills/ scan.</action>
-    <verify>jq '.name' .claude-plugin/plugin.json returns plugin name</verify>
-    <done>Valid plugin.json exists with all required fields</done>
-  </task>
+<task id='1' type='auto'>
+  <name>Establish plugin structure</name>
+  <files>{default component paths and optional .claude-plugin/plugin.json}</files>
+  <action>Use default component paths. Add a manifest only for metadata or custom paths.</action>
+  <verify>claude plugin validate {plugin path or manifestless component directory}</verify>
+  <done>Claude validates every component and discovery path</done>
+</task>
 
-  <task id='2' type='auto'>
-    <name>Create main SKILL.md</name>
-    <files>skills/{skill-name}/SKILL.md</files>
-    <action>Create skill with frontmatter and core instructions</action>
-    <verify>grep -q '^---' skills/{skill-name}/SKILL.md</verify>
-    <done>SKILL.md has valid frontmatter and passes token-count validation</done>
-  </task>
+<task id='2' type='auto'>
+  <name>Create main SKILL.md</name>
+  <files>skills/{skill-name}/SKILL.md</files>
+  <action>Create skill with frontmatter and core instructions</action>
+  <verify>uvx skilllint@latest check skills/{skill-name}/SKILL.md</verify>
+  <done>SKILL.md passes validation</done>
+</task>
 
-  Generate 2-5 atomic tasks. Each task must have:
-  - Single responsibility
-  - Testable <verify> command
-  - Clear <done> criteria"
-)
+Generate the atomic tasks required by the design. Each task has one responsibility, a runnable
+<verify> command, and checkable <done> criteria.
 ```
 
 ### 2b. Plan Checker Verification
 
 **BEFORE execution, verify the plan achieves goals:**
 
-```
-Agent(
-  agent="general-purpose",
-  prompt="PLAN CHECKER: Verify this plan achieves the plugin goals.
+Dispatch a separate harness-native general-purpose agent with:
+
+```text
+PLAN CHECKER: Verify this plan achieves the plugin goals.
 
   PLAN: {generated XML tasks}
   REQUIREMENTS: {from discuss-CONTEXT.md}
@@ -423,8 +374,7 @@ Agent(
   - PASS: Plan is ready for execution
   - FAIL: {specific issues to fix}
 
-  If FAIL, return to planner with feedback."
-)
+If FAIL, return specific feedback to the planner.
 ```
 
 **Loop until plan checker returns PASS.**
@@ -462,10 +412,10 @@ Reviewer: {agent ID}
 
 For each `<task>` in the approved plan:
 
-```
-Agent(
-  agent="general-purpose",
-  prompt="EXECUTOR: Implement this single task.
+Dispatch a harness-native general-purpose agent with:
+
+```text
+EXECUTOR: Implement this single task.
 
   <task id='{N}'>
     <name>{task name}</name>
@@ -487,8 +437,7 @@ Agent(
   OUTPUT:
   - Files created/modified
   - Verification result: PASS/FAIL
-  - If FAIL: what went wrong"
-)
+- If FAIL: what went wrong
 ```
 
 ### 3b. Atomic Git Commits
@@ -510,12 +459,7 @@ git commit -m "task-{N}: {task name}"
 
 **Independent tasks** (no shared files): Execute in parallel
 
-```text
-# Tasks 1, 2, 3 have no dependencies — spawn all:
-Agent(prompt="EXECUTOR: task 1...")
-Agent(prompt="EXECUTOR: task 2...")
-Agent(prompt="EXECUTOR: task 3...")
-```
+Dispatch independent executor tasks together in one parallel batch.
 
 **Dependent tasks** (task 2 needs task 1's output): Execute sequentially
 
@@ -655,10 +599,10 @@ uvx skilllint@latest check ./plugins/my-plugin
 
 ### Layer 2: Official Docs Verification
 
-```
-Agent(
-  agent="general-purpose",
-  prompt="VERIFIER: Check plugin against official docs.
+Dispatch a harness-native general-purpose agent with:
+
+```text
+VERIFIER: Check plugin against official docs.
 
   FETCH:
   - https://code.claude.com/docs/en/plugins-reference.md
@@ -668,16 +612,15 @@ Agent(
 
   REPORT:
   - PASS: All files compliant
-  - FAIL: {specific violations with file:line}"
-)
+- FAIL: {specific violations with file:line}
 ```
 
 ### Layer 3: Quality Assessment
 
-```
-Agent(
-  agent="plugin-assessor",
-  prompt="Assess ./plugins/my-plugin for marketplace readiness.
+Dispatch `plugin-creator:plugin-assessor` with:
+
+```text
+Assess ./plugins/my-plugin for marketplace readiness.
 
   CHECK:
   - Structural correctness
@@ -685,18 +628,17 @@ Agent(
   - Documentation completeness
   - Cross-reference integrity
 
-  SCORE: 1-10 with specific issues"
-)
+SCORE: 1-10 with specific issues
 ```
 
 ### Layer 4: Automatic Debugging (if failures)
 
 **If any layer returns FAIL, spawn debugger:**
 
-```
-Agent(
-  agent="general-purpose",
-  prompt="DEBUGGER: Diagnose validation failure.
+Dispatch a harness-native general-purpose agent with:
+
+```text
+DEBUGGER: Diagnose validation failure.
 
   FAILURE: {failure details from verifier}
   PLUGIN: ./plugins/my-plugin
@@ -713,8 +655,7 @@ Agent(
     <action>{how to fix}</action>
   </fix>
 
-  Return fix plan for re-execution."
-)
+Return the fix plan for re-execution.
 ```
 
 **Loop: Fix → Re-validate → until all layers PASS.**
@@ -754,12 +695,10 @@ Fixes applied: {list}
 
 <documentation_phase>
 
-**Delegate to plugin-docs-writer agent:**
+**Dispatch `plugin-creator:plugin-docs-writer` with:**
 
-```
-Agent(
-  agent="plugin-docs-writer",
-  prompt="Generate comprehensive documentation for the plugin at ./plugins/my-plugin.
+```text
+Generate comprehensive documentation for the plugin at ./plugins/my-plugin.
 
   CREATE:
   - README.md with installation, usage, and examples
@@ -769,8 +708,7 @@ Agent(
   ENSURE:
   - All features documented
   - Installation instructions accurate
-  - Examples are runnable"
-)
+- Examples are runnable
 ```
 
 </documentation_phase>

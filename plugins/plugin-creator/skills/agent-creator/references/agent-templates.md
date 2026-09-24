@@ -132,30 +132,11 @@ If no similar agent exists, build from scratch using [Agent Schema Reference](./
 
 These templates follow a structured contract pattern with standardized inputs/outputs. All agents using these templates should load the `subagent-contract` skill for consistent behavior.
 
-## Complete Agent Frontmatter Reference
+## Agent Frontmatter Reference
 
-### Routing Fields
-
-| Field         | Type   | Project/user/managed | Plugin | Description | Example |
-| ------------- | ------ | -------------------- | ------ | ----------- | ------- |
-| `name`        | string | Required | Recommended; falls back to file path | Cannot start with `-` or contain `:`; repository style may be tighter | `python-reviewer` |
-| `description` | string | Required | Recommended for accurate routing; invalid frontmatter gets a generic fallback | Clear delegation trigger and purpose | `"Review Python code for quality issues"` |
-
-### Optional Fields
-
-| Field             | Type   | Default     | Valid Values                                               | Description                             |
-| ----------------- | ------ | ----------- | ---------------------------------------------------------- | --------------------------------------- |
-| `model`           | string | `inherit`   | `sonnet`, `opus`, `haiku`, `fable`, `inherit`, or full model ID | Claude model to use                     |
-| `tools`           | string/list | (all tools) | CSV string or YAML list: `Read, Grep, Glob, Bash, Edit, Write`. MCP tools: exact registered name, case-sensitive; `mcp__<server>__*` or `mcp__<server>` grants that server's whole tool set. An entry matching no live tool is dropped; an agent whose entries all resolve to nothing refuses to launch. | Tools available to agent |
-| `disallowedTools` | string/list | (none)      | CSV string or YAML list of tool names                      | Tools explicitly forbidden              |
-| `permissionMode`  | string | (inherit)   | `default`, `acceptEdits`, `auto`, `dontAsk`, `bypassPermissions`, `plan`, `manual` | Permission behavior; ignored for plugin agents |
-| `skills`          | string/list | (none) | CSV string or YAML list of skill names                     | Skills to load                          |
-| `color`           | string | (none)      | `red`, `blue`, `green`, `yellow`, `purple`, `orange`, `pink`, `cyan` | Visual distinction in UI |
-| `hooks`           | object | (none)      | Agent lifecycle hook configuration | Valid for project/user agents; ignored for plugin agents |
-
-Agent frontmatter may define lifecycle hooks. Plugin-shipped agents ignore this field; use plugin hooks when the behavior must ship in a plugin.
-
-**SOURCE**: Lines 171-184 of [./claude-plugins-reference-2026/SKILL.md](../../claude-plugins-reference-2026/SKILL.md)
+Load `plugin-creator:claude-subagent-reference` for the canonical field table, scope-dependent
+requirements, tool and permission behavior, and plugin restrictions. The templates below remain
+executable examples; they do not redefine the schema.
 
 ## Base Agent Skeleton
 
@@ -1102,19 +1083,14 @@ Before completing, verify:
 - [ ] Would my output be actionable by the supervisor?
 ```
 
-### Example Invocations
+### Example Dispatch
 
-Show how to call the agent with Agent():
+Show how to dispatch the agent in portable prose:
 
 ```markdown
-## Example Invocations
+## Example Dispatch
 
-\`\`\`text
-Agent(
-  agent="my-agent",
-  prompt="Specific task with context and requirements"
-)
-\`\`\`
+Dispatch `my-plugin:my-agent` with the task, context, constraints, and expected output.
 ```
 
 ### Color Field for Visual Distinction

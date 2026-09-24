@@ -80,8 +80,6 @@ state; accept an MCP-only grant only where that hard runtime dependency is inten
 
 ## Restrict which subagent types can be spawned
 
-SOURCE: <https://code.claude.com/docs/en/sub-agents.md> § Restrict which subagents can be spawned (accessed 2026-05-28)
-
 When an agent runs as the main thread via `claude --agent`, use `Agent(name, name)` syntax in `tools` to allowlist which subagent types it can spawn:
 
 ```yaml
@@ -98,7 +96,8 @@ tools: Agent, Read, Bash
 
 Omit `Agent` from `tools` entirely to prevent the agent from spawning any subagents.
 
-> **Version note**: In v2.1.63, the Task tool was renamed to Agent. `Task(...)` references still work as aliases.
+Use the current `Agent` tool name for subagent dispatch. Legacy aliases are outside this reference's
+authoring contract.
 
 > **Scope note**: `Agent(agent_type)` restrictions apply only to agents running as the main thread with `claude --agent`. In subagent definitions, use bare `Agent` to enable depth-limited nesting; any parenthesized type list is ignored. Omit or deny `Agent` to prevent nesting.
 
@@ -130,7 +129,6 @@ Works for both built-in and custom subagents.
 
 ## Permission modes
 
-SOURCE: <https://code.claude.com/docs/en/permission-modes.md> § Available modes (accessed 2026-05-28)
 SOURCE: <https://code.claude.com/docs/en/sub-agents#supported-frontmatter-fields> (accessed 2026-09-24)
 
 The `permissionMode` frontmatter field controls how the subagent handles permission prompts.

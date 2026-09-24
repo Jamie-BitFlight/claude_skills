@@ -36,9 +36,9 @@ flowchart TD
 
 For deeper Claude Code coverage, these focused skills are available:
 
-- **hooks-core-reference** — Hook system fundamentals: events, configuration, matchers, environment variables, execution, security, debugging. Use `Skill(skill: "plugin-creator:hooks-core-reference")` for configuration and troubleshooting.
-- **hooks-io-api** — JSON input/output API: what data hooks receive via stdin and what JSON they return to control Claude. Use `Skill(skill: "plugin-creator:hooks-io-api")` for writing hook scripts that process input or produce JSON output.
-- **hooks-patterns** — Recipes and working examples: plugin hooks, frontmatter hooks, prompt-based hooks, complete code examples in Python/Node.js. Use `Skill(skill: "plugin-creator:hooks-patterns")` for implementation patterns and examples.
+- **hooks-core-reference** — Hook system fundamentals: events, configuration, matchers, environment variables, execution, security, debugging. Activate `/plugin-creator:hooks-core-reference` for configuration and troubleshooting.
+- **hooks-io-api** — JSON input/output API: what data hooks receive via stdin and what JSON they return to control Claude. Activate `/plugin-creator:hooks-io-api` when writing hook scripts that process input or produce JSON output.
+- **hooks-patterns** — Recipes and working examples: plugin hooks, frontmatter hooks, prompt-based hooks, complete code examples in Python/Node.js. Activate `/plugin-creator:hooks-patterns` for implementation patterns and examples.
 
 ## Reference Files
 

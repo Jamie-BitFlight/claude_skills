@@ -5,7 +5,7 @@ argument-hint: <plugin-path>
 model: sonnet
 user-invocable: true
 ---
-If the user's intent does not match the purpose of this skill, load `plugin-lifecycle` to route to the right skill and process: `Skill(skill="plugin-creator:plugin-lifecycle")`.
+If the user's intent does not match this skill, route through `/plugin-creator:plugin-lifecycle`.
 
 
 # Audit Skill Lifecycle
@@ -42,7 +42,7 @@ Scan plugin structure to identify all skills, agents, commands, and reference fi
 - Reference files loaded by skills
 - Data files (JSON, YAML, markdown tables) consumed by skills
 
-Extract all `Skill(skill:)`, `Skill(skill=)`, `Agent(command:)`, and `@agent` references to build outbound dependency graph.
+Extract portable `/plugin:skill` activations and `plugin:agent` dispatches to build the outbound dependency graph.
 
 ### Step 2: Analysis — Run Audit Dimensions
 
@@ -101,7 +101,7 @@ Returns bidirectional reference matrix per domain with one-directional reference
 
 ### 3. Circular Loading Detection
 
-Trace all `Skill(skill:)` and `Skill(skill=)` references to build directed graph. Identify:
+Trace all `/plugin:skill` references to build the directed graph. Identify:
 
 - Direct cycles: A loads B, B loads A
 - Indirect cycles: A loads B, B loads C, C loads A

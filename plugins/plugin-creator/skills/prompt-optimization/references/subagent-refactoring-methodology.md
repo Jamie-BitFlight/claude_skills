@@ -192,7 +192,7 @@ ANALYZE AGENT'S CORE FUNCTION:
 → File creation: Write, Edit
 → Research/documentation: WebSearch, WebFetch, MCP Ref tools
 → Code operations: Read, Write, Edit, Bash
-→ Orchestration: Task, TodoWrite
+→ Orchestration: current task tracking or plain STATUS updates
 → Testing: Bash, Read, Write
 
 APPLY MINIMALISM:

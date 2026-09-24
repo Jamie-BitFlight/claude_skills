@@ -5,7 +5,7 @@ argument-hint: path to skill directory (or plugin) to refactor
 model: opus
 user-invocable: true
 ---
-If the user's intent does not match the purpose of this skill, load `plugin-lifecycle` to route to the right skill and process: `Skill(skill="plugin-creator:plugin-lifecycle")`.
+If the user's intent does not match this skill, route through `/plugin-creator:plugin-lifecycle`.
 
 
 Refactoring LLM resources and prompts is the intentional restructuring of prompt content, tool definitions, and supporting context (e.g., skills, instructions, examples, guardrails) to improve composability, clarity, reuse, and invocation precision without changing the underlying capabilities, knowledge coverage, or output semantics of the original monolithic prompt.
@@ -187,7 +187,7 @@ user-invocable: true
 
 ## Related Skills
 
-For {topic}, activate `Skill(skill: "{plugin-name}:{related-skill-name}")`.
+For {topic}, activate `/{plugin-name}:{related-skill-name}`.
 
 ## {Main Sections}
 
@@ -211,7 +211,7 @@ Between new skills, use skill activation syntax:
 
 ```markdown
 For advanced {topic}, activate the {skill-name} skill:
-Skill(skill: "{plugin-name}:{skill-name}")
+/{plugin-name}:{skill-name}
 ```
 
 Within same skill, use relative links:
@@ -285,13 +285,13 @@ This skill loads focused specialist components for comprehensive coverage:
 
 ## Specialist Skills
 
-- **{skill-1}**: {description} - `Skill(skill: "{plugin-name}:{skill-1}")` for {use case}
-- **{skill-2}**: {description} - `Skill(skill: "{plugin-name}:{skill-2}")` for {use case}
-- **{skill-3}**: {description} - `Skill(skill: "{plugin-name}:{skill-3}")` for {use case}
+- **{skill-1}**: {description} - `/{plugin-name}:{skill-1}` for {use case}
+- **{skill-2}**: {description} - `/{plugin-name}:{skill-2}` for {use case}
+- **{skill-3}**: {description} - `/{plugin-name}:{skill-3}` for {use case}
 
 ## Usage
 
-**Full coverage**: `Skill(skill: "{plugin-name}:{original-name}")` loads all specialist skills
+**Full coverage**: `/{plugin-name}:{original-name}` loads all specialist skills
 **Focused work**: Activate specific specialist skill for targeted context
 
 ## Quick Reference
@@ -301,7 +301,7 @@ This skill loads focused specialist components for comprehensive coverage:
 
 2. **Verify backwards compatibility**:
 
-   - Search for all references: `grep -r "Skill(skill: \"{plugin-name}:{original-name}\")" .`
+   - Search for all references to `/{plugin-name}:{original-name}`.
    - Search for all slash command invocations: `grep -r "/{original-name}" .`
    - Confirm all existing references will continue to work
 
@@ -427,7 +427,7 @@ project-setup -> project-init
 5. Create circular dependencies
 6. Over-fragment (don't create skills too small to be independently useful — at least a few meaningful instructions)
 7. **DELETE the original skill** - it MUST become a facade/meta-skill that loads all new specialist skills
-8. **INTRODUCE breaking changes** - existing references to the original skill (e.g., `Skill(skill: "python-engineering:python3-core")` or `/python-engineering`) MUST continue to work
+8. **INTRODUCE breaking changes** - existing references to the original skill (for example, `/python-engineering:python3-core`) MUST continue to work
 
 ### Minimum Viable Skill Size
 
@@ -501,26 +501,9 @@ After completing refactoring, produce:
 
 ## Example Invocations
 
-```
-Agent(
-  agent="plugin-creator:refactor-skill",
-  prompt="Refactor ./plugins/python-engineering/skills/python3-core/SKILL.md into focused skills for testing, async, and packaging"
-)
-```
-
-```
-Agent(
-  agent="plugin-creator:refactor-skill",
-  prompt="The fastmcp-creator skill is too large. Analyze it and propose how to split it into smaller skills"
-)
-```
-
-```
-Agent(
-  agent="plugin-creator:refactor-skill",
-  prompt="Split the git-workflow skill by expertise level: basics, advanced, and team workflows"
-)
-```
+- `/plugin-creator:refactor-skill ./plugins/python-engineering/skills/python3-core/SKILL.md`
+- `/plugin-creator:refactor-skill ./plugins/fastmcp-creator/skills/fastmcp-creator/SKILL.md`
+- `/plugin-creator:refactor-skill ./plugins/example/skills/git-workflow/SKILL.md`
 
 ## Interaction Protocol
 

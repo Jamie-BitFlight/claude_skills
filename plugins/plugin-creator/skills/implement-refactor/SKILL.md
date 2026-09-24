@@ -1,422 +1,91 @@
 ---
 name: implement-refactor
-description: Use when a refactoring task file exists from /assessor and tasks need execution. Reads task files, resolves dependencies, delegates to specialist agents (SKILL_SPLIT, AGENT_OPTIMIZE, DOC_IMPROVE), and tracks completion with parallel orchestration
+description: Execute an assessor task file and every generated follow-up in dependency order. Use when a refactoring task file already exists.
 argument-hint: <plugin-slug or task-file-path>
 model: sonnet
 user-invocable: true
 ---
-If the user's intent does not match the purpose of this skill, load `plugin-lifecycle` to route to the right skill and process: `Skill(skill="plugin-creator:plugin-lifecycle")`.
-
 
 # Implement Refactor
-
-This command continues from `/plugin-creator:assessor`. After planning completes, use this to execute the refactoring tasks.
 
 <refactor_input>
 $ARGUMENTS
 </refactor_input>
 
-<plugin_target>$1</plugin_target>
+## 1. Resolve And Read
 
----
+If the input is a markdown path, use it. Otherwise resolve
+`.plugin-creator/plans/tasks-refactor-{slug}.md`. Read the complete task file and linked design.
+Extract each task's ID, status, dependencies, target, execution role, acceptance criteria,
+verification steps, and safe parallel peers.
 
-## Resolve Task File
+Gate: stop with `STATUS: BLOCKED` when either file is absent, a task lacks an execution contract,
+or dependency edges conflict with the design.
 
-If `<plugin_target/>` is:
+## 2. Build The Work Graph
 
-- A `.md` path: Use directly
-- A slug (e.g., `python-engineering`): GLOB for `.plugin-creator/plans/tasks-refactor-{slug}.md`
+Create one tracking item per task plus completion validation. A task is ready only when it is incomplete
+and every dependency is complete. Run ready tasks in parallel only when the task file marks them as
+safe peers and their write targets do not overlap. If incomplete tasks remain and none are ready,
+return the dependency deadlock as `STATUS: BLOCKED`.
 
----
+## 3. Route And Execute
 
-## Load and Analyze
+Use the task's execution role when it is reachable in the current harness. The canonical routes
+for plans produced by `/plugin-creator:assessor` are:
 
-### 1. Read Task File
+| Task type | Reachable route |
+|---|---|
+| `SKILL_SPLIT` | Activate `/plugin-creator:refactor-skill` |
+| `AGENT_OPTIMIZE` | Dispatch `plugin-creator:subagent-refactorer` |
+| `DOC_IMPROVE` or `ORPHAN_RESOLVE` | Dispatch `plugin-creator:ai-doc-optimizer` |
+| read-only quality audit | Dispatch `plugin-creator:skill-auditor` |
+| upstream documentation sync | Dispatch `plugin-creator:skill-content-updater` |
+| description-only change | Activate `/plugin-creator:write-frontmatter-description` |
+| `STRUCTURE_FIX` | Dispatch the harness-native `general-purpose` agent |
 
-READ the task file completely. Extract:
+Reject an unavailable role instead of assuming a project-level or separately installed agent.
+Pass the task file and task ID, then activate `/plugin-creator:start-refactor-task` for the task's
+execution contract.
 
-- All tasks with ID, name, status, dependencies, priority, **Agent**
-- Design spec path (from header or linked file)
-- Parallelization information
+After each task returns:
 
-**IMPORTANT**: Each task specifies its assigned **Agent** field. Use this to route to the correct specialized agent during execution.
+1. Verify its acceptance criteria and command evidence.
+2. Verify the task file status is complete.
+3. Mark its tracking item complete.
+4. Recalculate ready tasks.
 
-### 2. Read Design Spec
+A failed task remains incomplete. Return its evidence and blocker; do not skip it or ask the user to
+choose a weaker completion path.
 
-The task file links to its design spec (e.g., `refactor-design-{slug}.md`). READ it to understand the overall refactoring plan.
+## 4. Validate And Recurse
 
-### 3. Build Dependency Graph
+Activate `/plugin-creator:ensure-complete <task-file-path>` exactly once. It owns assessment,
+refactor validation, documentation validation, and follow-up planning for that task file. Do not
+run those checks separately here and do not ask it to re-enter itself.
 
-Identify:
+If it returns follow-up task files, execute each through Steps 1-4 in dependency order. This skill
+is the sole owner of follow-up recursion. Completion means every task and follow-up task is
+complete, each `ensure-complete` call returned `STATUS: DONE`, and the plan index records the result.
 
-- **Ready tasks**: Status `❌ NOT STARTED` with all dependencies `✅ COMPLETE` or "None"
-- **Blocked tasks**: Have incomplete dependencies
-- **Parallel groups**: Tasks that can run together (from "Can Parallelize With" field)
+Return:
 
-### 4. Create Progress Todos
-
-```
-TodoWrite(todos=[
-    {"content": "Task {ID}: {Name}", "status": "pending", "activeForm": "Implementing {Name}"},
-    ... for each task ...
-    {"content": "Final: Verify refactoring complete", "status": "pending", "activeForm": "Verifying completion"}
-])
-```
-
----
-
-## Execute Tasks
-
-### Agent Routing Strategy
-
-Route each task to the appropriate specialized agent based on the **Agent** field in the task:
-
-| Issue Type     | Agent                           | When to Use                                            |
-| -------------- | ------------------------------- | ------------------------------------------------------ |
-| SKILL_SPLIT    | `plugin-creator:refactor-skill` | Tasks splitting large skills into smaller focused ones |
-| AGENT_OPTIMIZE | `subagent-refactorer`           | Tasks improving agent prompts and descriptions         |
-| DOC_IMPROVE    | `plugin-creator:ai-doc-optimizer`            | Tasks improving skill/agent documentation quality      |
-| ORPHAN_RESOLVE | `plugin-creator:ai-doc-optimizer`            | Tasks integrating orphaned reference files             |
-| STRUCTURE_FIX  | `general-purpose`                            | Tasks fixing broken links or structural issues         |
-| Validation     | `plugin-assessor`               | Post-refactoring validation tasks                      |
-| Documentation  | `plugin-docs-writer`            | README and documentation generation tasks              |
-
-Routing by concern:
-- Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `plugin-creator:ai-doc-optimizer`
-- Audit quality (read-only, no writes, score against completeness categories) → `plugin-creator:skill-auditor`
-- Sync content against upstream docs (add NEW/fix STALE from live sources) → `plugin-creator:skill-content-updater`
-- Write/rewrite description field only → `/plugin-creator:write-frontmatter-description` skill directly
-
-### Launch Strategy
-
-For each ready task, READ the **Agent** field from the task and launch that agent:
-
-```
-Agent(
-    subagent_type="{task.agent}",  # From task's **Agent** field
-    description="Task {ID}: {Name}",
-    prompt="/start-refactor-task {task_file_path} --task {task_id}"
-)
+```text
+STATUS: DONE
+Plugin: {plugin}
+Task file: {path}
+Completed tasks: {IDs}
+Validation: {commands and results}
+Follow-up tasks: {completed paths or "none"}
+Plan index: {updated path}
 ```
 
-**Parallel execution**: If multiple tasks can parallelize, launch them in a SINGLE message with multiple Task calls.
+When blocked:
 
-**Example parallel launch**:
-
+```text
+STATUS: BLOCKED
+Task: {ID or "workflow"}
+Reason: {specific blocker}
+Completed: {verified task IDs}
+Remaining: {task IDs}
 ```
-# Launch skill split tasks in parallel (no shared files)
-Agent(
-    subagent_type="plugin-creator:refactor-skill",
-    description="Task 1: Split python3 core skill",
-    prompt="/start-refactor-task .plugin-creator/plans/tasks-refactor-python-engineering.md --task 1"
-)
-Agent(
-    subagent_type="subagent-refactorer",
-    description="Task 2: Optimize python-cli-architect agent",
-    prompt="/start-refactor-task .plugin-creator/plans/tasks-refactor-python-engineering.md --task 2"
-)
-```
-
-### On Task Completion
-
-When a sub-agent completes:
-
-1. Verify task status changed to `✅ COMPLETE` in task file
-2. Mark TodoWrite item as `completed`
-3. Recalculate ready tasks (dependencies may be satisfied now)
-4. Launch newly-ready tasks
-
-### Progress Loop
-
-```
-WHILE tasks remain incomplete:
-    ready = tasks where status=❌ and dependencies satisfied
-    IF ready is empty AND incomplete tasks exist:
-        → Deadlock. Report blocked tasks and their dependencies.
-
-    parallel_groups = group ready tasks by "Can Parallelize With"
-    FOR each group:
-        Launch all tasks in group (single message if multiple)
-        Wait for completion
-        Update status
-```
-
----
-
-## Plugin Validation Requirements
-
-After completing refactoring tasks, you MUST validate:
-
-### 1. Plugin.json Schema Validation
-
-Validate against authoritative plugin.json schema from claude-plugins-reference-2026:
-
-**Required validation steps:**
-
-```bash
-# Validate plugin structure
-claude plugin validate {plugin-directory}
-```
-
-**Common plugin.json issues after refactoring:**
-
-| Issue                         | Cause                                                | Fix                                                                         |
-| ----------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------- |
-| Default agents disappear     | Declared replacement `agents` paths without default files | Include retained default agent files or remove `agents` |
-| `name: Required`              | Missing required name field                          | Add `"name": "plugin-name"` in kebab-case                                   |
-| Invalid path format           | Absolute paths or missing `./` prefix                | All paths must be relative and start with `./`                              |
-| Referenced file doesn't exist | Path in plugin.json points to moved/deleted file     | Update paths to match new file locations after refactoring                  |
-
-**SOURCE:** Lines 25-92 of claude-plugins-reference-2026/SKILL.md
-
-### 2. Hook Configuration Validation
-
-If plugin includes hooks, validate hook configuration:
-
-**Hook validation checklist:**
-
-- [ ] Hook config file exists at path specified in plugin.json
-- [ ] Hook matchers reference valid tool names (Read, Write, Edit, etc.)
-- [ ] Hook script paths use `${CLAUDE_PLUGIN_ROOT}` variable
-- [ ] Hook scripts are executable (`chmod +x script.sh`)
-- [ ] Hook event types are valid (PreToolUse, PostToolUse, SessionStart, etc.)
-
-**Valid hook events:**
-
-- PreToolUse, PostToolUse, PostToolUseFailure
-- PermissionRequest, UserPromptSubmit, Notification
-- Stop, SubagentStart, SubagentStop
-- Setup, SessionStart, SessionEnd, PreCompact
-
-**SOURCE:** Lines 186-227 of claude-plugins-reference-2026/SKILL.md
-
-### 3. MCP Server Validation
-
-If plugin bundles MCP servers, validate MCP configuration:
-
-**MCP validation checklist:**
-
-- [ ] MCP config file exists (`.mcp.json` or inline in plugin.json)
-- [ ] Server commands use `${CLAUDE_PLUGIN_ROOT}` for plugin-relative paths
-- [ ] Server binaries are executable or installed as dependencies
-- [ ] Server `args` arrays are properly formatted
-- [ ] Environment variables are properly defined
-
-**SOURCE:** Lines 235-270 of claude-plugins-reference-2026/SKILL.md
-
-### 4. LSP Server Validation
-
-If plugin provides LSP servers, validate LSP configuration:
-
-**LSP validation checklist:**
-
-- [ ] LSP config file exists (`.lsp.json` or inline in plugin.json)
-- [ ] LSP server binary is documented as separate installation requirement
-- [ ] `extensionToLanguage` mapping is defined for all supported file types
-- [ ] `command` references binary in PATH or uses absolute path with `${CLAUDE_PLUGIN_ROOT}`
-
-**IMPORTANT:** LSP servers require separate binary installation. Plugin only configures connection, doesn't bundle the server.
-
-**Example LSP validation error:**
-
-```
-LSP server 'gopls' not found in $PATH
-→ User must install separately: go install golang.org/x/tools/gopls@latest
-```
-
-**SOURCE:** Lines 271-338 of claude-plugins-reference-2026/SKILL.md
-
-### 5. Plugin Caching Path Resolution
-
-**CRITICAL:** Plugins are copied to cache directory during installation. Validate path resolution:
-
-**Path resolution warnings to check:**
-
-- [ ] No `../` parent directory references (will break after caching)
-- [ ] All paths relative to plugin root with `./` prefix
-- [ ] External dependencies documented (symlinks or restructure required)
-- [ ] `${CLAUDE_PLUGIN_ROOT}` used in all hook/MCP/LSP commands
-
-**Common caching issues:**
-
-| Issue                                       | Problem                              | Solution                                                     |
-| ------------------------------------------- | ------------------------------------ | ------------------------------------------------------------ |
-| `../shared-utils` reference                 | Parent directory not copied to cache | Use symlink or restructure marketplace to include shared dir |
-| Hook script uses relative path without `./` | Ambiguous path resolution            | Change to `./scripts/hook.sh` or use `${CLAUDE_PLUGIN_ROOT}` |
-| MCP server references user home directory   | Won't work for other users           | Use plugin-relative paths or environment variables           |
-
-**SOURCE:** Lines 349-398 of claude-plugins-reference-2026/SKILL.md
-
-### 6. Agent Dependencies
-
-**Agents included in plugin-creator:**
-
-- `subagent-refactorer` - Used for AGENT_OPTIMIZE tasks (✅ included)
-- `ai-doc-optimizer` - Used for DOC_IMPROVE and ORPHAN_RESOLVE tasks (✅ included)
-- `plugin-assessor` - Used for validation tasks (✅ included)
-
-**Known external agent dependencies:**
-
-- `plugin-docs-writer` - Used for documentation generation (not in plugin-creator)
-
-**Action if external agent missing:**
-
-1. Check if agent exists in user's `~/.claude/agents/` or project `.claude/agents/`
-2. If missing, create follow-up task to install required agent plugin
-3. OR modify task routing to use included agents only
-
-## Completion and Verification Loop
-
-When all tasks show `✅ COMPLETE`:
-
-### Invoke Complete Refactor
-
-AUTOMATICALLY invoke the ensure-complete command to trigger verification:
-
-```
-Skill(skill="plugin-creator:ensure-complete", args="{task_file_path}")
-```
-
-This runs 4 phases:
-
-1. **Plugin Validation** - Re-assess plugin structure, verify improvements
-2. **Code Review** - Validates refactored code against project standards
-3. **Documentation Audit** - Checks for documentation drift
-4. **Gap Identification** - Creates follow-up tasks if issues found
-
-### Check for Follow-up Tasks
-
-After ensure-complete finishes, CHECK if follow-up tasks were created:
-
-```
-GLOB for: .plugin-creator/plans/tasks-refactor-{plugin-slug}-followup*.md
-```
-
-**IF follow-up tasks exist:**
-
-1. DISPLAY:
-
-```
-================================================================================
-                    FOLLOW-UP TASKS IDENTIFIED
-================================================================================
-
-The review found issues that need resolution:
-- {list of follow-up task files}
-
-Continuing recursive refactoring...
-================================================================================
-```
-
-2. RECURSIVELY call implement-refactor on each follow-up task:
-
-```
-Skill(skill="plugin-creator:implement-refactor", args="{followup_task_file_path}")
-```
-
-3. REPEAT until no more follow-up tasks are generated
-
-**IF no follow-up tasks:**
-
-1. UPDATE REFACTOR-PLAN.md: Move entry from Active to Completed with scores
-2. DISPLAY final summary:
-
-```
-================================================================================
-                    PLUGIN REFACTORING COMPLETE
-================================================================================
-
-Plugin: {plugin_name}
-Task File: {task_file_path}
-
-COMPLETED TASKS:
-✅ Task {ID}: {Name}
-✅ Task {ID}: {Name}
-...
-
-VERIFICATION PASSED:
-✅ Plugin Validation: Score improved from X to Y
-✅ Code Review: No issues found
-✅ Documentation: Synced with implementation
-
-All quality gates passed. Plugin refactoring is complete.
-================================================================================
-```
-
----
-
-## Recursive Development Cycle
-
-This command implements a **recursive refactoring loop**:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    IMPLEMENT-REFACTOR                            │
-│                                                                  │
-│  ┌──────────────┐    ┌───────────────────┐    ┌──────────────┐ │
-│  │ Execute      │───▶│ Complete          │───▶│ Follow-up    │ │
-│  │ All Tasks    │    │ Refactor          │    │ Tasks?       │ │
-│  └──────────────┘    └───────────────────┘    └──────┬───────┘ │
-│                                                       │         │
-│                              ┌────────────────────────┴───┐     │
-│                              │                            │     │
-│                              ▼                            ▼     │
-│                         ┌────────┐                  ┌─────────┐ │
-│                         │ YES    │                  │ NO      │ │
-│                         └───┬────┘                  └────┬────┘ │
-│                             │                            │      │
-│                             ▼                            ▼      │
-│                    ┌─────────────────┐          ┌────────────┐  │
-│                    │ Recurse:        │          │ DONE       │  │
-│                    │ implement-      │          │ Plugin     │  │
-│                    │ refactor on     │          │ Refactored │  │
-│                    │ follow-up tasks │          └────────────┘  │
-│                    └────────┬────────┘                          │
-│                             │                                   │
-│                             └───────────────────────────────────┘
-└─────────────────────────────────────────────────────────────────┘
-```
-
-The cycle continues until the review finds no more issues.
-
----
-
-## Error Handling
-
-### Task Failure
-
-If a sub-agent reports failure:
-
-1. Keep task as `🔄 IN PROGRESS`
-2. Display error details
-3. Ask user: "(1) Retry, (2) Skip, (3) Abort"
-
-### Dependency Deadlock
-
-If no tasks are ready but tasks remain:
-
-1. Display blocked tasks and their unmet dependencies
-2. Ask user to resolve manually
-
-### Design Conflicts
-
-If sub-agent reports design spec conflicts with actual skill structure:
-
-1. STOP implementation
-2. Report the conflict
-3. The design spec may need revision before continuing
-
----
-
-## Orchestrator Responsibilities
-
-You coordinate. Sub-agents implement.
-
-- **You** read task files and identify what's ready
-- **You** launch sub-agents with `/start-refactor-task`
-- **You** track overall progress with TodoWrite
-- **Sub-agents** do the actual refactoring work
-- **Sub-agents** run verification steps
-- **Sub-agents** report completion or blocking issues
-
-If a sub-agent is blocked by concurrent edits from another agent, that's expected in parallel execution. Help them understand the changes and continue.

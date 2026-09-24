@@ -195,6 +195,7 @@ Use the library source code as a reference implementation for building your own 
 
 ---
 
-## Adoption
+## Client Support
 
-Agent Skills has been adopted by a growing number of agent products, including Claude Code, Cursor, VS Code, Gemini CLI, OpenAI Codex & Copilot, Roo Code, Amp, Goose, Factory, and Databricks. See the live client showcase at <https://agentskills.io> for the current full list.
+Use the live client showcase at <https://agentskills.io> for current implementations. Do not copy
+the roster into local documentation.

@@ -41,7 +41,7 @@ For each skill that participates in a domain (e.g., "Python code quality"):
 
 ### 3. Circular Loading Detection
 
-Trace all `Skill(skill:)` and `Skill(skill=)` references to build a directed graph. Identify:
+Trace all portable `/plugin:skill` references to build a directed graph. Identify:
 
 - Direct cycles: A loads B, B loads A
 - Indirect cycles: A loads B, B loads C, C loads A

@@ -1,841 +1,95 @@
 ---
 name: assessor
-description: Assess a plugin and create refactoring task files for parallel agent execution. Use when you need to analyze a plugin structure, score its quality, and generate a phased refactoring plan with design map and implementation tasks.
+description: Assess a plugin and produce an executable refactoring design, task plan, and context manifest. Use when preparing systematic plugin refactoring.
 argument-hint: <plugin-name>
 model: sonnet
 user-invocable: true
 ---
-If the user's intent does not match the purpose of this skill, load `plugin-lifecycle` to route to the right skill and process: `Skill(skill="plugin-creator:plugin-lifecycle")`.
 
+If the user's intent does not match this skill, activate `/plugin-creator:plugin-lifecycle` to route it.
 
-# Review Plugin for Refactor Workflow
-
-You MUST assess a plugin and create comprehensive refactoring plans following this multi-phase workflow. After planning completes, the orchestrator can launch parallel agents to execute tasks.
+# Plan Plugin Refactoring
 
 <plugin_name>
 $ARGUMENTS
 </plugin_name>
 
-## Mission
+Execute the phases in order. Before Phase 1, create separate tracking tasks named for assessment, design, task-file creation, plan-index update, context gathering, and final handoff. Mark each in progress before execution and complete only after verifying its output. After each phase, display its key findings and output paths before continuing.
 
-EXECUTE all four phases sequentially. Each phase depends on the previous phase's output. After each phase completes, DISPLAY a structured summary with key findings and file paths before proceeding to the next phase.
+## Phase 1: Assess
 
-RETURN to the orchestrator after Phase 4 completes so parallel agent execution can begin.
+Dispatch `plugin-creator:plugin-assessor` with:
 
----
+- **Input:** `./plugins/<plugin_name>/` and the request to assess structural correctness, quality issues, and refactoring opportunities.
+- **Context:** identify the plugin manifest and any skill, command, agent, hook, MCP, and reference content under the plugin root.
+- **Execution ownership:** the agent runs its complete assessment protocol. Do not restate its phases, schemas, or scoring rules in the dispatch prompt.
+- **Required output:** the standard assessment produced through its preloaded `/plugin-creator:assessment-reporting` skill, including marketplace readiness, scored findings, affected paths, severities, orphan classifications, and recommended execution roles.
+- **Completion:** `STATUS: DONE` plus the inline report or report path. `STATUS: BLOCKED` must name the missing input.
 
-## Completion Tracking (MANDATORY)
+Verify the report exists, contains the score and marketplace-readiness result, and accounts for every discovered component. Then activate `/plugin-creator:audit-skill-lifecycle <plugin_name>` and `/plugin-creator:audit-agent-lifecycle <plugin_name>` to add semantic lifecycle findings.
 
-**IMMEDIATELY** after reading this command, you MUST create tasks using TaskCreate with this exact checklist:
+Activate `/plugin-creator:audit-skill-completeness` for individual marketplace candidates, low-scoring skills, or when the user requests deep quality evaluation. Otherwise record that this optional audit was not run.
 
-```
-TaskCreate(subject="Phase 1: Generate Plugin Assessment Report", description="Generate comprehensive Plugin Assessment Report by analyzing plugin structure, quality, and refactoring opportunities", activeForm="Generating Plugin Assessment Report")
-TaskCreate(subject="Phase 2: Create refactoring design map", description="Create detailed refactoring design specification at .plugin-creator/plans/refactor-design-{slug}.md showing how each identified issue should be addressed", activeForm="Creating refactoring design map")
-TaskCreate(subject="Phase 3: Create task file", description="Create implementation task file at .plugin-creator/plans/tasks-refactor-{slug}.md with dependencies, verification steps, and parallel execution opportunities", activeForm="Creating refactoring task file")
-TaskCreate(subject="Phase 3: Update REFACTOR-PLAN.md", description="Update REFACTOR-PLAN.md index with new checklist items for this refactoring project", activeForm="Updating REFACTOR-PLAN.md index")
-TaskCreate(subject="Phase 4: Gather refactoring context", description="Gather comprehensive refactoring context for task file including skill content summaries and cross-references", activeForm="Gathering refactoring context")
-TaskCreate(subject="Final: Return to orchestrator", description="Return to orchestrator with execution plan and parallelization groups", activeForm="Returning execution plan to orchestrator")
-```
+Phase 1 is complete when the structural report and both lifecycle audit results are present, and every optional-audit decision is recorded.
 
-**RULES**:
+## Phase 2: Design
 
-1. Create ALL tasks BEFORE starting Phase 1
-2. Mark each task `in_progress` using TaskUpdate BEFORE starting that work
-3. Mark each task `completed` using TaskUpdate AFTER verification passes
-4. DO NOT display final summary until ALL tasks are `completed`
-5. If any verification fails, keep task as `in_progress` and fix before proceeding
+Dispatch `plugin-creator:refactor-planner` with:
 
----
+- **Input:** the complete Phase 1 assessment and audit results.
+- **Target:** `.plugin-creator/plans/refactor-design-{plugin-slug}.md`, where the slug is the plugin directory name.
+- **Context:** plugin root, current component paths, all findings, and validator output. Treat SK006/SK007 findings as the source of truth for complexity; do not copy numeric thresholds.
+- **Required content:** every finding mapped to a concrete transformation, target path, dependencies, preserved behavior, and safe parallelization group. Include split plans, agent optimizations, documentation changes, and orphan resolutions only when present in the findings.
+- **Completion:** write the target and return `STATUS: DONE` with its path, or `STATUS: BLOCKED` with the missing input.
 
-## Phase 1: Plugin Assessment
+Read the design and verify every Phase 1 finding has one disposition. Phase 2 is complete when the design exists and has no undisposed finding.
 
-**Objective**: Generate a comprehensive Plugin Assessment Report through a 4-tier assessment pipeline that progresses from structural analysis to deep semantic validation.
+## Phase 3: Plan Tasks
 
-### Tier 1: Structural Analysis
+Dispatch `plugin-creator:refactor-planner` with:
 
-**Action**: LAUNCH the plugin-assessor agent using the Agent tool with this exact prompt:
+- **Inputs:** `.plugin-creator/plans/refactor-design-{plugin-slug}.md` and the existing `.plugin-creator/plans/REFACTOR-PLAN.md` when present.
+- **Targets:** `.plugin-creator/plans/tasks-refactor-{plugin-slug}.md` and the matching plan-index entry.
+- **Task contract:** each task names its ID, type, target, dependencies, priority, execution role, at least three acceptance criteria, required inputs, expected outputs, at least three verification steps, and safe parallel peers. Express ordering through dependencies rather than temporal estimates.
+- **Routing:** `SKILL_SPLIT` to `/plugin-creator:refactor-skill`; `AGENT_OPTIMIZE` to `plugin-creator:subagent-refactorer`; `DOC_IMPROVE` to `plugin-creator:ai-doc-optimizer`; read-only audits to `plugin-creator:skill-auditor`; upstream synchronization to `plugin-creator:skill-content-updater`; description-only work to `/plugin-creator:write-frontmatter-description`.
+- **Verification tasks:** validate the completed plugin, then update plugin documentation when the design requires it.
+- **Completion:** write both targets and return `STATUS: DONE` with paths and parallelization groups, or `STATUS: BLOCKED` with the missing input.
 
-```
-Agent(
-    agent="plugin-assessor",
-    prompt="""
-Your ROLE_TYPE is sub-agent.
+Verify both files and confirm dependency edges match the design. Phase 3 is complete when every designed transformation has an executable task and every task has a verification path.
 
-Assess the plugin at ./plugins/<plugin_name/> for structural correctness, quality issues, and refactoring opportunities.
+## Phase 4: Gather Context
 
-<context>
-WHERE you are working:
-- Plugin root: ./plugins/<plugin_name/>
-- Plugin manifest: ./plugins/<plugin_name/>/.claude-plugin/plugin.json
-- Skills directory: ./plugins/<plugin_name/>/skills/
-- Commands directory: ./plugins/<plugin_name/>/commands/ (if exists)
-- Agents directory: ./plugins/<plugin_name/>/agents/ (if exists)
+Dispatch `plugin-creator:refactor-planner` with:
 
-WHAT already exists:
-- Reference skills for validation: claude-skills-overview-2026, claude-plugins-reference-2026, hooks-guide
-- Plugin schema requirements from Claude Code marketplace
-</context>
+- **Inputs:** the design, task file, and `./plugins/<plugin_name>/`.
+- **Write target:** the task file's `Context Manifest` section.
+- **Required content:** current summaries for each target, existing patterns to preserve, cross-references, and external dependencies. Pass source paths; do not substitute summaries for unread source.
+- **Completion:** return `STATUS: DONE` with the updated task-file path and manifest counts, or `STATUS: BLOCKED` with the missing input.
 
-<success_criteria>
-MUST deliver:
-1. Complete Plugin Assessment Report with ALL sections populated
-2. Overall score out of 100
-3. Marketplace readiness determination (Yes / No / With Changes)
-4. All skills analyzed with token counts (from validator) and quality scores
-5. All orphaned files identified and classified
-6. Specific refactoring recommendations with severity levels
-</success_criteria>
+Verify the `Context Manifest` exists and accounts for every task target. Phase 4 is complete when no task lacks source context or dependency evidence.
 
-<exploration_steps>
-EXECUTE the full plugin-assessor protocol:
-1. Phase 1: Discovery - scan plugin structure
-2. Phase 2: Manifest Validation - validate plugin.json
-3. Phase 3: Skills Analysis - analyze all SKILL.md files and references
-4. Phase 4: Commands Analysis - if commands/ exists
-5. Phase 5: Agents Analysis - if agents/ exists
-6. Phase 6: Hooks Validation - if hooks exist
-7. Phase 7: MCP Configuration - if .mcp.json exists
-8. Phase 8: Cross-Reference Analysis - link validation, orphan detection
-9. Phase 9: Enhancement Identification - refactoring opportunities
-</exploration_steps>
+## Final Handoff
 
-<output_specification>
-GENERATE a Plugin Assessment Report with these key sections:
+Verify every tracking task is complete, then return:
 
-### Executive Summary
-- Overall Score: X/100
-- Marketplace Ready: Yes / No / With Changes
-- Critical Issues: count
-- Skills needing refactoring: list (SK006/SK007 token threshold exceeded or multi-domain)
-- Agents needing optimization: list
-- Orphaned files: count
-
-### Skills Analysis Table
-| Skill | Lines | Status | Description Quality | Orphans | Refactor Needed |
-|-------|-------|--------|---------------------|---------|-----------------|
-
-### Refactoring Recommendations
-Categorized by:
-- SKILL_SPLIT: Skills exceeding the validator token threshold (SK006/SK007) or covering multiple domains
-- AGENT_OPTIMIZE: Agents with vague instructions or poor triggers
-- DOC_IMPROVE: Skills/agents with low description quality
-- ORPHAN_RESOLVE: Orphaned files needing integration or removal
-- STRUCTURE_FIX: Structural issues (broken links, missing files)
-
-Each recommendation must include:
-- Target file path
-- Issue type and severity (Critical/High/Medium/Low)
-- Recommended agent: plugin-creator:refactor-skill | subagent-refactorer | ai-doc-optimizer | plugin-docs-writer
-- Expected outcome
-</output_specification>
-
-<available_resources>
-- Full read access to ./plugins/<plugin_name/>/ directory
-- Reference skills loaded: claude-skills-overview-2026, claude-plugins-reference-2026
-- Plugin schema validation knowledge
-</available_resources>
-"""
-)
+```text
+STATUS: DONE
+Plugin: <plugin_name>
+Assessment: {inline or report path}
+Design: .plugin-creator/plans/refactor-design-{plugin-slug}.md
+Tasks: .plugin-creator/plans/tasks-refactor-{plugin-slug}.md
+Plan index: .plugin-creator/plans/REFACTOR-PLAN.md
+Context manifest: present
+Parallel groups: {groups or "none"}
+Next action: /plugin-creator:implement-refactor {plugin-slug}
 ```
 
-### Tier 2: Skill Lifecycle Audit
+If execution cannot continue:
 
-After Tier 1 completes, invoke the skill lifecycle audit for semantic validation of skill interconnections:
-
+```text
+STATUS: BLOCKED
+Phase: {phase}
+Reason: {specific missing input or failed verification}
+Completed: {verified outputs}
+Remaining: {uncompleted outputs}
 ```
-Skill(skill: "plugin-creator:audit-skill-lifecycle", args: "<plugin_name/>")
-```
-
-This audit traces call chains, detects circular dependencies, finds instruction contradictions, identifies duplicated datasets, and discovers scriptable sequences across all skills in the plugin.
-
-### Tier 3: Agent Lifecycle Audit
-
-After Tier 2 completes, invoke the agent lifecycle audit for execution capability validation:
-
-```
-Skill(skill: "plugin-creator:audit-agent-lifecycle", args: "<plugin_name/>")
-```
-
-This audit validates agent capability-configuration alignment, skill loading correctness, inter-agent contracts, tool sufficiency, and identifies dead agents.
-
-### Tier 4: Skill Completeness Audit (Optional)
-
-For skills identified as marketplace candidates or quality improvement targets, optionally invoke the completeness audit per skill:
-
-```
-Skill(skill: "plugin-creator:audit-skill-completeness", args: "./plugins/<plugin_name/>/skills/{skill-name}")
-```
-
-This evaluates individual skills against 8 quality categories derived from Anthropic's official skills repository.
-
-RULE: Tier 4 is optional. Invoke it when:
-- The plugin is being prepared for marketplace submission
-- Specific skills scored low in Tier 1 structural analysis
-- The user explicitly requests deep quality evaluation
-
-**Phase 1 Completion Requirements**:
-
-After all tiers complete, YOU MUST:
-
-1. **UPDATE TASK**: Mark "Phase 1: Generate Plugin Assessment Report" as `in_progress` before verification
-2. VERIFY all tier reports are complete
-3. DISPLAY this structured summary:
-
-```
-=== PHASE 1 COMPLETE: Plugin Assessed ===
-
-Plugin: <plugin_name/>
-Overall Score: [X/100]
-Marketplace Ready: [Yes / No / With Changes]
-Critical Issues: [count]
-
-Tier 1 - Structural:
-  Skills Analyzed: [count]
-  - Skills exceeding validator token threshold (refactor candidates): [list]
-  - Skills with multi-domain coverage: [list]
-  Agents Analyzed: [count]
-  - Agents needing optimization: [list]
-  Orphaned Files: [count]
-  Documentation Quality Issues: [count]
-
-Tier 2 - Skill Lifecycle:
-  Call Chain Issues: [count]
-  Circular Dependencies: [count]
-  Instruction Contradictions: [count]
-  Duplicated Datasets: [count]
-
-Tier 3 - Agent Lifecycle:
-  Capability Misalignments: [count]
-  Tool Sufficiency Issues: [count]
-  Dead Agents: [count]
-  Contract Mismatches: [count]
-
-Tier 4 - Completeness (if run):
-  Skills Evaluated: [count]
-  Average Score: [X%]
-  Below-Threshold Skills: [list]
-
-Assessment Report: [inline or note location]
-Audit Reports: .plugin-creator/audits/
-```
-
-4. CONFIRM all sections are populated before proceeding to Phase 2
-5. If any section is incomplete, STOP and request completion
-6. **UPDATE TASK**: Mark "Phase 1: Generate Plugin Assessment Report" as `completed`
-
----
-
-## Phase 2: Refactoring Design Map
-
-**Objective**: Create a detailed refactoring design specification showing how each identified issue should be addressed.
-
-**Action**: LAUNCH the python-cli-design-spec agent using the Agent tool with this exact prompt (substitute the complete Assessment Report from Phase 1 where indicated):
-
-```
-Agent(
-    agent="python-cli-design-spec",
-    prompt="""
-Your ROLE_TYPE is sub-agent.
-
-<assessment_report>
-[SUBSTITUTE: Insert the complete Plugin Assessment Report from Phase 1 here]
-</assessment_report>
-
-<context>
-WHERE you are designing:
-- Plugin root: ./plugins/<plugin_name/>
-- Existing skill structure: ./plugins/<plugin_name/>/skills/
-- Claude Code skill format reference: claude-skills-overview-2026
-
-WHAT patterns to follow:
-- Skills should minimize token count via progressive disclosure (references/ extraction); run `uvx skilllint@latest check <skill-path>` to verify
-- Skills should cover single domain (not multi-domain)
-- Agent descriptions need trigger keywords for delegation matching
-- Frontmatter must follow Claude Code schema exactly
-- Reference files must be linked from SKILL.md
-</context>
-
-<success_criteria>
-MUST deliver:
-1. Refactoring design file written to .plugin-creator/plans/refactor-design-{plugin-slug}.md
-2. Design addresses ALL issues from assessment report
-3. Clear transformation specifications for each refactoring target
-4. Dependency mapping between refactoring tasks
-5. Parallelization opportunities identified
-</success_criteria>
-
-<exploration_steps>
-EXECUTE these steps in order:
-1. READ the assessment report to understand all issues
-2. READ ./plugins/<plugin_name/>/skills/*/SKILL.md to understand current structure
-3. READ reference skills (claude-skills-overview-2026) to understand target format
-4. For skills needing split: ANALYZE content domains and propose partition plan
-5. For agents needing optimization: IDENTIFY specific improvements
-6. For orphaned files: DETERMINE integration or removal strategy
-</exploration_steps>
-
-<design_specifications>
-DESIGN and DOCUMENT these aspects for each refactoring target:
-
-### For SKILL_SPLIT targets:
-- Current skill path and token count (from validator output)
-- Identified domains within the skill
-- Proposed new skills with names and scopes
-- Content distribution plan (which sections go where)
-- Shared references strategy
-- Backward compatibility (if skill is externally referenced)
-
-### For AGENT_OPTIMIZE targets:
-- Current agent path
-- Current description (problems identified)
-- Proposed new description with trigger keywords
-- Instruction clarity improvements
-- Tool restrictions review
-
-### For DOC_IMPROVE targets:
-- Current file path
-- Current description quality score
-- Specific improvements needed
-- Target description with trigger phrases
-
-### For ORPHAN_RESOLVE targets:
-- Orphaned file path
-- Classification (New Content / Duplicate / Notes / Outdated)
-- Integration target or removal justification
-- Proposed link location if integrating
-</design_specifications>
-
-<file_naming>
-Generate a slug from the plugin name using these rules:
-1. Use the plugin directory name directly (already lowercase with hyphens)
-Example: "python-engineering" → "python-engineering"
-</file_naming>
-
-<output_file_structure>
-WRITE the specification to: .plugin-creator/plans/refactor-design-{plugin-slug}.md
-
-MUST use this exact structure:
-
-# Refactoring Design Map: {Plugin Name}
-
-## Overview
-[2-3 sentence description of refactoring scope and goals]
-
-## Source Assessment
-- Plugin: ./plugins/{plugin-name}
-- Overall Score: [from Phase 1]
-- Total Refactoring Targets: [count]
-
-## Skill Splits
-
-### {original-skill-name} Split Plan
-**Source**: ./plugins/{plugin}/skills/{skill}/SKILL.md
-**Lines**: [count]
-**Domains Identified**: [list]
-
-**Proposed Split**:
-| New Skill | Scope | Sections from Original |
-|-----------|-------|------------------------|
-| {name-1} | {domain} | {sections} |
-| {name-2} | {domain} | {sections} |
-
-**Shared References**: [files that both new skills will reference]
-**Migration Notes**: [any backward compatibility concerns]
-
-## Agent Optimizations
-
-### {agent-name} Optimization
-**Source**: ./plugins/{plugin}/agents/{agent}.md
-**Current Description**: "{current}"
-**Issues**: [list of problems]
-
-**Proposed Description**: "{new description with trigger keywords}"
-**Instruction Improvements**:
-- [specific improvement 1]
-- [specific improvement 2]
-
-## Documentation Improvements
-
-### {file-path}
-**Current Score**: [X/10]
-**Issues**: [list]
-**Target Improvements**: [specific changes]
-
-## Orphan Resolution
-
-### {orphan-path}
-**Classification**: [New Content / Duplicate / Notes / Outdated]
-**Resolution**: [Integrate into X / Remove / Merge with Y]
-**Implementation**: [specific steps]
-
-## Dependency Map
-
-```
-
-{visual or list showing which tasks depend on others}
-
-```
-
-## Parallelization Opportunities
-
-Tasks that can run simultaneously:
-- Group A: [task list] - No shared files
-- Group B: [task list] - No shared files
-</output_file_structure>
-
-<available_resources>
-- Full codebase read/write access
-- Existing skill files as reference
-- Claude Code skill format documentation
-</available_resources>
-"""
-)
-```
-
-**Phase 2 Completion Requirements**:
-
-After the python-cli-design-spec agent completes, YOU MUST:
-
-1. **UPDATE TASK**: Mark "Phase 2: Create refactoring design map" as `in_progress` before verification
-2. VERIFY the agent created the design file at .plugin-creator/plans/refactor-design-{plugin-slug}.md
-3. READ the design file to confirm all sections are populated
-4. DISPLAY this structured summary:
-
-```
-=== PHASE 2 COMPLETE: Refactoring Designed ===
-
-Design File: .plugin-creator/plans/refactor-design-{plugin-slug}.md
-Total Refactoring Targets: [count]
-
-Skill Splits Planned: [count]
-- {skill-name}: Split into {N} new skills
-...
-
-Agent Optimizations Planned: [count]
-- {agent-name}: {brief improvement}
-...
-
-Documentation Improvements: [count]
-Orphan Resolutions: [count]
-
-Parallelization Groups: [count]
-```
-
-5. CONFIRM the design file exists and is complete before proceeding to Phase 3
-6. If the file is missing or incomplete, STOP and request the agent to complete it
-7. **UPDATE TASK**: Mark "Phase 2: Create refactoring design map" as `completed`
-
----
-
-## Phase 3: Task Planning
-
-**Objective**: Generate detailed implementation tasks with dependencies, verification steps, and parallel execution opportunities.
-
-**Action**: LAUNCH a swarm-task-planner agent using the Agent tool with this exact prompt:
-
-````
-Agent(
-    agent="swarm-task-planner",
-    prompt="""
-Your ROLE_TYPE is sub-agent.
-
-<design_file_location>
-READ the refactoring design from Phase 2 at: .plugin-creator/plans/refactor-design-{plugin-slug}.md
-</design_file_location>
-
-<context>
-WHERE you are planning:
-- Plan directory: .plugin-creator/plans/
-- Task file destination: .plugin-creator/plans/tasks-refactor-{plugin-slug}.md
-- Plan index: .plugin-creator/plans/REFACTOR-PLAN.md (create if not exists)
-
-WHAT task structure to follow:
-- Dependency-based ordering (NO temporal language)
-- Explicit parallelization opportunities
-- Verification steps for each task
-- Status tracking: ❌ NOT STARTED, 🔄 IN PROGRESS, ✅ COMPLETE
-</context>
-
-<success_criteria>
-MUST deliver:
-1. Task file written to .plugin-creator/plans/tasks-refactor-{plugin-slug}.md
-2. REFACTOR-PLAN.md created/updated with checklist items
-3. ALL tasks follow the exact format specified
-4. Dependencies correctly mapped between tasks
-5. Parallelization opportunities explicitly identified
-6. Each task has acceptance criteria and verification steps
-</success_criteria>
-
-<exploration_steps>
-EXECUTE these steps in order:
-1. READ .plugin-creator/plans/refactor-design-{plugin-slug}.md (design from Phase 2)
-2. READ .plugin-creator/plans/REFACTOR-PLAN.md if it exists
-3. GLOB .plugin-creator/plans/tasks-*.md to identify existing task files
-</exploration_steps>
-
-<planning_steps>
-PERFORM these planning steps:
-
-1. **Create task file**:
-   WRITE to .plugin-creator/plans/tasks-refactor-{plugin-slug}.md
-
-   MUST follow this exact format for each task:
-
-   ```markdown
-   ## Task {ID}: {Descriptive Name}
-
-   **Status**: ❌ NOT STARTED
-   **Dependencies**: [Comma-separated Task IDs or "None"]
-   **Priority**: [Integer 1-5, where 1 is highest]
-   **Complexity**: [Low/Medium/High]
-   **Agent**: [plugin-creator:refactor-skill | subagent-refactorer | ai-doc-optimizer | plugin-docs-writer]
-
-   **Target**: [File path being refactored]
-   **Issue Type**: [SKILL_SPLIT | AGENT_OPTIMIZE | DOC_IMPROVE | ORPHAN_RESOLVE | STRUCTURE_FIX]
-
-   **Acceptance Criteria**:
-   1. [Specific, measurable criterion]
-   2. [Another testable requirement]
-   3. [At least 3 criteria total]
-
-   **Required Inputs**:
-   - Design spec section: [which section of refactor-design-{slug}.md]
-   - Source files: [paths to read]
-
-   **Expected Outputs**:
-   - [File paths to be created/modified]
-
-   **Can Parallelize With**: [Comma-separated Task IDs or "None"]
-   **Reason**: [Why parallelization is safe - no shared files/dependencies]
-
-   **Verification Steps**:
-   1. [How to verify criterion 1]
-   2. [How to verify criterion 2]
-   3. [At least 3 verification steps]
-   ```
-
-   **Agent Selection Rules**:
-   - SKILL_SPLIT tasks → `plugin-creator:refactor-skill`
-   - AGENT_OPTIMIZE tasks → `subagent-refactorer`
-   - DOC_IMPROVE tasks (skills/agents) → `plugin-creator:ai-doc-optimizer`
-   - ORPHAN_RESOLVE tasks → `plugin-creator:ai-doc-optimizer` (integrate) or orchestrator (remove)
-   - Documentation generation → `plugin-docs-writer`
-
-   Routing by concern (DOC_IMPROVE and ORPHAN_RESOLVE):
-   - Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `plugin-creator:ai-doc-optimizer`
-   - Audit quality (read-only, no writes, score against completeness categories) → `plugin-creator:skill-auditor`
-   - Sync content against upstream docs (add NEW/fix STALE from live sources) → `plugin-creator:skill-content-updater`
-   - Write/rewrite description field only → `/plugin-creator:write-frontmatter-description` skill directly
-
-   AFTER all refactoring tasks, ALWAYS include these verification tasks:
-
-   ```markdown
-   ## Task V1: Validate Plugin Structure
-
-   **Status**: ❌ NOT STARTED
-   **Dependencies**: [All refactoring task IDs]
-   **Priority**: 1
-   **Complexity**: Low
-   **Agent**: plugin-assessor
-
-   **Acceptance Criteria**:
-   1. Plugin passes structural validation
-   2. All links resolve correctly
-   3. No orphaned files remain
-   4. Frontmatter validates against schema
-
-   **Verification Steps**:
-   1. Run plugin-assessor on refactored plugin
-   2. Verify score improved from original assessment
-   3. Verify no critical issues remain
-   ```
-
-   ```markdown
-   ## Task V2: Update Plugin Documentation
-
-   **Status**: ❌ NOT STARTED
-   **Dependencies**: Task V1
-   **Priority**: 2
-   **Complexity**: Low
-   **Agent**: plugin-docs-writer
-
-   **Acceptance Criteria**:
-   1. README.md reflects current capabilities
-   2. All skills documented
-   3. Usage examples accurate
-
-   **Verification Steps**:
-   1. README.md exists and is comprehensive
-   2. All skills listed with descriptions
-   3. Installation instructions accurate
-   ```
-
-2. **Create/Update REFACTOR-PLAN.md**:
-
-   IF .plugin-creator/plans/REFACTOR-PLAN.md does not exist, CREATE it:
-
-   ```markdown
-   # Plugin Refactoring Plan Index
-
-   ## Active Refactoring Projects
-
-   | Plugin | Task File | Status | Score Before | Score After |
-   |--------|-----------|--------|--------------|-------------|
-
-   ## Completed Refactoring Projects
-
-   | Plugin | Task File | Completion Date | Score Improvement |
-   |--------|-----------|-----------------|-------------------|
-   ```
-
-   ADD new entry to Active Refactoring Projects:
-   ```markdown
-   | {plugin-name} | [tasks-refactor-{slug}.md](tasks-refactor-{slug}.md) | ❌ NOT STARTED | {score}/100 | TBD |
-   ```
-
-</planning_steps>
-
-<constraints>
-NEVER use temporal language:
-- ❌ "First, then, finally, before, after"
-- ✓ "Dependencies: Task 1, Task 2"
-
-ALWAYS specify:
-- Minimum 3 acceptance criteria per task
-- Minimum 3 verification steps per task
-- Explicit parallelization analysis
-- Complete file paths for inputs and outputs
-</constraints>
-
-<available_resources>
-- Full read/write access to .plugin-creator/plans/ directory
-- Refactoring design document from Phase 2
-</available_resources>
-"""
-)
-````
-
-**Phase 3 Completion Requirements**:
-
-After the swarm-task-planner agent completes, YOU MUST:
-
-1. **UPDATE TASKS**: Mark these as `in_progress` before verification:
-   - "Phase 3: Create task file at .plugin-creator/plans/tasks-refactor-{slug}.md"
-   - "Phase 3: Update REFACTOR-PLAN.md with new checklist items"
-2. VERIFY the task file was created at .plugin-creator/plans/tasks-refactor-{plugin-slug}.md
-3. VERIFY REFACTOR-PLAN.md exists and has the new entry
-4. READ both files to confirm completeness
-5. DISPLAY this structured summary:
-
-```
-=== PHASE 3 COMPLETE: Tasks Planned ===
-
-Task File: .plugin-creator/plans/tasks-refactor-{plugin-slug}.md
-REFACTOR-PLAN.md: Updated
-
-Total Tasks: [count]
-- Skill Split Tasks: [count]
-- Agent Optimization Tasks: [count]
-- Documentation Tasks: [count]
-- Orphan Resolution Tasks: [count]
-- Verification Tasks: [count]
-
-Parallelization Groups:
-- Group A (can run together): [task IDs]
-- Group B (can run together): [task IDs]
-...
-
-Task Summary:
-- Task {ID}: {Name} | Agent: {agent} | Dependencies: {deps}
-...
-```
-
-6. CONFIRM all files exist and are complete
-7. If any file is missing or incomplete, STOP and request completion
-8. **UPDATE TASKS**: Mark both Phase 3 items as `completed`
-
----
-
-## Phase 4: Context Gathering
-
-**Objective**: Gather comprehensive refactoring context before execution begins.
-
-**Action**: LAUNCH the context-gathering agent using the Agent tool:
-
-```
-Agent(
-    agent="context-gathering",
-    prompt="""
-Your ROLE_TYPE is sub-agent.
-
-<task_file>
-.plugin-creator/plans/tasks-refactor-{plugin-slug}.md
-</task_file>
-
-<design_spec>
-.plugin-creator/plans/refactor-design-{plugin-slug}.md
-</design_spec>
-
-<context>
-WHERE you are researching:
-- Plugin: ./plugins/<plugin_name/>
-- Design spec: .plugin-creator/plans/refactor-design-{plugin-slug}.md
-- Task file: .plugin-creator/plans/tasks-refactor-{plugin-slug}.md
-
-WHAT to gather:
-1. Current skill content summaries (for split planning)
-2. Existing patterns in reference files
-3. Cross-references between skills
-4. External dependencies on skills being modified
-</context>
-
-<success_criteria>
-MUST deliver:
-1. Context manifest written to the task file
-2. All relevant skill content summarized
-3. Cross-reference map documented
-4. STATUS: DONE or BLOCKED response
-</success_criteria>
-
-<instructions>
-1. READ the design spec to understand what will change
-2. READ the task file to understand all tasks
-3. READ each skill being refactored to understand current content
-4. MAP cross-references between files
-5. IDENTIFY external dependencies (other plugins/skills referencing these)
-6. WRITE context manifest to the task file
-7. RETURN STATUS output with summary
-</instructions>
-"""
-)
-```
-
-**Phase 4 Completion Requirements**:
-
-After the context-gathering agent completes:
-
-1. **UPDATE TASK**: Mark "Phase 4: Gather refactoring context" as `in_progress` before verification
-2. VERIFY the task file now contains a "Context Manifest" section
-3. DISPLAY:
-
-```
-=== PHASE 4 COMPLETE: Context Gathered ===
-
-Task File: .plugin-creator/plans/tasks-refactor-{plugin-slug}.md
-Context Manifest: [added/updated]
-Skills Analyzed: [count]
-Cross-References Mapped: [count]
-External Dependencies: [count or "none found"]
-```
-
-4. **UPDATE TASK**: Mark "Phase 4: Gather refactoring context" as `completed`
-
----
-
-## Final Summary - Return to Orchestrator
-
-**BEFORE displaying the final summary, YOU MUST:**
-
-1. **VERIFY ALL TODOS COMPLETE**: Check that ALL tasks are marked `completed`
-2. If ANY task is still `pending` or `in_progress`, go back and complete the missing work
-3. **UPDATE TASK**: Mark "Final: Return to orchestrator with execution plan" as `in_progress`
-
-<final_summary_structure>
-
-```
-================================================================================
-                    PLUGIN REFACTORING PLANNING COMPLETE
-================================================================================
-
-Plugin: <plugin_name/>
-Plugin Path: ./plugins/<plugin_name/>
-
-DELIVERABLES:
--------------
-✓ Assessment Report: Generated (Phase 1)
-✓ Refactoring Design: .plugin-creator/plans/refactor-design-{plugin-slug}.md
-✓ Task File: .plugin-creator/plans/tasks-refactor-{plugin-slug}.md
-✓ REFACTOR-PLAN.md: Updated
-✓ Context Manifest: Added to task file
-
-PHASE 1 SUMMARY - Assessment:
-- Original Score: {X}/100
-- Critical Issues: {count}
-- Refactoring Targets: {count}
-
-PHASE 2 SUMMARY - Design:
-- Skill Splits: {count}
-- Agent Optimizations: {count}
-- Documentation Improvements: {count}
-- Orphan Resolutions: {count}
-
-PHASE 3 SUMMARY - Planning:
-- Total Tasks: {count}
-- Parallelizable Tasks: {count}
-- Estimated Complexity: {Low/Medium/High}
-
-PHASE 4 SUMMARY - Context:
-- Context Manifest: Added
-- Cross-References: {count}
-
-================================================================================
-                         READY FOR PARALLEL EXECUTION
-================================================================================
-
-ORCHESTRATOR: You can now launch parallel agents using:
-
-/plugin-creator:implement-refactor {plugin-slug}
-
-This will:
-1. Load the task file
-2. Build dependency graph
-3. Launch parallel agents for independent tasks
-4. Track progress and handle completions
-5. Trigger review loop when tasks complete
-
-PARALLELIZATION GROUPS (can launch simultaneously):
-- Group A: {task IDs} - Agent: {agent type}
-- Group B: {task IDs} - Agent: {agent type}
-...
-
-FILES TO REVIEW BEFORE EXECUTION:
----------------------------------
-- .plugin-creator/plans/refactor-design-{plugin-slug}.md (refactoring design)
-- .plugin-creator/plans/tasks-refactor-{plugin-slug}.md (implementation tasks)
-================================================================================
-```
-
-</final_summary_structure>
-
-4. **UPDATE TASK**: Mark "Final: Return to orchestrator with execution plan" as `completed`
-
-**WORKFLOW COMPLETE** - Control returns to orchestrator for parallel execution.
-
----
-
-## Workflow Guidelines
-
-**Sequential Dependency Requirements**:
-
-Each phase MUST complete before the next begins:
-
-- Phase 1 output (assessment) → Phase 2 input
-- Phase 2 output (design map) → Phase 3 input
-- Phase 3 output (task file) → Phase 4 input
-- Phase 4 output (context) → Orchestrator execution
-
-**Slug Generation**:
-
-Use the plugin directory name directly (already lowercase with hyphens):
-
-- `python-engineering` → `python-engineering`
-- `gitlab-skill` → `gitlab-skill`
-
-**Quality Assurance**:
-
-At each phase completion:
-
-- VERIFY all required files exist
-- CONFIRM all sections are populated
-- VALIDATE format matches specifications
-- STOP if incomplete and request agent to fix

@@ -40,16 +40,17 @@ Specificity and brevity pull the same way once you count branches: spend the wor
 
 Quoted phrases buy nothing. The agent matches on meaning, not on literal strings, and quotes are what force the whole value into YAML quoting.
 
-## Write imperative activation guidance
+## Write direct activation guidance
 
-The description is injected into the system prompt as instruction to Claude about when to activate the skill. First and second person put the agent in the wrong point of view and degrade discovery.
+The description is injected into the system prompt as an instruction about activation. State the
+action, then give direct `Use when...` guidance.
 
 ```yaml
-# Third person — the agent reads this as its own instruction
-description: Generate commit messages by analyzing staged git diffs. Use when the user asks for help writing a commit message.
+# Direct activation guidance
+description: Generate commit messages by analyzing staged git diffs. Use when writing a commit message.
 
 # First person — describes a helper the agent is not
-description: I can help you write commit messages by looking at your staged changes.
+description: I can help write commit messages by looking at staged changes.
 
 # Second person — addresses a reader who is not there
 description: You can use this to generate commit messages.

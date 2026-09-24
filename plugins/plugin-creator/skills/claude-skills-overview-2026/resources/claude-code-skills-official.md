@@ -96,6 +96,17 @@ All fields are optional. Only `description` is recommended.
 | `$ARGUMENTS[N]`        | Specific argument by 0-based index. |
 | `$N`                   | Shorthand for `$ARGUMENTS[N]`. |
 | `${CLAUDE_SESSION_ID}` | Current session ID. |
+| `${CLAUDE_SKILL_DIR}`  | Absolute path to the directory containing the active `SKILL.md`; substituted in skill content and `allowed-tools`. |
+
+SOURCE: [Available string substitutions](https://code.claude.com/docs/en/skills#available-string-substitutions) (accessed 2026-09-24)
+
+### Tool Pre-Approval
+
+`allowed-tools` pre-approves matching tools for the turn in which the skill is invoked. It does not
+restrict tool availability: unlisted tools remain callable under the user's normal permission
+settings. Use `disallowed-tools` when a skill must make tools unavailable.
+
+SOURCE: [Pre-approve tools for a skill](https://code.claude.com/docs/en/skills#pre-approve-tools-for-a-skill) (accessed 2026-09-24)
 
 ---
 

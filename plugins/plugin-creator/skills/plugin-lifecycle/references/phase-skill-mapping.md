@@ -1,37 +1,37 @@
-# Plugin Lifecycle — Phase-to-Skill Mapping
+# Plugin Lifecycle Phase Mapping
 
-Lookup reference: which skill or agent handles each phase, and the exact invocation syntax.
+Lookup reference for the owner and portable handoff at each phase.
 
-| Phase | Skill/Agent | Invocation |
-|-------|-------------|------------|
-| 0: RT-ICA | `rt-ica` skill (inline procedure) | Inline — see Phase 0 |
-| 0.5: Discussion | Direct — capture to discuss-CONTEXT.md | Inline — see Phase 0.5 |
-| 1: Assess | `/plugin-creator:assessor` | `Skill(skill="plugin-creator:assessor")` |
-| 2: Research | `/plugin-creator:feature-discovery` | `Skill(skill="plugin-creator:feature-discovery")` |
-| 2: Research | 4-way parallel researchers | subagent_type="plugin-creator:plugin-assessor" x3 + "general-purpose" x1 |
-| 3: Design | `/dh:rt-ica` | `Skill(skill="dh:rt-ica")` |
-| 4: Create | `/plugin-creator:skill-creator` | `Skill(skill="plugin-creator:skill-creator")` |
-| 4: Create | `/plugin-creator:agent-creator` | `Skill(skill="plugin-creator:agent-creator")` |
-| 4: Create | `/plugin-creator:hook-creator` | `Skill(skill="plugin-creator:hook-creator")` |
-| 5: Debug | `/plugin-creator:lint` | `Skill(skill="plugin-creator:lint")` |
-| 5: Debug | `/plugin-creator:refactor-skill` | `Skill(skill="plugin-creator:refactor-skill")` |
-| 5: Debug | `/plugin-creator:lint` | `Skill(skill="plugin-creator:lint", args="--fix PATH")` |
-| 6: Optimize | `/plugin-creator:skill-goal-extractor` | Activate `plugin-creator:skill-goal-extractor` |
-| 6: Optimize | `/plugin-creator:evaluate-and-tighten-skills` | Activate `plugin-creator:evaluate-and-tighten-skills` |
-| 6: Optimize | `/plugin-creator:refactor-plugin` | `Skill(skill="plugin-creator:refactor-plugin")` |
-| 6: Optimize | `/plugin-creator:optimize-claude-md` | `Skill(skill="plugin-creator:optimize-claude-md")` — entry point; dispatches `@ai-doc-optimizer` itself |
-| 6: Optimize | `@skill-auditor` | subagent_type="plugin-creator:skill-auditor" |
-| 6: Optimize | `@skill-content-updater` | subagent_type="plugin-creator:skill-content-updater" |
-| 6: Optimize | `/plugin-creator:subagent-refactoring-methodology` | `Skill(skill="plugin-creator:subagent-refactoring-methodology")` — load before the agent below |
-| 6: Optimize | `@subagent-refactorer` | subagent_type="plugin-creator:subagent-refactorer" |
+| Phase | Owner | Handoff |
+|---|---|---|
+| 0: RT-ICA | inline procedure | See Phase 0 |
+| 0.5: Discussion | lifecycle orchestrator | Write `discuss-CONTEXT.md` |
+| 1: Assess | assessor skill | `/plugin-creator:assessor` |
+| 2: Research | feature discovery skill | `/plugin-creator:feature-discovery` |
+| 2: Research | three `plugin-creator:plugin-assessor` agents and one harness-native general-purpose agent | Dispatch together |
+| 3: Design | RT-ICA skill | `/dh:rt-ica` |
+| 4: Create skills | skill creator | `/plugin-creator:skill-creator` |
+| 4: Create agents | agent creator | `/plugin-creator:agent-creator` |
+| 4: Create hooks | hook creator | `/plugin-creator:hook-creator` |
+| 5: Debug | lint skill | `/plugin-creator:lint` or `/plugin-creator:lint --fix PATH` |
+| 5: Debug | refactor skill | `/plugin-creator:refactor-skill` |
+| 6: Optimize goals | goal extractor | `/plugin-creator:skill-goal-extractor` |
+| 6: Tighten | tightening skill | `/plugin-creator:evaluate-and-tighten-skills` |
+| 6: Refactor plugin | refactor skill | `/plugin-creator:refactor-plugin` |
+| 6: Optimize prose | Claude documentation optimizer | `/plugin-creator:optimize-claude-md` |
+| 6: Audit skill | `plugin-creator:skill-auditor` | Dispatch agent |
+| 6: Sync upstream docs | `plugin-creator:skill-content-updater` | Dispatch agent |
+| 6: Optimize agent | methodology skill, then `plugin-creator:subagent-refactorer` | Activate `/plugin-creator:subagent-refactoring-methodology`, then dispatch agent |
+| 6.5: Documentation | `plugin-creator:plugin-assessor` | Dispatch agent |
+| 7: Verify | completion skill | `/plugin-creator:ensure-complete` |
+| 7: Verify | skilllint | `uvx skilllint@latest check` |
 
 Routing by concern:
-- Establish what a skill exists to achieve, before judging any of its content → `/plugin-creator:skill-goal-extractor` skill
-- Remove content that serves no goal (decides whether text exists) → `/plugin-creator:evaluate-and-tighten-skills` skill, run before optimizing
-- Optimize existing content (decides how surviving text reads — clarity, structure, Anthropic prompt engineering principles) → `/plugin-creator:optimize-claude-md` skill, which measures baselines, dispatches the `ai-doc-optimizer` agent, runs independent verification, and reports. Do not dispatch that agent directly — a bare dispatch skips measurement, goal resolution, verification, and reporting.
-- Audit quality (read-only, no writes, score against completeness categories) → `skill-auditor` agent (uses `/plugin-creator:audit-skill-completeness`)
-- Sync content against upstream docs (add NEW/fix STALE from live sources) → `skill-content-updater` agent (subagent_type="plugin-creator:skill-content-updater")
-- Write/rewrite description field only → `/plugin-creator:write-frontmatter-description` skill directly
-| 6.5: Documentation | `@plugin-assessor` | subagent_type="plugin-creator:plugin-assessor" |
-| 7: Verify | `/plugin-creator:ensure-complete` | `Skill(skill="plugin-creator:ensure-complete")` |
-| 7: Verify | `skilllint` | `uvx skilllint@latest check` |
+
+- Establish a skill's goals before judging content: `/plugin-creator:skill-goal-extractor`.
+- Remove content that serves no goal: `/plugin-creator:evaluate-and-tighten-skills`.
+- Optimize surviving skill or Claude instructions through `/plugin-creator:optimize-claude-md`;
+  that skill owns baselines, dispatch, independent verification, and reporting.
+- Audit quality without writes by dispatching `plugin-creator:skill-auditor`.
+- Sync against upstream documentation by dispatching `plugin-creator:skill-content-updater`.
+- Rewrite only a description with `/plugin-creator:write-frontmatter-description`.

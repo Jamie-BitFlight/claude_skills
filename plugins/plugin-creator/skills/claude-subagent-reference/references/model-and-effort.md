@@ -1,6 +1,5 @@
 # Model and Effort Configuration
 
-SOURCE: <https://code.claude.com/docs/en/sub-agents.md> § Choose a model (accessed 2026-05-28)
 SOURCE: <https://code.claude.com/docs/en/model-config.md> (accessed 2026-05-28)
 SOURCE: <https://code.claude.com/docs/en/sub-agents#choose-a-model> (accessed 2026-09-24)
 
@@ -18,8 +17,6 @@ The `model` frontmatter field accepts:
 | `inherit` | Same model as the main conversation (default when field is omitted) |
 
 ## Model resolution order
-
-SOURCE: <https://code.claude.com/docs/en/sub-agents.md> § Choose a model (accessed 2026-05-28)
 
 When Claude invokes a subagent, the model resolves in this order (first match wins):
 

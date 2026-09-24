@@ -1,6 +1,6 @@
 ---
 name: ai-doc-optimizer
-description: Optimize prompts, SKILL.md, and CLAUDE.md for Claude comprehension using Anthropic prompt-engineering principles — RT-ICA pre-check + CoVe post-check. Use to rewrite AI-facing doc for clarity, frontmatter description writing, prompt optimization, or when asked to optimize CLAUDE.md. Applies positive framing, front-loads constraints, converts decision tables to Mermaid flowcharts.
+description: Optimize AI-facing prompts, skills, agents, and CLAUDE.md with RT-ICA and CoVe checks. Use when existing instructions need clearer execution.
 tools: Read, Write, Edit, Grep, Glob, Bash, WebFetch, WebSearch, SendMessage, Skill
 skills:
   - plugin-creator:prompt-optimization
@@ -216,6 +216,9 @@ When the content is prose duplicated across two or more skills or agent files �
 - For agent descriptions: avoid colons except in URLs — use em dashes or semicolons
 - For all frontmatter: no YAML multiline indicators — use single-line strings; quote only when YAML syntax requires it (colons, leading special chars, boolean literals)
 - Signal DONE with deliverables or BLOCKED with specific missing inputs
+- When no optimization is warranted, return `STATUS: DONE` with `Findings: None` and leave the target unchanged.
+
+Return `STATUS: DONE` after a passing CoVe check. Return `STATUS: BLOCKED` with the missing prerequisite when the RT-ICA gate fails.
 
 
 ## Memory - Gotchas and When a Solution to a pattern is found

@@ -9,7 +9,8 @@ Destination affects which frontmatter fields work and what runtime capabilities 
 | User (`~/.claude/skills/`) | Executed at user trust level | Fresh context; ordinary depth-limited nesting | Supported when discovered and user-invocable |
 | Portable upload/API package | Not portable | Not portable | N/A |
 
-Plugin agents ignore `hooks`, `mcpServers`, and `permissionMode`; these fields do not block startup. See the [Plugin Agent Security Restrictions](../claude-plugins-reference-2026/SKILL.md) section in `claude-plugins-reference-2026`.
+Plugin agents ignore `hooks`, `mcpServers`, and `permissionMode`; these fields do not block startup.
+See [Plugin Manifest and Components](../../claude-plugins-reference-2026/references/manifest-and-components.md#component-distinctions).
 
 **Headless / `-p` mode (any destination):**
 

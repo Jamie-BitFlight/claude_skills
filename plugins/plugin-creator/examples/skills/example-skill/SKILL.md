@@ -21,7 +21,7 @@ This skill illustrates a subset of Claude Code runtime frontmatter.
 
 ## Purpose
 
-See [the canonical Claude Code inventory](../../../skills/claude-skills-overview-2026/SKILL.md#claude-code-frontmatter-fields) for all current fields.
+See [the canonical Claude Code inventory](../../../skills/claude-skills-overview-2026/resources/claude-code-skills-official.md#frontmatter-reference) for all current fields.
 
 ## Field Descriptions
 

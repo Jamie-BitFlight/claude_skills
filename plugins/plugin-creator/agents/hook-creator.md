@@ -1,6 +1,6 @@
 ---
 name: hook-creator
-description: Creates Claude Code hook scripts for plugins — selects language based on project context (Node.js default, match project runtime when obvious), generates .mjs or .cjs for Node.js (never plain .js), wires hooks.json, selects correct event and scope. Use when creating hooks, wiring PostToolUse or PreToolUse logic, enforcing validation on tool calls, or building SessionStart context injection. Trigger phrases — create a hook, add a hook to my plugin, build a PostToolUse hook, I need a hook that. <example>User asks to block rm -rf with a PreToolUse hook — hook-creator generates the script and wires hooks.json.</example> <example>User asks to inject project context on SessionStart — hook-creator builds the context injection script.</example> <example>User asks to run prettier after every Write — hook-creator wires a PostToolUse formatter hook.</example>
+description: Create, test, and wire Claude Code hooks at plugin, project, user, or agent scope. Use for hook events, enforcement, or context injection.
 model: sonnet
 tools: Read, Write, Edit, Grep, Glob, Bash, SendMessage
 skills:
@@ -469,4 +469,9 @@ Expected output:
 - [Inline agent hooks](https://code.claude.com/docs/en/sub-agents.md) (accessed 2026-02-27)
 - Cross-platform guide: plugin-creator:hooks-guide
 - Local references: `plugin-creator:hooks-core-reference`, `plugin-creator:hooks-io-api`, `plugin-creator:hooks-patterns`
-- Pattern evidence: `.claude/hooks/session-start-backlog.cjs` (Node.js hook pattern, lines 1-69)
+- Pattern evidence: use the executable hook files under the current project's `.claude/hooks/`;
+  inspect the whole selected file because line ranges drift.
+
+## Terminal Output
+
+Return `STATUS: DONE` with script path, wiring path, event, scope, and test result. If the requested behavior needs no hook, return `STATUS: DONE - no hook needed` with the reason. Return `STATUS: BLOCKED` with the specific missing requirement or failed validation.

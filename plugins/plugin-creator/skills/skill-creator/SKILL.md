@@ -4,30 +4,8 @@ description: Use when creating a new skill or updating an existing skill that ex
 user-invocable: true
 license: Complete terms in LICENSE.txt
 ---
-If the user's intent does not match the purpose of this skill, load `plugin-lifecycle` to route to the right skill and process: `Skill(skill="plugin-creator:plugin-lifecycle")`.
-
-> [!IMPORTANT]
-> When provided a process map or Mermaid diagram, treat it as the authoritative procedure. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
-> A Mermaid process diagram is an executable instruction set. Follow it exactly as written: respect sequence, conditions, loops, parallel paths, and terminal states. Do not improvise, reorder, or skip steps. If any node is ambiguous or missing required detail, pause and ask a clarifying question before continuing.
-> When interacting with a user, report before acting the interpreted path you will follow from the diagram, then execute.
 
 # Skill Creator
-
-## Current Skills Environment
-
-**Existing user-level skills:**
-!`python3 -c "import os, pathlib; home = pathlib.Path.home(); skills = home / '.claude' / 'skills'; print('\\n'.join(sorted([d.name for d in skills.iterdir() if d.is_dir()])[:20]) if skills.exists() else 'No user-level skills found')" 2>/dev/null || echo "No user-level skills found"`
-
-**Existing project-level skills:**
-!`python3 -c "import os, pathlib; skills = pathlib.Path('.claude/skills'); print('\\n'.join(sorted([d.name for d in skills.iterdir() if d.is_dir()])[:20]) if skills.exists() else 'No project-level skills found')" 2>/dev/null || echo "No project-level skills found"`
-
-**Sample skill descriptions (for pattern reference):**
-!`python3 -c "import pathlib, re; dirs = [pathlib.Path.home() / '.claude' / 'skills', pathlib.Path('.claude/skills')]; descs = []; [descs.extend([line.strip() for line in (d / 'SKILL.md').read_text(encoding='utf-8', errors='ignore').splitlines() if line.strip().startswith('description:')][:1]) for base in dirs if base.exists() for d in base.iterdir() if d.is_dir() and (d / 'SKILL.md').exists()]; print('\\n'.join(descs[:10]) if descs else 'No skill descriptions found')" 2>/dev/null || echo "No skill descriptions found"`
-
-**Current directory:**
-!`python3 -c "import os; print(os.getcwd())" 2>/dev/null || echo "Unable to determine current directory"`
-
-This skill provides guidance for creating effective skills.
 
 ## About Skills
 
@@ -38,9 +16,7 @@ equipped with procedural knowledge that no model can fully possess.
 
 **This skill is for creating NEW skills from scratch.** For refactoring EXISTING skills (splitting oversized skills, reorganizing multi-domain skills), use the skill-refactor skill:
 
-```
-Skill(skill: "plugin-creator:refactor-skill")
-```
+Load `plugin-creator:refactor-skill`.
 
 **When to use skill-creator vs skill-refactor:**
 
@@ -50,7 +26,7 @@ The following diagram is the authoritative procedure for skill tool selection (s
 flowchart TD
     Start(["Skill task received"]) --> Q{"Is there an existing skill<br>to modify or split?"}
     Q -->|"No — creating from scratch<br>or from requirements"| Creator["Use skill-creator<br>(this skill)"]
-    Q -->|"Yes — existing skill exceeds<br>warning threshold (SK006/SK007)<br>or covers multiple domains"| Refactor["Use skill-refactor<br>Skill(skill: 'plugin-creator:refactor-skill')"]
+    Q -->|"Yes — existing skill exceeds<br>warning threshold (SK006/SK007)<br>or covers multiple domains"| Refactor["Load plugin-creator:refactor-skill"]
     Creator --> Together(["Both can combine — create with<br>skill-creator, refactor later<br>with skill-refactor as needs evolve"])
     Refactor --> Together
 ```
@@ -61,18 +37,6 @@ flowchart TD
 2. Tool integrations - Instructions for working with specific file formats or APIs
 3. Domain expertise - Company-specific knowledge, schemas, business logic
 4. Bundled resources - Scripts, references, and assets for complex and repetitive tasks
-
-### Auto-Updating Documentation Pattern
-
-Add automated doc updater when skill wraps external docs (API specs, frameworks, CLI refs) that change regularly. Self-maintaining pipeline: download → process → index upstream docs.
-
-**Trigger**: Skill provides access to documentation that updates over time.
-
-**Add after skill creation**: `/plugin-creator:add-doc-updater <skill-path>`
-- Collects 6 variables (source URL, local path, cooldown days)
-- 5-phase workflow: implementation → review → quality gates → testing → integration
-
-**Candidates**: GitLab CI docs, CLI tools (glab, gh, kubectl), frameworks (React, Django), API specs (OpenAPI)
 
 ## Core Principles
 
@@ -100,195 +64,20 @@ Match the level of specificity to the task's fragility and variability:
 
 Think of Claude as exploring a path: a narrow bridge with cliffs needs specific guardrails (low freedom), while an open field allows many routes (high freedom).
 
-### Anatomy of a Skill
+### Skill Format and Runtime Branches
 
-Every skill consists of a required SKILL.md file and optional bundled resources:
-
-```
-skill-name/
-├── SKILL.md (required)
-│   ├── YAML frontmatter metadata (required)
-│   │   └── name: (optional in Claude Code; required for portable packages)
-│   │   └── description: (recommended)
-│   └── Markdown instructions (required)
-└── Bundled Resources (optional)
-    ├── scripts/          - Executable code (Python/Bash/etc.)
-    ├── references/       - Documentation intended to be loaded into context as needed
-    └── assets/           - Files used in output (templates, icons, fonts, etc.)
-```
-
-#### SKILL.md (required)
-
-Every SKILL.md consists of:
-
-- **Frontmatter** (YAML): Choose either the portable Agent Skills fields or Claude Code runtime extensions for the intended destination. In Claude Code, an omitted `description` uses the first non-empty markdown line.
-- **Body** (Markdown): Instructions and guidance for using the skill. Only loaded AFTER the skill triggers (if at all).
-
-#### Bundled Resources and Content Patterns (optional)
-
-##### Scripts (`scripts/`)
-
-Executable code (Python/Bash/etc.) for tasks that require deterministic reliability or are repeatedly rewritten.
-
-- **When to include**: When the same code is being rewritten repeatedly or deterministic reliability is needed
-- **Example**: `scripts/rotate_pdf.py` for PDF rotation tasks
-- **Benefits**: Token efficient, deterministic, may be executed without loading into context
-- **Note**: Scripts may still need to be read by Claude for patching or environment-specific adjustments
-
-##### References (`references/`)
-
-Documentation and reference material intended to be loaded as needed into context to inform Claude's process and thinking.
-
-- **When to include**: For documentation that Claude should reference while working
-- **Examples**: `references/finance.md` for financial schemas, `references/mnda.md` for company NDA template, `references/policies.md` for company policies, `references/api_docs.md` for API specifications
-- **Use cases**: Database schemas, API documentation, domain knowledge, company policies, detailed workflow guides
-- **Benefits**: Keeps SKILL.md lean, loaded only when Claude determines it's needed
-- **Best practice**: If files are large (>10k words), include grep search patterns in SKILL.md
-- **Avoid duplication**: Information should live in either SKILL.md or references files, not both. Prefer references files for detailed information unless it's truly core to the skill—this keeps SKILL.md lean while making information discoverable without hogging the context window. Keep only essential procedural instructions and workflow guidance in SKILL.md; move detailed reference material, schemas, and examples to references files.
-
-##### Assets (`assets/`)
-
-Files primarily used in output. They are not eagerly loaded, but the agent can read them on demand.
-
-- **When to include**: When the skill needs files that will be used in the final output
-- **Examples**: `assets/logo.png` for brand assets, `assets/slides.pptx` for PowerPoint templates, `assets/frontend-template/` for HTML/React boilerplate, `assets/font.ttf` for typography
-- **Use cases**: Templates, images, icons, boilerplate code, fonts, sample documents that get copied or modified
-- **Benefits**: Separates output resources from documentation, enables Claude to use files without loading them into context
-
-##### Anti-Rationalization Component (optional)
-
-For skills that enforce a multi-step discipline with skippable quality gates, add a two-column table pairing common agent excuses with counter-responses, plus an optional Red Flags list, to defend against agents rationalizing their way past required steps. See [anti-rationalization-pattern.md](./references/anti-rationalization-pattern.md) for the pattern, table shape, and worked examples.
-
-#### What to Not Include in a Skill
-
-A skill should only contain essential files that directly support its functionality. Do NOT create extraneous documentation or auxiliary files, including:
-
-- README.md
-- INSTALLATION_GUIDE.md
-- QUICK_REFERENCE.md
-- CHANGELOG.md
-- etc.
-
-The skill should only contain the information needed for an AI agent to do the job at hand. It should not contain auxilary context about the process that went into creating it, setup and testing procedures, user-facing documentation, etc. Creating additional documentation files just adds clutter and confusion.
-
-### Advanced Skill Patterns
-
-#### Context Fork (Isolated Execution)
-
-Add `context: fork` to frontmatter when you want a skill to run in a fresh subagent without access to conversation history. Despite the field name, this is not a conversation fork.
-
-**When to use:**
-
-- Skill has explicit, complete instructions that don't need conversation context
-- Want to prevent conversation history from affecting skill behavior
-- Need predictable, consistent execution independent of what user discussed earlier
-
-**When NOT to use:**
-
-- Skill contains only guidelines (e.g., "use these API conventions") without actionable task
-- Need access to conversation context or previous discussion
-- Need the current conversation history; use a conversation fork instead
-
-**Agent types:**
-
-```yaml
-context: fork
-agent: Explore  # or Plan, general-purpose, custom-agent-name
-```
-
-| Agent             | Model    | Tools                      | Use Case                     |
-| ----------------- | -------- | -------------------------- | ---------------------------- |
-| `Explore`         | Inherits | Read-only                  | File discovery and codebase exploration |
-| `Plan`            | Inherits | File/web/MCP (read-only)   | Research before planning     |
-| `general-purpose` | Inherits | File/web/MCP + Bash/system | Complex operations (default) |
-
-**Tool restrictions:**
-
-- Forks default to background execution; set `background: false` to wait and retain foreground tools
-- Background agents retain MCP tools plus a narrower built-in tool set, and their edits are outside `/rewind`
-- Explore and Plan skip `CLAUDE.md` and git status
-- This skill subagent follows ordinary depth-limited nesting; only conversation forks are unable to spawn another conversation fork
-
-**SOURCE:** `../claude-skills-overview-2026/SKILL.md` section on Context Fork Behavior.
-
-#### Invocation Control
-
-Control who can invoke your skill:
-
-The following diagram is the authoritative procedure for invocation control configuration. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
-
-```mermaid
-flowchart TD
-    Start(["Choose invocation mode for skill"]) --> Q{"Who should be able<br>to invoke this skill?"}
-    Q -->|"Both user and Claude<br>(default behavior)"| Default["Default — no frontmatter flag needed<br>User types /skill-name<br>Claude loads automatically when relevant<br>Description always in context"]
-    Q -->|"User only — has side effects<br>such as deploy or send-slack-message"| Manual["Set disable-model-invocation: true<br>Only user can invoke with /skill-name<br>Claude cannot load automatically<br>Description NOT in Claude's context<br>Reason — you control timing;<br>Claude won't deploy just because code looks ready"]
-    Q -->|"Claude only — background knowledge<br>not a meaningful user action"| Background["Set user-invocable: false<br>Only Claude can invoke (automatically when relevant)<br>Not shown in / autocomplete menu<br>Description always in context<br>Full skill loads when Claude activates it<br>Example use — /legacy-system-context"]
-    Default --> Done(["Invocation mode configured"])
-    Manual --> Done
-    Background --> Done
-```
-
-**SOURCE:** `../claude-skills-overview-2026/SKILL.md` section on Invocation Control.
-
-#### Hooks (Lifecycle Automation)
-
-Skills can define hooks in frontmatter to respond to events during the skill's lifecycle:
-
-**Common events (all hook events are supported):**
-
-- `PreToolUse` - Before tool executes
-- `PostToolUse` - After successful execution
-- `Stop` - When skill finishes
-
-**Example:**
-
-```yaml
-hooks:
-  PreToolUse:
-    - matcher: "Bash"           # Regex pattern matching tool name
-      hooks:
-        - type: command
-          command: "./scripts/check.sh"
-          once: true            # Run only once per session
-  PostToolUse:
-    - matcher: "Write|Edit"
-      hooks:
-        - type: command
-          command: "./scripts/lint.sh"
-  Stop:
-    - hooks:
-        - type: command
-          command: "./scripts/cleanup.sh"
-```
-
-**Hook I/O:**
-
-- Receives JSON via stdin (session info, tool name, parameters)
-- Exit 0: Success
-- Exit 2: Blocking error (prevents tool, shows stderr)
-- Other: Non-blocking error
-
-**Complete documentation:** Use `Skill(skill: "plugin-creator:hooks-guide")` for all events, matchers, JSON output control, and examples.
-
-**SOURCE:** Skill /claude-skills-overview-2026
-
-### Progressive Disclosure Design Principle
-
-Skills use a three-level loading system to manage context efficiently:
-
-1. **Metadata (name + description)** - Cataloged at about 50-100 tokens per skill
-2. **SKILL.md body** - Loaded on activation; keep below 5000 tokens
-3. **Bundled resources** - Read on demand when the skill instructions or task call for them; the portable specification does not require clients to enumerate them automatically
-
-#### Progressive Disclosure Patterns
-
-Keep SKILL.md lean. Run `uvx skilllint@latest check <skill-path>` to check token complexity. Keep only core workflow and selection guidance in SKILL.md; move variant-specific details into reference files. Reference them from SKILL.md with clear descriptions of when to read each file.
-
-Three patterns: (1) high-level guide with pointers to FORMS.md, REFERENCE.md, etc.; (2) domain-split references (finance.md, sales.md per domain); (3) conditional details (basic inline, advanced via link). Load [workflows.md](./references/workflows.md) for full examples of all three patterns.
-
-Rules: keep references one level deep from SKILL.md. NEVER add ToC, anchor links, or bold/italic for visual emphasis to reference files — Load [ai-audience-writing-rules.md](./references/ai-audience-writing-rules.md).
-
-> **Editing an existing SKILL.md?** Before treating an unrecognized frontmatter key as an error, check whether it is an ecosystem-owned field. The currently known ecosystem-owned key is `mcp:` (owned by OpenCode) — preserve it and all its nested content verbatim. Do not strip, rewrite, or normalize it. For `mcp:` specifically, see the `references/agent-plugin-ecosystem.md` reference (OpenCode SKILL.md Extensions section) for the full schema.
+- **Portable schema, validation, resources, and progressive disclosure**: Load
+  `plugin-creator:agentskills` and its specification or best-practices branch.
+- **Claude Code frontmatter, invocation, substitutions, forks, and loading**: Load
+  `plugin-creator:claude-skills-overview-2026` and its official reference.
+- **Skill hooks**: Load `plugin-creator:hooks-guide`.
+- **Host package distinctions and OpenCode `mcp:` preservation**: Read
+  [agent-plugin-ecosystem.md](./references/agent-plugin-ecosystem.md).
+- **Workflow disclosure patterns**: Read [workflows.md](./references/workflows.md).
+- **AI-facing prose and reference layout**: Read
+  [ai-audience-writing-rules.md](./references/ai-audience-writing-rules.md).
+- **Skippable quality gates**: Read
+  [anti-rationalization-pattern.md](./references/anti-rationalization-pattern.md).
 
 ## Skill Creation Process
 
@@ -358,6 +147,9 @@ Example: When building a `big-query` skill to handle queries like "How many user
 
 To establish the skill's contents, analyze each concrete example to create a list of the reusable resources to include: scripts, references, and assets.
 
+If the skill wraps external documentation that changes independently of the skill, activate
+`/plugin-creator:add-doc-updater` before implementation to add the maintained sync branch.
+
 ### Step 3: Determine Skill Location and Distribution Strategy
 
 The following diagram is the authoritative procedure for skill location and distribution strategy selection. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
@@ -378,7 +170,8 @@ flowchart TD
     Discovery --> Done(["Location decided — proceed to Step 4"])
 ```
 
-**SOURCE:** `../claude-skills-overview-2026/SKILL.md` section on Directory Structure and Location Priority.
+**SOURCE:**
+[Claude Code skills official reference](../claude-skills-overview-2026/resources/claude-code-skills-official.md#where-skills-live).
 
 For capability restrictions per destination (plugin/project/user/headless/fork), load [destination-capabilities.md](./references/destination-capabilities.md).
 
@@ -445,19 +238,13 @@ Consult these helpful guides based on your skill's needs:
 
 These files contain established best practices for effective skill design.
 
-- **Official specification**: Load [claude-code-skills-official.md](./references/claude-code-skills-official.md) for the authoritative source on frontmatter fields, discovery rules, invocation control, and budget limits
+- **Claude Code runtime specification**: Read
+  [claude-code-skills-official.md](../claude-skills-overview-2026/resources/claude-code-skills-official.md)
+  for frontmatter, discovery, invocation, substitution, fork, and budget behavior.
 
 #### Start with Reusable Skill Contents
 
 To begin implementation, start with the reusable resources identified above: `scripts/`, `references/`, and `assets/` files. Note that this step may require user input. For example, when implementing a `brand-guidelines` skill, the user may need to provide brand assets or templates to store in `assets/`, or documentation to store in `references/`.
-
-**Documentation-wrapping skills**: If the skill provides access to external docs (API specs, framework guides, CLI references), add automated updater BEFORE finalizing implementation:
-
-```bash
-/plugin-creator:add-doc-updater {skill-path}
-```
-
-This creates self-maintaining doc pipeline: download → process → index with cooldown enforcement.
 
 Added scripts must be tested by actually running them to ensure there are no bugs and that the output matches what is expected. If there are many similar scripts, only a representative sample needs to be tested to ensure confidence that they all work while balancing time to completion.
 
@@ -486,38 +273,18 @@ These patterns appear when skill content is drafted from training data or genera
 
 ##### Frontmatter
 
-Write the YAML frontmatter. All fields are optional, but `description` is strongly recommended:
+Choose the destination before writing frontmatter:
 
-- `name`: Optional in Claude Code. The skill name defaults to the directory name if omitted. Portable packages require NFKC normalization, cap the normalized value at 64 characters, allow lowercase Unicode alphanumeric characters and hyphens, reject case-changing or malformed-hyphen names, and compare against the NFKC-normalized directory name.
-- `description`: Optional but strongly recommended in Claude Code. If omitted, uses the first non-empty markdown line. Portable packages require it and cap it at 1024 characters.
-  - Include both what the Skill does and specific triggers/contexts for when to use it.
-  - Include all "when to use" information here - Not in the body. The body is only loaded after triggering, so "When to Use This Skill" sections in the body are not helpful to Claude.
-  - Example description for a `docx` skill: "Comprehensive document creation, editing, and analysis with support for tracked changes, comments, formatting preservation, and text extraction. Use when Claude needs to work with professional documents (.docx files) for: (1) Creating new documents, (2) Modifying or editing content, (3) Working with tracked changes, (4) Adding comments, or any other document tasks"
-- `argument-hint`: Optional. Hint shown during autocomplete to indicate expected arguments. Example: `[issue-number]` or `[filename] [format]`.
-- `allowed-tools`: Optional. Claude Code accepts a space- or comma-separated string or YAML list. Portable Agent Skills requires a non-empty string of space-separated tool tokens and marks support experimental; `skills-ref` does not currently type-check or delimiter-check the field.
-- `model`: Optional. Model to use when this skill is active. Options: `claude-opus-4-5-20251101`, `claude-sonnet-4-20250514`, `opus`, `sonnet`, `haiku`
-- `context`: Optional. Set to `fork` to run in a fresh skill subagent for isolation; this is not a conversation fork. See advanced patterns below.
-- `agent`: Optional. Which subagent type to use when `context: fork` is set. Options: `Explore`, `Plan`, `general-purpose`, or custom agent name.
-- `user-invocable`: Optional. Set to `false` to hide from the `/` menu. Use for background knowledge users shouldn't invoke directly. Default: `true`.
-- `disable-model-invocation`: Optional. Set to `true` to prevent Claude from automatically loading this skill. Use for workflows you want to trigger manually with `/name`. Default: `false`. Agent SDK sessions can dispatch a user-invocable skill directly by sending `/<name>` in the prompt; this dispatch is independent of the SDK `skills` allowlist. See `../claude-skills-overview-2026/resources/headless-agent-sdk.md`.
-- `hooks`: Optional. Hooks scoped to this skill's lifecycle. See hooks documentation for configuration format.
+- **Portable package, upload, or API**: Load `plugin-creator:agentskills` and use only its portable
+  schema.
+- **Claude Code runtime**: Load `plugin-creator:claude-skills-overview-2026` and read its official
+  reference for runtime extensions and invocation behavior.
+- **Other hosts**: Read [agent-plugin-ecosystem.md](./references/agent-plugin-ecosystem.md) and
+  preserve only fields documented by that consumer.
 
-**Destination boundaries:** portable uploads, the Skills API, and Anthropic packaging accept only `name`, `description`, `license`, `compatibility`, `metadata`, and experimental `allowed-tools`; unexpected fields hard-fail. Claude Code runtime loading accepts its documented extensions. Preserve other ecosystem-owned fields such as OpenCode `mcp:` only for consumers that document them.
-
-```yaml
----
-name: my-skill
-description: Does something useful
-mcp:
-  server-name:
-    command: npx
-    args: ["-y", "some-mcp-package"]
----
-```
-
-Here `mcp:` is an OpenCode-only extension. Do not submit this mixed file to a portable upload/API/package boundary.
-
-**Claude Code runtime field reference:** See `../claude-skills-overview-2026/SKILL.md`. **Portable upload/package schema:** see `../agentskills/SKILL.md`.
+Write direct activation guidance in `description`; load
+`plugin-creator:write-frontmatter-description` when choosing model-vs-user invocation or tightening
+trigger branches.
 
 ##### Body
 
@@ -535,7 +302,7 @@ Before delegating the draft, run it against [references/authoring-checklist.md](
 
 After completing the SKILL.md and all bundled resources, delegate the draft to the `ai-doc-optimizer` agent before packaging or evaluation. This agent pre-loads `prompt-optimization`, `audit-skill-completeness`, and the official Claude Code skill guidelines — it verifies the draft against best practices and produces an optimized version with evidence-backed changes.
 
-Task is SKILL.md quality review with subagent_type="plugin-creator:ai-doc-optimizer"
+Dispatch `plugin-creator:ai-doc-optimizer` for the SKILL.md quality review.
    Context to include in the prompt: absolute path to the skill directory (includes SKILL.md and all bundled resources)
    Output: optimized SKILL.md content, bulleted list of changes applied with principle citations, CoVe verification results, and STATUS: DONE or BLOCKED
 
@@ -566,13 +333,13 @@ flowchart TD
     AgentReg --> Done
 ```
 
-See [claude-plugins-reference-2026](../claude-plugins-reference-2026/SKILL.md) for plugin creation documentation.
+Load `plugin-creator:claude-plugins-reference-2026` for plugin creation and distribution.
 
 ### Steps 7-10: Evaluate, Improve, and Optimize
 
 After creating the skill, test it with real prompts, grade results with the A/B evaluation harness, iterate on failures, and optimize the description for triggering accuracy.
 
-**Read `references/evaluation-and-optimization.md`** for the complete workflow covering:
+Read [evaluation-and-optimization.md](./references/evaluation-and-optimization.md) for the complete workflow covering:
 
 - **Step 7** — Define test cases (`evals/evals.json`)
 - **Step 8** — Run A/B evaluation (parallel with-skill vs baseline runs, grading via `@plugin-creator:grader`, viewer via `eval-viewer/generate_review.py`)
@@ -589,7 +356,7 @@ Load [schemas.md](./references/schemas.md) for evals.json and grading.json forma
 | `@plugin-creator:comparator` | Blind A/B comparison — evaluates two skill versions without knowing which is which |
 | `@plugin-creator:analyzer` | Post-hoc analysis — explains why the winning version won and generates improvement suggestions |
 | `/plugin-creator:shared-content-references` | Cross-skill prose duplication — placement decision (plugin-root `docs/` vs. a skill's `references/`) when the same steps or rules are needed by 2+ skills or agents |
-| `references/` | `references/schemas.md` (JSON schemas), `references/evaluation-and-optimization.md` (Steps 7-10), `references/claude-code-skills-official.md` (spec), `references/workflows.md` (patterns), [`references/authoring-checklist.md`](./references/authoring-checklist.md) (pre-publish checklist) |
+| `references/` | `references/schemas.md` (JSON schemas), `references/evaluation-and-optimization.md` (Steps 7-10), `references/workflows.md` (patterns), [`references/authoring-checklist.md`](./references/authoring-checklist.md) (pre-publish checklist) |
 | `eval-viewer/` | `viewer.html` (interactive eval viewer), `generate_review.py` (HTML generator) |
 | `assets/` | `eval_review.html` (trigger eval review template) |
 | `scripts/` | `init_skill.py`, `package_skill.py`, `quick_validate.py`, `run_eval.py`, `run_loop.py`, `improve_description.py`, `generate_report.py`, `aggregate_benchmark.py` |
