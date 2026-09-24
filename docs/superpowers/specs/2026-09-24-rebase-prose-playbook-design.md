@@ -299,7 +299,7 @@ flowchart TD
     Account --> AccountResult{Every moved commit has one evidence-backed disposition?}
     AccountResult -->|All classified; no supported conflict| Next; AccountResult -->|Unclassified or conflicting| Decision
     AccountResult -->|Failure or unobservable| Recover
-    Next{Reobserved start path?} -->|Replay required| Shape; Next -->|No-replay publication; predicate true| Current[Agent: bind current result OID R]
+    Next{Reobserved start path?} -->|Replay required| Shape; Next -->|No-replay publication; bound goal relation true| Current[Agent: bind current result OID R]
     Next -->|Failure or unobservable| Recover
     Current --> CurrentResult{Named result ref resolves to R?}; CurrentResult -->|Yes| Saved; CurrentResult -->|No or unobservable| Recover
     Shape{Merge in fresh replay set?} -->|Yes| History["`Agent: read [history shape](./references/history-shape.md); choose state-specific disposition`"]
@@ -312,7 +312,7 @@ flowchart TD
     Stop -->|Metadata active; resolution staged or no conflict| ContinueReplay[Agent: continue the bound active replay]
     Stop -->|Other failure or unobservable| Recover
     StartReplay --> ReplayResult{Replay operation result?}; ContinueReplay --> ReplayResult; Skip --> ReplayResult; Preserve --> ReplayResult
-    ReplayResult -->|Metadata/unmerged absent; R bound; result ref and predicate match| Saved{Lifecycle saved entry?}
+    ReplayResult -->|Metadata/unmerged absent; R bound; result ref and bound goal relation match| Saved{Lifecycle saved entry?}
     ReplayResult -->|Unmerged entries| ReplayConflict["`Agent: read [conflict and ambiguity](./references/conflict-and-ambiguity.md); resolve replay intent`"]
     ReplayResult -->|Topology, equivalent, or empty| History; ReplayResult -->|Other failure or unobservable| Recover
     ReplayConflict --> ReplayIntent{Exactly one outcome preserves compatible intent, passes checks, and is staged?}
@@ -361,7 +361,7 @@ flowchart TD
     HandoffResult -->|Yes| Terminal; HandoffResult -->|No or unobservable| Pending
     Terminal -->|Abort request and restored pre-state| Aborted([Aborted and restored])
     Terminal -->|Start/continue; post-push destination resolves to R| Published([Published completion])
-    Terminal -->|Start/continue; result ref resolves to R; predicate true; no publication| Local([Local completion])
+    Terminal -->|Start/continue; result ref resolves to R; bound goal relation true; no publication| Local([Local completion])
     Terminal -->|No-change evidence complete| NoChangeDone([No change]); Terminal -->|Metadata absent; no mutation| NoActiveDone([No active rebase])
     Terminal -->|Decision report complete| Paused([Paused for decision]); Terminal -->|Stopped-state report complete| Stopped([Stopped with observed state])
     Terminal -->|Inconsistent or unobservable| Recover
