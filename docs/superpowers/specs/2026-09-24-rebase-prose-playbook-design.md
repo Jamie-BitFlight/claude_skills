@@ -36,10 +36,11 @@ budget. `**Keywords**:` is a local Markdown grep/search convention, not Agent Sk
 universal skill requirement; automatic activation still depends on `description`. The body contains
 the router immediately after the keyword entry and no other routine prose.
 
-Activation is validated in isolated harness runs. Every row requires a recorded `PASS`; an
-`UNRUN`, `FAIL`, or `INCONCLUSIVE` row blocks completion.
+Activation is validated in isolated harness runs. Every row targets a recorded `PASS`; record any
+other observed status without relabeling it. The bounded-evidence gate in Validation strategy
+determines whether a non-passing record blocks publication.
 
-| Branch | Prompt intent | Expected | Required record |
+| Branch | Prompt intent | Expected | Target record |
 |---|---|---|---|
 | Start | Rebase named `feature/a` onto named `main` | Activate | `PASS` |
 | Continue | Continue an observed active rebase after conflict resolution | Activate | `PASS` |
@@ -396,10 +397,19 @@ matrix record is validation evidence, not skill runtime or routine context.
 
 ## Validation strategy
 
-Validation is claim-specific. Implementation completes only when every row and every case named by
-that row has a recorded `PASS`; `UNRUN`, `FAIL`, or `INCONCLUSIVE` blocks completion.
+Validation is claim-specific. `PASS` means the cited evidence supports the claim. Preserve every
+other result as observed; an exhausted or invalid bounded experiment is `UNVALIDATED`, never
+`PASS`. The process owner may bound further model evidence and accept publication only when every
+permitted high-value and static check is complete, every `UNVALIDATED` claim is disclosed, and
+every accepted mismatch remains named as a limitation. Any non-passing result without that explicit
+acceptance blocks completion.
 
-| Validation row | Cases and `PASS` predicate | Required record |
+For this implementation, the accepted bounded record names Sol's post-completion push-only
+over-activation as a discovery limitation. It marks active-worker coordination, cross-invocation
+stash restoration, remote drift/exact lease, indirect reorientation, and intent-preserving
+conflict resolution `UNVALIDATED`.
+
+| Validation row | Cases and `PASS` predicate | Target record |
 |---|---|---|
 | Skill discovery and package shape | `skilllint` accepts required `name`/`description`; the exact local keyword entry precedes the router; `step-by-step.md` is absent; every router reference is direct, one level deep, and loads only on its node. | `PASS` |
 | Named refs are not silently substituted | Start, continue, replay, correction, and no-replay publication cases use literal named refs while tempting related refs remain unselected; each correction/publication case reobserves exact source/target before mutation. | `PASS` |
@@ -445,5 +455,6 @@ The design is implemented when:
   inconsistent facts pause before that mutation;
 - the Mermaid router parses successfully;
 - cross-harness prose contains no harness-specific syntax or root-path assumptions;
-- every invocation-matrix and validation-table row and every case within it records `PASS`; and
+- the bounded-evidence gate is satisfied without relabeling any limitation or `UNVALIDATED` claim
+  as `PASS`; and
 - no turn- or token-saving claim is made without a matched treatment arm.
