@@ -1,6 +1,6 @@
 ---
 name: python3-tdd
-description: Guides test-driven development for Python using a five-phase red-green-refactor cycle. Use when asked to write tests first, apply TDD, do test-first implementation, or follow red-green-refactor — designs typed interfaces and Protocol classes, writes failing pytest tests (RED), implements minimal passing code (GREEN), verifies with prek or ruff plus pytest-cov, and enforces a quality gate requiring all tests pass with no lint or type errors and coverage at or above 80 percent.
+description: Use when a Python task explicitly requires test-driven development, tests-first implementation, or a red-green-refactor workflow.
 argument-hint: '<feature-description>'
 user-invocable: true
 ---
@@ -17,9 +17,8 @@ Task: $ARGUMENTS
 
 ### 1. Design Interface
 
-- Define function signatures with full type annotations
-- Create Protocol classes for dependencies
-- Write docstrings before implementation
+- Define only the interface needed to express the behavior under test
+- Preserve the project's existing architecture and typing conventions
 - Load `python3-typing` when boundary types or models are involved
 
 ### 2. Write Failing Tests
@@ -27,12 +26,13 @@ Task: $ARGUMENTS
 - Load `python3-testing` for fixture patterns and test structure
 - Tests must fail initially (RED)
 - AAA pattern; behavioral naming
-- Run `uv run pytest -v` — confirm failures
+- Run the smallest relevant pytest target and confirm RED
+- Record the expected failure reason before running it; RED is valid only when the observed failure demonstrates the missing behavior. A syntax/import/fixture failure or a test that already passes does not establish the requirement.
 
 ### 3. Implement to Pass
 
 - Minimal code to make tests pass (GREEN)
-- Run `uv run pytest -v` after each change
+- Run the smallest relevant pytest target after each change and compare the observed result with the expected GREEN result
 - Refactor only while tests stay green
 
 ### 4. Verify
@@ -53,5 +53,6 @@ uv run pytest --cov=src --cov-report=term-missing
 - [ ] All tests pass
 - [ ] No lint errors
 - [ ] No type errors
-- [ ] Coverage ≥80%
+- [ ] Changed behavior, boundaries, and regressions have appropriate tests
+- [ ] Existing project coverage gate is respected, if configured
 - [ ] Shebang validated on scripts

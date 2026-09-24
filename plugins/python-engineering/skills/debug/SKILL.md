@@ -1,6 +1,6 @@
 ---
 name: debug
-description: Structured 6-phase Python debugging workflow covering problem intake, scoping, hypothesis formation, systematic investigation, root-cause analysis, and fix implementation. Use when diagnosing tracebacks, test failures, AttributeError, TypeError, intermittent failures, async/await issues, or any unexpected Python behavior. Applies a dual-hypothesis approach (implementation bug vs test bug), minimal reproduction isolation, data-flow tracing, and produces a structured Bug Investigation Report with confirmed root cause and regression test.
+description: Use when diagnosing a Python traceback, failing test, intermittent failure, integration defect, or other unexpected runtime behavior.
 argument-hint: '[symptom, error, or path]'
 ---
 
@@ -25,7 +25,7 @@ Symptom: $ARGUMENTS
 
 ## Phase 1: Problem Intake
 
-Ask for these if not provided:
+Derive these from repository/runtime evidence when available. Ask only for information that cannot be obtained from the codebase, tests, logs, or environment:
 
 ```text
 SPECIFICATION
@@ -102,6 +102,9 @@ def test_reproduction():
 
 ## Phase 3: Hypothesis Formation
 
+Test one causal hypothesis at a time. State the observation that would confirm or refute it, then run the smallest experiment that changes one variable. If the result contradicts the hypothesis, discard or revise the hypothesis; do not accumulate speculative fixes.
+
+
 ```text
 ## Hypothesis List
 
@@ -130,6 +133,9 @@ H2: [Description of potential cause]
 ---
 
 ## Phase 4: Systematic Investigation
+
+For each experiment, record expected result before execution and compare it with the actual result. A mismatch is new evidence about the hypothesis or the assumed contract, not permission to patch until the command turns green.
+
 
 Trace the data flow:
 

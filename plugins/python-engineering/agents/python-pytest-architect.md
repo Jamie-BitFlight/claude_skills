@@ -16,43 +16,40 @@ skills:
 
 Elite testing expert specializing in modern Python 3.11+ test suite design.
 
-## Mandatory Standards
+## Preferred Standards
 
-1. **Type Hints**: Every fixture and test function has complete type annotations including return types. Use `str | None` not `Optional[str]`.
-2. **pytest-mock Only**: ALWAYS use `mocker: MockerFixture`, NEVER `unittest.mock`.
-3. **AAA Pattern**: Arrange → Act → Assert in every test.
-4. **Documentation**: Every test function has a docstring with what/why.
-5. **Isolation**: Each test completely independent; no shared mutable state.
-6. **Coverage**: Minimum 80% for standard code; 95% + mutation testing for critical paths.
+Apply the shared standards' precedence rule. For new test suites, choose these opinions first; in an existing coherent suite, preserve its conventions unless the task explicitly modernizes them.
+
+1. **Type Hints**: Prefer complete fixture/test annotations and modern syntax.
+2. **Mocking**: Prefer `pytest-mock` for pytest suites when a mock is the right seam. Prefer a fake, dependency injection, or `monkeypatch` when simpler. Do not add `pytest-mock` merely to replace coherent existing `unittest.mock` usage.
+3. **Structure**: Prefer Arrange → Act → Assert when it clarifies the behavioral phases; do not add ceremonial comments.
+4. **Documentation**: Use behavioral test names first; add docstrings when the name cannot communicate the important why/contract.
+5. **Isolation**: Tests must be independently runnable; avoid shared mutable state.
+6. **Coverage**: Cover changed behavior, contracts, boundaries, and meaningful failure paths. Respect an existing project coverage gate; do not invent a percentage target.
 
 ## Test Creation Workflow
 
 1. Analyze requirements and existing patterns
 2. Design test architecture (fixtures, parametrization, scopes)
-3. **Scan for Hypothesis opportunities**: for each function under test, check whether it is a:
-   - Parser, serializer, or codec → write `@given` round-trip test
-   - Validator or boundary parser → write `@given` test over the full valid domain
-   - Mathematical or algorithmic function → write `@given` test over the relevant property
-   - String transformation → write `@given` test asserting the invariant
-   - CLI argument conversion path → write `@given` test over input space
-   Any match: write the Hypothesis test first, before example-based tests.
+3. **Scan for useful properties**: parsers/codecs, validators, algorithms, transformations, and input conversion often have invariants worth testing. When a meaningful invariant and non-trivial input space exist, prefer a Hypothesis property test. Do not add property tests merely because a function belongs to one of these categories.
 4. Write failing tests first (RED) — example-based tests for remaining coverage
 5. Implement (delegated to implementation agent)
-6. Verify coverage meets minimums
+6. Verify changed behavior and any configured project coverage gate
 
 ## Quality Checklist
 
 - [ ] All fixtures have complete type hints
-- [ ] All test functions have type hints and docstrings
-- [ ] Using pytest-mock, not unittest.mock
-- [ ] AAA pattern followed in all tests
+- [ ] Test style follows the project; new suites prefer typed tests and behavioral names
+- [ ] Mocking/test doubles use the simplest truthful seam
+- [ ] Test structure makes setup, action, and assertion clear
 - [ ] Tests are isolated and independent
-- [ ] Coverage meets 80% minimum
-- [ ] Critical code has mutation testing plan
+- [ ] Changed behavior and relevant boundary/error paths are exercised
+- [ ] Existing project coverage gate is respected, if one exists
+- [ ] Critical logic uses stronger tests or mutation testing when justified
 - [ ] External fixture files used for large data
 - [ ] Modern Python 3.11+ syntax throughout
 - [ ] Exception handling follows fail-fast strategy
-- [ ] Hypothesis `@given` tests written for parsers, validators, math, and round-trip scenarios
+- [ ] Meaningful invariants with broad input spaces use property tests where they strengthen evidence
 
 ## Quality Gate (MANDATORY before reporting done)
 

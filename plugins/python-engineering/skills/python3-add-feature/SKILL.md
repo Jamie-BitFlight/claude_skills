@@ -1,6 +1,6 @@
 ---
 name: python3-add-feature
-description: Executes a four-phase feature addition workflow (Discovery, Planning, TDD Implementation, Verification) for Python projects. Use when adding a new feature end-to-end — discovering project structure and integration points, drafting a feature spec with MoSCoW-prioritized requirements and BDD acceptance criteria, implementing via test-first TDD cycles, then verifying with ruff lint, ty type checks, and 100% coverage on new code.
+description: Executes a four-phase feature addition workflow (Discovery, Planning, TDD Implementation, Verification) for Python projects. Use when adding a new feature end-to-end — discovering project structure and integration points, drafting a feature spec with MoSCoW-prioritized requirements and BDD acceptance criteria, implementing via test-first TDD cycles, then verifying with ruff lint, ty type checks, and behavior-focused regression and contract coverage.
 argument-hint: <feature-description>
 user-invocable: true
 ---
@@ -282,11 +282,15 @@ uv run ty check src/ tests/
 uv run pytest tests/ --cov=src --cov-report=term-missing
 ```
 
-### Coverage Requirements
+### Coverage Policy
 
-- New feature code: 100% coverage
-- Integration points: Covered by integration tests
-- Overall project: Maintain or improve existing coverage
+Coverage is evidence about exercised behavior, not a percentage objective.
+
+- Test changed behavior, public contracts, boundaries, error paths, and reproduced regressions that matter to the change.
+- Add integration or behavioral tests where unit tests cannot establish the user-visible contract.
+- Inspect uncovered changed branches and decide whether they represent meaningful risk.
+- Respect an existing repository coverage gate; do not introduce an arbitrary percentage when the project has none.
+- Do not add low-value tests solely to increase line coverage.
 
 ### Success Metrics
 
@@ -300,7 +304,7 @@ Define measurable success criteria before implementation:
 | --------------- | ------------- | -------------------------- |
 | Test pass rate  | 100%          | `pytest --tb=short`        |
 | Type coverage   | 100%          | `ty check` or project mypy command |
-| Code coverage   | ≥80% new code | `pytest --cov`             |
+| Changed behavior | Relevant contracts and risk paths exercised | targeted tests + coverage inspection |
 | Command startup | <500ms        | `time uv run <cmd> --help` |
 
 **Lagging Indicators** (Observable in weeks-months):
@@ -382,7 +386,7 @@ Load and follow the standards in `/python-engineering:standards-for-python-devel
 
 1. **Type Safety**: All code passes the project's type checker — match **hooks/CI** (`ty` vs `mypy`); use **`uv run ty check`** when ty is what the repo runs; use **`uv run mypy`** only when mypy is actually invoked there (not merely because `[tool.mypy]` exists)
 2. **Linting**: Zero ruff errors or warnings
-3. **Tests**: New code has 100% coverage
+3. **Tests**: Changed behavior and relevant regression/boundary paths are covered; respect any existing project coverage gate
 4. **Patterns**: Follows existing project conventions
 5. **Documentation**: Docstrings on all public interfaces
 

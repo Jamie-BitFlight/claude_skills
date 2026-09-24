@@ -17,9 +17,17 @@ Covers: app creation with `typer.Typer()` and `typer.run()`, CLI arguments and o
 
 ---
 
+## Agent-facing CLI output
+
+**Triggers**: CLI or script implemented inside an Agent Skill or plugin; command primarily consumed by AI agents or automation.
+
+Keep output machine-readable: compact JSON on stdout, preferably `BaseModel.model_dump_json()`; diagnostics on stderr. Do not route to Rich/UI skills unless a separate human-facing presentation mode is explicitly required.
+
+---
+
 ## Terminal UI — Rich
 
-**Triggers**: `rich.console.Console`, `rich.table.Table`, `rich.progress.track`, `rich.progress.Progress`, `rich.panel.Panel`, `rich.tree.Tree`, `rich.live.Live`, `rich.syntax.Syntax`, `rich.markdown.Markdown`, `rich.logging.RichHandler`, `rich.traceback.install`, `rich.print`, Rich markup tags, `rich.columns.Columns`, `rich.layout.Layout`, `rich.json.JSON`, `rich.pretty.pprint`, `__rich_console__`, `__rich__`, `__rich_repr__`
+**Triggers**: human-facing terminal presentation using `rich.console.Console`, `rich.table.Table`, `rich.progress.track`, `rich.progress.Progress`, `rich.panel.Panel`, `rich.tree.Tree`, `rich.live.Live`, `rich.syntax.Syntax`, `rich.markdown.Markdown`, `rich.logging.RichHandler`, `rich.traceback.install`, `rich.print`, Rich markup tags, `rich.columns.Columns`, `rich.layout.Layout`, `rich.json.JSON`, `rich.pretty.pprint`, `__rich_console__`, `__rich__`, `__rich_repr__`
 
 ```text
 Skill(skill="python-engineering:python3-cli")
@@ -201,15 +209,15 @@ This skill behaves differently for orchestrators vs sub-agents. Orchestrators de
 
 ---
 
-## Technical Debt / Modernization
+## Python Quality / Modernization Audit
 
-**Triggers**: eliminating `Any` types across a module, removing legacy typing imports (`Optional[X]`, `Union[X, Y]`, `List[X]`, `Dict[K, V]`), refactoring for Protocol usage, progressive quality improvement across multiple files
+**Triggers**: broad Python quality audit, PR/diff quality assessment, technical-debt discovery, Pythonic modernization, dependency/library substitution, maintenance-burden reduction, obsolete compatibility removal, "what can we delete?", "what should a library do for us?", or comparison with practices in large Python projects.
 
 ```text
-Skill(skill="python-engineering:stinkysnake")
+Skill(skill="python-engineering:python-quality-audit")
 ```
 
-Multi-phase workflow: static analysis → type analysis → modernization planning → plan review → test-driven implementation. Load before planning a refactor, not mid-implementation.
+This is the owning entryway. It fans out independent StinkySnake smell discovery, SnakePolish modernization assessment, ecosystem substitution, large-project practice, and removal/process-debt lanes, then synthesizes one verified/actionable report. Invoke `stinkysnake` or `snakepolish` directly only when the task explicitly requests that single lens.
 
 **Triggers**: applying modern Python 3.11+ patterns, learning about PEPs (585, 604, 695), finding modern alternatives for old code
 
@@ -258,17 +266,15 @@ Skill(skill="python-engineering:python3-add-feature")
 
 ## Implementation & Refactoring Loop
 
-**Triggers**: implementing functions following a modernization plan, running tests iteratively until passing, executing the implementation phase of a refactor
+**Triggers**: implementing an approved modernization/refactoring plan, applying accepted quality-audit findings, running the implementation/test loop.
 
-```text
-Skill(skill="python-engineering:snakepolish")
-```
+Route implementation through `python-engineering:orchestrate` (or directly to `python-cli-architect` when already inside an orchestrated implementation phase) and use the appropriate TDD/testing path. `snakepolish` is assessment-only and must not be used as a writer.
 
 ---
 
-## Code Review & Quality Audits
+## Code Review
 
-**Triggers**: reviewing Python code for quality issues, auditing code before merge, checking pattern compliance, verifying architecture standards
+**Triggers**: bounded conventional review against task acceptance criteria, correctness, security, tests, and established standards. For broad quality/modernization audits, route to `python-quality-audit` above.
 
 ```text
 Skill(skill="python-engineering:review")
@@ -306,6 +312,10 @@ Skill(skill="python-engineering:test-failure-mindset")
 ```
 
 ---
+
+## Optional external specialists
+
+Cross-plugin specialists are preferred accelerators, not hidden prerequisites. Before dispatching a named external agent or skill, verify that capability is available. If it is unavailable, preserve the required outcome using this plugin's own discovery, testing, review, or lint workflow. Report a blocker only when the missing capability provides something the local workflow cannot establish safely.
 
 ## Agent Routing (For Orchestrators)
 

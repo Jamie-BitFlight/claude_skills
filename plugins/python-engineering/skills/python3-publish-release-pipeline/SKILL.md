@@ -72,7 +72,7 @@ jobs:
 
       - name: Run ruff
         run: |
-          uv run ruff check src/ tests/
+          uv run ruff check --no-fix src/ tests/
           uv run ruff format --check src/ tests/
 
       - name: Run type check (ty default; swap to mypy if hooks/CI run mypy — not merely [tool.mypy])
@@ -124,6 +124,18 @@ permissions:
   id-token: write  # Required for trusted publishing
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv python install 3.11
+      - run: uv sync --all-extras
+      - run: uv run ruff check --no-fix src/ tests/
+      - run: uv run ruff format --check src/ tests/
+      - run: uv run ty check src/ tests/
+      - run: uv run pytest tests/ --cov=src --cov-report=term-missing
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -146,7 +158,8 @@ jobs:
 
   # Option 1: Trusted Publishing (Recommended)
   publish-pypi:
-    needs: build
+    # Publish only an artifact from this release workflow after its tests pass.
+    needs: [build, test]
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -164,7 +177,7 @@ jobs:
 
   # Option 2: Token-based Publishing (Alternative)
   # publish-pypi:
-  #   needs: build
+  #   needs: [build, test]
   #   runs-on: ubuntu-latest
   #   steps:
   #     - name: Download artifacts
@@ -229,7 +242,7 @@ default:
 lint:
   stage: lint
   script:
-    - uv run ruff check src/ tests/
+    - uv run ruff check --no-fix src/ tests/
     - uv run ruff format --check src/ tests/
     - uv run ty check src/ tests/
 
@@ -362,14 +375,15 @@ version-file = "src/my_package/_version.py"
 # 1. Update CHANGELOG.md
 
 # 2. Commit changes
-git add -A
+git add CHANGELOG.md pyproject.toml
 git commit -m "Prepare release v1.2.3"
 
 # 3. Create annotated tag
 git tag -a v1.2.3 -m "Release v1.2.3"
 
 # 4. Push with tags
-git push origin main --tags
+git push origin main
+git push origin v1.2.3
 ```
 
 ---
@@ -471,8 +485,8 @@ uvx twine check dist/*
 ### Upload Fails
 
 ```bash
-# Verify token
-echo $PYPI_TOKEN | head -c 10
+# Never print any portion of a publishing credential.
+# Verify authentication only by a non-secret-bearing API/tool response.
 
 # Check package name availability
 curl https://pypi.org/pypi/your-package/json

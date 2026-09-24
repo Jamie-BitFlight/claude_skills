@@ -14,7 +14,7 @@ Comprehensive guide for orchestrating Python development tasks using specialized
 
 ### Agents (bundled in this plugin)
 
-- **python-cli-architect** — Build modern CLI applications with Typer and Rich (DEFAULT for all Python code)
+- **python-cli-architect** — Default implementation agent. Applies repository architecture first; for new CLIs offers the plugin's preferred Typer architecture, with Rich for human-facing output and compact JSON for agent-facing tools.
 - **python-engineering:python3-stdlib-only** — Create stdlib-only portable scripts (LAST RESORT for confirmed restricted environments only)
 - **python-pytest-architect** — Design comprehensive test suites
 - **code-reviewer** — Review Python code for quality and standards
@@ -32,7 +32,7 @@ Comprehensive guide for orchestrating Python development tasks using specialized
 **Context to include in the prompt** means: file paths, outcomes, and user requirements only. Do not pass file contents, summaries, or pre-gathered data — agents discover and read files themselves.
 
 Design/Architecture steps dispatch `python-cli-design-spec`, which writes its spec to
-`.claude/specs/{slug}.md` — no backlog item_id needed.
+`.tmp/scratch/plans/{slug}.md` — no backlog item_id needed.
 
 ## Core Workflow Patterns
 
@@ -40,22 +40,24 @@ Design/Architecture steps dispatch `python-cli-design-spec`, which writes its sp
 
 **When to use**: Building new features, fixing bugs with test coverage
 
+The adversarial solution-design stage is mandatory before implementation. Its investigation depth is fixed: it independently traces callers, consumers, tests, documentation, configuration, generated artifacts, manifests, and public contracts. Its prescription depth is adaptive: genuinely local changes need little design ceremony; architectural or high-consequence changes require explicit alternatives, invariants/failure modes, and stronger validation.
+
 Prose above the diagram carries detail that would clutter the nodes. Before delegating the Design step, verify whether the user has existing architecture docs — if yes, pass those paths instead of creating new architecture.
 
 Before the Implement step, check whether the deployment environment is restricted (no internet, no uv). If yes, use `python-engineering:python3-stdlib-only` instead of `python-engineering:python-cli-architect`.
 
-When the task involves display/output/interaction code, step 1.5 invokes `python-engineering:designing-ui-for-cli` to produce a user-confirmed shape brief before tests are written. The brief inputs the architecture's command tree and outputs surface design (colour strategy, status vocabulary, output hierarchy) that the architect references during step 3. This gate is interactive with the user — run it before any automated execution phase, since the shape-brief AskUserQuestion cannot block automated execution once one starts.
+When the task involves human-facing presentation or interaction, step 1.5 invokes `python-engineering:designing-ui-for-cli` to produce a user-confirmed shape brief before tests are written. Agent-only JSON stdout is an automation contract, not a UI surface, and bypasses this gate. Mixed-audience commands take this gate for their explicit human presentation mode. The brief inputs the architecture's command tree and outputs surface design (colour strategy, status vocabulary, output hierarchy) that the architect references during step 3. This gate is interactive with the user — run it before any automated execution phase, since the shape-brief AskUserQuestion cannot block automated execution once one starts.
 
-The adversarial design step reads the actual codebase, not the architecture spec, and challenges the approach against real code. It identifies gotchas, alternative approaches, and which specialist skills apply. Pass the architecture file path and affected module paths — the agent reads further from there. It produces a behavioral validation plan (Phases 1–3) that the architect receives alongside the implementation brief.
+The adversarial design step reads the actual codebase, not the architecture spec, and challenges the approach against real code. It identifies gotchas, alternative approaches, and which specialist skills apply. Pass the architecture file path and affected module paths — the agent reads further from there. It produces a behavioral validation plan (Phases 1–3) that the architect receives alongside the implementation brief. Every material verification step states its expected observable result before execution; actual results are compared against that expectation. A mismatch reopens the implementation or plan rather than being patched blindly.
 
 ```mermaid
 flowchart TD
-    S1["1. Design<br>subagent_type=python-engineering:python-cli-design-spec<br>Context: user requirements, any existing codebase paths<br>Output: .claude/specs/{slug}.md (interfaces, layout, CLI command tree)"]
+    S1["1. Design<br>subagent_type=python-engineering:python-cli-design-spec<br>Context: user requirements, any existing codebase paths<br>Output: .tmp/scratch/plans/{slug}.md (interfaces, layout, CLI command tree)"]
     S2["2. Write Tests<br>subagent_type=python-engineering:python-pytest-architect<br>Context: architecture design file path<br>Output: tests/ directory with failing test suite"]
     S3{"3. Implement<br>Default: python-engineering:python-cli-architect<br>Restricted env only: python-engineering:python3-stdlib-only<br>Context: tests/ path, load python-engineering:typer-and-rich for python-cli-demo.py<br>Output: implementation that makes all tests pass"}
     S4["4. Review<br>subagent_type=python-engineering:code-reviewer<br>Context: implementation file paths, tests/ path<br>Output: review findings with file:line references, improvement suggestions"]
-    S5["5. Validate<br>Run: /python-engineering:shebangpython on each script<br>Run: Activate holistic-linting skill<br>Run: uv run pytest (verify >80% coverage)<br>Check: CI config for additional validators<br>Pass criteria: all tests green, linting clean, coverage threshold met"]
-    S1Q{"Display, output, or<br>interaction code in scope?"}
+    S5["5. Validate<br>Run: /python-engineering:shebangpython on each script<br>Run: Activate holistic-linting skill<br>Run: uv run pytest (verify changed behavior and configured project coverage gate)<br>Check: CI config for additional validators<br>Pass criteria: all tests green, linting clean, coverage threshold met"]
+    S1Q{"Human-facing presentation<br>or interaction in scope?"}
     S1B["1.5 UI Design<br>Skill: python-engineering:designing-ui-for-cli<br>Context: architecture file path, surfaces in scope<br>Output: shape brief (user-confirmed)"]
     S1 -->|"Output: interfaces, layout, CLI command tree"| S1Q
     S_AD["Adversarial Solution Design<br>subagent_type=python-engineering:adversarial-solution-design<br>Context: architecture file path, affected module paths<br>Output: solution brief + validation plan + TDD recommendation"]
@@ -75,7 +77,7 @@ User: "Build a CLI tool to process CSV files with progress bars"
 
 1. Task is Design with subagent_type="python-engineering:python-cli-design-spec"
    Context to include in the prompt: Design architecture for CSV processing CLI with progress tracking
-   Output: .claude/specs/{slug}.md — read directly via the Read tool
+   Output: .tmp/scratch/plans/{slug}.md — read directly via the Read tool
 
 2. Task is Write Tests with subagent_type="python-engineering:python-pytest-architect"
    Context to include in the prompt: Path to architecture design file from step 1
@@ -92,34 +94,35 @@ User: "Build a CLI tool to process CSV files with progress bars"
 5. Validate
    /python-engineering:shebangpython packages/csv_processor.py
    Activate holistic-linting skill on packages/ tests/
-   uv run pytest — verify all pass, coverage >80%
+   uv run pytest — verify all pass, coverage configured project coverage gate
 </example>
 
 ### 2. Feature Addition Workflow
 
 **When to use**: Adding new functionality to existing codebase
 
-Before delegating Requirements Gathering, read `git log --oneline -10` and pass the codebase path to the spec-analyst — do not summarize the codebase yourself.
+Before delegating Requirements Gathering, read `git log --oneline -10`. If an external `spec-analyst` capability is available, pass it the codebase path and user request verbatim. Otherwise gather the same acceptance criteria through this workflow's discovery step; absence of the preferred specialist is not itself a blocker.
 
 ```mermaid
 flowchart TD
     S1["1. Requirements Gathering<br>subagent_type=spec-analyst<br>Context: codebase path, user request verbatim<br>Output: requirements doc with acceptance criteria"]
-    S2["2. Architecture<br>subagent_type=python-engineering:python-cli-design-spec<br>Context: requirements doc path, existing codebase path<br>Output: .claude/specs/{slug}.md, showing integration points"]
+    S2["2. Architecture<br>subagent_type=python-engineering:python-cli-design-spec<br>Context: requirements doc path, existing codebase path<br>Output: .tmp/scratch/plans/{slug}.md, showing integration points"]
     S4{"4. Implement<br>Default: python-engineering:python-cli-architect<br>Restricted env only: python-engineering:python3-stdlib-only<br>Context: architecture spec path, relevant existing file paths<br>Output: new feature implementation in packages/, broken into an ordered internal task list before writing code"}
     S5["5. Testing<br>subagent_type=python-engineering:python-pytest-architect<br>Context: new implementation paths, existing test patterns path<br>Output: tests for new feature + integration tests in tests/"]
     S6["6. Review<br>subagent_type=python-engineering:code-reviewer<br>Context: changed file paths, requirements doc path<br>Output: quality assessment against acceptance criteria, improvement list"]
-    S7["7. Validate<br>Run: uv run pytest (verify no regressions, >80% coverage)<br>Run: Activate holistic-linting skill<br>Run: /python-engineering:modernpython on changed files<br>Pass criteria: all tests green, no regressions, linting clean"]
+    S7["7. Validate<br>Run: uv run pytest (verify no regressions, changed behavior and configured project coverage gate)<br>Run: Activate holistic-linting skill<br>Run: /python-engineering:modernpython on changed files<br>Pass criteria: all tests green, no regressions, linting clean"]
     S1 -->|"Output: requirements doc, acceptance criteria"| S2
-    S2Q{"Display, output, or<br>interaction code in scope?"}
+    S2Q{"Human-facing presentation<br>or interaction in scope?"}
     S2B["2.5 UI Design<br>Skill: python-engineering:designing-ui-for-cli<br>Context: architecture file path, surfaces in scope<br>Output: shape brief (user-confirmed)"]
     S2 -->|"Output: design with integration points"| S2Q
     S2Q -->|"No"| S_AD2
     S2Q -->|"Yes"| S2B
     S2B -->|"Output: confirmed shape brief"| S_AD2
     S_AD2["Adversarial Solution Design<br>subagent_type=python-engineering:adversarial-solution-design<br>Context: architecture spec path, affected module paths<br>Output: solution brief + validation plan + TDD recommendation"]
-    S_AD2 -->|"Output: solution brief, validation plan"| S4
-    S4 -->|"Output: new feature implementation"| S5
-    S5 -->|"Output: tests for new feature + integration tests"| S6
+    S_AD2 -->|"TDD REQUIRED/RECOMMENDED"| S5
+    S_AD2 -->|"TDD OPTIONAL/NOT_APPLICABLE"| S4
+    S5 -->|"Failing tests written first"| S4
+    S4 -->|"Output: implementation satisfying tests"| S6
     S6 -->|"Output: quality assessment, improvement list"| S7
 ```
 
@@ -134,9 +137,9 @@ flowchart TD
     S1["1. Self-Review<br>Run: /python-engineering:modernpython on changed files<br>Check: no legacy typing imports (typing.List, typing.Dict, Optional)<br>Check: modern union syntax (X | Y not Union[X, Y])"]
     S2{"2. Scripts present?<br>Criterion: any .py file has shebang (#!/) line"}
     S2a["Run: /python-engineering:shebangpython on each script<br>Pass criteria: PEP 723 compliance verified, shebang corrected if needed"]
-    S3["3. Agent Review<br>subagent_type=python-engineering:code-reviewer<br>Context: changed file paths, PR description or task description<br>Output: review findings with file:line references, severity labels (critical/major/minor)"]
-    S4{"4. Issues found with severity critical or major?"}
-    S4a["Fix Issues<br>Implementation fixes: python-engineering:python-cli-architect<br>Test fixes: python-engineering:python-pytest-architect<br>Context: review findings doc path, file paths to fix"]
+    S3["3. Agent Review<br>subagent_type=python-engineering:code-reviewer<br>Context: changed file paths, PR description or task description<br>Output: review findings with file:line references, severity labels (HIGH/MEDIUM/LOW)"]
+    S4{"4. Issues found with severity HIGH or MEDIUM?"}
+    S4a["Fix Issues<br>Implementation fixes: python-engineering:python-cli-architect<br>Test fixes: python-engineering:python-pytest-architect<br>Context: reviewer STATUS FINDINGS, file paths to fix"]
     S5["5. Re-validate<br>Run: Activate holistic-linting skill<br>Run: uv run pytest<br>Pass criteria: all review issues addressed, tests green, linting clean"]
     S1 --> S2
     S2 -->|"Yes — scripts present"| S2a
@@ -144,7 +147,7 @@ flowchart TD
     S2a -->|"PEP 723 compliance verified"| S3
     S3 -->|"Output: review findings with severity labels"| S4
     S4 -->|"Yes — fix required"| S4a
-    S4 -->|"No critical/major issues"| S5
+    S4 -->|"No HIGH/MEDIUM issues"| S5
     S4a -->|"Output: corrections applied"| S5
 ```
 
@@ -152,11 +155,11 @@ flowchart TD
 
 **When to use**: Improving code structure without changing behavior
 
-Decision criterion for "Tests exist?": run `uv run pytest --co -q` — if output lists test items and exit code is 0, tests exist. If exit code is non-zero or output is empty, tests are missing.
+Decision criterion for "Tests exist and pass?": first run `uv run pytest --co -q` to establish that tests are collected, then run `uv run pytest` to establish the passing baseline. Collection alone never proves tests pass.
 
 ```mermaid
 flowchart TD
-    S1{"Tests exist and pass?<br>Run: uv run pytest --co -q<br>Yes: test items listed, exit 0<br>No: empty output or exit non-zero"}
+    S1{"Tests exist and pass?<br>Collect: uv run pytest --co -q<br>Execute: uv run pytest<br>Yes: items collected AND suite exit 0<br>No: no items or suite non-zero"}
     S1a["Write Tests First<br>subagent_type=python-engineering:python-pytest-architect<br>Context: file paths to be refactored, current behavior description<br>Output: tests/ capturing current behavior (all must pass before refactoring)"]
     S2["Refactor<br>subagent_type=python-engineering:python-cli-architect<br>Context: file paths to refactor, tests/ path<br>Constraint: must not break existing tests — run uv run pytest after each change<br>Output: refactored implementation with same external behavior"]
     S3["Validate<br>Run: uv run pytest (coverage must equal or exceed pre-refactor baseline)<br>Pass criteria: all tests green, coverage maintained or improved"]
@@ -197,21 +200,19 @@ flowchart TD
 
 **Use when**:
 
-- **DEFAULT choice for all Python scripts and CLI tools**
-- Building command-line applications with rich user interaction
-- Need progress bars, tables, colored output
-- User-facing CLI tools and automation scripts
-- Any script where UX matters (formatted output, progress feedback)
-- PEP 723 + uv available (internet access present)
+- Default implementation agent for Python work routed by this plugin
+- Building or modifying scripts and CLI applications
+- Human-facing CLI work where Typer/Rich is the preferred new-work default
+- Agent-facing/plugin CLI work where compact JSON is the preferred output contract
+- Existing projects whose established framework/architecture should be preserved
 
 **Characteristics**:
 
-- Uses Typer for CLI framework
-- Uses Rich for terminal output
-- Focuses on UX and polish
-- PEP 723 makes dependencies transparent (single file)
-- Better UX than stdlib alternatives
-- Works anywhere with Python 3.11+ and internet access
+- Offers Typer first for new CLI frameworks when dependencies are acceptable
+- Offers Rich first for human-facing terminal presentation; never for agent-only output
+- Uses compact Pydantic JSON contracts for agent-facing tools when Pydantic is justified/available
+- Preserves coherent project frameworks, architecture, Python floor, and dependency policy
+- PEP 723 + uv is the preferred standalone-script dependency path when appropriate
 
 **Complexity Advantage** (IMPORTANT):
 
@@ -220,7 +221,7 @@ flowchart TD
 - Better UX — professional output with minimal effort
 - Just as portable — PEP 723 + uv makes single-file scripts with dependencies work seamlessly
 
-**This agent is EASIER to use than stdlib-only approaches. Choose this as the default unless portability restrictions exist.**
+Choose this implementation agent by default; its preferred libraries are defaults to offer first, not reasons to replace coherent project choices.
 
 **Rich Width Handling**: For Rich Panel/Table width issues in CI/non-TTY environments, load `Skill(skill="python-engineering:typer-and-rich")` for complete solutions including the `get_rendered_width()` helper pattern.
 
@@ -328,9 +329,9 @@ If answers indicate restrictions: python-engineering:python3-stdlib-only
 **Characteristics**:
 
 - Modern pytest patterns
-- pytest-mock exclusively (never unittest.mock)
-- AAA pattern (Arrange-Act-Assert)
-- Coverage and mutation testing
+- pytest-mock offered first when mocking is appropriate, while preserving coherent existing seams
+- Clear Arrange/Act/Assert structure where useful
+- Behavioral coverage, property testing, and mutation testing when they strengthen evidence
 
 **Example tasks**:
 
@@ -390,15 +391,15 @@ Analyzes imports, corrects shebang, adds/removes PEP 723 metadata, sets execute 
 **Every Python development task must pass**:
 
 1. **Code quality**: Activate holistic-linting skill for linting, formatting, and type checking workflows
-2. **Tests**: `uv run pytest` (>80% coverage)
+2. **Tests**: `uv run pytest` (changed behavior and configured project coverage gate)
 3. **Standards**: `/python-engineering:modernpython` for modern patterns
 4. **Script compliance**: `/python-engineering:shebangpython` for standalone scripts
 
 **For critical code** (payments, auth, security):
 
-- Coverage: >95%
-- Mutation testing: `uv run mutmut run`
-- Security scan: `uv run bandit -r packages/`
+- Exercise security-sensitive contracts, boundaries, and failure modes directly
+- Use mutation testing when it materially strengthens confidence in critical logic
+- Run the repository's configured security checks; add a scanner only when the project or task requires one
 
 **CI Compatibility**: After local checks pass, verify CI requirements are met by checking CI config files for additional validators.
 

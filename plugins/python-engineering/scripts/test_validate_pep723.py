@@ -21,7 +21,13 @@ from pathlib import Path
 
 import pytest
 
-from validate_pep723 import UV_SHEBANG, determine_applicable_rule, is_part_of_package
+from validate_pep723 import (
+    UV_SHEBANG,
+    auto_fix_file,
+    determine_applicable_rule,
+    is_part_of_package,
+    validate_file,
+)
 
 RULE_PACKAGE_EXECUTABLE = 2
 RULE_UV_SCRIPT = 3
@@ -161,3 +167,92 @@ def test_package_module_without_pep723_selects_the_package_rule(distribution: Pa
     module.chmod(0o755)
     rule, _reason, _evaluations = determine_applicable_rule(module, module.read_text())
     assert rule == RULE_PACKAGE_EXECUTABLE
+
+
+def test_auto_fix_preserves_existing_pep723_metadata(distribution: Path) -> None:
+    """Repairing a shebang preserves the script's complete PEP 723 contract."""
+    script = distribution / "scripts" / "tool.py"
+    script.parent.mkdir(parents=True)
+    metadata = """# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#   "httpx==0.28.1; python_version >= '3.12'",
+# ]
+#
+# [tool.example]
+# retain_this = true
+# ///
+"""
+    script.write_text(
+        "#!/usr/bin/env -S uv run --script\n" + metadata + "import httpx\n",
+        encoding="utf-8",
+    )
+    script.chmod(0o755)
+
+    before = script.read_text(encoding="utf-8")
+    result = validate_file(script)
+    assert result.is_correct is False
+    assert auto_fix_file(script, result) is True
+
+    after = script.read_text(encoding="utf-8")
+    assert after.startswith(UV_SHEBANG + "\n")
+    assert after.removeprefix(UV_SHEBANG + "\n") == before.split("\n", 1)[1]
+    assert 'requires-python = ">=3.12"' in after
+    assert '"httpx==0.28.1; python_version >= \'3.12\'"' in after
+    assert "# retain_this = true" in after
+
+
+def test_rule3_without_dependency_metadata_is_not_repaired_as_success(distribution: Path) -> None:
+    """A UV shebang cannot make an undeclared external dependency valid."""
+    script = distribution / "scripts" / "missing_metadata.py"
+    script.parent.mkdir(parents=True)
+    script.write_text("#!/usr/bin/env python3\nimport httpx\n", encoding="utf-8")
+    script.chmod(0o755)
+
+    result = validate_file(script)
+    assert result.applicable_rule == RULE_UV_SCRIPT
+    assert result.is_correct is False
+    before = script.read_text(encoding="utf-8")
+
+    assert auto_fix_file(script, result) is False
+    assert script.read_text(encoding="utf-8") == before
+    assert validate_file(script).is_correct is False
+
+
+@pytest.mark.parametrize(
+    "requirement",
+    [
+        '"httpx[http2]>=0.27"',
+        "'httpx>=0.27'",
+        '"httpx~=0.28"',
+    ],
+)
+def test_rule3_accepts_valid_pep723_requirement_forms(distribution: Path, requirement: str) -> None:
+    script = distribution / "scripts" / "requirements.py"
+    script.parent.mkdir(parents=True)
+    script.write_text(
+        UV_SHEBANG
+        + "\n# /// script\n# requires-python = \">=3.11\"\n# dependencies = ["
+        + requirement
+        + "]\n# ///\nimport httpx\n",
+        encoding="utf-8",
+    )
+    script.chmod(0o755)
+    assert validate_file(script).is_correct is True
+
+
+def test_rule3_ignores_sibling_local_module(distribution: Path) -> None:
+    scripts = distribution / "scripts"
+    scripts.mkdir(parents=True)
+    (scripts / "local_helper.py").write_text("def run() -> None:\n    pass\n", encoding="utf-8")
+    script = scripts / "tool.py"
+    script.write_text(
+        UV_SHEBANG
+        + "\n# /// script\n# requires-python = \">=3.11\"\n# dependencies = [\"httpx>=0.27\"]\n# ///\n"
+        + "import httpx\nfrom local_helper import run\n",
+        encoding="utf-8",
+    )
+    script.chmod(0o755)
+    result = validate_file(script)
+    assert result.is_correct is True
+    assert "local_helper" not in result.external_imports

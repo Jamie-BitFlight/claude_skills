@@ -160,37 +160,32 @@ def extract_imports(content: str) -> set[str]:
 
 
 def extract_pep723_dependencies(content: str) -> tuple[bool, set[str]]:
-    """Extract dependencies from PEP 723 metadata block.
-
-    Handles both Unix (LF) and Windows (CRLF) line endings.
-
-    Args:
-        content: File content to parse
-
-    Returns:
-        Tuple of (has_pep723_block, set_of_normalized_package_names)
-    """
-    # Normalize line endings to handle Windows CRLF
+    """Parse PEP 723 metadata and return normalized declared distribution names."""
     normalized_content = content.replace("\r\n", "\n")
-
-    pep723_match = re.search(r"# /// script\n(.*?)\n# ///", normalized_content, re.DOTALL)
-    if not pep723_match:
+    match = re.search(r"^# /// script\n(.*?)^# ///$", normalized_content, re.MULTILINE | re.DOTALL)
+    if not match:
         return False, set()
 
-    deps_match = re.search(r"dependencies\s*=\s*\[(.*?)\]", pep723_match.group(1), re.DOTALL)
-    if not deps_match:
+    metadata_lines: list[str] = []
+    for line in match.group(1).splitlines():
+        if not line.startswith("#"):
+            return True, set()
+        text = line[1:]
+        metadata_lines.append(text[1:] if text.startswith(" ") else text)
+
+    try:
+        metadata = tomllib.loads("\n".join(metadata_lines))
+    except tomllib.TOMLDecodeError:
         return True, set()
 
-    deps_text = deps_match.group(1)
-    # Extract package names from dependency strings
-    dependencies = set()
-    for match in re.finditer(r'"([^"><=!\s]+)', deps_text):
-        pkg = match.group(1)
-        # Normalize package names (e.g., GitPython -> gitpython)
-        dependencies.add(pkg.lower().replace("-", "_").replace(".", "_"))
-
+    dependencies: set[str] = set()
+    for requirement in metadata.get("dependencies", []):
+        if not isinstance(requirement, str):
+            continue
+        name_match = re.match(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)", requirement)
+        if name_match:
+            dependencies.add(name_match.group(1).lower().replace("-", "_").replace(".", "_"))
     return True, dependencies
-
 
 def normalize_import_to_package(import_name: str) -> str:
     """Map import names to package names.
@@ -225,6 +220,17 @@ def normalize_import_to_package(import_name: str) -> str:
 
     normalized = import_name.lower().replace("-", "_").replace(".", "_")
     return mappings.get(import_name, normalized)
+
+
+def local_import_names(file_path: Path) -> set[str]:
+    """Return top-level module names importable from the script's local directory."""
+    names: set[str] = set()
+    for child in file_path.parent.iterdir():
+        if child.is_file() and child.suffix == ".py":
+            names.add(child.stem)
+        elif child.is_dir() and (child / "__init__.py").exists():
+            names.add(child.name)
+    return names
 
 
 def is_part_of_package(file_path: Path) -> bool:
@@ -632,8 +638,16 @@ def validate_file(file_path: Path) -> ValidationResult:
     # Get expected shebang
     expected_shebang = get_expected_shebang(rule_number)
 
-    # Check if current matches expected
+    # Check the shebang and the runtime dependency contract. Rule 3 requires
+    # PEP 723 metadata declaring every detected external import; a correct
+    # shebang alone is not sufficient.
     is_correct = current_shebang == expected_shebang
+    missing_pep723_dependencies: set[str] = set()
+    if rule_number == RULE_UV_SCRIPT:
+        has_pep723, _declared = extract_pep723_dependencies(content)
+        normalized_external = {normalize_import_to_package(name) for name in external_imports}
+        missing_pep723_dependencies = normalized_external - pep723_deps
+        is_correct = is_correct and has_pep723 and not missing_pep723_dependencies
 
     # Gather errors
     errors: list[str] = []
@@ -644,6 +658,12 @@ def validate_file(file_path: Path) -> ValidationResult:
         if rule_number == RULE_UV_SCRIPT and UV_SHEBANG_PATTERN.match(current_shebang):
             diag = diagnose_uv_shebang(current_shebang)
             errors.extend(diag)
+
+    if rule_number == RULE_UV_SCRIPT and missing_pep723_dependencies:
+        errors.append(
+            "PEP 723 metadata does not establish dependencies for: "
+            + ", ".join(sorted(missing_pep723_dependencies))
+        )
 
     # Check execute bit alignment with rule
     if rule_number in EXECUTABLE_RULES and not is_exec:
@@ -713,65 +733,47 @@ def format_validation_output(result: ValidationResult) -> str:
 
 
 def auto_fix_file(file_path: Path, result: ValidationResult) -> bool:
-    """Auto-fix a file's shebang and PEP 723 metadata.
+    """Repair only shebang and execute-bit state without rewriting PEP 723 metadata.
+
+    Existing inline metadata is runtime configuration owned by the script. A
+    shebang repair must preserve its Python requirement, dependency constraints,
+    markers, extras, and tool tables verbatim.
 
     Args:
-        file_path: Path to file to fix
-        result: Validation result indicating what needs fixing
+        file_path: Path to file to fix.
+        result: Validation result indicating the expected shebang and mode.
 
     Returns:
-        True if fix was successful, False otherwise
+        True if the repair was successful, False otherwise.
     """
     try:
         content = file_path.read_text(encoding="utf-8")
         lines = content.split("\n")
-
         needs_shebang = result.applicable_rule in EXECUTABLE_RULES
-        needs_pep723 = result.applicable_rule == RULE_UV_SCRIPT
         needs_execute_bit = result.applicable_rule in EXECUTABLE_RULES
+        if result.applicable_rule == RULE_UV_SCRIPT and not result.pep723_dependencies:
+            console.print(
+                "[red]ERROR: Cannot auto-fix Rule 3 without established PEP 723 dependency metadata; "
+                "declare the script dependencies explicitly.[/red]"
+            )
+            return False
 
-        # Remove existing shebang (if present)
         if lines and lines[0].startswith("#!"):
             lines = lines[1:]
 
-        content_no_shebang = "\n".join(lines)
-
-        # Remove existing PEP 723 block (if present)
-        content_no_pep723 = re.sub(r"# /// script\n.*?\n# ///\n?", "", content_no_shebang, flags=re.DOTALL)
-        content_no_pep723 = re.sub(r"\n{3,}", "\n\n", content_no_pep723)
-        remaining_lines = content_no_pep723.split("\n")
-
-        new_lines: list[str] = []
         if needs_shebang:
-            new_lines.append(result.expected_shebang)
+            lines.insert(0, result.expected_shebang)
 
-        if needs_pep723:
-            new_lines.extend(("# /// script", '# requires-python = ">=3.11"'))
-            if result.external_imports:
-                new_lines.append("# dependencies = [")
-                for imp in sorted(result.external_imports):
-                    pkg_name = normalize_import_to_package(imp)
-                    new_lines.append(f'#     "{pkg_name}>=0.1.0",')
-                new_lines.append("# ]")
-            else:
-                new_lines.append("# dependencies = []")
-            new_lines.append("# ///")
-
-        new_lines.extend(remaining_lines)
-        file_path.write_text("\n".join(new_lines), encoding="utf-8")
+        file_path.write_text("\n".join(lines), encoding="utf-8")
 
         if needs_execute_bit and not result.is_executable:
             file_path.chmod(file_path.stat().st_mode | 0o111)
-
-        if result.applicable_rule == RULE_NO_SHEBANG and result.is_executable:
+        elif result.applicable_rule == RULE_NO_SHEBANG and result.is_executable:
             file_path.chmod(file_path.stat().st_mode & ~0o111)
-
     except OSError as e:
         console.print(f"[red]ERROR: Failed to fix file: {e}[/red]")
         return False
-    else:
-        return True
-
+    return True
 
 def _get_table_width(table: Table) -> int:
     """Get the natural width of a table using a temporary wide console.

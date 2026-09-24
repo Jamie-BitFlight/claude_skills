@@ -1,6 +1,6 @@
 ---
 name: python3-testing
-description: Pytest testing patterns for Python — fixtures (session/module/function/factory), AAA structure, behavioral naming, coverage targets by code type, property-based testing with Hypothesis, and mutation testing with mutmut. Use when writing tests, designing fixtures, configuring coverage, or applying parametrize, async testing, or property-based strategies.
+description: Pytest testing patterns for Python — fixtures, behavioral naming, behavior/risk-driven coverage, property-based testing with Hypothesis when useful, and mutation testing when justified. Use when writing tests, designing fixtures, configuring coverage, or applying parametrize, async testing, or property-based strategies.
 user-invocable: false
 ---
 
@@ -47,30 +47,16 @@ def mock_binary(tmp_path: Path) -> Path:
     return binary
 ```
 
-## Coverage Targets
+## Coverage
 
-| Code Type | Minimum |
-|---|---|
-| Business logic | 90% |
-| Standard code | 80% |
-| Scripts/utilities | 70% |
-| Critical paths | 95% + mutation testing |
+Coverage is evidence about exercised behavior, not a universal percentage target.
 
-```toml
-# pyproject.toml
-[tool.coverage.run]
-branch = true
-source = ["src"]
-omit = ["**/tests/**"]
+- Cover changed behavior, contracts, boundaries, regressions, and meaningful failure paths.
+- Respect an existing repository coverage gate; do not introduce one when the project has none.
+- Inspect uncovered changed branches and decide whether they represent meaningful risk.
+- Do not add low-value tests solely to raise a percentage.
 
-[tool.coverage.report]
-fail_under = 80
-exclude_lines = [
-    "pragma: no cover",
-    "if TYPE_CHECKING:",
-    "raise NotImplementedError",
-]
-```
+A project that already configures `fail_under` keeps that value. New configuration may enable branch measurement and missing-line reporting without inventing a threshold.
 
 ## Property-Based Testing
 
@@ -100,7 +86,7 @@ uv run mutmut run --paths-to-mutate=packages/module/
 uv run mutmut results
 ```
 
-Target: >90% mutation score for critical code paths.
+Use mutation testing for critical logic when it materially strengthens confidence. Do not invent a universal mutation-score target.
 
 ## Fixture Composition
 
@@ -135,7 +121,7 @@ def database_with_users(database_connection: Connection) -> Generator[Connection
 
 | Code under test | What the tests must do |
 |---|---|
-| Critical business logic (payments, auth, validation) | 95%+ coverage, mutation testing, every boundary and invalid input, every error path asserted |
+| Critical business logic (payments, auth, validation) | Exercise security/correctness boundaries, invalid inputs, and meaningful error paths directly; consider mutation testing where it strengthens evidence |
 | Async code | `@pytest.mark.asyncio`; `AsyncClient` for HTTP; `asyncio.gather()` for concurrency; cover timeouts and retries |
 | CLI applications | `CliRunner` from `typer.testing`; capture Rich output; run with and without `NO_COLOR`. See `typer-rich-testing-patterns.md` in the `python-engineering:python3-cli` skill |
 | Database operations | Isolated test database (`tmp_path` or `pytest-postgresql`); assert commit on success and rollback on error; test migrations against a real engine |
@@ -152,12 +138,9 @@ def test_operation_performance(benchmark) -> None:
     assert result.success
 ```
 
-## Migrating unittest.mock to pytest-mock
+## Mocking
 
-- Replace `unittest.mock` imports with `pytest_mock.MockerFixture`.
-- Turn `@patch` decorators into `mocker.patch()` calls inside the test.
-- Turn `Mock()` into `mocker.Mock()`.
-- Drop the `with` context managers; call `mocker` directly.
+For new pytest suites, prefer `pytest-mock` when a mock is the clearest seam. Preserve coherent existing `unittest.mock` usage rather than introducing a dependency solely to migrate syntax. Prefer fakes, dependency injection, or `monkeypatch` when they make the behavior clearer.
 
 ## Test Directory Structure
 
