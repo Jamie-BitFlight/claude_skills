@@ -124,6 +124,18 @@ permissions:
   id-token: write  # Required for trusted publishing
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv python install 3.11
+      - run: uv sync --all-extras
+      - run: uv run ruff check src/ tests/
+      - run: uv run ruff format --check src/ tests/
+      - run: uv run ty check src/ tests/
+      - run: uv run pytest tests/ --cov=src --cov-report=term-missing
+
   build:
     runs-on: ubuntu-latest
     steps:
