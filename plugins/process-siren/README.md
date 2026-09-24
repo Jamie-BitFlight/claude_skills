@@ -93,8 +93,7 @@ Paste the process directly:
 /process-siren:woo-sailor plugins/my-plugin/  --dry-run
 ```
 
-`--dry-run` reports what would be converted without writing any files. `--report` produces the
-same output plus a structured audit of findings.
+`--dry-run` and `--report` use read-only ANALYZE behavior. Use `--improve` to apply intent-preserving changes or `--represent` for faithful Mermaid representation.
 
 ### Run a quality audit before converting
 
@@ -102,9 +101,7 @@ same output plus a structured audit of findings.
 /process-siren:improve-processes
 ```
 
-Paste or reference the process you want audited. The skill runs a triage checklist and surfaces
-gaps — abstract verbs, unevaluable conditions, missing entry/exit states, undefined actors —
-before you ask for a conversion.
+Paste or reference the process you want audited. The skill builds the semantic model, classifies uncertainty, identifies correctness claims and gaps, and selects proportionate validation.
 
 ## Operating Modes
 
@@ -125,30 +122,9 @@ provides real-time syntax checking during conversion. This prevents incomplete o
 Mermaid syntax from entering the codebase. The server runs automatically after Bun is
 installed; no additional MCP configuration is needed.
 
-## Quality Gate — The Triage Protocol
+## Improvement and Validation Loop
 
-The `improve-processes` skill runs automatically when a source process shows structural
-problems:
-
-```mermaid
-flowchart TD
-    Start(["Source process received"]) --> O{"Outcome stated in\none measurable sentence?"}
-    O -->|"No"| FixO["Rewrite outcome statement\nbefore proceeding"]
-    O -->|"Yes"| A{"Actor named\nfor every step?"}
-    FixO --> A
-    A -->|"No — actor undefined"| FixA["Name actor per step;\nask user if ambiguous"]
-    A -->|"Yes"| B{"All steps change\nobservable state?"}
-    FixA --> B
-    B -->|"No — pure description steps"| FixB["Remove or rewrite no-op steps\nas concrete actions"]
-    B -->|"Yes"| C{"All decision conditions\nevaluable without interpretation?"}
-    FixB --> C
-    C -->|"No — vague conditions remain"| FixC["Replace with observable facts:\nexit code, file existence, string match"]
-    C -->|"Yes"| D{"Entry and exit\nconditions explicit?"}
-    FixC --> D
-    D -->|"No"| FixD["Add entry precondition\nand exit terminal state"]
-    D -->|"Yes"| Convert(["Ready for Mermaid conversion"])
-    FixD --> Convert
-```
+`improve-processes` uses one recursive loop: UNDERSTAND → MODEL → CHALLENGE → IMPROVE → VALIDATE. Resolvable uncertainty is investigated; only intent-dependent decisions block autonomous improvement. Validation failures become evidence for diagnosis and targeted revalidation.
 
 ## When Not to Use It
 
