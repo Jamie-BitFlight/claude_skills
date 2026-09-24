@@ -84,7 +84,7 @@ def test_github_sync_provider_normalizes_bounded_snapshot() -> None:
     backend._fetch_issue_comments_graphql = MagicMock(return_value=[])
 
     # When: reconciliation fetches an initial snapshot
-    snapshot = backend._fetch_snapshot(ReconcileRequest(scope=ReconcileScope.INITIAL))
+    snapshot = backend.fetch_snapshot(ReconcileRequest(scope=ReconcileScope.INITIAL))
 
     # Then: the normalized provider item retains body, labels, and revision
     assert snapshot.items[0].reference == "#1"
@@ -102,7 +102,7 @@ def test_github_sync_provider_forwards_label_scope_to_snapshot_query() -> None:
     backend._fetch_issue_comments_graphql = MagicMock(return_value=[])
 
     # When: the adapter fetches the provider snapshot
-    backend._fetch_snapshot(ReconcileRequest(scope=ReconcileScope.INITIAL, label="review"))
+    backend.fetch_snapshot(ReconcileRequest(scope=ReconcileScope.INITIAL, label="review"))
 
     # Then: the existing GraphQL query receives only the requested label
     assert backend._fetch_issues_graphql.call_args.kwargs["labels"] == ["review"]
@@ -137,7 +137,7 @@ def test_github_sync_provider_targeted_fetch_uses_alias_batch_and_emits_tombston
     backend._graphql_request = MagicMock(return_value={"repository": {"i0": _issue(1), "i1": None}})
 
     # When: reconciliation asks only for those linked references
-    snapshot = backend._fetch_snapshot(ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#1", "#2"]))
+    snapshot = backend.fetch_snapshot(ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#1", "#2"]))
 
     # Then: one bounded alias query replaces per-issue reads and preserves the deletion explicitly
     assert [item.exists for item in snapshot.items] == [True, False]
@@ -287,7 +287,7 @@ def test_github_backend_reconcile_owns_snapshot_cache_and_engine(tmp_path: Path)
     assert result.fetched_items == 1
     assert result.local_updates == 1
     assert result.changed_references == ["#1"]
-    assert not hasattr(backend, "fetch_snapshot")
+    assert callable(backend.fetch_snapshot)
     assert not hasattr(backend, "apply_patches")
     assert cache._work_item_snapshots().snapshots[0][1].metadata.sync_fingerprint
 

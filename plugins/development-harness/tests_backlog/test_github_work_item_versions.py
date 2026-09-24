@@ -250,7 +250,7 @@ def test_github_work_item_backend_human_body_change_invalidates_prior_head() -> 
     backend._fetch_targeted_issues = MagicMock(return_value={"#42": _issue("after")})
 
     # When: snapshot sees a human body whose identity-bound root digest differs
-    [item] = backend._fetch_snapshot(ReconcileRequest(scope=ReconcileScope.INITIAL)).items
+    [item] = backend.fetch_snapshot(ReconcileRequest(scope=ReconcileScope.INITIAL)).items
 
     # Then: the obsolete head is ignored and the human Issue body/root become current
     assert (item.body, item.revision) == ("after", root_revision("#42", "issue-node", "after"))
@@ -297,7 +297,7 @@ def test_github_work_item_snapshot_batches_heads_and_audit_comments() -> None:
         }
     )
 
-    snapshot = backend._fetch_snapshot(ReconcileRequest(scope=ReconcileScope.INITIAL))
+    snapshot = backend.fetch_snapshot(ReconcileRequest(scope=ReconcileScope.INITIAL))
 
     assert [(item.reference, item.body) for item in snapshot.items] == [("#42", "first"), ("#43", "second")]
     backend._contents.get.assert_not_called()

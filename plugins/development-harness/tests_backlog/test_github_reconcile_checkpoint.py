@@ -75,7 +75,7 @@ def test_github_reconcile_initial_establishes_durable_snapshot_checkpoint(tmp_pa
     # Given: a complete initial provider snapshot and an empty provider-owned cache
     cache = FileCache(tmp_path)
     backend = GitHubBackend(cache=cache)
-    backend._fetch_snapshot = MagicMock(
+    backend.fetch_snapshot = MagicMock(
         return_value=ProviderSnapshot(items=[], sync_started_at="2026-08-12T01:00:00Z", pages_fetched=1)
     )
 
@@ -108,7 +108,7 @@ def test_github_reconcile_result_counts_dead_lettered_work_item_rejections(tmp_p
         )
     )
     backend = GitHubBackend(cache=cache)
-    backend._fetch_snapshot = MagicMock(
+    backend.fetch_snapshot = MagicMock(
         return_value=ProviderSnapshot(items=[], sync_started_at="2026-08-12T01:00:00Z", pages_fetched=1)
     )
 
@@ -134,7 +134,7 @@ def test_github_reconcile_result_counts_corrupt_queue_entries_as_rejected(tmp_pa
         )
     )
     backend = GitHubBackend(cache=cache)
-    backend._fetch_snapshot = MagicMock(
+    backend.fetch_snapshot = MagicMock(
         return_value=ProviderSnapshot(items=[], sync_started_at="2026-08-12T01:00:00Z", pages_fetched=1)
     )
 
@@ -148,7 +148,7 @@ def test_github_reconcile_result_counts_corrupt_queue_entries_as_rejected(tmp_pa
 def test_github_reconcile_empty_incremental_normalizes_to_initial(tmp_path: Path) -> None:
     # Given: a provider-owned cache without a durable snapshot watermark
     backend = GitHubBackend(cache=FileCache(tmp_path))
-    backend._fetch_snapshot = MagicMock(
+    backend.fetch_snapshot = MagicMock(
         return_value=ProviderSnapshot(items=[], sync_started_at="2026-08-12T01:00:00Z", pages_fetched=1)
     )
 
@@ -156,7 +156,7 @@ def test_github_reconcile_empty_incremental_normalizes_to_initial(tmp_path: Path
     backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL))
 
     # Then: the provider privately fetches a complete initial snapshot
-    effective_request = backend._fetch_snapshot.call_args.args[0]
+    effective_request = backend.fetch_snapshot.call_args.args[0]
     assert effective_request.scope is ReconcileScope.INITIAL
     assert effective_request.since == ""
 
@@ -166,7 +166,7 @@ def test_github_reconcile_incremental_uses_durable_snapshot_checkpoint(tmp_path:
     cache = FileCache(tmp_path)
     cache._set_snapshot_checkpoint(_ProviderSnapshotCheckpoint(watermark="2026-08-12T01:00:00Z"))
     backend = GitHubBackend(cache=cache)
-    backend._fetch_snapshot = MagicMock(
+    backend.fetch_snapshot = MagicMock(
         return_value=ProviderSnapshot(items=[], sync_started_at="2026-08-12T02:00:00Z", pages_fetched=1)
     )
 
@@ -174,7 +174,7 @@ def test_github_reconcile_incremental_uses_durable_snapshot_checkpoint(tmp_path:
     backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL))
 
     # Then: the backend supplies the durable watermark to its private snapshot adapter
-    assert backend._fetch_snapshot.call_args.args[0].since == "2026-08-12T01:00:00Z"
+    assert backend.fetch_snapshot.call_args.args[0].since == "2026-08-12T01:00:00Z"
     assert FileCache(tmp_path)._get_snapshot_checkpoint() == _ProviderSnapshotCheckpoint(
         watermark="2026-08-12T02:00:00Z", scope="incremental", label="", items_observed=0
     )
@@ -202,7 +202,7 @@ def test_github_reconcile_legacy_checkpoint_without_scope_metadata_forces_initia
     assert legacy_checkpoint.has_scope_metadata is False
     monkeypatch.setattr(cache, "_get_snapshot_checkpoint", lambda: legacy_checkpoint)
     backend = GitHubBackend(cache=cache)
-    backend._fetch_snapshot = MagicMock(
+    backend.fetch_snapshot = MagicMock(
         return_value=ProviderSnapshot(items=[], sync_started_at="2026-08-12T02:00:00Z", pages_fetched=1)
     )
 
@@ -212,7 +212,7 @@ def test_github_reconcile_legacy_checkpoint_without_scope_metadata_forces_initia
     # Then: the untrusted legacy watermark is never handed to the provider as
     # an incremental "since" -- the request is upgraded to a full initial
     # reconciliation instead, exactly as if no checkpoint existed at all
-    effective_request = backend._fetch_snapshot.call_args.args[0]
+    effective_request = backend.fetch_snapshot.call_args.args[0]
     assert effective_request.scope is ReconcileScope.INITIAL
     assert effective_request.since == ""
 
@@ -231,7 +231,7 @@ def test_github_reconcile_checkpoint_with_explicit_scope_metadata_is_trusted(
     assert current_checkpoint.has_scope_metadata is True
     monkeypatch.setattr(cache, "_get_snapshot_checkpoint", lambda: current_checkpoint)
     backend = GitHubBackend(cache=cache)
-    backend._fetch_snapshot = MagicMock(
+    backend.fetch_snapshot = MagicMock(
         return_value=ProviderSnapshot(items=[], sync_started_at="2026-08-12T02:00:00Z", pages_fetched=1)
     )
 
@@ -240,7 +240,7 @@ def test_github_reconcile_checkpoint_with_explicit_scope_metadata_is_trusted(
 
     # Then: the trusted checkpoint's watermark is supplied to the private
     # snapshot fetch and the request stays incremental
-    effective_request = backend._fetch_snapshot.call_args.args[0]
+    effective_request = backend.fetch_snapshot.call_args.args[0]
     assert effective_request.scope is ReconcileScope.INCREMENTAL
     assert effective_request.since == "2026-08-12T01:00:00Z"
 
@@ -277,11 +277,11 @@ def test_github_reconcile_legacy_checkpoint_stays_untrusted_after_a_no_op_transa
     # Then: startup incremental reconciliation still cannot trust the watermark
     # -- the no-op transaction must not have laundered it into a trusted shape
     backend = GitHubBackend(cache=FileCache(tmp_path))
-    backend._fetch_snapshot = MagicMock(
+    backend.fetch_snapshot = MagicMock(
         return_value=ProviderSnapshot(items=[], sync_started_at="2026-08-12T02:00:00Z", pages_fetched=1)
     )
     backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL))
-    effective_request = backend._fetch_snapshot.call_args.args[0]
+    effective_request = backend.fetch_snapshot.call_args.args[0]
     assert effective_request.scope is ReconcileScope.INITIAL, (
         "No-op transaction laundered the legacy checkpoint into a trusted one"
     )
@@ -361,7 +361,7 @@ def test_github_reconcile_label_scoped_zero_items_does_not_advance_checkpoint(tm
     # Given: a cold cache (never synced) and a repository whose *labeled* slice is empty
     cache = FileCache(tmp_path)
     backend = GitHubBackend(cache=cache)
-    backend._fetch_snapshot = MagicMock(
+    backend.fetch_snapshot = MagicMock(
         return_value=ProviderSnapshot(items=[], sync_started_at="2026-08-12T01:00:00Z", pages_fetched=1)
     )
 
@@ -383,7 +383,7 @@ def test_github_reconcile_label_scoped_populated_snapshot_does_not_advance_check
     # Given: a cold cache and a label-scoped reconcile that *does* observe items
     cache = FileCache(tmp_path)
     backend = GitHubBackend(cache=cache)
-    backend._fetch_snapshot = MagicMock(
+    backend.fetch_snapshot = MagicMock(
         return_value=ProviderSnapshot(
             items=[
                 ProviderItem(
@@ -420,7 +420,7 @@ def test_github_reconcile_unlabeled_empty_repo_still_produces_usable_checkpoint(
     # Given: a cold cache and a repository with genuinely zero open issues (no label filter)
     cache = FileCache(tmp_path)
     backend = GitHubBackend(cache=cache)
-    backend._fetch_snapshot = MagicMock(
+    backend.fetch_snapshot = MagicMock(
         return_value=ProviderSnapshot(items=[], sync_started_at="2026-08-12T01:00:00Z", pages_fetched=1)
     )
 
@@ -440,7 +440,7 @@ def test_github_reconcile_checkpoint_records_items_observed_for_populated_snapsh
     # Given: a cold cache and an unlabeled reconcile that observes a populated repository
     cache = FileCache(tmp_path)
     backend = GitHubBackend(cache=cache)
-    backend._fetch_snapshot = MagicMock(
+    backend.fetch_snapshot = MagicMock(
         return_value=ProviderSnapshot(
             items=[
                 ProviderItem(
@@ -490,7 +490,7 @@ def test_github_reconcile_vanished_snapshot_file_reports_incomplete(tmp_path: Pa
     # Given: a durably synced cache holding two item snapshots
     cache = FileCache(tmp_path)
     backend = GitHubBackend(cache=cache)
-    backend._fetch_snapshot = MagicMock(
+    backend.fetch_snapshot = MagicMock(
         return_value=ProviderSnapshot(
             items=[
                 ProviderItem(
@@ -542,7 +542,7 @@ def test_github_reconcile_fetch_failure_preserves_snapshot_checkpoint(tmp_path: 
     old_checkpoint = _ProviderSnapshotCheckpoint(watermark="2026-08-12T01:00:00Z")
     cache._set_snapshot_checkpoint(old_checkpoint)
     backend = GitHubBackend(cache=cache)
-    backend._fetch_snapshot = MagicMock(side_effect=BacklogError("partial snapshot"))
+    backend.fetch_snapshot = MagicMock(side_effect=BacklogError("partial snapshot"))
 
     # When: incremental reconciliation attempts the incomplete fetch
     with pytest.raises(BacklogError, match="partial snapshot"):
@@ -565,7 +565,7 @@ def test_github_reconcile_patch_failure_preserves_snapshot_checkpoint(tmp_path: 
     local.metadata.sync_fingerprint = synchronized_fingerprint(baseline)
     local.description = "local body"
     cache._save_item_snapshot(local, Path("issues/1.yaml"))
-    backend._fetch_snapshot = MagicMock(
+    backend.fetch_snapshot = MagicMock(
         return_value=ProviderSnapshot(
             items=[
                 ProviderItem(
@@ -607,7 +607,7 @@ def test_github_reconcile_conflict_preserves_snapshot_checkpoint(tmp_path: Path)
     local.metadata.sync_fingerprint = synchronized_fingerprint(baseline)
     local.description = "local body"
     cache._save_item_snapshot(local, Path("issues/1.yaml"))
-    backend._fetch_snapshot = MagicMock(
+    backend.fetch_snapshot = MagicMock(
         return_value=ProviderSnapshot(
             items=[
                 ProviderItem(
@@ -659,7 +659,7 @@ def test_github_reconcile_dry_run_preserves_snapshot_checkpoint(tmp_path: Path) 
     old_checkpoint = _ProviderSnapshotCheckpoint(watermark="2026-08-12T01:00:00Z")
     cache._set_snapshot_checkpoint(old_checkpoint)
     backend = GitHubBackend(cache=cache)
-    backend._fetch_snapshot = MagicMock(
+    backend.fetch_snapshot = MagicMock(
         return_value=ProviderSnapshot(items=[], sync_started_at="2026-08-12T02:00:00Z", pages_fetched=1)
     )
 
@@ -680,7 +680,7 @@ def _offline_work_item_backend(tmp_path: Path) -> GitHubBackend:
     local = baseline.model_copy(deep=True)
     local.description = "local body"
     backend.put_work_item(local)
-    backend._fetch_snapshot = MagicMock(side_effect=BacklogError("offline"))
+    backend.fetch_snapshot = MagicMock(side_effect=BacklogError("offline"))
     return backend
 
 
@@ -704,7 +704,7 @@ def test_github_work_item_intent_replays_once_after_reconnect(tmp_path: Path) ->
         backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, references=["#1"]))
     baseline = BacklogItem(title="Issue 1", description="provider body")
     baseline.metadata.issue = "#1"
-    backend._fetch_snapshot = MagicMock(
+    backend.fetch_snapshot = MagicMock(
         return_value=ProviderSnapshot(
             items=[
                 ProviderItem(
@@ -750,7 +750,7 @@ def test_reconcile_does_not_acknowledge_pending_mutation_when_unlink_snapshot_sa
     local = BacklogItem(title="Issue 1", description="local body")
     local.metadata.issue = "#1"
     backend.put_work_item(local)
-    backend._fetch_snapshot = MagicMock(
+    backend.fetch_snapshot = MagicMock(
         return_value=ProviderSnapshot(
             items=[
                 ProviderItem(
@@ -790,7 +790,7 @@ def test_github_reconcile_retains_mutation_queued_after_plan_construction(tmp_pa
     planned = baseline.model_copy(update={"description": "planned body"})
     backend.put_work_item(planned)
     planned_mutation = cache._pending_work_item_mutations()[0]
-    backend._fetch_snapshot = MagicMock(
+    backend.fetch_snapshot = MagicMock(
         return_value=ProviderSnapshot(
             items=[
                 ProviderItem(
@@ -856,7 +856,7 @@ def test_github_reconcile_acknowledges_successful_queue_despite_independent_conf
     noop.metadata.issue = "#2"
     noop.metadata.sync_fingerprint = synchronized_fingerprint(noop)
     backend.put_work_item(noop)
-    backend._fetch_snapshot = MagicMock(
+    backend.fetch_snapshot = MagicMock(
         return_value=ProviderSnapshot(
             items=[
                 ProviderItem(
@@ -908,7 +908,7 @@ def test_github_queued_title_rename_survives_reconnect(tmp_path: Path) -> None:
     baseline.metadata.sync_fingerprint = synchronized_fingerprint(baseline)
     renamed = baseline.model_copy(update={"title": "Renamed offline"})
     backend.put_work_item(renamed)
-    backend._fetch_snapshot = MagicMock(
+    backend.fetch_snapshot = MagicMock(
         return_value=ProviderSnapshot(
             items=[
                 ProviderItem(
@@ -997,7 +997,7 @@ def test_github_reconcile_accepts_remote_rename_when_local_only_edited_body(tmp_
     baseline = _leak_a_baseline()
     local = baseline.model_copy(update={"description": "local body"})
     backend.put_work_item(local)
-    backend._fetch_snapshot = MagicMock(
+    backend.fetch_snapshot = MagicMock(
         return_value=_leak_a_snapshot(backend, title="Renamed on GitHub", body_item=baseline)
     )
     backend._apply_patches = _leak_a_applied_patches()
@@ -1019,7 +1019,7 @@ def test_github_reconcile_retains_local_rename_when_remote_title_unchanged(tmp_p
     baseline = _leak_a_baseline()
     renamed = baseline.model_copy(update={"title": "Renamed offline"})
     backend.put_work_item(renamed)
-    backend._fetch_snapshot = MagicMock(return_value=_leak_a_snapshot(backend, title="Issue 1", body_item=baseline))
+    backend.fetch_snapshot = MagicMock(return_value=_leak_a_snapshot(backend, title="Issue 1", body_item=baseline))
     backend._apply_patches = _leak_a_applied_patches()
 
     result = backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, references=["#1"]))
@@ -1046,7 +1046,7 @@ def test_github_reconcile_conflicts_when_remote_renamed_and_remote_body_changed(
     remote_body_item = baseline.model_copy(update={"description": "remote body moved on"})
     local = baseline.model_copy(update={"description": "local body"})
     backend.put_work_item(local)
-    backend._fetch_snapshot = MagicMock(
+    backend.fetch_snapshot = MagicMock(
         return_value=_leak_a_snapshot(backend, title="Renamed on GitHub", body_item=remote_body_item)
     )
     backend._apply_patches = _leak_a_applied_patches()
@@ -1064,7 +1064,7 @@ def test_github_reconcile_retains_local_rename_when_remote_body_also_changed(tmp
     remote_body_item = baseline.model_copy(update={"description": "remote body moved on"})
     renamed = baseline.model_copy(update={"title": "Renamed offline"})
     backend.put_work_item(renamed)
-    backend._fetch_snapshot = MagicMock(
+    backend.fetch_snapshot = MagicMock(
         return_value=_leak_a_snapshot(backend, title="Issue 1", body_item=remote_body_item)
     )
     backend._apply_patches = _leak_a_applied_patches()
@@ -1083,7 +1083,7 @@ def test_github_reconcile_retains_local_rename_when_both_sides_renamed_different
     baseline = _leak_a_baseline()
     renamed = baseline.model_copy(update={"title": "Renamed offline"})
     backend.put_work_item(renamed)
-    backend._fetch_snapshot = MagicMock(
+    backend.fetch_snapshot = MagicMock(
         return_value=_leak_a_snapshot(backend, title="Renamed on GitHub", body_item=baseline)
     )
     backend._apply_patches = _leak_a_applied_patches()
@@ -1109,7 +1109,7 @@ def test_github_work_item_ack_ignores_stable_reference_when_title_drifted(
     local = baseline.model_copy(update={"description": "local body"})
     backend.put_work_item(local)  # frozen queued title: "Issue 1"
 
-    backend._fetch_snapshot = MagicMock(
+    backend.fetch_snapshot = MagicMock(
         return_value=ProviderSnapshot(
             items=[
                 ProviderItem(

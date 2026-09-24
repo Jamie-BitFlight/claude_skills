@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 
+from backlog_core.backends.github_backend import GitHubBackend
 from backlog_core.backends.memory_backend import InMemoryBackend
+from backlog_core.file_cache import FileCache
 from backlog_core.gh_client import _fetch_issues_graphql
 from backlog_core.models import (
     BackendUnavailableError,
@@ -133,6 +136,27 @@ def test_explicit_cached_fallback_attempts_live_first_and_reads_cache_once() -> 
     assert output.warnings == ["Live provider read failed; using cached work items: offline"]
 
 
+def test_cached_fallback_withholds_rows_overlaid_by_the_pending_journal(tmp_path: Path, mocker: MockerFixture) -> None:
+    backend = GitHubBackend(cache=FileCache(tmp_path))
+    snapshot = ProviderSnapshot(
+        items=[provider_item("#7", "provider title")], sync_started_at="2026-09-24T00:00:00+00:00"
+    )
+    backend.reconcile(ReconcileRequest(scope=ReconcileScope.INITIAL, apply_local_patches=False), snapshot=snapshot)
+    backend.put_work_item(BacklogItem(title="queued title", description="queued edit", issue="#7"))
+    assert [item.title for item in backend.list_work_items()] == ["queued title"]
+    mocker.patch.object(backend, "fetch_snapshot", side_effect=BackendUnavailableError("offline"))
+    context = WorkItemDecisionContext(backend, allow_cached=True)
+
+    read = context.all()
+    target = context.select("#7", purpose="mutation")
+
+    assert read.provider_items == []
+    assert target.provider is None
+    assert target.pending is not None
+    assert target.pending.title == "queued title"
+    assert target.mutation_base == target.pending
+
+
 def test_select_memoizes_one_targeted_snapshot_for_equivalent_exact_references() -> None:
     backend = DecisionBackend(live_items=[provider_item("#7", "live title")])
     context = WorkItemDecisionContext(backend)
@@ -181,6 +205,23 @@ def test_journal_entries_remain_separate_from_live_reads_and_supply_mutation_con
     assert target.pending.description == "queued edit"
     assert target.mutation_base == target.pending
     assert all(item.issue != "#8" for item in read.provider_items)
+
+
+def test_title_selection_joins_pending_intent_by_selected_provider_reference() -> None:
+    selected_pending = BacklogItem(title="renamed queued title", description="selected edit", issue="#7")
+    wrong_pending = BacklogItem(title="live title duplicate", description="wrong edit", issue="#8")
+    backend = DecisionBackend(
+        live_items=[provider_item("#7", "live title")], pending_items=[selected_pending, wrong_pending]
+    )
+    context = WorkItemDecisionContext(backend)
+
+    target = context.select("live title", purpose="mutation")
+
+    assert target.provider is not None
+    assert target.provider.issue == "#7"
+    assert target.pending is not None
+    assert target.pending.issue == "#7"
+    assert target.mutation_base == selected_pending
 
 
 def test_live_read_failure_returns_no_partial_or_cached_result() -> None:
