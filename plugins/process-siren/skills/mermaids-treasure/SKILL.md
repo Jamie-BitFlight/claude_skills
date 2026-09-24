@@ -26,7 +26,7 @@ flowchart TD
     Q1 -->|timeline/journey| TL[Load timeline-journey.md]
     Q1 -->|pie/quadrant/XY/sankey| DC[Load data-charts.md]
     Q1 -->|block/C4/kanban/packet| ADV[Load advanced-diagrams.md]
-    Q1 -->|fix broken syntax| Debug[Load all references — check syntax rules]
+    Q1 -->|fix broken syntax| Debug["Identify diagram family and failing construct; load only references that govern it"]
     FC --> Construct[Construct diagram using syntax reference]
     SEQ --> Construct
     CLS --> Construct
