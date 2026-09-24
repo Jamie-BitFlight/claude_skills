@@ -29,7 +29,11 @@ Record the repository's actual Python floor. If the user explicitly supplies a t
 
 Run the applicable lanes in isolated agents. Give each the resolved scope and starting paths, not another lane's conclusions. Lanes report evidence and candidates; they do not edit.
 
-### 1. Smell and standards lane — StinkySnake intent
+### 1. Smell and standards lane — StinkySnake
+
+Dispatch an isolated agent and have it load `python-engineering:stinkysnake` against the resolved scope. Its returned findings are evidence for synthesis, not instructions to edit.
+
+The lane must cover:
 
 Find demonstrated deviation from the shared standards and Pythonic design:
 
@@ -42,7 +46,11 @@ Find demonstrated deviation from the shared standards and Pythonic design:
 
 A smell is a signal to trace to its cause. Do not recommend cosmetic churn when the underlying design is sound.
 
-### 2. Python modernization lane — SnakePolish intent
+### 2. Python modernization lane — SnakePolish
+
+Dispatch a separate isolated agent and have it load `python-engineering:snakepolish` against the same resolved scope and any explicitly proposed Python floor. Do not give it the StinkySnake findings; independence is intentional.
+
+The lane must cover:
 
 Ask how the same capability could be smaller, clearer, more Pythonic, and lower-maintenance at the authoritative/target Python floor:
 
