@@ -275,17 +275,23 @@ class GitHubBackend:
         """
         return self._work_items.fetch_snapshot(request)
 
-    def pending_work_items(self) -> list[BacklogItem]:
-        """Return copied queued work-item intent without cached provider rows."""
+    def pending_work_items(self, repo: str = "") -> list[BacklogItem]:
+        """Return configured-repository intent only when that repository is selected."""
+        if repo and repo != self._repo:
+            return []
         return self._reconciliation.pending_work_items()
 
-    def _apply_patches(self, patches: list[ProviderPatch]) -> list[PatchResult]:
+    def _apply_patches(self, patches: list[ProviderPatch], repo: str = "") -> list[PatchResult]:
         """Apply optimistic GitHub body patches and return one outcome per patch.
+
+        Args:
+            patches: Provider patches derived from the reconciliation snapshot.
+            repo: Repository slug used to fetch that snapshot.
 
         Returns:
             Patch results indexed by the stable provider reference.
         """
-        return self._work_items.apply_patches(patches)
+        return self._work_items.apply_patches(patches, repo)
 
     # ------------------------------------------------------------------
     # GraphQL utilities

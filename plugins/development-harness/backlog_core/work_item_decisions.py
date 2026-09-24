@@ -169,7 +169,12 @@ class WorkItemDecisionContext:
 
     def _pending(self) -> list[BacklogItem]:
         if self._pending_items is None:
-            self._pending_items = self._github.pending_work_items() if self._is_github else []
+            if not self._is_github:
+                self._pending_items = []
+            elif self.repo:
+                self._pending_items = self._github.pending_work_items(self.repo)
+            else:
+                self._pending_items = self._github.pending_work_items()
         return self._pending_items
 
     def _cached_items(self) -> CommandWorkItems:
