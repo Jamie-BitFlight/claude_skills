@@ -96,6 +96,9 @@ plan/
 # Hermes
 .hermes/plans/
 
+# Superpowers plans and specs are ephemeral work state
+/docs/superpowers/
+
 # Resumable collection-state files (transient; see scripts/discover_cross_harness_mcp_candidates.py --checkpoint)
 *.checkpoint.json
 
