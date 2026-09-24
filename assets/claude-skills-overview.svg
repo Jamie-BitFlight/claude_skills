@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" role="img" aria-labelledby="title desc">
+<title id="title">Claude Skills engineering workflow ecosystem</title>
+<desc id="desc">Engineering workflows feed a central Claude Skills hub which routes work to skills, specialist agents, hooks and MCP tools, producing verified software.</desc>
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0b1020"/><stop offset="1" stop-color="#15102a"/></linearGradient>
+  <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#60a5fa"/><stop offset=".5" stop-color="#a78bfa"/><stop offset="1" stop-color="#22d3ee"/></linearGradient>
+  <filter id="glow"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <style>
+    .t{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;fill:#e5e7eb}
+    .muted{fill:#94a3b8}.box{fill:#111827;stroke:#334155;stroke-width:1.5}.line{fill:none;stroke:#64748b;stroke-width:2}
+  </style>
+</defs>
+<rect width="1200" height="420" rx="22" fill="url(#bg)"/>
+<text x="600" y="55" text-anchor="middle" class="t" font-size="34" font-weight="700">Claude Skills</text>
+<text x="600" y="82" text-anchor="middle" class="t muted" font-size="15">Engineering workflows for coding agents</text>
+
+<g class="t" font-size="15">
+  <rect class="box" x="55" y="115" width="250" height="48" rx="10"/><text x="78" y="145">Python engineering</text>
+  <rect class="box" x="55" y="177" width="250" height="48" rx="10"/><text x="78" y="207">Development orchestration</text>
+  <rect class="box" x="55" y="239" width="250" height="48" rx="10"/><text x="78" y="269">Plugin &amp; skill creation</text>
+  <rect class="box" x="55" y="301" width="250" height="48" rx="10"/><text x="78" y="331">Process, verification &amp; quality</text>
+
+  <path class="line" d="M305 139 C390 139 390 190 465 190"/><path class="line" d="M305 201 C390 201 390 200 465 200"/>
+  <path class="line" d="M305 263 C390 263 390 210 465 210"/><path class="line" d="M305 325 C390 325 390 220 465 220"/>
+
+  <rect x="465" y="145" width="270" height="120" rx="18" fill="#101827" stroke="url(#accent)" stroke-width="3" filter="url(#glow)"/>
+  <text x="600" y="193" text-anchor="middle" font-size="24" font-weight="700">Claude Skills</text>
+  <text x="600" y="221" text-anchor="middle" class="muted" font-size="14">route • specialize • verify</text>
+
+  <path class="line" d="M735 185 C805 185 805 139 875 139"/><path class="line" d="M735 198 C805 198 805 201 875 201"/>
+  <path class="line" d="M735 212 C805 212 805 263 875 263"/><path class="line" d="M735 225 C805 225 805 325 875 325"/>
+
+  <rect class="box" x="875" y="115" width="270" height="48" rx="10"/><text x="900" y="145">Agent Skills &amp; policies</text>
+  <rect class="box" x="875" y="177" width="270" height="48" rx="10"/><text x="900" y="207">Specialist agents</text>
+  <rect class="box" x="875" y="239" width="270" height="48" rx="10"/><text x="900" y="269">Hooks &amp; enforcement</text>
+  <rect class="box" x="875" y="301" width="270" height="48" rx="10"/><text x="900" y="331">MCP tools &amp; integrations</text>
+</g>
+<rect x="430" y="374" width="340" height="2" fill="url(#accent)"/>
+<text x="600" y="399" text-anchor="middle" class="t muted" font-size="13">Repository-aware defaults • evidence before action • progressive disclosure</text>
+</svg>
