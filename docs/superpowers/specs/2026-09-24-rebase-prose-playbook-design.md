@@ -17,16 +17,26 @@ or replacement runtime.
 
 ## Invocation contract
 
-The rewritten model-invoked skill uses this exact frontmatter description:
+The rewritten model-invoked skill begins with this exact discovery metadata:
 
-```yaml
+```markdown
+---
+name: rebase
 description: >-
   Start a Git rebase when the user explicitly requests replay of a named source ref onto a named
   target, or continue or abort an active rebase. When a start or continue request explicitly grants
   force-push authority, also publish that same rebase lifecycle's rewritten result. Do not use for
   merge-based branch updates, forge merge-method settings, pull-request or merge-request merging,
   or standalone pushes after or outside an active rebase lifecycle.
+---
+
+**Keywords**: rebase, git rebase, history replay, rebase conflict, continue rebase, abort rebase, git worktree, rewritten history, authorized force-with-lease publication
 ```
+
+The required frontmatter and local keyword entry are discovery material outside the Mermaid process-line
+budget. `**Keywords**:` is a local Markdown grep/search convention, not Agent Skills metadata or a
+universal skill requirement; automatic activation still depends on `description`. The body contains
+the router immediately after the keyword entry and no other routine prose.
 
 Activation is validated in isolated harness runs. Every row requires a recorded `PASS`; an
 `UNRUN`, `FAIL`, or `INCONCLUSIVE` row blocks completion.
@@ -68,7 +78,6 @@ existing relative symlink at `.claude/skills/rebase`.
 .agents/skills/rebase/
 ├── SKILL.md
 └── references/
-    ├── step-by-step.md
     ├── named-stash.md
     ├── history-shape.md
     ├── conflict-and-ambiguity.md
@@ -78,58 +87,40 @@ existing relative symlink at `.claude/skills/rebase`.
 .claude/skills/rebase -> ../../.agents/skills/rebase
 ```
 
-`SKILL.md` is the sole home of routine rules. Every activation loads
-`references/step-by-step.md` before execution so the whole-process Mermaid router is visible. The
-router carries control flow and all conditional reference pointers; a node-specific reference loads
-only when that node is reached. `SKILL.md` does not provide direct conditional pointers as an
-alternative route.
+`SKILL.md` contains discovery metadata followed immediately by the authoritative whole-process
+Mermaid router. The router is therefore visible on every activation. Its nodes directly point to
+one-level-deep conditional references, and only the reference on the reached node loads. No second
+routine route or router file exists.
 
 No scripts, schemas, plans, receipts, generated evidence, runtime state names, or maintained eval
 artifacts belong in the package.
 
 ## Information hierarchy
 
-Classify content by meaning before applying a size threshold:
+Classify content by meaning before applying its hard budget:
 
-1. Necessary ordinary behavior becomes a single bullet with a hard maximum of 120 characters.
-2. An always-required fixed safety process has a hard inline maximum of 1,024 characters.
-3. Conditional node detail lives in that node's reference regardless of its length.
-4. `references/step-by-step.md` remains an always-loaded Mermaid router of at most 100 lines.
-5. Guidance whose value is uncertain is tested in isolation before it enters routine context.
+1. The Mermaid control plane contains every stage, guard, reference route, and terminal in at most
+   100 process lines. Discovery metadata is outside this budget.
+2. A necessary ordinary note in a conditional reference is one bullet of at most 120 characters.
+3. A fixed safety process in a conditional reference is at most 1,024 characters.
+4. Required signal that exceeds its budget is split into coherent node-owned sections; it is never
+   truncated or moved into always-loaded prose.
+5. Guidance whose value is uncertain is tested in isolation before entering a reference.
 
-The limits shape output after semantic classification; they are not optional review triggers.
-Required signal is never removed to fit. Content that exceeds its classified budget is split into
-semantic stages or routed through the corresponding router node.
-
-The routine bullets cover exact ref fidelity, front-loaded authority, source-location selection,
-active-rebase inspection, commit-first dirty-work handling, intent-preserving conflict resolution,
-selected validation, complete interaction reorientation, and worker handoff only when one exists.
-
-The short inline processes cover:
-
-- binding the exact source and target, completion and result destinations, publication decision,
-  authority when required, and observed object IDs before mutation;
-- reaching a safe worker checkpoint before mutating the branch;
-- preserving compatible intent without treating recency, style, `ours`, or `theirs` as authority;
-- reorienting interrupted work when the new base changes relevant inputs, outputs, or assumptions.
-
-Binding, source location, worker checkpointing, preparation, ref reobservation, reorientation,
-verification, and handoff remain solely in `SKILL.md`. Router nodes may name these stages and their
-observable result guards, but cannot restate how to perform them.
-
-The routed files contain only conditional node detail below. Their pointers occur only in the
-always-loaded router.
+The `SKILL.md` body has no routine prose outside the router. Routine stages and observable guards
+exist once in the Mermaid control plane. Detailed guidance exists only in the conditional reference
+selected by the reached node.
 
 | Reference | Load condition | Owned design concern |
 |---|---|---|
 | `named-stash.md` | Preparation requires a save or a lifecycle entry must be restored | Git-observable stash identity, exact-entry restoration/removal, and preservation through conflict recovery. |
 | `history-shape.md` | Replay includes merges, equivalent changes, or empty commits | Preserve-or-flatten intent, equivalence versus discard, and empty-commit intent. |
-| `conflict-and-ambiguity.md` | Replay, restoration, or remote integration conflicts | Combined-intent analysis, dependency recheck, and the genuine-ambiguity stop. |
+| `conflict-and-ambiguity.md` | Replay, restoration, or remote integration conflicts | Combined-intent analysis, dependency recheck, and missing/incompatible outcome reporting. |
 | `active-rebase-recovery.md` | Continue, abort, or any stage fails or becomes unobservable | Lifecycle rediscovery, recovery choice, stabilization, and reporting of confirmed facts and unknowns. |
 | `publication.md` | Destination, authority, and initial remote OID were bound on start/continue before the first dependent mutation | Comparison with the bound OID, final observation, changed-intent integration, exact lease, and rejection loop. |
 
-The router's routine stage labels are control-flow addresses into `SKILL.md`, not a second copy of
-the rules. Reference labels appear only on the conditional edges that load them.
+Router labels are the single source of process order. Reference labels appear only on conditional
+nodes and load only the named file when reached.
 
 ## Process model
 
@@ -255,15 +246,15 @@ than replay or `No change`.
 
 ## Decision router
 
-`references/step-by-step.md` contains this router and one sentence defining its labels. `SKILL.md`
-labels route to that file's named routine stage; reference labels load only the named conditional
-procedure. The router carries stage names, observable guards, references, and terminals, never the
-routine rules or ordinary Git syntax.
+`SKILL.md` contains this router immediately after its discovery metadata. Stage nodes execute the
+named routine stage; reference nodes load only the named conditional procedure when reached. The
+router carries stage names, observable guards, direct reference paths, and terminals without
+ordinary Git syntax.
 
 ```mermaid
 flowchart TD
     Start([Explicit start, continue, or abort request]) --> Kind{Request?}
-    Kind -->|Start| Bind["Binding stage<br/>SKILL.md"]; Kind -->|Continue or abort| Active["Inspect lifecycle<br/>active-rebase-recovery.md"]
+    Kind -->|Start| Bind[Binding stage]; Kind -->|Continue or abort| Active["Inspect lifecycle<br/>active-rebase-recovery.md"]
     Bind --> BindResult{Binding result?}
     BindResult -->|Dependent facts and completion predicate bound| Satisfied{Ordinary local relation observation?}; BindResult -->|Missing or ambiguous| Decision([Paused for decision]); BindResult -->|Failure or unobservable| Recover
     Satisfied -->|True; all result and publication destinations match| NoChange([No change]); Satisfied -->|False, transformation goal, or local result differs| Locate
@@ -271,15 +262,15 @@ flowchart TD
     Active --> ActiveResult{Inspection result?}
     ActiveResult -->|No active metadata in worktree and Git dir| NoActive([No active rebase]); ActiveResult -->|Git state proven; dependent contract and predicate rebound| Locate
     ActiveResult -->|Required contract fact missing or inconsistent| Decision; ActiveResult -->|Failure or unobservable| Recover
-    Locate["Source-location stage<br/>SKILL.md"] --> Location{Exact source location?}
+    Locate[Source-location stage] --> Location{Exact source location?}
     Location -->|Owned local branch| Safe; Location -->|Unowned local branch| BranchWT[Create dedicated branch worktree]
     Location -->|Non-branch ref; result bound| DetachedWT[Create detached worktree at bound OID]; Location -->|Failure or unobservable| Recover
     BranchWT --> WTResult{Creation result?}; DetachedWT --> WTResult
     WTResult -->|HEAD OID equals source; branch attachment also matches when required| Safe; WTResult -->|Failure or unobservable| Recover
-    Safe["Worker-safety stage<br/>SKILL.md"] --> Owner{Worktree-writing command state?}
+    Safe[Worker-safety stage] --> Owner{Worktree-writing command state?}
     Owner -->|None, or pause/end observed| Operation{Operation?}; Owner -->|Observed active| Wait[Wait for checkpoint predicate]; Wait --> Owner
     Owner -->|Unknown or unreachable| Decision
-    Operation -->|Start| Prepare["Preparation stage<br/>SKILL.md"]; Operation -->|Continue| Stop{Current rebase state?}
+    Operation -->|Start| Prepare[Preparation stage]; Operation -->|Continue| Stop{Current rebase state?}
     Operation -->|Abort| Abort["Abort and restore pre-state<br/>active-rebase-recovery.md"]
     Prepare --> PrepResult{Preparation result?}
     PrepResult -->|Status empty, or checkpoint contains all changes and status is empty| Refs; PrepResult -->|Dirty and checkpoint commit blocked| Save["Save and bind exact entry<br/>named-stash.md"]
@@ -287,13 +278,13 @@ flowchart TD
     Save --> SaveResult{Exact entry verified?}
     SaveResult -->|Yes| Refs
     SaveResult -->|No or unobservable| Recover
-    Refs["Reobserve exact source and target<br/>SKILL.md"] --> RefResult{Ref result?}
-    RefResult -->|Bound OIDs unchanged| Next; RefResult -->|Same named refs moved| Account["Account for movement<br/>SKILL.md"]
+    Refs[Reobserve exact source and target] --> RefResult{Ref result?}
+    RefResult -->|Bound OIDs unchanged| Next; RefResult -->|Same named refs moved| Account[Account for movement]
     RefResult -->|Failure or unobservable| Recover
     Account --> AccountResult{Moved-commit dispositions complete?}
     AccountResult -->|All classified; no supported conflict| Next; AccountResult -->|Unclassified or conflicting| Decision
     AccountResult -->|Failure or unobservable| Recover
-    Next{Reobserved local path?} -->|Replay required| Shape; Next -->|No-replay publication; predicate true| Current["Bind proven current result OID R<br/>SKILL.md"]
+    Next{Reobserved local path?} -->|Replay required| Shape; Next -->|No-replay publication; predicate true| Current[Bind proven current result OID R]
     Next -->|Failure or unobservable| Recover
     Current --> CurrentResult{Named result ref resolves to R?}
     CurrentResult -->|Yes| Saved; CurrentResult -->|No or unobservable| Recover
@@ -326,7 +317,7 @@ flowchart TD
     RestoreConflict --> RestoreIntent{One semantic outcome class preserves compatible intent and checks?}
     RestoreIntent -->|Exactly one| Restore; RestoreIntent -->|None or incompatible alternatives| Decision
     RestoreIntent -->|Failure or unobservable| Recover
-    FinishMode -->|Explicit abort request| OrientAbort["Abort reorientation<br/>SKILL.md"]; FinishMode -->|Completed start or continue| Orient["Reorientation and verification<br/>SKILL.md"]
+    FinishMode -->|Explicit abort request| OrientAbort[Abort reorientation]; FinishMode -->|Completed start or continue| Orient[Reorientation and verification]
     Orient --> VerifyResult{Selected validation set result?}
     VerifyResult -->|All checks zero; no unmerged entries; intersections accounted| Publish{Publication bound and authorized?}
     VerifyResult -->|Failing check identifies one goal-consistent correction| Correct[Correct changed interaction]
@@ -347,7 +338,7 @@ flowchart TD
     Push --> PushResult{Push result?}
     PushResult -->|Exit zero and post-fetch destination equals result| Handoff; PushResult -->|Lease rejected or destination mismatch| Remote
     PushResult -->|Other failure or unobservable| Recover
-    OrientAbort --> Handoff["Worker-handoff stage<br/>SKILL.md"]
+    OrientAbort --> Handoff[Worker-handoff stage]
     Handoff --> Worker{Worker exists?}
     Worker -->|Yes| Deliver[Deliver summary and resume]; Worker -->|No| Terminal{Bound path predicate?}
     Worker -->|Unknown or unobservable| Recover
@@ -388,6 +379,7 @@ The prose playbook replaces rather than wraps the existing runtime. The followin
   machinery, and runtime-coupled tests;
 - `.agents/skills/rebase/evals/evals.json` and
   `.agents/skills/rebase/evals/activation-results.json`;
+- `references/step-by-step.md`, because its router moves directly into `SKILL.md`;
 - `references/start-rebase.md`, `references/active-rebase.md`,
   `references/active-rebase-operation.md`, and `references/rebase-edge-cases.md` after their valid
   safety content is represented by the new hierarchy;
@@ -395,8 +387,8 @@ The prose playbook replaces rather than wraps the existing runtime. The followin
 - every instruction that requires capture/finalize/execute calls, JSON plans, receipts, hashes,
   custom terminal codes, recovery branches created by default, or Python-owned replay arguments.
 
-`SKILL.md` and `references/step-by-step.md` are rewritten. The existing `.claude/skills/rebase`
-symlink remains unchanged.
+`SKILL.md` is rewritten and the existing `references/step-by-step.md` is deleted. The existing
+`.claude/skills/rebase` symlink remains unchanged.
 
 The runtime-coupled eval definitions and historical activation results are removed rather than
 translated. Repository evidence found no consumer outside the deleted runtime tests. The rewritten
@@ -410,6 +402,7 @@ that row has a recorded `PASS`; `UNRUN`, `FAIL`, or `INCONCLUSIVE` blocks comple
 
 | Validation row | Cases and `PASS` predicate | Required record |
 |---|---|---|
+| Skill discovery and package shape | `skilllint` accepts required `name`/`description`; the exact local keyword entry precedes the router; `step-by-step.md` is absent; every router reference is direct, one level deep, and loads only on its node. | `PASS` |
 | Named refs are not silently substituted | Start, continue, replay, correction, and no-replay publication cases use literal named refs while tempting related refs remain unselected; each correction/publication case reobserves exact source/target before mutation. | `PASS` |
 | Publication requires separate authority and active lifecycle | Start/continue treatment does not push without authority; with authority and destination bound, it enters remote reconciliation. Post-completion publication does not activate. | `PASS` |
 | Final comparison and exact lease preserve new work | Remote advances after initial observation; stale lease cannot overwrite it; integration/revalidation preserves compatible remote intent; final remote equals local result. | `PASS` |
@@ -442,11 +435,12 @@ a no-op.
 The design is implemented when:
 
 - the package matches the stated boundary and contains no Python or runtime artifacts;
-- `SKILL.md` uses the exact invocation description and is the sole home of routine rules;
-- every activation loads `step-by-step.md` before execution, its whole router stays at most 100
-  lines, and node references load only when reached;
-- ordinary bullets and inline fixed processes respect the hard 120/1,024-character budgets without
-  losing required signal;
+- `SKILL.md` contains only required `name`/`description` frontmatter, the exact local keyword entry,
+  and the authoritative Mermaid router;
+- the Mermaid process body stays at most 100 lines, with discovery metadata outside that budget;
+- `references/step-by-step.md` is absent and direct one-level node references load only when reached;
+- reference notes and fixed processes respect the hard 120/1,024-character budgets without losing
+  required signal;
 - each rule has one authoritative home and each reference loads only under its stated condition;
 - every fact required by a mutation is proven from Git or explicitly rebound; missing or
   inconsistent facts pause before that mutation;
