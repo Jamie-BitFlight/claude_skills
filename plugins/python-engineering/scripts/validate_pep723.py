@@ -713,65 +713,41 @@ def format_validation_output(result: ValidationResult) -> str:
 
 
 def auto_fix_file(file_path: Path, result: ValidationResult) -> bool:
-    """Auto-fix a file's shebang and PEP 723 metadata.
+    """Repair only shebang and execute-bit state without rewriting PEP 723 metadata.
+
+    Existing inline metadata is runtime configuration owned by the script. A
+    shebang repair must preserve its Python requirement, dependency constraints,
+    markers, extras, and tool tables verbatim.
 
     Args:
-        file_path: Path to file to fix
-        result: Validation result indicating what needs fixing
+        file_path: Path to file to fix.
+        result: Validation result indicating the expected shebang and mode.
 
     Returns:
-        True if fix was successful, False otherwise
+        True if the repair was successful, False otherwise.
     """
     try:
         content = file_path.read_text(encoding="utf-8")
         lines = content.split("\n")
-
         needs_shebang = result.applicable_rule in EXECUTABLE_RULES
-        needs_pep723 = result.applicable_rule == RULE_UV_SCRIPT
         needs_execute_bit = result.applicable_rule in EXECUTABLE_RULES
 
-        # Remove existing shebang (if present)
         if lines and lines[0].startswith("#!"):
             lines = lines[1:]
 
-        content_no_shebang = "\n".join(lines)
-
-        # Remove existing PEP 723 block (if present)
-        content_no_pep723 = re.sub(r"# /// script\n.*?\n# ///\n?", "", content_no_shebang, flags=re.DOTALL)
-        content_no_pep723 = re.sub(r"\n{3,}", "\n\n", content_no_pep723)
-        remaining_lines = content_no_pep723.split("\n")
-
-        new_lines: list[str] = []
         if needs_shebang:
-            new_lines.append(result.expected_shebang)
+            lines.insert(0, result.expected_shebang)
 
-        if needs_pep723:
-            new_lines.extend(("# /// script", '# requires-python = ">=3.11"'))
-            if result.external_imports:
-                new_lines.append("# dependencies = [")
-                for imp in sorted(result.external_imports):
-                    pkg_name = normalize_import_to_package(imp)
-                    new_lines.append(f'#     "{pkg_name}>=0.1.0",')
-                new_lines.append("# ]")
-            else:
-                new_lines.append("# dependencies = []")
-            new_lines.append("# ///")
-
-        new_lines.extend(remaining_lines)
-        file_path.write_text("\n".join(new_lines), encoding="utf-8")
+        file_path.write_text("\n".join(lines), encoding="utf-8")
 
         if needs_execute_bit and not result.is_executable:
             file_path.chmod(file_path.stat().st_mode | 0o111)
-
-        if result.applicable_rule == RULE_NO_SHEBANG and result.is_executable:
+        elif result.applicable_rule == RULE_NO_SHEBANG and result.is_executable:
             file_path.chmod(file_path.stat().st_mode & ~0o111)
-
     except OSError as e:
         console.print(f"[red]ERROR: Failed to fix file: {e}[/red]")
         return False
-    else:
-        return True
-
+    return True
 
 def _get_table_width(table: Table) -> int:
     """Get the natural width of a table using a temporary wide console.
