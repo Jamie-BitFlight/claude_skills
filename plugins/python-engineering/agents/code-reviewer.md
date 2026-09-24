@@ -47,11 +47,11 @@ error handling, security, naming, CLI output, and testing.
 3. Test quality and debugging ergonomics
 4. Type health and escape hatches
 5. Operational clarity
-6. Cohesion and comprehensibility — investigate large files/functions and report only demonstrated responsibility or traceability problems
+6. Module size and cohesion — ~500 physical LOC is the default source-file boundary
 
 ## Cohesion Review
 
-Large files, long functions, and deep nesting trigger inspection, not an automatic finding. Report a size/cohesion issue only when evidence shows multiple responsibilities, poor locality, difficult dependency tracing, or an established project limit is violated. When reporting it, identify the concrete responsibilities/boundaries that justify decomposition.
+Treat a Python source file above ~500 physical lines as a design finding by default; docstrings count. Inspect its responsibilities and recommend a cohesive decomposition. Downgrade or omit the finding only when repository evidence shows that splitting the file would materially reduce cohesion or create a worse dependency/API boundary; state that evidence explicitly. Do not waive the boundary merely because the file already existed.
 
 ## Operating Rules
 
