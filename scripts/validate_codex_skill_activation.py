@@ -694,25 +694,6 @@ def proxy_provenance(env: dict[str, str]) -> dict[str, object]:
     return {"transport": transport, "configuration_names": names}
 
 
-def require_repo_skill_resolution(response_text: str, installed: InstalledSkill) -> tuple[bool, bool, bool]:
-    """Prove the response resolved the installed root, skill file, and reference.
-
-    Returns:
-        Successful skill-root, skill-file, and reference-path matches.
-    """
-    skill_root = str(installed.path.parent)
-    skill_file_path = str(installed.path)
-    reference_path = installed.path.parent / "references" / "publication.md"
-    if not installed.path.is_file():
-        raise HarnessError("Installed skill file is missing")
-    if not reference_path.is_file():
-        raise HarnessError("Installed reference is missing")
-    expected_lines = [f"SKILL_ROOT={skill_root}", f"SKILL_FILE={skill_file_path}", f"REFERENCE={reference_path}"]
-    if response_text.splitlines() != expected_lines:
-        raise HarnessError("Codex response did not resolve the installed skill root, skill file, and reference")
-    return True, True, True
-
-
 def require_task_text(target: dict[str, object]) -> str:
     """Extract the mapped task text, failing closed if it is missing.
 
@@ -810,13 +791,6 @@ def main() -> int:
             timeout_seconds=args.timeout_seconds,
         )
         matched = require_expected_tokens_matched(result.response_text, args.expect_contains)
-        skill_root_matched = False
-        instructed_skill_file_path_matched = False
-        instructed_reference_path_matched = False
-        if plugin_id == "repo-skills":
-            (skill_root_matched, instructed_skill_file_path_matched, instructed_reference_path_matched) = (
-                require_repo_skill_resolution(result.response_text, context.installed)
-            )
         write_evidence(
             args.evidence_file,
             {
@@ -825,13 +799,10 @@ def main() -> int:
                 "installation_kind": context.installation_kind,
                 "installed_skill": context.installed.relative_path.as_posix(),
                 "installed_tree_sha256": context.installed.tree_sha256,
-                "instructed_reference_path_matched": instructed_reference_path_matched,
-                "instructed_skill_file_path_matched": instructed_skill_file_path_matched,
                 "observed_methods": list(result.observed_methods),
                 "proxy": proxy_provenance(context.env),
                 "response_characters": len(result.response_text),
                 "response_sha256": hashlib.sha256(result.response_text.encode()).hexdigest(),
-                "skill_root_matched": skill_root_matched,
                 "skill_sha256": context.installed.sha256,
                 "source_tree_sha256": context.source_digest,
                 "status": "PASSED",

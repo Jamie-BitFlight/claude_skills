@@ -1,0 +1,168 @@
+{
+  "skill_name": "rebase",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Read-only decision trace. Do not execute shell commands, tools, Git, or network calls; do not mutate anything. Treat these as complete immutable observations: request=start; source=refs/heads/feature/payments@S1; target=refs/remotes/origin/main@T1; required result relation=T1 is an ancestor of refs/heads/feature/payments; publication authority=none; active rebase metadata=absent; source is attached at /repo-feature with Git dir=/git/worktrees/feature and HEAD=S1; status=clean; saved entry=none; fresh replay set has no merge; T1 is not an ancestor of S1; worker/writer=none; source and target reobservations remain S1 and T1. Return only the route, required reference(s), permitted next action, forbidden actions, still-required observations or authority, and terminal or pause state.",
+      "expected_output": "The trace reaches the fresh local replay gate with all start prerequisites bound, performs nothing, and withholds publication.",
+      "assertions": [
+        "Selects the explicit start path for the supplied source, target, result relation, and attached owner.",
+        "Concludes that a fresh local replay would be the next permitted lifecycle action because refs are stable, state is clean, and no worker or special history blocks it.",
+        "Performs no command or mutation and does not claim that replay completed.",
+        "Forbids publication because no publication authority was supplied.",
+        "Leaves the lifecycle nonterminal at the ready-to-start boundary."
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Read-only decision trace. Do not execute shell commands, tools, Git, or network calls; do not mutate anything. Treat these as complete immutable observations: request=continue; active metadata owner=/repo-feature with Git dir=/git/worktrees/feature; HEAD=C7; source=refs/heads/feature/payments@C7; target=refs/remotes/origin/main@T1; required result relation=T1 is an ancestor of refs/heads/feature/payments; result destination=refs/heads/feature/payments; publication authority=none; progress=3/5; unmerged entries=none; conflict resolution is staged; saved entry=verified none; status contains only the staged resolution; worker/writer=none; immediate reobservation shows the same owner, metadata, and saved-entry state. Return only the route, required reference(s), permitted next action, forbidden actions, still-required observations or authority, and terminal or pause state.",
+      "expected_output": "The trace recovers the bound active lifecycle and reaches the continue gate without starting a new replay or publishing.",
+      "assertions": [
+        "Requires active-rebase-recovery.md and keeps the route in the supplied metadata-owning worktree and Git dir.",
+        "Treats continuation of the existing replay as the next permitted lifecycle action because the resolution is staged and the active guard is unchanged.",
+        "Forbids a fresh replay start and any publication.",
+        "Performs no command or mutation and does not claim that continuation completed.",
+        "Leaves the lifecycle nonterminal at the ready-to-continue boundary."
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Read-only decision trace. Do not execute shell commands, tools, Git, or network calls; do not mutate anything. Treat these as complete immutable observations: request=abort; active metadata owner=/repo-feature with Git dir=/git/worktrees/feature; pre-replay source OID=P0; current HEAD=C4; source=refs/heads/feature/payments@C4; progress=2/5; unmerged entries=none; saved entry has unique OID=ST1, selector=stash@{2}, and subject ending rebase:refs/heads/feature/payments:P0; status contains only replay state; worker/writer=none; immediate reobservation shows the same metadata and saved entry; publication authority=none. Return only the route, required reference(s), permitted next action, forbidden actions, still-required observations or authority, and terminal or pause state.",
+      "expected_output": "The trace reaches the abort gate in the exact owner, then identifies the restoration evidence still required before an aborted-and-restored terminal can be claimed.",
+      "assertions": [
+        "Requires active-rebase-recovery.md and named-stash.md for the supplied active lifecycle and bound saved entry.",
+        "Treats abort in the metadata-owning worktree as the next permitted lifecycle action.",
+        "Requires later observation of metadata removal, restoration to P0, exact-entry application, checks, and unique-entry drop before terminal completion.",
+        "Performs no command or mutation and does not claim the repository is already restored.",
+        "Forbids publication."
+      ],
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Read-only decision trace. Do not execute shell commands, tools, Git, or network calls; do not mutate anything. Treat these as complete immutable observations from one start lifecycle: request=trace whether the recorded publication attempt is permitted; source and result ref=refs/heads/feature/payments@R1; target=refs/remotes/origin/main@T1; replay metadata and unmerged entries are absent; T1 is an ancestor of R1; saved entry=verified none; repository and affected-interaction checks exited zero; worker obligation=none; recorded publication authority covers one attempt to remote=origin and destination=refs/heads/feature/payments; initial destination OID=D0; reconciliation found no new commits; final fetch still observes D0; exact lease OID=D0; this evaluation itself grants no execution authority. Return only the route, required reference(s), permitted next action, forbidden actions, still-required observations or authority, and terminal or pause state.",
+      "expected_output": "The trace identifies the exact-lease publication attempt that the recorded lifecycle authority would permit, while making no call and claiming no publication.",
+      "assertions": [
+        "Requires publication.md and keeps publication bound to the same completed replay lifecycle.",
+        "Concludes that only one push with an exact lease tied to D0 would be permitted by the supplied lifecycle facts.",
+        "Performs no Git or network action and does not claim that the destination changed to R1.",
+        "Forbids an unqualified force push, a different destination, and any retry without renewed explicit authority.",
+        "Leaves the lifecycle at a pre-publication boundary rather than a Published terminal."
+      ],
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Read-only decision trace. Do not execute shell commands, tools, Git, or network calls; do not mutate anything. Treat these as complete immutable observations: request=merge refs/remotes/origin/main@T1 into refs/heads/feature/payments@S1; desired operation is a merge commit rather than history replay; active rebase metadata=absent; publication request=none. Return only the route, required reference(s), permitted next action, forbidden actions, still-required observations or authority, and terminal or pause state.",
+      "expected_output": "The trace routes the merge-based update outside the rebase skill without touching repository state.",
+      "assertions": [
+        "Rejects the rebase route because the requested operation is merge-based.",
+        "Identifies merge handling as the appropriate external route without inventing replay authority.",
+        "Requires no rebase reference for this request.",
+        "Performs no command, history rewrite, or publication."
+      ],
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "Read-only decision trace. Do not execute shell commands, tools, Git, or network calls; do not mutate anything. Treat these as complete immutable observations: request=change a forge repository setting so pull requests allow rebase merging and disallow merge commits; no local source or target ref was named; active rebase metadata=absent; no local history operation was requested. Return only the route, required reference(s), permitted next action, forbidden actions, still-required observations or authority, and terminal or pause state.",
+      "expected_output": "The trace routes repository merge-method administration to forge settings rather than local replay.",
+      "assertions": [
+        "Rejects the local rebase route because the request concerns forge configuration.",
+        "Identifies forge administration as the appropriate external route.",
+        "Requires no rebase reference or local-ref observations.",
+        "Performs no tool, network, or local Git action."
+      ],
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "Read-only decision trace. Do not execute shell commands, tools, Git, or network calls; do not mutate anything. Treat these as complete immutable observations: request=use a forge's rebase-and-merge action for pull request 42; pull request identity=42; no local source or target ref was named; active rebase metadata=absent; no local replay was requested. Return only the route, required reference(s), permitted next action, forbidden actions, still-required observations or authority, and terminal or pause state.",
+      "expected_output": "The trace routes the pull-request merge action to the forge workflow rather than local history replay.",
+      "assertions": [
+        "Rejects the local rebase route because the requested action merges a pull request at the forge.",
+        "Identifies the forge pull-request workflow as the appropriate external route.",
+        "Requires no rebase reference or local replay observations.",
+        "Performs no tool, network, rebase, or push action."
+      ],
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "Read-only decision trace. Do not execute shell commands, tools, Git, or network calls; do not mutate anything. Treat these as complete immutable observations: request=push the already-rewritten refs/heads/feature/payments tip R1 to origin; active rebase metadata=absent; no start, continue, or abort operation was requested; no current replay lifecycle or lifecycle-bound publication authority exists. Return only the route, required reference(s), permitted next action, forbidden actions, still-required observations or authority, and terminal or pause state.",
+      "expected_output": "The trace routes the standalone push request outside the rebase skill and does not infer authority from an earlier rewrite.",
+      "assertions": [
+        "Rejects the rebase route because the request is push-only and no replay lifecycle is active or requested.",
+        "Identifies a separate publication workflow as the appropriate external route.",
+        "Does not treat the rewritten tip as lifecycle-bound push authority.",
+        "Performs no Git or network action."
+      ],
+      "files": []
+    },
+    {
+      "id": 9,
+      "prompt": "Read-only decision trace. Do not execute shell commands, tools, Git, or network calls; do not mutate anything. Treat these as complete immutable observations: request=continue; current worktree has no metadata; exact active metadata owner=/repo-linked with Git dir=/git/worktrees/linked; HEAD=C8; source=refs/heads/feature/payments@C8; progress=4/6; unmerged entries=src/payments.py; status shows that unmerged path; stopped commit=C8; saved entry=verified none; worker/writer=none; target name, target OID, required result relation, and result destination are absent from both current request/task context and observable metadata; all listed inspections succeeded. Return only the route, required reference(s), permitted next action, forbidden actions, still-required observations or authority, and terminal or pause state.",
+      "expected_output": "The trace recovers and reports the exact active owner but pauses because the remaining replay contract cannot be rebound.",
+      "assertions": [
+        "Requires active-rebase-recovery.md and binds the supplied linked worktree and Git dir as the lifecycle owner.",
+        "Reports the supplied active state rather than searching or inventing additional state.",
+        "Treats the missing target, result relation, and destination as blocking facts for continuation.",
+        "Forbids continue, abort, fresh replay, conflict resolution, and publication while the contract is incomplete.",
+        "Returns a paused-for-decision state and performs no command or mutation."
+      ],
+      "files": []
+    },
+    {
+      "id": 10,
+      "prompt": "Read-only decision trace. Do not execute shell commands, tools, Git, or network calls; do not mutate anything. Treat these as complete immutable observations: request='rebase my branch onto the latest branch and make the history look right'; source ref and OID=absent; target ref and OID=absent; required observable result relation=absent; result destination=absent; publication authority=none; active rebase metadata=absent; worker facts=none. Return only the route, required reference(s), permitted next action, forbidden actions, still-required observations or authority, and terminal or pause state.",
+      "expected_output": "The trace stops at binding because the source, target, and result contract are ambiguous.",
+      "assertions": [
+        "Stops the start route before repository ownership or mutation because required source, target, and result facts are absent.",
+        "Identifies the missing facts without assigning meanings to the ambiguous phrases.",
+        "Permits only a decision request for the missing facts and forbids all Git and publication actions.",
+        "Returns a paused-for-decision state and performs no command or mutation."
+      ],
+      "files": []
+    },
+    {
+      "id": 11,
+      "prompt": "Read-only decision trace. Do not execute shell commands, tools, Git, or network calls; do not mutate anything. Treat these as complete immutable observations: request=continue; active metadata owner=/repo-feature with Git dir=/git/worktrees/feature; source=refs/heads/feature/payments@C7; target=refs/remotes/origin/main@T1; required result relation=T1 is an ancestor of the result source ref; publication authority=none; stopped commit=C7; progress=3/5; unmerged entry=rules/validation.md; saved entry=verified none; worker/writer=none; immediate metadata reobservation=unchanged; intent I1 requires rejecting empty values; intent I2 requires whitespace normalization; outcome A preserves I1 and I2, is staged, and all relevant checks exited zero; outcome B drops I1 and its validation check failed; no other supported outcome exists. Return only the route, required reference(s), permitted next action, forbidden actions, still-required observations or authority, and terminal or pause state.",
+      "expected_output": "The trace selects the single tested compatible-intent resolution and reaches the active continue gate without executing it.",
+      "assertions": [
+        "Requires active-rebase-recovery.md and conflict-and-ambiguity.md for the supplied active conflict.",
+        "Selects outcome A because it is the only staged, checked outcome that preserves both compatible intents.",
+        "Treats continuation of the unchanged active replay as the next permitted lifecycle action.",
+        "Rejects outcome B and does not select by side label or recency.",
+        "Performs no command or mutation and leaves the lifecycle nonterminal."
+      ],
+      "files": []
+    },
+    {
+      "id": 12,
+      "prompt": "Read-only decision trace. Do not execute shell commands, tools, Git, or network calls; do not mutate anything. Treat these as complete immutable observations: request=start; source=refs/heads/feature/payments@S1; target=refs/remotes/origin/main@T1; required result relation=T1 is an ancestor of the result source ref; publication authority=none; active rebase metadata=absent; source is attached at /repo-worker with Git dir=/git/worktrees/worker and HEAD=S1; source and target remain S1 and T1; status=clean; saved entry=none; worker W is actively writing in /repo-worker; pause is unsupported; one bounded wait completed and W is still writing and cannot pause or end; worker handoff acknowledgement=unobservable. Return only the route, required reference(s), permitted next action, forbidden actions, still-required observations or authority, and terminal or pause state.",
+      "expected_output": "The trace binds the existing attached owner and pauses after the single wait because its writer remains active.",
+      "assertions": [
+        "Keeps ownership at the supplied attached worktree rather than proposing a competing worktree.",
+        "Recognizes that the one allowed wait has completed without a safe worker checkpoint.",
+        "Permits only a later decision or worker-state update and forbids checkpoint, stash, replay, ref, and publication mutations.",
+        "Reports the unobservable handoff acknowledgement as unresolved.",
+        "Returns a paused or pending state and performs no command or mutation."
+      ],
+      "files": []
+    },
+    {
+      "id": 13,
+      "prompt": "Read-only decision trace. Do not execute shell commands, tools, Git, or network calls; do not mutate anything. Treat these as complete immutable observations: request=continue; bound worktree=/repo-feature with Git dir=/git/worktrees/feature; active rebase metadata is absent in both locations; HEAD=S1; source=refs/heads/feature/payments@S1; target=refs/remotes/origin/main@T1; unmerged entries=none; status=clean; saved entry=verified none; worker/writer=none; every listed inspection succeeded. Return only the route, required reference(s), permitted next action, forbidden actions, still-required observations or authority, and terminal or pause state.",
+      "expected_output": "The trace returns the no-active-rebase terminal with no mutation and no fresh replay.",
+      "assertions": [
+        "Requires active-rebase-recovery.md and uses the supplied bound worktree and Git dir observations.",
+        "Concludes that no active rebase exists because metadata is absent in both bound locations.",
+        "Permits no Git lifecycle action and forbids starting a fresh replay for a continue request.",
+        "Returns the no-active-rebase terminal and performs no command, tool, or network action."
+      ],
+      "files": []
+    }
+  ]
+}

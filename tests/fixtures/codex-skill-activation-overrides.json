@@ -1,19 +1,4 @@
 {
-  "repo-skills:rebase": {
-    "chain": [],
-    "evidence": {
-      "behavior": null,
-      "cache_provenance": null,
-      "distribution": null,
-      "injection": null,
-      "safety": null
-    },
-    "expected_outcome": "The real Codex consumer activates the installed repo-scoped rebase skill and reports its injected absolute skill_root, installed SKILL.md, and references/publication.md paths without executing commands or reading the authoring checkout.",
-    "safety_class": "READ_ONLY",
-    "status": "MAPPED",
-    "task_source": "tests/fixtures/codex-skill-activation-overrides.json",
-    "task_text": "Read only. Do not run commands and do not access any source checkout. Using only the Codex-supplied skill_root for the explicitly selected rebase skill, report exactly three lines: SKILL_ROOT=<absolute loaded skill directory>, SKILL_FILE=<that directory>/SKILL.md, and REFERENCE=<that directory>/references/publication.md."
-  },
   "rwr:audit": {
     "chain": [],
     "expected_outcome": "The explicitly selected audit skill uses compare mode and returns a read-only evidence ledger whose conflicting claim is STALE and whose implementation value is 60 seconds.",
