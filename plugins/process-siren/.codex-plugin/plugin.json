@@ -1,7 +1,7 @@
 {
   "name": "process-siren",
-  "version": "3.1.4",
-  "description": "Converts bullet steps, ASCII art, markdown tables, and prose workflows into Mermaid diagrams for AI-facing documents. Includes process quality methodology for improving ambiguous or incomplete processes before conversion.",
+  "version": "3.2.0",
+  "description": "Analyzes, improves, validates, and concisely represents processes and systems using a canonical semantic model and claim-level validation.",
   "author": {
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
@@ -16,8 +16,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Process Siren",
-    "shortDescription": "Converts bullet steps, ASCII art, markdown tables, and prose workflows into Mermaid diagrams for AI-facing documents. Includes process quality methodology for improving ambiguous or incomplete processes before conversion.",
-    "longDescription": "Converts bullet steps, ASCII art, markdown tables, and prose workflows into Mermaid diagrams for AI-facing documents. Includes process quality methodology for improving ambiguous or incomplete processes before conversion.",
+    "shortDescription": "Analyze, improve, validate, and represent processes and systems",
+    "longDescription": "Analyzes, improves, validates, and concisely represents processes and systems using a canonical semantic model and claim-level validation.",
     "developerName": "Jamie Nelson",
     "category": "Developer Tools",
     "capabilities": [
@@ -26,7 +26,7 @@
       "Write"
     ],
     "defaultPrompt": [
-      "Converts bullet steps, ASCII art, markdown tables, and prose workflows into Mermaid diagrams for AI-facing documents. Includes"
+      "Analyze or improve the supplied process/system using the canonical semantic model and validation loop."
     ]
   },
   "mcpServers": "./.mcp.json"

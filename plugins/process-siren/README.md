@@ -4,10 +4,7 @@
 
 # process-siren
 
-Prose workflows mislead AI agents. "Handle the usual cases" is not a condition an agent can
-evaluate. This plugin converts bullet steps, ASCII art, markdown tables, and prose workflows
-into precise Mermaid diagrams — structural process definitions that AI agents can follow
-without interpretation.
+Process Siren helps agents understand, improve, validate, and concisely describe processes and systems. It builds an explicit semantic model, identifies ambiguity and correctness gaps, improves behavior where established intent permits, and selects validation proportionate to each claim. Mermaid is used when a diagram is the clearest concise technical description of the process — not as a substitute for the underlying model or evidence.
 
 ## The Problem
 
@@ -18,9 +15,7 @@ AI agents reading prose instructions in SKILL.md, CLAUDE.md, and agent files mus
 - "Handle the usual cases" — which cases? what is usual?
 - "When done..." — done by what signal?
 
-Mermaid flowcharts eliminate these ambiguities. Every branch is an explicit labeled edge. Every
-decision is a diamond node with an observable condition. Every path ends at a named terminal
-state. An agent following a Mermaid diagram traces exactly one path without inferring anything.
+Mermaid can make process structure materially less ambiguous by expressing relevant transitions, guards, actors, and terminal states explicitly. It does not eliminate uncertainty or require deterministic behavior: the semantic model may intentionally permit multiple valid next states, and unresolved intent remains explicit rather than being invented by the diagram.
 
 ## Before and After
 
@@ -49,17 +44,16 @@ flowchart TD
     Restore --> Blocked(["Blocked — tests failed"])
 ```
 
-The correctness test: can an AI agent follow exactly one path without any interpretation? If
-yes, the conversion is correct.
+The structural representation test: can an AI agent follow the represented path without inventing meaning? Passing this establishes diagram fidelity, not behavioral correctness.
 
 ## What's Inside
 
 | Component | Name | Activates on |
 |-----------|------|--------------|
-| Agent | `process-siren` | Mermaid conversion requests for AI-facing documents |
+| Agent | `process-siren` | Analyze, improve, validate, or represent processes and systems |
 | Skill | `mermaids-treasure` | Mermaid syntax reference — flowcharts, sequences, state diagrams, ER, Gantt, and more |
-| Skill | `improve-processes` | Process quality methodology — triage and improve before converting |
-| Skill | `woo-sailor` | Bulk conversion — given a file or directory, convert all prose workflows |
+| Skill | `improve-processes` | Canonical semantic model and recursive improvement/validation loop |
+| Skill | `woo-sailor` | Bulk analyze/improve/represent orchestration with cross-file synthesis |
 
 ## Quick Start
 
@@ -97,8 +91,7 @@ Paste the process directly:
 /process-siren:woo-sailor plugins/my-plugin/  --dry-run
 ```
 
-`--dry-run` reports what would be converted without writing any files. `--report` produces the
-same output plus a structured audit of findings.
+`--dry-run` and `--report` use read-only ANALYZE behavior. Use `--improve` to apply intent-preserving changes or `--represent` for faithful Mermaid representation.
 
 ### Run a quality audit before converting
 
@@ -106,24 +99,19 @@ same output plus a structured audit of findings.
 /process-siren:improve-processes
 ```
 
-Paste or reference the process you want audited. The skill runs a triage checklist and surfaces
-gaps — abstract verbs, unevaluable conditions, missing entry/exit states, undefined actors —
-before you ask for a conversion.
+Paste or reference the process you want audited. The skill builds the semantic model, classifies uncertainty, identifies correctness claims and gaps, and selects proportionate validation.
+
+## Operating Modes
+
+- **ANALYZE** — identify purpose, gaps, assumptions, claims, boundaries, and validation needs without changing the process.
+- **IMPROVE** — apply corrections determined by established intent, validate affected claims, and iterate.
+- **REPRESENT** — faithfully render an already-defined process as a concise Mermaid diagram without changing semantics.
 
 ## How the Agent Works
 
-When you invoke `@process-siren`, the agent:
+The agent establishes purpose at the useful resolution, builds a canonical ProcessModel, challenges gaps and assumptions, extracts falsifiable correctness claims, and selects the least-formal sufficient validation for each claim. In IMPROVE mode, failures feed back into improvement. It asks the user when continuing would require creating or changing intent or policy.
 
-1. Inventories every step, condition, and terminal state in the source
-2. Selects the diagram type that best preserves the original structure
-3. Drafts the diagram — descriptive node labels, evaluable diamond conditions, outcome-labeled edges
-4. Validates Mermaid syntax using the bundled MCP server (`.mcp.json`)
-5. Verifies that every item from the source inventory appears in the diagram
-6. Replaces the content in-place (when given a file path) or returns the diagram source
-
-If the source has no identifiable discrete steps, subjective conditions, undefined actors, or
-missing terminal states, the agent surfaces those gaps and asks for clarification before
-converting. It does not invent structure.
+Mermaid is generated from the semantic model when a concise technical diagram improves communication. Syntax and semantic-fidelity validation ensure the diagram represents the model; they do not prove the process correct.
 
 ### MCP Server Integration
 
@@ -132,30 +120,9 @@ provides real-time syntax checking during conversion. This prevents incomplete o
 Mermaid syntax from entering the codebase. The server runs automatically after Bun is
 installed; no additional MCP configuration is needed.
 
-## Quality Gate — The Triage Protocol
+## Improvement and Validation Loop
 
-The `improve-processes` skill runs automatically when a source process shows structural
-problems:
-
-```mermaid
-flowchart TD
-    Start(["Source process received"]) --> O{"Outcome stated in\none measurable sentence?"}
-    O -->|"No"| FixO["Rewrite outcome statement\nbefore proceeding"]
-    O -->|"Yes"| A{"Actor named\nfor every step?"}
-    FixO --> A
-    A -->|"No — actor undefined"| FixA["Name actor per step;\nask user if ambiguous"]
-    A -->|"Yes"| B{"All steps change\nobservable state?"}
-    FixA --> B
-    B -->|"No — pure description steps"| FixB["Remove or rewrite no-op steps\nas concrete actions"]
-    B -->|"Yes"| C{"All decision conditions\nevaluable without interpretation?"}
-    FixB --> C
-    C -->|"No — vague conditions remain"| FixC["Replace with observable facts:\nexit code, file existence, string match"]
-    C -->|"Yes"| D{"Entry and exit\nconditions explicit?"}
-    FixC --> D
-    D -->|"No"| FixD["Add entry precondition\nand exit terminal state"]
-    D -->|"Yes"| Convert(["Ready for Mermaid conversion"])
-    FixD --> Convert
-```
+`improve-processes` uses one recursive loop: UNDERSTAND → MODEL → CHALLENGE → IMPROVE → VALIDATE. Resolvable uncertainty is investigated; only intent-dependent decisions block autonomous improvement. Validation failures become evidence for diagnosis and targeted revalidation.
 
 ## When Not to Use It
 

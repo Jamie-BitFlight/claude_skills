@@ -6,64 +6,9 @@ allowed-tools: Read, Grep, Glob
 
 # Mermaid Diagram Syntax
 
-Complete syntax reference for all Mermaid diagram types. Enables AI agents to construct valid diagrams with correct syntax, structure, and configuration across flowcharts, sequence diagrams, class diagrams, state diagrams, ER diagrams, gantt charts, git graphs, mindmaps, timelines, user journeys, data charts, and advanced diagram types.
-
 ## Scope
 
-TRIGGER: Activate when the user asks to create, fix, or modify any Mermaid diagram, or when generating Mermaid diagram code of any type.
-
-COVERS:
-
-- Flowchart/graph diagrams — node shapes, edge types, subgraphs, styling, interactivity
-- Sequence diagrams — actors, messages, loops, activations, notes
-- Class diagrams — classes, relationships, methods, visibility
-- State diagrams — states, transitions, composite states, forks
-- Entity-relationship diagrams — entities, attributes, relationships
-- Gantt charts — tasks, sections, dependencies, date formats
-- Git graphs — commits, branches, merges, cherry-picks
-- Mindmaps — nodes, icons, classes, shapes
-- Timeline and user journey diagrams
-- Data charts — pie, quadrant, XY chart, sankey
-- Advanced diagrams — block, C4, kanban, packet
-
-DOES NOT COVER:
-
-- Mermaid.js API or rendering engine internals
-- HTML/JavaScript integration beyond click callbacks
-
-## Quick Reference — Common Patterns
-
-```mermaid
-flowchart TD
-    Start([Start]) --> Decision{Condition?}
-    Decision -->|Yes| Action[Do something]
-    Decision -->|No| Other[Do other thing]
-    Action --> End([End])
-    Other --> End
-```
-
-**Direction codes:** `TD`/`TB` = top-down, `LR` = left-right, `BT` = bottom-up, `RL` = right-left
-
-**Essential node shapes:**
-
-| Shape | Classic Syntax | v11.3.0+ Syntax |
-|-------|---------------|-----------------|
-| Rectangle | `A[text]` | `A@{ shape: rect }` |
-| Rounded | `A(text)` | `A@{ shape: rounded }` |
-| Stadium | `A([text])` | `A@{ shape: stadium }` |
-| Diamond | `A{text}` | `A@{ shape: diamond }` |
-| Circle | `A((text))` | `A@{ shape: circle }` |
-| Database | `A[(text)]` | `A@{ shape: cyl }` |
-
-**Essential edge types:**
-
-| Type | Syntax |
-|------|--------|
-| Arrow | `A --> B` |
-| Arrow + text | `A -->\|text\| B` |
-| Dotted arrow | `A -.-> B` |
-| Thick arrow | `A ==> B` |
-| Open link | `A --- B` |
+Use when constructing, selecting, or debugging Mermaid syntax. Choose the diagram family that best expresses the intended semantics, then load only the relevant reference below. This skill covers Mermaid construction and parser/rendering constraints; it does not define the process/system being represented.
 
 ## Workflow
 
@@ -81,7 +26,7 @@ flowchart TD
     Q1 -->|timeline/journey| TL[Load timeline-journey.md]
     Q1 -->|pie/quadrant/XY/sankey| DC[Load data-charts.md]
     Q1 -->|block/C4/kanban/packet| ADV[Load advanced-diagrams.md]
-    Q1 -->|fix broken syntax| Debug[Load all references — check syntax rules]
+    Q1 -->|fix broken syntax| Debug["Identify diagram family and failing construct; load only references that govern it"]
     FC --> Construct[Construct diagram using syntax reference]
     SEQ --> Construct
     CLS --> Construct
@@ -96,23 +41,22 @@ flowchart TD
     Debug --> Construct
 ```
 
-For flowchart styling, subgraphs, and interactivity, also load [subgraphs-and-layout.md](./references/subgraphs-and-layout.md) and [styling-and-config.md](./references/styling-and-config.md).
-
-For the full 6-phase flowchart element selection process (direction, shape, edge, label, grouping, styling), see [Flowchart Construction Decision Process](./references/flowchart-construction.md).
 
 ## Reference Files
 
+Load only references needed by the current diagram branch.
+
 ### Flowchart References
 
-[Node Shapes](./references/node-shapes.md) — All node shape syntaxes — classic bracket notation and v11.3.0+ `@{ shape: ... }` notation. Includes the complete shape catalog with semantic names, short names, and aliases. Load when constructing nodes or choosing appropriate shapes.
+[Node Shapes](./references/node-shapes.md) — Load for node syntax or shape selection.
 
-[Edge Syntax](./references/edge-syntax.md) — All edge/link types — solid, dotted, thick, invisible, circle, cross, and multi-directional arrows. Covers edge IDs, animations, text labels, chaining, and the minimum length table. Load when connecting nodes or styling edges.
+[Edge Syntax](./references/edge-syntax.md) — Load for connections, labels, edge types, or edge styling.
 
-[Subgraphs and Layout](./references/subgraphs-and-layout.md) — Subgraph declaration, explicit IDs, nested direction control, direction limitation for external links. Also covers diagram direction codes, Markdown strings, special character escaping, entity codes, and comments. Load when grouping nodes or controlling layout.
+[Subgraphs and Layout](./references/subgraphs-and-layout.md) — Load for grouping, layout, direction, or escaping.
 
-[Styling and Configuration](./references/styling-and-config.md) — Node styling, link styling, classDef, CSS classes, click interactivity, tooltips, FontAwesome icons, custom icons, renderer selection (dagre/elk), and line curve configuration. Load when styling diagrams or adding interactive elements.
+[Styling and Configuration](./references/styling-and-config.md) — Load for styling, configuration, renderer, or interactivity.
 
-[Flowchart Construction](./references/flowchart-construction.md) — 6-phase element selection process: direction, shape, edge, label, grouping, styling. Decision trees for flowchart construction. Load when building a flowchart from scratch.
+[Flowchart Construction](./references/flowchart-construction.md) — Load when choosing flowchart elements from scratch.
 
 ### Other Diagram Types
 
