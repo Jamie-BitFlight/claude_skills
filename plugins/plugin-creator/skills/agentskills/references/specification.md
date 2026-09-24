@@ -193,7 +193,7 @@ The optional `allowed-tools` field:
 
 - A space-delimited list of tools that are pre-approved to run
 - Experimental — support varies between agent implementations
-- The reference validator checks that this field is a string and does not impose whitespace canonicalization
+- `skills-ref` currently passes this value through without type-checking or delimiter validation; enforce the specification's format independently
 
 ```yaml
 allowed-tools: Bash(git:*) Bash(jq:*) Read

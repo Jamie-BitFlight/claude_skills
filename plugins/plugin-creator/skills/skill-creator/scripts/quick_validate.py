@@ -76,8 +76,10 @@ def _validate_allowed_keys(frontmatter: dict) -> str | None:
 def _validate_optional_fields(frontmatter: dict) -> str | None:
     """Validate portable optional field types and limits."""
     for key in ("license", "compatibility", "allowed-tools"):
-        value = frontmatter.get(key)
-        if value is not None and not isinstance(value, str):
+        if key not in frontmatter:
+            continue
+        value = frontmatter[key]
+        if not isinstance(value, str):
             return f"{key} must be a string, got {type(value).__name__}"
     compatibility = frontmatter.get("compatibility")
     if isinstance(compatibility, str):
@@ -85,8 +87,11 @@ def _validate_optional_fields(frontmatter: dict) -> str | None:
             return "compatibility must be non-empty when provided"
         if len(compatibility) > 500:
             return f"Compatibility is too long ({len(compatibility)} characters). Maximum is 500 characters."
+    allowed_tools = frontmatter.get("allowed-tools")
+    if isinstance(allowed_tools, str) and not re.fullmatch(r"[^,\s]+(?: [^,\s]+)*", allowed_tools):
+        return "allowed-tools must be a non-empty string of space-separated tool tokens"
     metadata = frontmatter.get("metadata")
-    if metadata is not None and (
+    if "metadata" in frontmatter and (
         not isinstance(metadata, dict)
         or not all(isinstance(key, str) and isinstance(value, str) for key, value in metadata.items())
     ):
@@ -136,8 +141,7 @@ def _validate_description(frontmatter: dict) -> str | None:
     if not isinstance(description, str):
         return f"Description must be a string, got {type(description).__name__}"
 
-    description = description.strip()
-    if not description:
+    if not description.strip():
         return "Description is required for a portable skill package"
 
     if len(description) > MAX_DESCRIPTION_LENGTH:

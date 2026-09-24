@@ -274,7 +274,7 @@ With this plugin installed, Claude will:
 
 - Recognize when you describe a plugin, skill, agent, or hook and activate the appropriate creation workflow automatically
 - Validate frontmatter before writing it, catching YAML syntax errors, forbidden multiline indicators, and incorrect field types
-- Use destination-appropriate tool forms: Claude Code accepts documented strings and YAML lists; portable `allowed-tools` is a string whose contents the specification describes as space-separated, without stricter whitespace canonicalization
+- Use destination-appropriate tool forms: Claude Code accepts documented strings and YAML lists; portable `allowed-tools` is a non-empty string of space-separated tool tokens
 - Write hook scripts in the language that matches the project runtime (Node.js by default; Python when `pyproject.toml` is present); for Node.js always use `.mjs` or `.cjs` — never plain `.js` (see [hooks-nodejs-extension.md](./skills/hooks-guide/references/hooks-nodejs-extension.md))
 - Apply the `${CLAUDE_PLUGIN_ROOT}` environment variable in hook paths rather than hardcoding absolute paths
 - Check skill complexity with token-based thresholds and recommend `references/` extraction or splitting before a skill exceeds Claude's context budget

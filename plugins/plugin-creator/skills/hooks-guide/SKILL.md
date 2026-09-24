@@ -1,6 +1,6 @@
 ---
 name: hooks-guide
-description: Cross-platform hooks reference for AI coding assistants — Claude Code, GitHub Copilot, Cursor, Windsurf, Amp. Covers hook authoring in Node.js (ESM and CJS) and Python, per-platform event schemas, inline-agent hooks and MCP in agent frontmatter, common JSON I/O, exit codes, best practices, and a fetch script to refresh docs from official sources. Use when writing, reviewing, or debugging hooks for any AI assistant.
+description: Cross-platform hooks reference for AI coding assistants — Claude Code, OpenAI Codex, GitHub Copilot, Cursor, Windsurf, and Amp. Covers hook authoring in Node.js (ESM and CJS) and Python, per-platform event schemas, inline-agent hooks and MCP in agent frontmatter, common JSON I/O, exit codes, best practices, and a fetch script to refresh docs from official sources. Use when writing, reviewing, or debugging hooks for any AI assistant.
 allowed-tools: Read, Grep, Glob, Bash, Write, Edit
 ---
 
@@ -10,6 +10,7 @@ allowed-tools: Read, Grep, Glob, Bash, Write, Edit
 flowchart TD
     Start([What do you need?]) --> Q1{Which platform?}
     Q1 -->|Claude Code| Q2{Inline agent hooks<br>hooks/mcpServers/skills/memory?}
+    Q1 -->|OpenAI Codex plugin| OpenAI["Read references/openai-codex.md"]
     Q1 -->|GitHub Copilot| Copilot["Read references/github-copilot.md"]
     Q1 -->|Cursor, Windsurf, Amp<br>or coverage gaps| Coverage["Read references/platform-coverage.md"]
 
@@ -43,6 +44,7 @@ For deeper Claude Code coverage, these focused skills are available:
 
 - `references/common-schema.md` — shared concepts, cross-platform comparison, JSON I/O, exit codes
 - `references/claude-code.md` — Claude Code hooks full reference (events, matchers, configuration)
+- `references/openai-codex.md` — OpenAI plugin hook discovery, trust, execution, and platform boundaries
 - `references/inline-agent-hooks.md` — hooks, mcpServers, skills, and memory in agent frontmatter
 - `references/github-copilot.md` — GitHub Copilot coding agent hooks
 - `references/hooks-nodejs-extension.md` — Node.js authoring guide: extension rules (.mjs/.cjs), templates, anti-patterns
@@ -64,7 +66,8 @@ This updates reference files from official sources. Run when upstream docs chang
 
 ## Sources
 
-- Claude Code hooks: `https://docs.anthropic.com/en/docs/claude-code/hooks.md` (accessed 2026-05-21)
-- Claude Code hooks guide: `https://docs.anthropic.com/en/docs/claude-code/hooks-guide.md` (accessed 2026-05-21)
-- Claude Code agent frontmatter: `https://docs.anthropic.com/en/docs/claude-code/sub-agents.md` (accessed 2026-02-27)
+- Claude Code hooks: `https://code.claude.com/docs/en/hooks.md` (accessed 2026-09-24)
+- Claude Code hooks guide: `https://code.claude.com/docs/en/hooks-guide.md` (accessed 2026-09-24)
+- Claude Code agent frontmatter: `https://code.claude.com/docs/en/sub-agents.md` (accessed 2026-09-24)
+- OpenAI plugin hooks: `https://developers.openai.com/plugins/build/plugins.md` and `https://learn.chatgpt.com/docs/hooks` (accessed 2026-09-24)
 - GitHub Copilot coding agent: `https://docs.github.com/en/copilot/using-github-copilot/using-claude-as-your-copilot-llm` (accessed 2026-02-27)

@@ -301,6 +301,17 @@ class TestPackageSkillPackager:
         result = package_skill(skill_dir)
         assert result is None
 
+    def test_invalid_allowed_tools_blocks_packaging(self, tmp_path: Path) -> None:
+        from package_skill import package_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "bad-tools-skill")
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text(
+            skill_md.read_text().replace("description:", "allowed-tools: Read,Grep\ndescription:"), encoding="utf-8"
+        )
+
+        assert package_skill(skill_dir) is None
+
     def test_nonexistent_path_returns_none(self, tmp_path: Path) -> None:
         """package_skill returns None for a path that does not exist.
 
@@ -526,6 +537,52 @@ class TestQuickValidateBrokenFixtures:
         assert not valid
         assert "compatibility" in message.lower()
 
+    @pytest.mark.parametrize("key", ["license", "compatibility", "metadata", "allowed-tools"])
+    def test_explicit_null_optional_field_fails(self, tmp_path: Path, key: str) -> None:
+        from quick_validate import validate_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "null-field-skill")
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text(skill_md.read_text().replace("description:", f"{key}: null\ndescription:"))
+
+        valid, message = validate_skill(skill_dir)
+        assert not valid
+        assert key in message
+
+    @pytest.mark.parametrize("description", ["", "   "])
+    def test_whitespace_only_description_fails(self, tmp_path: Path, description: str) -> None:
+        from quick_validate import validate_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "empty-description-skill")
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text(
+            skill_md.read_text().replace(
+                "description: A test skill for smoke testing", f"description: '{description}'"
+            ),
+            encoding="utf-8",
+        )
+
+        valid, message = validate_skill(skill_dir)
+        assert not valid
+        assert "description is required" in message.lower()
+
+    def test_description_length_is_checked_before_trimming(self, tmp_path: Path) -> None:
+        from quick_validate import MAX_DESCRIPTION_LENGTH, validate_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "long-description-skill")
+        skill_md = skill_dir / "SKILL.md"
+        description = f" {'a' * MAX_DESCRIPTION_LENGTH} "
+        skill_md.write_text(
+            skill_md.read_text().replace(
+                "description: A test skill for smoke testing", f"description: '{description}'"
+            ),
+            encoding="utf-8",
+        )
+
+        valid, message = validate_skill(skill_dir)
+        assert not valid
+        assert f"{len(description)} characters" in message
+
     def test_space_delimited_allowed_tools_passes(self, tmp_path: Path) -> None:
         from quick_validate import validate_skill
 
@@ -552,8 +609,10 @@ class TestQuickValidateBrokenFixtures:
         assert not valid
         assert "allowed-tools must be a string" in message
 
-    @pytest.mark.parametrize("allowed_tools", ["", "Read,Grep", "Read  Grep", "Read\tGrep"])
-    def test_allowed_tools_string_whitespace_is_not_canonicalized(self, tmp_path: Path, allowed_tools: str) -> None:
+    @pytest.mark.parametrize(
+        "allowed_tools", ["", "Read,Grep", "Read, Grep", "Read\tGrep", "Read  Grep", " Read Grep", "Read Grep "]
+    )
+    def test_non_space_delimited_allowed_tools_fails(self, tmp_path: Path, allowed_tools: str) -> None:
         from quick_validate import validate_skill
 
         skill_dir = _make_minimal_valid_skill(tmp_path, "tool-format-skill")
@@ -564,7 +623,8 @@ class TestQuickValidateBrokenFixtures:
         )
 
         valid, message = validate_skill(skill_dir)
-        assert valid, message
+        assert not valid
+        assert "space-separated tool tokens" in message
 
     def test_description_with_angle_brackets_passes(self, tmp_path: Path) -> None:
         from quick_validate import validate_skill

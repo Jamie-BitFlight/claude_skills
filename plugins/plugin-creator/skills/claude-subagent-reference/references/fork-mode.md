@@ -1,7 +1,6 @@
 # Fork Mode
 
-SOURCE: <https://code.claude.com/docs/en/sub-agents.md> § Fork the current conversation (accessed 2026-05-28)
-SOURCE: <https://code.claude.com/docs/en/env-vars.md> — `CLAUDE_CODE_FORK_SUBAGENT` entry (accessed 2026-05-28)
+SOURCE: <https://code.claude.com/docs/en/sub-agents#fork-the-current-conversation> (accessed 2026-09-24)
 
 Fork mode is enabled by default in interactive Claude Code.
 
@@ -83,4 +82,4 @@ When Claude spawns a fork through the Agent tool, it can pass `isolation: "workt
 - A fork cannot spawn further forks
 - To keep spawns synchronous, set `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` alongside fork mode
 
-SOURCE: <https://code.claude.com/docs/en/sub-agents#choose-a-model> (accessed 2026-09-24)
+SOURCE: <https://code.claude.com/docs/en/sub-agents#fork-the-current-conversation> (accessed 2026-09-24)

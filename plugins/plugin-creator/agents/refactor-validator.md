@@ -61,7 +61,7 @@ You are a refactoring validation specialist responsible for verifying that refac
 - [ ] `skilllint` reports no token threshold violations (`TOKEN_WARNING_THRESHOLD` / `TOKEN_ERROR_THRESHOLD`)
 - [ ] Portable package frontmatter: `name` is present and matches the directory; Claude Code runtime validation is evaluated separately
 - [ ] Skill frontmatter: `description` field is present and contains trigger keywords
-- [ ] Skill frontmatter: Claude Code `allowed-tools` uses a space/CSV string or YAML list; portable `allowed-tools` is a string and is not rejected for non-canonical whitespace
+- [ ] Skill frontmatter: Claude Code `allowed-tools` uses a space/CSV string or YAML list; portable `allowed-tools` uses a non-empty string of space-separated tool tokens
 - [ ] No YAML multiline indicators (`>-`, `|-`) in any frontmatter `description` field
 - [ ] Description is single-line string (quoted only if YAML syntax requires — colons, leading special chars, boolean literals); not multiline
 - [ ] Progressive disclosure used for complex skills (references/, examples/, scripts/)

@@ -494,7 +494,7 @@ Write the YAML frontmatter. All fields are optional, but `description` is strong
   - Include all "when to use" information here - Not in the body. The body is only loaded after triggering, so "When to Use This Skill" sections in the body are not helpful to Claude.
   - Example description for a `docx` skill: "Comprehensive document creation, editing, and analysis with support for tracked changes, comments, formatting preservation, and text extraction. Use when Claude needs to work with professional documents (.docx files) for: (1) Creating new documents, (2) Modifying or editing content, (3) Working with tracked changes, (4) Adding comments, or any other document tasks"
 - `argument-hint`: Optional. Hint shown during autocomplete to indicate expected arguments. Example: `[issue-number]` or `[filename] [format]`.
-- `allowed-tools`: Optional. Claude Code accepts a space- or comma-separated string or YAML list. Portable Agent Skills accepts a string, describes its contents as space-separated, and marks support experimental; preserve valid string whitespace because the reference validator does not canonicalize it.
+- `allowed-tools`: Optional. Claude Code accepts a space- or comma-separated string or YAML list. Portable Agent Skills requires a non-empty string of space-separated tool tokens and marks support experimental; `skills-ref` does not currently type-check or delimiter-check the field.
 - `model`: Optional. Model to use when this skill is active. Options: `claude-opus-4-5-20251101`, `claude-sonnet-4-20250514`, `opus`, `sonnet`, `haiku`
 - `context`: Optional. Set to `fork` to run in a fresh skill subagent for isolation; this is not a conversation fork. See advanced patterns below.
 - `agent`: Optional. Which subagent type to use when `context: fork` is set. Options: `Explore`, `Plan`, `general-purpose`, or custom agent name.
@@ -555,7 +555,7 @@ flowchart TD
     Q -->|"Yes — plugin distribution planned"| Q2{"Prefer the local .skill ZIP convention<br>or bundle directly in plugin?"}
     Q2 -->|"Bundle directly in plugin<br>(recommended)"| Bundle["Place skill directory under<br>plugin's skills/ directory<br>Claude Code auto-discovers all skills under skills/<br>No plugin.json update needed"]
     Q2 -->|"Local standalone .skill ZIP convention"| RunPkg["Run: scripts/package_skill.py path/to/skill-folder<br>Only portable Agent Skills fields are accepted<br>.skill is a local/client convention, not part of the portable standard"]
-    RunPkg --> Validate["Script validates the portable package boundary:<br>required name and description<br>six-field allowlist<br>64/1024 limits<br>name matches parent directory"]
+    RunPkg --> Validate["Script validates the portable package boundary:<br>required name and description<br>specification field allowlist<br>64/1024 limits<br>name matches parent directory"]
     Validate --> VQ{"Validation<br>exit code?"}
     VQ -->|"0 — validation passed"| Package["Script packages the skill<br>Creates my-skill.skill (zip with .skill extension)<br>Includes all files with proper directory structure"]
     VQ -->|"non-zero — validation failed<br>script reports errors and exits"| Fix["Fix reported validation errors<br>then run packaging command again"]

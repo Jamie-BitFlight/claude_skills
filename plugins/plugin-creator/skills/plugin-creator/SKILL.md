@@ -631,7 +631,7 @@ allowed-tools: Read, Grep, Glob
 | `user-invocable`           | boolean                | true            | `false` hides from `/` menu                |
 | `disable-model-invocation` | boolean                | false           | `true` prevents Claude auto-loading        |
 
-Claude Code accepts `allowed-tools` as a space- or comma-separated string or YAML list. Portable Agent Skills accepts a string and the reference validator does not canonicalize its whitespace.
+Claude Code accepts `allowed-tools` as a space- or comma-separated string or YAML list. Portable Agent Skills requires a non-empty string of space-separated tool tokens; `skills-ref` does not currently type-check or delimiter-check the field.
 
 **Source**: <https://code.claude.com/docs/en/skills.md>
 

@@ -25,7 +25,9 @@ Plugins can include any combination of:
 
 ## plugin.json Schema
 
-The `plugin.json` file in `.claude-plugin/` defines your plugin's metadata and configuration.
+The optional `plugin.json` file in `.claude-plugin/` defines Claude Code-specific plugin metadata
+and configuration. Claude Code can load a plugin without it when components use default locations;
+add it when the plugin needs a stable name, metadata, or custom component paths.
 
 ### Complete Schema Example
 
@@ -44,7 +46,7 @@ The `plugin.json` file in `.claude-plugin/` defines your plugin's metadata and c
   "license": "MIT",
   "keywords": ["keyword1", "keyword2"],
   "commands": ["./custom/commands/special.md"],
-  "agents": "./custom/agents/",
+  "agents": "./custom/agents/security-reviewer.md",
   "skills": "./custom/skills/",
   "hooks": "./config/hooks.json",
   "mcpServers": "./mcp-config.json",
@@ -115,7 +117,7 @@ SOURCE: [Plugins reference — Component path fields](https://code.claude.com/do
 ```
 enterprise-plugin/
 ├── .claude-plugin/           # Metadata directory
-│   └── plugin.json          # Required: plugin manifest
+│   └── plugin.json          # Optional host manifest for identity/custom paths
 ├── commands/                 # Default command location
 │   ├── status.md
 │   └── logs.md
@@ -148,7 +150,7 @@ enterprise-plugin/
 
 | Component       | Default Location             | Purpose                                    |
 | --------------- | ---------------------------- | ------------------------------------------ |
-| **Manifest**    | `.claude-plugin/plugin.json` | Required metadata file                     |
+| **Manifest**    | `.claude-plugin/plugin.json` | Optional host metadata/configuration file  |
 | **Commands**    | `commands/`                  | Skill Markdown files (legacy; use skills/) |
 | **Agents**      | `agents/`                    | Subagent Markdown files                    |
 | **Skills**      | `skills/`                    | Skills with `<name>/SKILL.md` structure    |
@@ -164,7 +166,7 @@ enterprise-plugin/
 
 Plugins add skills to Claude Code, creating `/name` shortcuts that you or Claude can invoke.
 
-**Location**: `skills/` or `commands/` directory in plugin root
+**Location**: `skills/` in the plugin root. `commands/` is the legacy flat-file form.
 
 **Skill structure**:
 
@@ -183,6 +185,11 @@ skills/
 - Skills and commands are automatically discovered when the plugin is installed
 - Claude can invoke them automatically based on task context
 - Skills can include supporting files alongside SKILL.md
+- Plugin skills invoke as `/plugin-name:skill-name`, so they do not collide with standalone
+  `/skill-name` entries. The skill frontmatter `name` supplies the suffix; when omitted, Claude uses
+  the skill directory basename.
+- A plugin containing exactly one skill may place `SKILL.md` at the plugin root. Claude uses its
+  frontmatter `name` as the invocation suffix.
 
 [Skill subdirectory warning](../../docs/skill-subdirectory-warning.md) — nested skill directories silently fail to register, with a wrong/right example; read before organizing related skills into grouping subdirectories.
 
@@ -236,6 +243,12 @@ Plugins can provide event handlers that respond to Claude Code events automatica
 
 **Format**: JSON configuration with event matchers and actions
 
+Claude auto-discovers plugin-wide hooks from `hooks/hooks.json`. These hooks are active whenever
+the plugin is enabled. Skill-frontmatter hooks are different: only `PreToolUse`, `PostToolUse`, and
+`Stop` are supported there, and invoking the skill adds them for the rest of the session. Matching
+handlers run in parallel, so one handler cannot prevent another matching handler from starting.
+Hook commands run with the user's system permissions; review plugin hook code before enabling it.
+
 **Hook configuration**:
 
 ```json
@@ -263,7 +276,8 @@ Plugins can provide event handlers that respond to Claude Code events automatica
 - `UserPromptSubmit`: When user submits a prompt
 - `SessionStart`: At the beginning of sessions
 
-SOURCE: [Plugins Reference](https://code.claude.com/docs/en/plugins-reference.md) lines 211-265 (accessed 2026-04-23)
+SOURCE: [Hooks guide](https://code.claude.com/docs/en/hooks-guide.md) and
+[Hooks reference](https://code.claude.com/docs/en/hooks.md) (accessed 2026-09-24)
 
 For the complete hook event catalog (all events, matchers, input schemas, exit code behavior), see [hook events reference](./references/hook-events.md).
 
@@ -423,7 +437,7 @@ Set the plugin path to a parent directory that contains all required files, then
   "source": "./",
   "description": "Plugin that needs root-level access",
   "commands": ["./plugins/my-plugin/commands/"],
-  "agents": ["./plugins/my-plugin/agents/"],
+  "agents": ["./plugins/my-plugin/agents/security-reviewer.md", "./plugins/my-plugin/agents/compliance-checker.md"],
   "strict": false
 }
 ```
@@ -990,19 +1004,23 @@ Follow semantic versioning for plugin releases:
 
 ## Plugin Cache Lifecycle
 
-When a plugin version is updated, the old version is not deleted immediately. It is marked orphaned and removed automatically 7 days later. This grace period allows concurrent sessions using the old version to finish without errors.
+When a copied plugin version is updated, the old version is not deleted immediately. It is marked
+orphaned and removed by a background sweep roughly 14 days later. This grace period allows
+concurrent sessions using the old version to finish without errors. The sweep runs only while at
+least one plugin is installed.
 
 Claude's `Glob` and `Grep` tools skip orphaned version directories during file searches, so file results do not include outdated plugin code.
 
-SOURCE: [Plugins Reference](https://code.claude.com/docs/en/plugins-reference.md) lines 1210-1213 (accessed 2026-04-23)
+SOURCE: [Plugins Reference — Plugin caching and file resolution](https://code.claude.com/docs/en/plugins-reference.md#plugin-caching-and-file-resolution) (accessed 2026-09-24)
 
 ---
 
 ## Sources
 
-- [Plugins Reference](https://code.claude.com/docs/en/plugins-reference.md) (accessed 2026-01-28, refreshed 2026-04-23)
-- [Create Plugins](https://code.claude.com/docs/en/plugins.md) (accessed 2026-01-28, refreshed 2026-04-23)
+- [Plugins Reference](https://code.claude.com/docs/en/plugins-reference.md) (accessed 2026-09-24)
+- [Create Plugins](https://code.claude.com/docs/en/plugins.md) (accessed 2026-09-24)
 - [Plugin Marketplaces](https://code.claude.com/docs/en/plugin-marketplaces) (accessed 2026-09-24)
-- [Skills Reference](https://code.claude.com/docs/en/skills.md)
-- [Hooks Reference](https://code.claude.com/docs/en/hooks.md)
+- [Skills Reference](https://code.claude.com/docs/en/skills.md) (accessed 2026-09-24)
+- [Hooks Guide](https://code.claude.com/docs/en/hooks-guide.md) (accessed 2026-09-24)
+- [Hooks Reference](https://code.claude.com/docs/en/hooks.md) (accessed 2026-09-24)
 - [MCP Reference](https://code.claude.com/docs/en/mcp.md)

@@ -236,7 +236,7 @@ The open standard defines a **portable subset**. Claude Code extends it with add
 | `disable-model-invocation` | No          | Yes                   |
 | `hooks`                  | No            | Yes                   |
 
-**For portable skills and claude.ai/Skills API/package upload:** use only the six fields above. Anthropic upload and package boundaries hard-fail unknown fields; runtime behavior for other clients is implementation-specific.
+**For portable skills and claude.ai/Skills API/package upload:** use only the fields in the table above. Anthropic upload and package boundaries hard-fail unknown fields; runtime behavior for other clients is implementation-specific.
 
 **Claude Code-specific validation:** Claude Code additionally rejects `name` or `description` values containing XML tags, and rejects `name` values containing the reserved words `anthropic` or `claude` — a stricter check than the open standard's own name/description rules above. This constraint is Claude Code-specific and not part of the agentskills.io specification.
 
