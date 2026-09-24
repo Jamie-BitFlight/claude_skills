@@ -254,7 +254,7 @@ ordinary Git syntax.
 ```mermaid
 flowchart TD
     Start([Explicit start, continue, or abort request]) --> Kind{Request?}
-    Kind -->|Start| Bind[Binding stage]; Kind -->|Continue or abort| Active["Inspect lifecycle<br/>active-rebase-recovery.md"]
+    Kind -->|Start| Bind[Binding stage]; Kind -->|Continue or abort| Active["Inspect lifecycle<br/>references/active-rebase-recovery.md"]
     Bind --> BindResult{Binding result?}
     BindResult -->|Dependent facts and completion predicate bound| Satisfied{Ordinary local relation observation?}; BindResult -->|Missing or ambiguous| Decision([Paused for decision]); BindResult -->|Failure or unobservable| Recover
     Satisfied -->|True; all result and publication destinations match| NoChange([No change]); Satisfied -->|False, transformation goal, or local result differs| Locate
@@ -271,9 +271,9 @@ flowchart TD
     Owner -->|None, or pause/end observed| Operation{Operation?}; Owner -->|Observed active| Wait[Wait for checkpoint predicate]; Wait --> Owner
     Owner -->|Unknown or unreachable| Decision
     Operation -->|Start| Prepare[Preparation stage]; Operation -->|Continue| Stop{Current rebase state?}
-    Operation -->|Abort| Abort["Abort and restore pre-state<br/>active-rebase-recovery.md"]
+    Operation -->|Abort| Abort["Abort and restore pre-state<br/>references/active-rebase-recovery.md"]
     Prepare --> PrepResult{Preparation result?}
-    PrepResult -->|Status empty, or checkpoint contains all changes and status is empty| Refs; PrepResult -->|Dirty and checkpoint commit blocked| Save["Save and bind exact entry<br/>named-stash.md"]
+    PrepResult -->|Status empty, or checkpoint contains all changes and status is empty| Refs; PrepResult -->|Dirty and checkpoint commit blocked| Save["Save and bind exact entry<br/>references/named-stash.md"]
     PrepResult -->|Failure or unobservable| Recover
     Save --> SaveResult{Exact entry verified?}
     SaveResult -->|Yes| Refs
@@ -288,7 +288,7 @@ flowchart TD
     Next -->|Failure or unobservable| Recover
     Current --> CurrentResult{Named result ref resolves to R?}
     CurrentResult -->|Yes| Saved; CurrentResult -->|No or unobservable| Recover
-    Shape{Merge in replay set or Git reports empty/equivalent?} -->|Yes| History["Resolve topology/equivalence<br/>history-shape.md"]; Shape -->|No| Replay[Run ordinary Git replay]
+    Shape{Merge in replay set or Git reports empty/equivalent?} -->|Yes| History["Resolve topology/equivalence<br/>references/history-shape.md"]; Shape -->|No| Replay[Run ordinary Git replay]
     Shape -->|Failure or unobservable| Recover
     History --> HistoryResult{Every special commit has a supported disposition?}
     HistoryResult -->|Yes; no supported conflict| Replay; HistoryResult -->|No or conflicting| Decision
@@ -299,7 +299,7 @@ flowchart TD
     Stop -->|Other failure or unobservable| Recover
     Replay --> ReplayResult{Replay result?}
     ReplayResult -->|Metadata/unmerged absent; observed R bound; result ref resolves to R; predicate true| Saved{Lifecycle saved entry?}
-    ReplayResult -->|Unmerged index entries| ReplayConflict["Resolve replay intent<br/>conflict-and-ambiguity.md"]
+    ReplayResult -->|Unmerged index entries| ReplayConflict["Resolve replay intent<br/>references/conflict-and-ambiguity.md"]
     ReplayResult -->|Topology, equivalent, or empty| History
     ReplayResult -->|Other failure or unobservable| Recover
     ReplayConflict --> ReplayIntent{One semantic outcome class preserves compatible intent and checks?}
@@ -308,11 +308,11 @@ flowchart TD
     Abort --> AbortResult{Abort restoration predicate?}
     AbortResult -->|Metadata/unmerged absent; source or HEAD equals pre-replay OID| Saved
     AbortResult -->|Failure or unobservable| Recover
-    Saved -->|Verified none| FinishMode{Lifecycle outcome?}; Saved -->|Exact entry bound| Restore["Restore and remove exact entry<br/>named-stash.md"]
+    Saved -->|Verified none| FinishMode{Lifecycle outcome?}; Saved -->|Exact entry bound| Restore["Restore and remove exact entry<br/>references/named-stash.md"]
     Saved -->|Ambiguous or unobservable| Recover
     Restore --> RestoreResult{Restoration result?}
     RestoreResult -->|Command zero; no unmerged entries; exact entry absent| FinishMode
-    RestoreResult -->|Conflict; entry preserved| RestoreConflict["Resolve restoration intent<br/>conflict-and-ambiguity.md"]
+    RestoreResult -->|Conflict; entry preserved| RestoreConflict["Resolve restoration intent<br/>references/conflict-and-ambiguity.md"]
     RestoreResult -->|Other failure or unobservable| Recover
     RestoreConflict --> RestoreIntent{One semantic outcome class preserves compatible intent and checks?}
     RestoreIntent -->|Exactly one| Restore; RestoreIntent -->|None or incompatible alternatives| Decision
@@ -326,11 +326,11 @@ flowchart TD
     VerifyResult -->|Missing intent or incompatible corrections| Decision
     VerifyResult -->|Failure or unobservable| Recover
     Publish -->|No| Handoff
-    Publish -->|Yes| Remote["Reconcile destination<br/>publication.md"]
+    Publish -->|Yes| Remote["Reconcile destination<br/>references/publication.md"]
     Remote --> RemoteResult{Remote stage result?}
     RemoteResult -->|Final fetch unchanged; exact lease OID current| Push[Authorized exact-lease push]
     RemoteResult -->|Every moved commit disposed; interactions validated| Orient
-    RemoteResult -->|Conflict| RemoteConflict["Resolve remote intent<br/>conflict-and-ambiguity.md"]
+    RemoteResult -->|Conflict| RemoteConflict["Resolve remote intent<br/>references/conflict-and-ambiguity.md"]
     RemoteResult -->|Failure or unobservable| Recover
     RemoteConflict --> RemoteIntent{One semantic outcome class preserves compatible intent and checks?}
     RemoteIntent -->|Exactly one| Remote; RemoteIntent -->|None or incompatible alternatives| Decision
@@ -348,7 +348,7 @@ flowchart TD
     Terminal -->|Completed start/continue; post-push destination resolves to R| Published([Published completion])
     Terminal -->|Completed start/continue; result ref resolves to R; predicate true; no publication| Local([Local completion])
     Terminal -->|Inconsistent or unobservable| Recover
-    Recover["Stop mutations and collect report fields<br/>active-rebase-recovery.md"] --> Stopped([Stopped with observed state])
+    Recover["Stop mutations and collect report fields<br/>references/active-rebase-recovery.md"] --> Stopped([Stopped with observed state])
 ```
 
 Every stage has an observable result gate. Expected semantic branches select their conditional
