@@ -85,7 +85,10 @@ def add(
 @app.command("list")
 def list_items(
     refresh: Annotated[
-        bool, typer.Option("--refresh", help="Refresh from the selected backend provider before listing")
+        bool,
+        typer.Option(
+            "--refresh", help="Reconcile the command's live provider snapshot in the foreground before returning"
+        ),
     ] = False,
     allow_cached: Annotated[
         bool,
@@ -137,7 +140,11 @@ def list_items(
 def view(
     selector: Annotated[str, typer.Option("--selector", help="Item selector")],
     refresh: Annotated[
-        bool, typer.Option("--refresh", help="Bypass the local cache and validate against the live backend")
+        bool,
+        typer.Option(
+            "--refresh",
+            help="Request live enrichment for native-backend title selectors; GitHub selectors are always live-first",
+        ),
     ] = False,
     repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
     offset: Annotated[int, typer.Option("--offset", min=0, help="Pagination offset")] = 0,

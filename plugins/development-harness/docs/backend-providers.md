@@ -118,7 +118,14 @@ and the caller must retry rather than assume the append succeeded. See
 
 The CLI and MCP are two transports over the same configured backend. Use the
 surface available to the caller; do not infer a different source of truth from
-the transport.
+the transport. The CLI schedules no implicit synchronization. After assembling
+successful response data, MCP may schedule the existing single-flight
+maintenance worker when the remote reconciliation checkpoint is absent; it
+does not await that worker or use it to produce the response.
+
+Provider requests are individually bounded to no more than 30 seconds. An
+ordinary command that performs several provider requests has no default
+whole-command deadline; each request retains its own bound.
 
 The CLI transport is `sam_schema/cli.py` (grouped Typer app: `plan`, `backlog`,
 `dispatch`, `artifact`, `active-task`; also reachable through the
@@ -140,7 +147,9 @@ dependent step. Do not emulate it with a cache or direct file access.
 
 The configured backend is the sole source of truth for backlog records. Remote
 provider snapshots and local item files are private `FileCache` records; they
-support reconciliation and recovery but do not create a second backlog. Beads,
+support pending-mutation journaling, reconciliation checkpoints, and an explicit
+fallback after a live failure, but do not create a second backlog. GitHub
+work-item commands observe the live provider first. Beads,
 SQLite, and memory backends read and write their own native state directly and
 do not use YAML or a provider cache.
 
@@ -166,51 +175,50 @@ inside the selected backend.
 
 Remote providers use the same `FileCache` contract:
 
-- Read provider state when reachable and refresh the private cache.
-- Return a cached record with `stale=true` when the provider is unavailable and
-  a cached record exists.
+- Read provider state before making a work-item command decision.
+- Propagate a live work-item read failure by default. Only `allow_cached=True`
+  permits a warned fallback to cached provider records after that failure.
+- Treat a successful live observation with no matching rows as authoritative;
+  never substitute cached rows for live-empty.
 - Return an unavailable error when no authoritative or cached record exists.
 - Apply a write immediately when reachable; otherwise persist the write in the
   cache queue and return `pending=true`.
 - Derive one stable idempotency key per queued write. Replay queued writes on
   reconnect in order, acknowledge only successful writes, and retain failed or
   conflicting writes for diagnosis and retry.
-- Treat the cache as a recovery and performance mechanism. Never treat it as a
-  second source of truth or as a fallback backend.
+- Treat work-item cache state only as a pending-mutation journal, a
+  reconciliation checkpoint, or the explicit fallback above. Never treat it as
+  a second source of truth or an automatic fallback backend. Plan and artifact
+  content keeps the separate stale-read contract exposed by `ContentProvider`.
 
 The same rule applies to remote work-item reconciliation: provider snapshots
 and local item files are private cache records, while the remote provider owns
 the accepted state.
 
-### Listing provenance
+### Command-scoped provider observations and provenance
 
-On a never-synced remote cache, `operations.list_items()` performs one
-unlabeled, fetch-only reconciliation before serving the listing. The unlabeled
-scope can establish the global snapshot checkpoint even when the caller filters
-the eventual listing by label; subsequent calls then use the cache instead of
-repeating a label-scoped initial fetch. This implicit read-through never applies
-queued local patches, shares the normal sync single-flight guard, and degrades
-documented provider or cache I/O failures to warnings. The resulting
-low-confidence listing remains withheld unless the caller opts in with
-`allow_cached=True`, as described below.
+Each GitHub work-item command owns one live provider observation. Exact numeric,
+`#N`, and GitHub-URL selectors use a targeted read unless the command already
+has a bulk observation. Title selectors and operations that decide across the
+backlog use one complete bulk snapshot for that command. Selection, status
+facts, duplicate checks, and compatible reconciliation reuse that observation
+instead of independently refetching or consulting cached provider state.
 
-`operations.list_items` reports two independent, provenance-flavored bits on
-every response — `from_cache` and `has_pending_writes` — rather than one
-conflated "authoritative" boolean (backlog #3546 task A4; the two-bit shape
-follows Firestore's `SnapshotMetadata.fromCache`/`hasPendingWrites`).
-`from_cache` is `True` only for a backend with `supports_cached_listing = True`
-(GitHub); `has_pending_writes` is `True` when the listing includes
-locally-queued mutations the provider has not yet acknowledged, independent of
-`from_cache` — a fully-synced GitHub cache can still hold unconfirmed local
-writes.
+Pending mutations remain a separate local-intent journal. Mutation commands
+may use that intent as their mutation base after selecting the live provider
+fact, but journal rows do not become provider observations. A provider failure
+stops the command unless the caller explicitly passes `allow_cached=True`; the
+fallback carries a warning and `from_cache=True`. A successful live observation,
+including an empty snapshot or an exact selector that does not exist, is
+authoritative and does not activate fallback.
 
-When a GitHub-backed listing's cache state cannot be confirmed complete
-(never synced, or a checkpoint sitting over a snapshot set with unreadable
-files — see `WorkItemSnapshotBatch.skipped`, backlog #3546 task A2), the
-listing is withheld by default: `items` and `count` are both `None` instead
-of the ambiguous `[]`/`0` an unaware caller could misread as a confirmed-empty
-backlog. Pass `allow_cached=True` (`--allow-cached` on the CLI) to opt into
-the best-effort cached list anyway.
+`operations.list_items` reports `from_cache` and `has_pending_writes`
+independently. Normal successful GitHub reads set `from_cache=False` even when
+the private journal has pending mutations. `has_pending_writes=True` reports
+unacknowledged local intent without adding it to provider rows. The legacy
+low-confidence cache completeness checks apply only after explicit fallback;
+they may withhold `items` and `count` when the cached snapshot cannot be
+confirmed complete.
 
 Status provenance is independent of listing provenance. `status_source` is
 `live` when all returned status-bearing rows came from a successful provider
@@ -359,7 +367,7 @@ Handle provider status as follows:
 | Result | Required action |
 |---|---|
 | Reachable | Continue and use returned provider revisions. |
-| Stale | Use only for read context; re-read after reachability returns before making a decision. |
+| Stale | Use only after an explicit cached fallback; re-read live before making a provider decision. |
 | Pending | Report that the write is durably queued; wait for replay acknowledgement before claiming completion. |
 | Unavailable | Preserve the error and stop the dependent write or verification step. |
 
