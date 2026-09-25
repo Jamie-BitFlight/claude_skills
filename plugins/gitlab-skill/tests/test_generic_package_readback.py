@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from typing_extensions import override
 
 PLUGIN_ROOT = Path(__file__).parents[1]
 COMPONENT = PLUGIN_ROOT / "skills/gitlab-skill/assets/release-components/templates/generic-package.yml"
@@ -32,7 +33,8 @@ def component_script() -> str:
     documents = list(yaml.safe_load_all(COMPONENT.read_text(encoding="utf-8")))
     job = documents[1]["$[[ inputs.job-name ]]"]
     commands = job["script"]
-    assert isinstance(commands, list) and all(isinstance(command, str) for command in commands)
+    assert isinstance(commands, list)
+    assert all(isinstance(command, str) for command in commands)
     return "set -eu\n" + "\n".join(commands)
 
 
@@ -70,11 +72,7 @@ def run_component(work: Path, environment: dict[str, str]) -> subprocess.Complet
     ids=["matching-readback", "upload-failed", "wrong-bytes", "missing", "read-denied", "read-failed"],
 )
 def test_publication_requires_matching_readback(
-    tmp_path: Path,
-    upload_status: int,
-    download_status: int,
-    download_bytes: bytes,
-    expected_success: bool,
+    tmp_path: Path, upload_status: int, download_status: int, download_bytes: bytes, expected_success: bool
 ) -> None:
     """An upload acknowledgment alone cannot satisfy destination verification."""
     uploads: list[bytes] = []
@@ -96,6 +94,7 @@ def test_publication_requires_matching_readback(
             self.end_headers()
             self.wfile.write(download_bytes)
 
+        @override
         def log_message(self, format: str, *args: object) -> None:
             pass
 

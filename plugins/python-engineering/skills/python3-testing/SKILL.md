@@ -10,7 +10,8 @@ Consult `standards-for-python-development` for the shared rules (coverage, test 
 
 ## Test Failure Mindset
 
-Tests are specifications. When a test fails, investigate both possibilities:
+Tests encode claims about expected behavior; validate them against authoritative intent.
+Neither a test nor its implementation is automatically correct. Investigate both possibilities:
 
 | Hypothesis A | Hypothesis B |
 |---|---|
@@ -20,7 +21,9 @@ Tests are specifications. When a test fails, investigate both possibilities:
 
 **Red flags**: Never immediately change tests to match implementation. Never assume implementation is always correct. Never bulk-update tests without individual analysis.
 
-For the full investigation protocol, red flags, and example responses, load `/python-engineering:test-failure-mindset`.
+Also investigate producer/consumer contracts, fixtures, mocks, observation, and CI conditions;
+several defects can coexist. For the evidence, correction, and validation protocol, load
+[the test-failure mindset](../test-failure-mindset/SKILL.md).
 
 ## Fixture Design
 

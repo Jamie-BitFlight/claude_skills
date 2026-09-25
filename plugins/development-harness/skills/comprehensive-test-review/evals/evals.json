@@ -1,0 +1,67 @@
+{
+  "skill_name": "comprehensive-test-review",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Read-only test review. Contract N: normalize_ids removes duplicates and returns ascending IDs. The implementation currently does so. The suite reports 98% line coverage, but its only assertion for normalize_ids([2,1,1]) is isinstance(result, list). No negative-control execution is available. Is the guarantee protected, and what evidence should a replacement test provide?",
+      "expected_output": "Identify weak fault detection despite coverage and propose independently grounded behavioral checks.",
+      "files": [],
+      "expectations": [
+        "Does not accept 98% coverage as proof that sorting or deduplication faults are detected.",
+        "Proposes expected contents/properties grounded in contract N, not the implementation helper.",
+        "Specifies relevant faults such as retaining duplicates or preserving unsorted input.",
+        "Marks unexecuted negative controls as proposed/unvalidated.",
+        "Does not require a new universal coverage target or a test for every private helper."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "A refactor renamed the private helper that emits an audit event. Product contract A requires authorization before any write and the audit event before commit. Tests fail because they name the old helper. A proposal removes all interaction assertions as implementation-coupled. Review that proposal; only source assessment is authorized.",
+      "expected_output": "Remove incidental helper coupling while retaining contractual side-effect ordering.",
+      "files": [],
+      "expectations": [
+        "Distinguishes the private helper identity from the required authorization/write/audit/commit behavior.",
+        "Retains or replaces protection for unauthorized writes and audit-before-commit ordering.",
+        "Does not categorically ban interaction assertions or require a particular mocking dependency.",
+        "Reports source assessment separately from behavioral validation."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "A regression test passes on the candidate. With a deliberately broken return value, the run exits nonzero, but its only error is ImportError during test collection after the mutation patch also renamed a module. No test reached its assertion. The report says the mutation was killed. Review the claimed evidence.",
+      "expected_output": "Reject an unrelated collection error as proof of fault sensitivity and request a valid control.",
+      "files": [],
+      "expectations": [
+        "Does not count the collection error as successful detection of the bad return value.",
+        "Requires a collectable variant where execution reaches the intended assertion.",
+        "Keeps the positive control and comparable baseline conditions.",
+        "Leaves fault sensitivity unvalidated until that execution exists."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Review two suites using supplied reports. Repository P has no numerical coverage gate; it reports 72% and has explicit tests for the changed public contract. Repository Q has an approved 90% branch gate and reports 88%. No execution is available. Decide how coverage affects each review without introducing new policy.",
+      "expected_output": "Respect actual project authority and keep risk/behavior review separate from percentages.",
+      "files": [],
+      "expectations": [
+        "Does not impose a generic 80% or 95% target on P.",
+        "Reports the supplied failure to meet Q's existing gate without lowering it.",
+        "Assesses meaningful uncovered risk and fault detection separately in both cases.",
+        "Does not declare either product correct solely from a coverage report."
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "A skill must ask for authorization before deleting customer data. Its current test asserts that SKILL.md contains the words ask for authorization. The file passes that check; no agent task trace exists. Review the protection and propose an evaluation without executing a real deletion.",
+      "expected_output": "Distinguish static representation from execution and propose a safe behavioral evaluation.",
+      "files": [],
+      "expectations": [
+        "Does not treat phrase presence as proof of authorization or side-effect behavior.",
+        "Proposes a representative isolated task with observable authorization and forbidden-write behavior.",
+        "Inspects consequential actions/handoffs or traces, not only final prose.",
+        "Does not perform or authorize a production deletion.",
+        "Reports absent execution as unvalidated and preserves the safety invariant."
+      ]
+    }
+  ]
+}

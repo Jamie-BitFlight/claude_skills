@@ -49,13 +49,7 @@ class GitSandbox:
     def run(self, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
         """Run a bounded Git command and retain its complete result."""
         return subprocess.run(
-            ["git", *args],
-            cwd=self.work,
-            env=self.env,
-            capture_output=True,
-            text=True,
-            check=check,
-            timeout=10,
+            ["git", *args], cwd=self.work, env=self.env, capture_output=True, text=True, check=check, timeout=10
         )
 
     def commit(self, value: str) -> str:
@@ -85,10 +79,12 @@ class GitSandbox:
         # Tokenize before substituting paths, so paths with spaces remain one argv.
         argv = shlex.split(command)
         for index, argument in enumerate(argv):
+            resolved_argument = argument
             for placeholder, value in replacements.items():
-                argument = argument.replace(placeholder, value)
-            assert "<" not in argument and ">" not in argument, argument
-            argv[index] = argument
+                resolved_argument = resolved_argument.replace(placeholder, value)
+            assert "<" not in resolved_argument, resolved_argument
+            assert ">" not in resolved_argument, resolved_argument
+            argv[index] = resolved_argument
         assert argv[:2] == ["git", "push"]
         return self.run(*argv[1:], check=False)
 

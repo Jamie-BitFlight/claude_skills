@@ -65,4 +65,4 @@ Generate diagrams or starter artifacts only when they advance the learner's stat
 
 ## Credits
 
-Knowledge-graph material is distilled and adapted from Southeast University’s graduate Knowledge Graph course by Prof. Peng Wang: https://github.com/npubird/KnowledgeGraphCourse.
+Knowledge-graph material is distilled and adapted from Southeast University’s graduate Knowledge Graph course by Prof. Peng Wang: <https://github.com/npubird/KnowledgeGraphCourse>.
