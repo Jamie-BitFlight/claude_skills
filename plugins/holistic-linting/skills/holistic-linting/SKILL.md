@@ -1,280 +1,104 @@
 ---
 name: holistic-linting
-description: Comprehensive linting and formatting verification workflows. Provides automatic format-lint-resolve pipelines for orchestrators and sub-agents. Use when running linters, fixing ruff/mypy/bandit errors, ensuring code quality before completion, or resolving linting issues systematically.
+description: Discover and run configured quality gates for requested or changed work, preserve diagnostics as evidence, route failures to the appropriate causal/domain capability, and verify corrections. Use for linting, formatting, type-checking, configured hook checks, or pre-completion quality verification.
 ---
 
-# Holistic Linting Skill
+# Holistic Linting
 
-This skill embeds comprehensive linting and formatting verification into Claude Code's workflow, preventing the common pattern where code is claimed "production ready" without actually running quality checks.
+Run configured quality gates and treat diagnostics as evidence to diagnose, not instructions to silence. Read [../../ARCHITECTURE.md](../../ARCHITECTURE.md) when changing this workflow or when a diagnostic crosses language, configuration, generated-artifact, or shared-contract boundaries.
 
-## When This Skill Applies
+## 1. Resolve scope and discover gates
 
-This skill applies to **all code editing tasks** in projects with linting configuration. It provides different behavior based on Claude's role:
+Start from explicitly requested files/directories, or task-changed files when no scope was supplied. Do not broaden into repository-wide cleanup unless requested or required by an authoritative configured gate.
 
-### For Orchestrators (Interactive Claude Code CLI)
+Inspect repository configuration read-only. Prefer an aggregate hook/task command when repository configuration makes it authoritative; preserve unknown/custom configured hooks rather than silently reducing them to a known-tool allowlist. Do not use `discover_linters.py` for runtime discovery: it is a setup/documentation writer.
 
-After completing implementation work, orchestrators MUST delegate to specialized agents. See the [holistic-linting-orchestrator skill](../holistic-linting-orchestrator/SKILL.md) for complete delegation workflows.
+When `.pre-commit-config.yaml` is authoritative, [detect_hook_tool.py](./scripts/detect_hook_tool.py) may assist runner selection. Resolve the script from this installed skill directory, not the caller's working directory. Its answer is evidence about runner selection, not proof that all configured gates were discovered.
 
-**Quick reference**:
+Classify discovery as `COMPLETE`, `NO_APPLICABLE_GATES`, or `INCOMPLETE`. Missing executables, malformed/unsupported configuration, timeout, and no-applicable-gate are distinct outcomes. Never turn an empty/unknown result into a pass.
 
-1. **Delegate immediately** - Launch linting-root-cause-resolver agent for modified files
-2. **Read reports** - Agent produces resolution reports in `.claude/reports/`
-3. **Delegate review** - Launch post-linting-architecture-reviewer to validate resolution quality
-4. **Iterate if needed** - Re-delegate to resolver if reviewer identifies issues
+For every planned gate retain command, cwd, scope, revision/config identity, and tool identity/version when material.
 
-**CRITICAL**: Orchestrators do NOT run formatting or linting commands themselves. The agent gathers its own linting data, formats files, runs linters, and resolves issues. Orchestrators only delegate tasks and read completion reports.
+## 2. Execute and account for diagnostics
 
-### For Sub-Agents (Task-delegated agents)
+Run formatting and quality checks according to repository configuration. Formatting is a state change; add formatter-touched files to the affected verification surface.
 
-Before completing any task that involved Edit/Write:
+Record exit status and emitted diagnostics for every gate. Gate success and diagnostic disposition are separate: a zero exit can still emit warnings/advisories. Account for those diagnostics before completion without promoting repository-approved warnings into failures.
 
-1. **Format touched files** - Run formatters on files the agent modified
-2. **Lint touched files** - Run linters on files the agent modified
-3. **Resolve issues directly** - Use linting tools directly to fix issues
-4. **Don't complete** - Don't mark task complete until all linting issues in touched files are resolved
+If no diagnostic requires correction, continue through integrity/final reporting; do not bypass out-of-scope/advisory accounting.
 
-For detailed resolution workflows, see the [holistic-linting-resolver skill](../holistic-linting-resolver/SKILL.md).
+## 3. Classify and cluster
 
-## How to Use This Skill
+Classify every material diagnostic as defect, tooling/configuration defect, justified-exception candidate, unresolved, or out-of-scope. Blocking versus advisory follows repository/task policy.
 
-### Linter Detection
+Cluster diagnostics that can share an API/type contract, configuration, generated source, dependency, or implementation boundary. A filename is not itself proof of independence or dependence. Parallelize only correction clusters whose relevant surfaces are established as independent.
 
-Linter detection is handled automatically by scanning project configuration files. The linting hook's `ConfigurationDetector` identifies available tools at runtime by checking:
+## 4. Diagnose at the owning boundary
 
-| Config File                    | Tools Detected                                       |
-| ------------------------------- | ---------------------------------------------------- |
-| `.pre-commit-config.yaml`      | pre-commit/prek hooks (takes priority, skips others) |
-| `.husky/` directory            | Husky git hooks                                      |
-| `pyproject.toml`               | Ruff, MyPy, basedpyright, bandit                     |
-| `package.json`, `.eslintrc*`   | ESLint                                               |
-| `package.json`, `.prettierrc*` | Prettier                                             |
-| `.clang-format`                | clang-format (C/C++)                                 |
-| `.rubocop.yml`                 | RuboCop (Ruby)                                       |
-| `.shellcheckrc`                | ShellCheck (shell scripts)                           |
-| `.markdownlint.json/.yaml`     | markdownlint                                         |
+Apply an obvious mechanically safe correction only when intent is already established.
 
-**Detection Priority** (highest to lowest):
+Otherwise, if `dh:root-cause-tracing-process` is actually available in the host, pass it the original gate evidence and use it to establish mechanism, governing contract, and correction boundary. If unavailable, perform only bounded causal work supported by current evidence; return `UNRESOLVED` when the missing capability/evidence prevents a safe decision.
 
-1. Pre-commit/prek (if found, uses hooks exclusively)
-2. Husky
-3. Language-specific tools (Python → JS/TS → Shell → etc.)
+Resolve a language/domain capability before invoking it. For Python, use `python-engineering:standards-for-python-development` when available. Broader read-only Python review capabilities such as StinkySnake, SnakePolish, `review`, or `python-quality-audit` are conditional assessment lanes, not automatic writers. If unavailable, do not invent their conclusions; if they return findings, hand correction to the caller or another authorized writer.
 
-### Running Formatters and Linters
+For non-Python failures, use an available owning domain capability when it materially improves the decision. Do not load Python methodology by default.
 
-**Git Hook Tool Detection** (if `.pre-commit-config.yaml` exists):
+### Rule interpretation
 
-Use the detection script to identify and run the correct tool:
+Interpret a rule from evidence corresponding to the configured tool/version where practical.
 
-```bash
-# Detect tool (outputs 'prek' or 'pre-commit')
-uv run ./scripts/detect_hook_tool.py
+- Ruff: prefer the installed tool's `ruff rule <CODE>`.
+- MyPy: prefer matching-version documentation; when unavailable/offline, use the bundled [MyPy rule index](./references/rules/mypy/index.md) and [vendored MyPy docs](./references/mypy-docs/) as fallback evidence, marking version uncertainty.
+- Bandit: prefer current installed/official evidence, with the bundled [Bandit rule index](./references/rules/bandit/index.md) as offline fallback.
+- Other checkers: use installed/current documentation when available. For typing failures, trace expected/actual types upstream and inspect third-party stubs/configuration when relevant.
 
-# Run detected tool with arguments
-uv run ./scripts/detect_hook_tool.py run --files path/to/file.py
+If authoritative interpretation cannot be established, retain that as missing evidence rather than guessing.
 
-# Check different repository on specific files
-uv run ./scripts/detect_hook_tool.py --directory /path/to/repo run --files path/to/file.py
+## 5. Protect quality-gate integrity
+
+Do not autonomously add/broaden suppressions, reduce configured applicability/severity, bypass a gate, or delete required behavior merely to obtain green output.
+
+A targeted exception is a policy decision. When evidence establishes valid behavior that requires one, record the proposed exception and required authority. Applied authorized exceptions remain explicit in final evidence.
+
+## 6. Preserve unresolved and out-of-scope findings
+
+For `UNRESOLVED`, retain the original diagnostic, material attempts/observations, fundamental constraint or unknown, and next evidence/decision required. An unresolved blocking requirement prevents successful workflow status.
+
+For `OUT_OF_SCOPE`, retain tool/gate, rule when available, location/scope, exact diagnostic, reproduction command/context, and discovery revision/date. Deliver it to an existing authorized repository policy/tracker when available and record destination/receipt. If no consumer exists or delivery is unavailable, return the complete payload to the caller. Do not create a plugin-specific tracker.
+
+## 7. Verify correction integrity and final state
+
+Before accepting a corrected state:
+
+1. Compare relevant source/configuration against the pre-correction state.
+2. Check for newly added/broadened suppression, ignore/exclusion/severity/applicability weakening, gate bypass/removal, and deletion of required behavior.
+3. Distinguish live suppression from suppression-like fixture/string text and unchanged pre-existing comments.
+4. Confirm any exception is explicitly authorized.
+5. Rerun every affected configured gate, including incidentally changed files.
+6. If a relevant edit occurs after verification, invalidate and rerun the affected evidence.
+
+A failed or unverified required integrity check returns to diagnosis/correction. A successful linter rerun alone is insufficient.
+
+Report:
+
+```text
+Workflow status: DONE | BLOCKED
+Scope:
+Discovery: COMPLETE | NO_APPLICABLE_GATES | INCOMPLETE
+Configured gates executed:
+Gate results:
+Diagnostic dispositions: (include explicit none)
+Corrections and integrity evidence:
+UNRESOLVED: (include explicit none)
+OUT_OF_SCOPE and delivery status: (include explicit none)
+Additional validation required:
 ```
 
-**Important - Scoped Operations**: Always use `--files` or staged file patterns rather than `--all-files`. Use `--all-files` ONLY when explicitly requested by the user for repository-wide cleanup.
+Use `DONE` only when required gates/integrity checks are terminal for the claimed scope. `BLOCKED` identifies the missing evidence, authority, capability, or failing required gate.
 
-**Note**: prek is a Rust-based drop-in replacement for pre-commit. Both tools use the same `.pre-commit-config.yaml` and have identical CLI interfaces.
+## Bundled mechanics
 
-**For Python files**:
+- [detect_hook_tool.py](./scripts/detect_hook_tool.py) assists pre-commit-compatible runner selection.
+- `discover_linters.py` is a separately authorized setup/documentation utility; it is not the runtime discovery API.
 
-```bash
-# Format first (auto-fixes trivial issues)
-uv run ruff format path/to/file.py
-
-# Then lint (reports substantive issues)
-uv run ruff check path/to/file.py
-uv run mypy path/to/file.py
-uv run pyright path/to/file.py
-```
-
-**For JavaScript/TypeScript files**:
-
-```bash
-# Format first
-npx prettier --write path/to/file.ts
-
-# Then lint
-npx eslint path/to/file.ts
-```
-
-**For Shell scripts**:
-
-```bash
-# Format first
-shfmt -w path/to/script.sh
-
-# Then lint
-shellcheck path/to/script.sh
-```
-
-**For Markdown**:
-
-```bash
-# Lint and auto-fix
-npx markdownlint-cli2 --fix path/to/file.md
-```
-
-### Resolving Linting Issues
-
-**For Orchestrators**: Delegate immediately to linting-root-cause-resolver WITHOUT running linters yourself. See the [holistic-linting-orchestrator skill](../holistic-linting-orchestrator/SKILL.md) for complete delegation workflows.
-
-```claude
-Agent(subagent_type="holistic-linting:linting-root-cause-resolver", prompt="Format, lint, and resolve any issues in file1.py")
-Agent(subagent_type="holistic-linting:linting-root-cause-resolver", prompt="Format, lint, and resolve any issues in file2.py")
-```
-
-**For Sub-Agents**: Follow the linter-specific resolution workflow documented in the [holistic-linting-resolver skill](../holistic-linting-resolver/SKILL.md) based on the linting tool reporting the issue.
-
-## Bundled Resources
-
-### Agent: linting-root-cause-resolver
-
-Location: [`../../agents/linting-root-cause-resolver.md`](../../agents/linting-root-cause-resolver.md)
-
-**To install the agent**:
-
-```bash
-# Install to user scope (~/.claude/agents/)
-uv run ./scripts/install_agents.py --scope user
-
-# Install to project scope (<git-root>/.claude/agents/)
-uv run ./scripts/install_agents.py --scope project
-
-# Overwrite existing agent file
-uv run ./scripts/install_agents.py --scope user --force
-```
-
-### Rules Knowledge Base
-
-Comprehensive documentation of linting rules from three major tools:
-
-#### Ruff Rules
-
-Location: [`./references/rules/ruff/index.md`](./references/rules/ruff/index.md)
-
-Covers all Ruff rule families including:
-
-- **E/W** (pycodestyle errors and warnings)
-- **F** (Pyflakes logical errors)
-- **B** (flake8-bugbear common bugs)
-- **S** (Bandit security checks)
-- **I** (isort import sorting)
-- **UP** (pyupgrade modern Python patterns)
-- And 13 more families
-
-#### MyPy Error Codes
-
-Location: [`./references/rules/mypy/index.md`](./references/rules/mypy/index.md)
-
-Comprehensive type checking error documentation organized by category:
-
-- Attribute access errors
-- Name resolution errors
-- Function call type checking
-- Assignment compatibility
-- Collection type checking
-- Operator usage
-- Import resolution
-- Abstract class enforcement
-- Async/await patterns
-
-#### Bandit Security Checks
-
-Location: [`./references/rules/bandit/index.md`](./references/rules/bandit/index.md)
-
-Security vulnerability documentation organized by category:
-
-- Credentials and secrets
-- Cryptography weaknesses
-- SSL/TLS vulnerabilities
-- Injection attacks (command, SQL, XML)
-- Deserialization risks
-- File permissions
-- Unsafe functions
-- Framework configuration
-- Dangerous imports
-
-### Scripts
-
-Available in [`./scripts/`](./scripts/):
-
-1. **install_agents.py** - Install the linting-root-cause-resolver agent to user or project scope
-2. **detect_hook_tool.py** - Detect and run the correct git hook tool (prek vs pre-commit)
-
-## Slash Commands
-
-### `/lint` Command
-
-The `/lint` command is a shorthand that activates this skill with optional file/directory path arguments.
-
-**Usage**:
-
-```bash
-/lint                    # Activate holistic-linting for current task's modified files
-/lint path/to/file.py    # Activate holistic-linting for specific file
-/lint path/to/directory  # Activate holistic-linting for all files in directory
-```
-
-The command loads this skill and follows the workflows documented above. It is equivalent to activating `/holistic-linting:holistic-linting` directly.
-
-## Pre-Existing Issues Protocol
-
-When a linter run reveals issues in files the current agent did not modify, "pre-existing issues not related to my changes" is a trigger to act — not a reason to skip. Every detected problem gets recorded. No detected issue silently disappears.
-
-**Outcome depends on whether the issue blocks the pipeline:**
-
-- **Blocking** (linter exits nonzero, CI would fail, or current task verification cannot pass) → apply a pre-fix check before touching any file: (1) load the domain skill for the affected file, (2) state in one sentence how the fix aligns with that plugin's mission, (3) classify complexity. Trivial (one file, obvious root cause): fix now. Multi-file or design-decision: route to planning for an in-session fix, or mark the current run BLOCKED if the fix cannot be scoped to this session.
-- **Non-blocking** (advisory warning, file unrelated to current task) → discover the repo's tracking system and record it
-
-**Record each non-blocking issue** with: tool, rule code, file:line, exact linter message, discovery date.
-
-**Report all pre-existing activity** in the resolution report — both issues fixed and issues recorded.
-
-See the [Pre-Existing Issues Protocol reference](./references/pre-existing-issues-protocol.md) for the tracking-system search order, the per-item record format, and the full triage pipeline (groom → reproduce → plan → execute).
-
-When uncertain whether an issue is blocking: treat it as blocking and fix it.
-
-## Best Practices
-
-1. **Run linters concurrently (Sub-Agents only)** - Use parallel execution for multiple files or multiple linters
-2. **Never suppress** - Agents must not add `# type: ignore`, `# noqa`, `# ruff: ignore[<rule>]`, `# ruff: file-ignore[<rules>]`, or any suppression comment, or modify linter config to reduce rule severity. If a fix cannot resolve the issue, escalate as UNRESOLVED with documentation of what was tried
-3. **Never delete to fix** - Removing a function, test, or class to eliminate a linting error is prohibited. Document it as a cleanup recommendation instead
-4. **Record pre-existing issues** - Every linting issue discovered — whether in files you touched or not — gets recorded. Apply the Pre-Existing Issues Protocol
-5. **Orchestrators delegate, sub-agents execute** - Orchestrators launch agents and read reports. Sub-agents run formatters, linters, and resolve issues.
-6. **Check UNRESOLVED items before architecture review** - Orchestrators read the resolution report and surface UNRESOLVED items to the user before delegating to the architecture reviewer
-7. **Verify after fixes (Sub-Agents only)** - Re-run linters on primary file AND any incidentally touched files to confirm all are clean
-8. **Trust agent verification (Orchestrators)** - Read resolution reports instead of re-running linters to verify
-
-## Troubleshooting
-
-**Problem**: "I don't know which linters this project uses"
-**Solution**: Linters are detected automatically by scanning config files (pyproject.toml, package.json, .pre-commit-config.yaml, etc.). Check the Linter Detection section for supported tools.
-
-**Problem**: "Linting errors but I don't understand the rule"
-**Solution**: Reference the rules knowledge base at `./references/rules/{ruff,mypy,bandit}/index.md`
-
-**Problem**: "Multiple files with linting errors"
-**Solution**: If orchestrator, launch concurrent linting-root-cause-resolver agents (one per file). If sub-agent, resolve each file sequentially.
-
-**Problem**: "Linter not found (command not available)"
-**Solution**: Check that linters are installed. Use `uv run <tool>` for Python tools to ensure virtual environment activation.
-
-**`error[unresolved-import]: Cannot resolve imported module 'X'`** — Add the directory containing module `X` to `[tool.ty.environment] extra-paths` in `pyproject.toml`; run `uv run ty check <path>` to verify; if errors persist, confirm `pyproject.toml` is the config ty is reading (a `ty.toml` in the project root takes precedence and `pyproject.toml` will be ignored).
-
-**Problem**: "False positive linting error"
-**Solution**: Investigate using the rule's documentation. If the rule fires on code that is genuinely correct, document what you tried and why each approach failed, then return UNRESOLVED. The user decides whether to reconfigure the rule — agents do not modify linter configuration autonomously.
-
-**Problem**: "No code change resolves the linting error"
-**Solution**: This is expected for some issues (e.g., platform-conditional imports where ruff can't evaluate `sys.platform`). Mark the issue as UNRESOLVED in the resolution report with: (1) approaches attempted, (2) why each failed, (3) the fundamental constraint. The orchestrator will present this to the user for a human decision on suppression vs. rule reconfiguration.
-
-## Related Skills
-
-- [holistic-linting-orchestrator](../holistic-linting-orchestrator/SKILL.md) - Orchestrator delegation workflows for linting tasks
-- [holistic-linting-resolver](../holistic-linting-resolver/SKILL.md) - Linter-specific resolution workflows for sub-agents
-- **python-engineering** - Modern Python development patterns and best practices
-- **uv** - Python package and project management with uv
+Script output is evidence, not semantic diagnosis.
