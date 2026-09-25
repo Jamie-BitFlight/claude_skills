@@ -3,6 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #   "pytest>=9.1.1",
+#   "pytest-asyncio>=1.4.0",
 # ]
 # ///
 """Run the summarizer plugin's complete pytest boundary."""
