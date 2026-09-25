@@ -297,6 +297,9 @@ jobs:
       - name: Run integration tests
         run: uv run -q --locked pytest -m "integration and not research_vault" -v plugins/development-harness/tests/ tests/research_backlinks/
 
+      - name: Verify rebase publication identity
+        run: uv run -q --locked pytest -m integration -v tests/test_rebase_publication_identity.py
+
   # =============================================================================
   # Python: End-to-end live validation tests
   # Runs only on main push and manual dispatch — not on PRs.
