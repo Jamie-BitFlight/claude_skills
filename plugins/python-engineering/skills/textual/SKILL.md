@@ -11,7 +11,7 @@ Provides patterns, API constraints, and working examples for building terminal a
 
 ## Scope
 
-Consult `python-engineering:python3-core` for standing defaults (architecture, typing, testing, CLI rules).
+Consult `python-engineering:standards-for-python-development` for the shared rules (architecture, typing, testing, CLI rules).
 
 TRIGGER: Activate when the user asks about Textual — building TUI apps, widgets, CSS styling, reactive attributes, testing, or concurrency.
 

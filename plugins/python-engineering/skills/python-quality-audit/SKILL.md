@@ -9,7 +9,7 @@ user-invocable: true
 
 Audit Python without modifying the target. Fan out independent evidence gathering, then synthesize one deduplicated report whose findings can be verified and actioned.
 
-Load `python-engineering:python3-core` first. Its shared standards define the preferred Python engineering defaults and repository-precedence rules.
+Load `python-engineering:standards-for-python-development` first. Its shared rules define the preferred Python engineering defaults and repository-precedence rules.
 
 ## Resolve scope
 

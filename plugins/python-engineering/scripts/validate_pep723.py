@@ -160,7 +160,15 @@ def extract_imports(content: str) -> set[str]:
 
 
 def extract_pep723_dependencies(content: str) -> tuple[bool, set[str]]:
-    """Parse PEP 723 metadata and return normalized declared distribution names."""
+    """Parse PEP 723 metadata for the distribution names it declares.
+
+    Args:
+        content: Full text of the script to inspect.
+
+    Returns:
+        Whether a `# /// script` block is present, and the normalized distribution
+        names its `dependencies` declare. An unparseable block yields an empty set.
+    """
     normalized_content = content.replace("\r\n", "\n")
     match = re.search(r"^# /// script\n(.*?)^# ///$", normalized_content, re.MULTILINE | re.DOTALL)
     if not match:
@@ -171,7 +179,7 @@ def extract_pep723_dependencies(content: str) -> tuple[bool, set[str]]:
         if not line.startswith("#"):
             return True, set()
         text = line[1:]
-        metadata_lines.append(text[1:] if text.startswith(" ") else text)
+        metadata_lines.append(text.removeprefix(" "))
 
     try:
         metadata = tomllib.loads("\n".join(metadata_lines))
@@ -186,6 +194,7 @@ def extract_pep723_dependencies(content: str) -> tuple[bool, set[str]]:
         if name_match:
             dependencies.add(name_match.group(1).lower().replace("-", "_").replace(".", "_"))
     return True, dependencies
+
 
 def normalize_import_to_package(import_name: str) -> str:
     """Map import names to package names.
@@ -603,6 +612,78 @@ def _analyze_content(file_path: Path, content: str) -> tuple[str, set[str], set[
     return (current_shebang, pep723_deps, stdlib_imports, external_imports, is_executable(file_path))
 
 
+def _check_dependency_contract(
+    *,
+    content: str,
+    rule_number: int,
+    shebang_matches: bool,
+    external_imports: set[str],
+    declared_dependencies: set[str],
+) -> tuple[bool, set[str]]:
+    """Check the runtime dependency contract alongside the shebang.
+
+    Rule 3 requires PEP 723 metadata declaring every detected external import, so a
+    correct shebang alone does not make the file correct.
+
+    Args:
+        content: Full text of the script.
+        rule_number: Applicable shebang rule.
+        shebang_matches: Whether the shebang already equals the expected one.
+        external_imports: External modules the script imports.
+        declared_dependencies: Distribution names the inline block declares.
+
+    Returns:
+        Whether the file is correct, and the declared dependencies it is missing.
+    """
+    if rule_number != RULE_UV_SCRIPT:
+        return shebang_matches, set()
+
+    has_pep723, _declared = extract_pep723_dependencies(content)
+    missing = {normalize_import_to_package(name) for name in external_imports} - declared_dependencies
+    return shebang_matches and has_pep723 and not missing, missing
+
+
+def _collect_errors(
+    *,
+    rule_number: int,
+    current_shebang: str,
+    expected_shebang: str,
+    is_correct: bool,
+    is_exec: bool,
+    missing_pep723_dependencies: set[str],
+) -> list[str]:
+    """Build the human-readable findings for one already-analyzed file.
+
+    Args:
+        rule_number: Applicable shebang rule.
+        current_shebang: Shebang found in the file.
+        expected_shebang: Shebang the applicable rule requires.
+        is_correct: Whether shebang and dependency contract both hold.
+        is_exec: Whether the file carries the execute bit.
+        missing_pep723_dependencies: External imports absent from the inline block.
+
+    Returns:
+        One message per finding, empty when the file satisfies its rule.
+    """
+    errors: list[str] = []
+    if not is_correct:
+        errors.append(f"Incorrect shebang: expected '{expected_shebang}', got '{current_shebang}'")
+        if rule_number == RULE_UV_SCRIPT and UV_SHEBANG_PATTERN.match(current_shebang):
+            errors.extend(diagnose_uv_shebang(current_shebang))
+
+    if rule_number == RULE_UV_SCRIPT and missing_pep723_dependencies:
+        errors.append(
+            "PEP 723 metadata does not establish dependencies for: " + ", ".join(sorted(missing_pep723_dependencies))
+        )
+
+    if rule_number in EXECUTABLE_RULES and not is_exec:
+        errors.append(f"Rule {rule_number} requires execute bit, but file is not executable")
+    elif rule_number == RULE_NO_SHEBANG and is_exec:
+        errors.append("Rule 4 (no shebang) applies, but file has execute bit set")
+
+    return errors
+
+
 def validate_file(file_path: Path) -> ValidationResult:
     """Validate a Python file's shebang compliance.
 
@@ -641,35 +722,22 @@ def validate_file(file_path: Path) -> ValidationResult:
     # Check the shebang and the runtime dependency contract. Rule 3 requires
     # PEP 723 metadata declaring every detected external import; a correct
     # shebang alone is not sufficient.
-    is_correct = current_shebang == expected_shebang
-    missing_pep723_dependencies: set[str] = set()
-    if rule_number == RULE_UV_SCRIPT:
-        has_pep723, _declared = extract_pep723_dependencies(content)
-        normalized_external = {normalize_import_to_package(name) for name in external_imports}
-        missing_pep723_dependencies = normalized_external - pep723_deps
-        is_correct = is_correct and has_pep723 and not missing_pep723_dependencies
+    is_correct, missing_pep723_dependencies = _check_dependency_contract(
+        content=content,
+        rule_number=rule_number,
+        shebang_matches=current_shebang == expected_shebang,
+        external_imports=external_imports,
+        declared_dependencies=pep723_deps,
+    )
 
-    # Gather errors
-    errors: list[str] = []
-    if not is_correct:
-        errors.append(f"Incorrect shebang: expected '{expected_shebang}', got '{current_shebang}'")
-
-        # Add detailed diagnostics for UV shebangs
-        if rule_number == RULE_UV_SCRIPT and UV_SHEBANG_PATTERN.match(current_shebang):
-            diag = diagnose_uv_shebang(current_shebang)
-            errors.extend(diag)
-
-    if rule_number == RULE_UV_SCRIPT and missing_pep723_dependencies:
-        errors.append(
-            "PEP 723 metadata does not establish dependencies for: "
-            + ", ".join(sorted(missing_pep723_dependencies))
-        )
-
-    # Check execute bit alignment with rule
-    if rule_number in EXECUTABLE_RULES and not is_exec:
-        errors.append(f"Rule {rule_number} requires execute bit, but file is not executable")
-    elif rule_number == RULE_NO_SHEBANG and is_exec:
-        errors.append("Rule 4 (no shebang) applies, but file has execute bit set")
+    errors = _collect_errors(
+        rule_number=rule_number,
+        current_shebang=current_shebang,
+        expected_shebang=expected_shebang,
+        is_correct=is_correct,
+        is_exec=is_exec,
+        missing_pep723_dependencies=missing_pep723_dependencies,
+    )
 
     return ValidationResult(
         current_shebang=current_shebang,
@@ -774,6 +842,7 @@ def auto_fix_file(file_path: Path, result: ValidationResult) -> bool:
         console.print(f"[red]ERROR: Failed to fix file: {e}[/red]")
         return False
     return True
+
 
 def _get_table_width(table: Table) -> int:
     """Get the natural width of a table using a temporary wide console.

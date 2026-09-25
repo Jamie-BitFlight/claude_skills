@@ -18,7 +18,7 @@ Correctness patterns for building CLI applications with Typer and Rich, focused 
 
 ## Non-TTY and Programmatic Usage
 
-Consult `python-engineering:python3-core` for standing defaults (architecture, typing, testing, CLI rules).
+Consult `python-engineering:standards-for-python-development` for the shared rules (architecture, typing, testing, CLI rules).
 
 See `../python3-cli/references/typer-rich-non-tty-patterns.md` — Console behavior without TTY, width defaults, force_terminal vs width, Progress/Live in non-interactive contexts, environment variables.
 

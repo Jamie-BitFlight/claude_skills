@@ -6,7 +6,7 @@ user-invocable: false
 
 # CLI Development
 
-Consult `python3-core` for standing defaults. Load `python3-testing` for test patterns.
+Consult `standards-for-python-development` for the shared rules. Load `python3-testing` for test patterns.
 
 ## Audience First
 

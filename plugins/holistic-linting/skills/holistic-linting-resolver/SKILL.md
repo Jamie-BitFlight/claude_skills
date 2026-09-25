@@ -21,12 +21,12 @@ Use this skill when you are a **sub-agent** assigned to resolve linting issues i
 
 All linter-specific workflows share these common steps. Apply them in order before the linter-specific procedures.
 
-### 1. Load the python3-core Skill
+### 1. Load the Python Standards
 
 Before implementing any fixes:
 
 ```claude
-Skill(skill: "python-engineering:python3-core")
+Skill(skill: "python-engineering:standards-for-python-development")
 ```
 
 **Motivation**: Ensures fixes follow Python 3.11+ standards, modern typing patterns, and project conventions.
@@ -173,7 +173,7 @@ All incidentally modified files must also produce zero errors before resolution 
 4. **Apply Common Methodology**
 
    Follow steps 1-4 in the Common Resolution Methodology section above:
-   - Load python3-core skill
+   - Load standards-for-python-development skill
    - Pass through Suppression Gate
    - Check Architectural Context
    - Verify Resolution
@@ -183,7 +183,7 @@ All incidentally modified files must also produce zero errors before resolution 
    Apply the fix following these principles:
 
    - Address the root cause, not the symptom
-   - Follow modern Python patterns from the python3-core skill
+   - Follow modern Python patterns from the standards-for-python-development skill
    - Maintain or improve code readability
    - Consider performance and maintainability
    - Add comments only if the fix is non-obvious
@@ -265,7 +265,7 @@ All incidentally modified files must also produce zero errors before resolution 
 4. **Apply Common Methodology**
 
    Follow steps 1-4 in the Common Resolution Methodology section above:
-   - Load python3-core skill
+   - Load standards-for-python-development skill
    - Pass through Suppression Gate
    - Check Architectural Context
    - Verify Resolution
@@ -430,7 +430,7 @@ All incidentally modified files must also produce zero errors before resolution 
 5. **Apply Common Methodology**
 
    Follow steps 1-4 in the Common Resolution Methodology section above:
-   - Load python3-core skill
+   - Load standards-for-python-development skill
    - Pass through Suppression Gate
    - Check Architectural Context
    - Verify Resolution
@@ -504,9 +504,9 @@ All incidentally modified files must also produce zero errors before resolution 
 
    **When all strategies fail**: Apply the Suppression Gate — document approaches tried and fundamental constraint, then return UNRESOLVED to the orchestrator. The pyproject.toml severity level is a project configuration decision, not a linting resolution action. Config changes require explicit user approval via the UNRESOLVED escalation path, not autonomous agent action.
 
-## Integration: Resolution Process with python3-core
+## Integration: Resolution Process with the Python Standards
 
-All linter resolution workflows integrate with the python3-core skill at the implementation stage. This integration ensures:
+All linter resolution workflows integrate with the standards-for-python-development skill at the implementation stage. This integration ensures:
 
 1. **Modern Python Patterns**: Fixes use Python 3.11+ syntax
 
@@ -536,7 +536,7 @@ All linter resolution workflows integrate with the python3-core skill at the imp
 
 ```text
 [Identify linting issue] → [Research rule] → [Read code] → [Check architecture]
-→ [Load python3-core skill] → [Implement elegant fix] → [Verify]
+→ [Load standards-for-python-development skill] → [Implement elegant fix] → [Verify]
 ```
 
 ## Related Skills

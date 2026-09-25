@@ -14,7 +14,7 @@ Build CLI applications with Typer by annotating Python functions. Typer converts
 
 ## Scope
 
-Consult `python-engineering:python3-core` for standing defaults (architecture, typing, testing, CLI rules).
+Consult `python-engineering:standards-for-python-development` for the shared rules (architecture, typing, testing, CLI rules).
 
 TRIGGER: Activate when the user asks about building CLIs with Typer, defining CLI arguments or options, composing subcommands, testing CLI apps, or using Typer features like prompts, enums, progress bars, or autocompletion.
 

@@ -224,6 +224,6 @@ tests/
 ## Related Resources
 
 - **Agent**: Use `python-engineering:python-pytest-architect` for test implementation
-- **Skill**: `python-engineering:python3-core` for general Python patterns
+- **Skill**: `python-engineering:standards-for-python-development` for the shared Python rules
 - **Skill**: `python-engineering:python3-testing` for test implementation patterns
 - **Command**: `/python-engineering:modernpython` for modern Python syntax reference
