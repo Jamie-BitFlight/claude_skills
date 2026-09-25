@@ -61,7 +61,10 @@ FALSIFICATION_CRITERIA: {what would disprove this claim}
 
 ### Step 1: Understand the Claim
 
-Parse the claim into a precise, falsifiable statement. If the claim is vague, narrow it to the most specific testable assertion.
+Keep the supplied claim unchanged as the result identity. Parse a separate, falsifiable
+statement for analysis; narrowing that statement does not authorize rewriting the original claim
+or asserting more than the gathered evidence establishes. Apply the claim-identity rules in the
+[Fact-Check result contract](../skills/work-backlog-item/references/workflows/groom/fact-check-result.md#claim-identity).
 
 ### Step 2: Gather Evidence from Primary Source
 
@@ -104,29 +107,14 @@ Before finalizing, challenge your initial verdict:
 
 ### Step 4: Return Verdict
 
-Assemble the verdict in this exact shape. It is your deliverable: in your response it follows the
-`STATUS: DONE` line, and in Step 5 it is the `content` argument on its own, with no status line.
+Read the [Fact-Check result contract](../skills/work-backlog-item/references/workflows/groom/fact-check-result.md)
+and assemble and validate the result before Step 5. That contract owns the lowercase fields,
+exact claim/hypothesis identity and unavailable-evidence behavior. Keep the direct excerpts,
+retrieval dates, CoVe findings, explanation and verification-source detail gathered above.
 
-```text
-CLAIM: {exact claim text}
-VERDICT: VERIFIED | REFUTED | INCONCLUSIVE
-
-EVIDENCE:
-  - Source: {URL, file:line, or command used}
-  - Retrieved: {YYYY-MM-DD}
-  - Content: |
-      {relevant excerpt — quote directly, do not paraphrase}
-
-CROSS_CHECK:
-  - Source: {second source used for CoVe}
-  - Finding: {what the cross-check revealed}
-
-EXPLANATION: {1-2 sentences connecting evidence to verdict}
-
-CITATION: |
-  SOURCE: {URL or file:line} (accessed {YYYY-MM-DD})
-  VERIFIED_BY: mcp__Ref|mcp__exa|mcp__context7|gh|CLI|Read|Grep|WebFetch|WebSearch on {date}
-```
+The validated record is the deliverable. Return it after the `dh:subagent-contract` delivery
+status; persist the same record without the status line. Do not emit a competing uppercase
+result format. A delivery status is not the claim's verdict.
 
 ### Step 5: Persist the Verdict to the Backlog Item
 

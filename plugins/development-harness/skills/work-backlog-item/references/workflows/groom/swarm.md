@@ -16,11 +16,11 @@ Each agent's section is how the others reach its findings — an agent that must
    own separate claim to verify, every one prefixed `HYPOTHESIS:` using that claim's own exact
    text, so `finalize.md` can match each verdict back to its originating line by exact-text
    comparison (see Fact-Checker output contract below). Write to `section="Fact-Check"`, recording
-   each `REFUTED:` claim there (they become MISSING in RT-ICA).
+   each `verdict: REFUTED` claim there (they become MISSING in RT-ICA).
 
 3. **rtica-assessor** — Assess information completeness using impact-analyst and fact-checker
    output. Write to `section="RT-ICA"`. Re-read Impact Radius and Fact-Check before
-   finalizing: a `REFUTED:` claim marks its condition MISSING, a `SCOPE_EXPANSION:` line adds
+   finalizing: a `verdict: REFUTED` claim marks its condition MISSING, a `SCOPE_EXPANSION:` line adds
    conditions.
 
 4. **classifier** — Classify issue type and run root-cause analysis if `defect` or
@@ -82,7 +82,7 @@ sequenceDiagram
     FC->>FC: re-read Impact Radius, add CI claims to verification list
 
     FC->>FC: verify claims against primary sources
-    FC->>FC: write Fact-Check, recording "REFUTED: task_format.py multi-doc support"
+    FC->>FC: write Fact-Check using the shared result contract
 
     IA->>IA: prove causal paths, outcomes, owners, evidence, and verification obligations
     IA-->>O: STATUS: DONE — Impact Radius written
@@ -159,26 +159,9 @@ an owned verification obligation and review trigger, not a completion condition 
 
 ## Fact-Checker output contract
 
-Each claim must contain:
-
-```text
-verdict: VERIFIED | REFUTED | INCONCLUSIVE
-claim: {exact claim from item}
-evidence: {tool result citation}
-source: {URL or file path with line numbers}
-```
-
-When the claim is one of the item description's `**Hypothesis**: {text}` lines, prefix `claim:`
-with `HYPOTHESIS:` followed by that line's exact text verbatim — do not paraphrase (e.g.
-`claim: HYPOTHESIS: retries fail because the cache is stale`). With more than one hypothesis line,
-`finalize.md`'s Hypothesis Resolution step matches each verdict back to its originating line by
-comparing this exact text, so a paraphrased claim breaks that match.
-
-Validation rules:
-
-- `verdict` absent → reject claim, log error, do not write
-- `evidence` absent → mark INCONCLUSIVE, write with note
-- RT-ICA mapping: REFUTED → MISSING, INCONCLUSIVE → DERIVABLE
+Read the [Fact-Check result contract](./fact-check-result.md) for the result fields,
+exact hypothesis identity, evidence handling and RT-ICA mapping. The fact-checker and
+finalizer use the same contract; do not supply a second output template in dispatch.
 
 ## Issue Classification
 

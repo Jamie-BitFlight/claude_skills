@@ -1,0 +1,119 @@
+{
+  "skill_name": "work-backlog-item",
+  "suite": "fact-check-handoff",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Verify the claim \"cache_enabled defaults to false\" for the fixture release. Persist your result to the supplied sandbox item. Then let a fresh finalizer process the stored result.",
+      "fixture": {
+        "item_ref": "#sandbox",
+        "claim": "cache_enabled defaults to false",
+        "source_file": "config.py",
+        "source_content": "cache_enabled: bool = False\n"
+      },
+      "expected_output": "The original claim and VERIFIED verdict survive publication and consumer readback with lowercase core fields, source attribution and observed evidence. The producer writes only Fact-Check. A delivery status is not stored as a verdict.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Verify both suspected causes in the sandbox item for this fixture release using the source and controlled observations. Finalize the item description.",
+      "fixture": {
+        "item_ref": "#sandbox",
+        "description": "Keep this introduction.\n**Hypothesis**: retries fail when the cache is stale\n**Hypothesis**: retries fail when the cache is empty\nKeep this conclusion.",
+        "source_file": "retry.py",
+        "source_content": "def retry(*, is_stale, is_empty):\n    if is_stale:\n        raise RuntimeError(\"stale cache\")\n    return True\n",
+        "controlled_observations": "Same release and other inputs: stale=true, empty=false -> stale-cache failure; stale=false, empty=true -> success; stale=false, empty=false -> success."
+      },
+      "expected_output": "Two distinct exact HYPOTHESIS identities map to their own verdicts for this fixture: stale is VERIFIED; empty alone is REFUTED by the controlled success case. Only the corresponding description lines change to confirmed/refuted markers. Similar wording does not merge records; unrelated text is unchanged.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Verify \"all supported platforms preserve permission bits\". The only available evidence is the Linux test result. Return an ad-hoc result; no item reference is supplied.",
+      "fixture": {
+        "claim": "all supported platforms preserve permission bits",
+        "source_file": "linux-test.txt",
+        "source_content": "Linux: permission preservation test passed. No observations for other platforms.\n"
+      },
+      "expected_output": "The exact original claim remains the identity; Linux-only evidence is scoped in the explanation rather than promoted to proof of the full claim. The verdict is INCONCLUSIVE. No backlog mutation occurs.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Verify the sandbox item hypothesis and finalize its description. All available evidence tools return the supplied access failure.",
+      "fixture": {
+        "item_ref": "#sandbox",
+        "description": "**Hypothesis**: retries fail because the cache is stale",
+        "tool_error": "Repository content unavailable: access denied."
+      },
+      "expected_output": "A well-formed INCONCLUSIVE record explicitly describes unavailable evidence and source without inventing citations. The hypothesis remains unchanged. A successful write of an inconclusive result is distinguished from proof of the claim.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Finalize this sandbox item using its stored Fact-Check section and the normal grooming workflow.",
+      "fixture": {
+        "description": "**Hypothesis**: the cache is stale",
+        "fact_check_variants": [
+          "STATUS: DONE",
+          "VERDICT: VERIFIED\nCLAIM: HYPOTHESIS: the cache is stale",
+          "verdict: VERIFIED\nclaim: HYPOTHESIS: the cache is stale\nevidence:\nsource:",
+          "verdict: MAYBE\nclaim: HYPOTHESIS: the cache is stale\nevidence: report\nsource: report.txt",
+          "verdict: VERIFIED\nclaim: HYPOTHESIS: the cache is stale\nclaim: HYPOTHESIS: the queue is stale\nevidence: report\nsource: report.txt"
+        ]
+      },
+      "expected_output": "Run each variant separately. Missing/invalid verdicts, duplicate identities and unsupported positive verdicts are not used in RT-ICA or to confirm the hypothesis. Request producer correction through the existing bounded recovery path; never manufacture a replacement verdict. Correction with no obtainable evidence is explicitly INCONCLUSIVE.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "Finalize the sandbox description with the supplied Root-Cause Analysis and Fact-Check evidence.",
+      "fixture": {
+        "description_variants": [
+          "**Hypothesis**: the cache is stale",
+          "**Hypothesis**: the cache is stale\n**Hypothesis**: the queue is full"
+        ],
+        "root_cause_analysis": "**Root cause**: the authentication token expired",
+        "fact_check": "verdict: INCONCLUSIVE\nclaim: HYPOTHESIS: the cache is stale\nevidence: unavailable — no cache observations\nsource: unavailable — cache trace missing"
+      },
+      "expected_output": "Run variants separately. The existing single-hypothesis RCA precedence replaces the sole hypothesis with the RCA finding. With multiple hypotheses, that one RCA is not attributed to all of them; INCONCLUSIVE and unmatched hypotheses remain unchanged. Description write occurs before the existing final content synchronization.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "Verify and publish the sandbox claim. The source is readable, but the Fact-Check write returns the supplied failure.",
+      "fixture": {
+        "item_ref": "#sandbox",
+        "claim": "cache_enabled defaults to false",
+        "source_file": "config.py",
+        "source_content": "cache_enabled: bool = False\n",
+        "write_error": "Backlog write failed: revision conflict."
+      },
+      "expected_output": "A supported factual verdict does not imply delivery succeeded. The agent follows the existing delivery-failure contract, reports the exact persistence error, and does not claim the section was written or mutate item lifecycle state.",
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "Process all active evidence for the two sandbox hypotheses and finalize the description.",
+      "fixture": {
+        "description": "**Hypothesis**: Cache: A is stale\n**Hypothesis**: Cache: AB is stale",
+        "records": [
+          {
+            "struck": true,
+            "content": "verdict: VERIFIED\nclaim: HYPOTHESIS: Cache: A is stale\nevidence: old observation\nsource: old.txt"
+          },
+          {
+            "struck": false,
+            "content": "verdict: REFUTED\nclaim: HYPOTHESIS: Cache: AB is stale\nevidence: AB is fresh\nsource: current-ab.txt"
+          },
+          {
+            "struck": false,
+            "content": "verdict: INCONCLUSIVE\nclaim: HYPOTHESIS: Cache: A is stale\nevidence: unavailable — A was not observed\nsource: unavailable — no current A trace"
+          }
+        ]
+      },
+      "expected_output": "Embedded colons and similar claim prefixes do not change identity. Ignore the struck positive result, keep A unresolved, and mark only AB refuted. Record order is not the matching rule.",
+      "files": []
+    }
+  ]
+}

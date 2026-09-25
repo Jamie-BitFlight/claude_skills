@@ -22,6 +22,10 @@ backlog view --selector "{item_ref}"
 ```
 
 Extract: Impact Radius, Fact-Check, Issue Classification, Research (if Wave 0 ran), groomed subsections.
+Validate active Fact-Check records against the [Fact-Check result contract](./fact-check-result.md#validation-and-handoff)
+before using their verdicts below. For malformed records, use the Output Validation Gate's
+existing retry limit with the fact-checker as the producer; do not infer a verdict from delivery
+status or rewrite the producer's evidence.
 
 2. Re-assess every condition from the initial RT-ICA snapshot:
    - Compare snapshot status to current status per condition.
@@ -151,7 +155,7 @@ Use the `section` filter to read each required section individually. The `sectio
 |---|---|
 | `RT-ICA` | Contains a plain `Decision:` line whose token is `APPROVED-FOR-PLANNING`, `APPROVED-WITH-GAPS`, or `BLOCKED-FOR-PLANNING`, and a `Date: YYYY-MM-DD` line. Any other token, or a missing line, fails the gate — do not accept it as either pass or block. |
 | `Impact Radius` | At least one entry under `Systems Inventory` |
-| `Fact-Check` | At least one claim with `verdict:` field |
+| `Fact-Check` | At least one result; every relevant active record satisfies the [Fact-Check result contract](./fact-check-result.md#validation-and-handoff), including claim identity and explicit INCONCLUSIVE handling for unavailable evidence. |
 | `Acceptance Criteria` | Non-empty — at least one criterion listed |
 | `Reproducibility` | Non-empty — "N/A for feature items" is acceptable but must be present |
 | `Issue Classification` | Contains `Type:` field with valid type value |
@@ -234,10 +238,10 @@ to an agent reading just a truncated glimpse of the item.
      analyzes one root cause for the item — with multiple hypothesis lines there is no reliable
      way to attribute that single finding to one specific line over another, so this precedence
      tier applies only when exactly one hypothesis line exists.)
-   - Else, `Fact-Check` section contains a claim prefixed `HYPOTHESIS:` whose text exactly matches
-     this line's `{text}` (per `swarm.md`'s fact-checker instruction, which prefixes every
-     hypothesis claim with `HYPOTHESIS:` using the claim's own exact text so each verdict maps
-     back to its originating line) — read its `verdict`:
+   - Else, an active `Fact-Check` result validated against the
+     [Fact-Check result contract](./fact-check-result.md#claim-identity) has the exact claim
+     `HYPOTHESIS: {text}` for this line. Use only that record's verdict; an ambiguous or
+     malformed result does not resolve a hypothesis. Read its `verdict`:
      - `VERIFIED` → `**Confirmed cause**: {original hypothesis text}`
      - `REFUTED` → `**Hypothesis (refuted — see Fact-Check section)**: {original hypothesis text}`
      - `INCONCLUSIVE` → no rewrite; the marker already correctly signals "not yet confirmed"
