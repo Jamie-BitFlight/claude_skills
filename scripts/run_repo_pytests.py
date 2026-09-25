@@ -1,15 +1,5 @@
-#!/usr/bin/env -S uv run --quiet --script
-# /// script
-# requires-python = ">=3.11"
-# dependencies = [
-#   "pytest>=9.1.1",
-#   "pytest-asyncio>=1.4.0",
-#   "pytest-cov>=7.1.0",
-#   "pytest-mock>=3.15.1",
-#   "pytest-xdist>=3.8.0",
-# ]
-# ///
-"""Run repository-owned pytest tests, excluding plugin-owned suites."""
+#!/usr/bin/env python3
+"""Run repository-owned pytest tests from the root development environment."""
 
 from __future__ import annotations
 
