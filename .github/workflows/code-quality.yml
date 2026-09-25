@@ -65,7 +65,7 @@ jobs:
   # JavaScript/TypeScript/JSON: Biome linting and formatting (via prek)
   # =============================================================================
   lint-js:
-    name: JS/TS/JSON / Biome
+    name: JS/TS/JSON / Biome lint
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -388,8 +388,12 @@ jobs:
   # =============================================================================
   # Summary job that requires all checks to pass
   # =============================================================================
+  # The repository ruleset currently requires the historical
+  # "JS/TS/JSON / Biome" context. Keep that stable context as the aggregate
+  # merge gate so every blocking job below is actually merge-enforced.
+  # The underlying Biome job is named "JS/TS/JSON / Biome lint".
   quality-gate:
-    name: Quality Gate
+    name: JS/TS/JSON / Biome
     if: always()
     needs:
       - lint-python
