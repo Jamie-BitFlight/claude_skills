@@ -37,7 +37,7 @@ The `/gh` skill is a primitive infrastructure layer. Composio adds a semantic la
 
 ### 2. SAM Task Plan System
 
-**File**: `./plugins/development-harness/plugins/development-harness/scripts/run_backlog_server.py` (inferred; not examined)
+**File**: `./plugins/development-harness/scripts/run_backlog_server.py` (inferred; not examined)
 
 **Result**: SKIPPED
 

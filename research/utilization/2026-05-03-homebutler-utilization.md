@@ -203,8 +203,8 @@ HomeButler presents **direct integration opportunities** as an MCP server depend
 
 If Phase 1–2 integrated:
 - `.claude-plugin/plugin.json` — add optional homebutler MCP server
-- `plugins/development-harness/SKILL.md` — reference and use cases
-- `plugins/development-harness/references/` — new reference file (optional)
+- `plugins/development-harness/skills/development-harness/SKILL.md` — reference and use cases
+- `plugins/development-harness/skills/development-harness/references/` — new reference file (optional)
 
 ---
 

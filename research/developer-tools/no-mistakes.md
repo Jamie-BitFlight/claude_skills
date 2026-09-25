@@ -462,7 +462,7 @@ Not yet an MCP server, but architecture allows:
 | `/everything-claude-code` skill | skill | Include no-mistakes as a post-generation workflow automation option for Claude Code agents; document how to configure gates matching the plugin's quality standards. |
 | `/claude-pilot` skill | skill | Reference no-mistakes as a complementary tool for pre-PR quality validation; document how TDD enforcement and hook automation can delegate to no-mistakes gates. |
 | `/worktrunk` skill | skill | Cross-reference no-mistakes for worktree-based validation; show how git worktree isolation patterns align with no-mistakes architecture. |
-| `plugins/development-harness/skills/git-workflow/` | skill | Add no-mistakes as a recommended git push alternative for AI-assisted development; document the gate model and agent-agnostic validation approach. |
+| `/dh:gate-push` skill | skill | Add no-mistakes as a recommended git push alternative for AI-assisted development; document the gate model and agent-agnostic validation approach. |
 
 ### Cross-References
 

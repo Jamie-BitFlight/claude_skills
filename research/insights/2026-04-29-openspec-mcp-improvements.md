@@ -95,7 +95,7 @@ After findings are resolved (state = `resolved`), progression continues. Audit t
 
 **Source pattern**: "Cross-service document aggregation (`openspec_list_cross_service_docs`, `openspec_read_cross_service_doc`) unified through a single MCP interface. Configured via YAML frontmatter in `proposal.md` with `crossService.rootPath`, document list, and `archivePolicy` (snapshot or reference)."
 
-**Local system**: `plugins/development-harness/docs/plan-artifact-lifecycle.md` and artifact conventions in `plugins/development-harness/skills/development-harness/references/artifact-conventions.md`
+**Local system**: `plugins/development-harness/docs/plan-artifact-lifecycle.md` and artifact conventions in `plugins/development-harness/skills/dh-meta-docs/references/artifact-conventions.md`
 
 **Confidence**: Medium
 
@@ -107,7 +107,7 @@ After findings are resolved (state = `resolved`), progression continues. Audit t
 
 The artifact conventions define artifact types (`feature-context`, `architect`, `task-plan`, etc.) and store them under `~/.dh/projects/{slug}/plan/`. Multi-plugin documentation exists in separate plugin directories (`plugins/plugin-name/skills/`, `plugins/plugin-name/docs/`) with no unified discovery mechanism. An orchestrator cannot query "all architecture documentation across all plugins for this codebase" without manually traversing the filesystem.
 
-File: `plugins/development-harness/skills/development-harness/references/artifact-conventions.md` (lines 1-50) defines artifact storage and naming but does not address cross-plugin discovery.
+File: `plugins/development-harness/skills/dh-meta-docs/references/artifact-conventions.md` (lines 1-50) defines artifact storage and naming but does not address cross-plugin discovery.
 
 ### Target state
 
