@@ -61,11 +61,11 @@ null until the validation runner records an observed result. It is not a passing
   one `research_vault` test reads the production corpus only in the advisory research-validation job;
   e2e tests need the explicit sandbox configuration above and run on main or manual dispatch.
 - **Async mode**: `asyncio_mode = "auto"` — tests auto-detect async
-- **Test discovery**: Multiple test directories configured in `pyproject.toml [tool.pytest.ini_options] testpaths`
-  (plugin `tests/` dirs, `development-harness`'s `tests_sam`/`tests_backlog`/`sam_schema/tests`/`backlog_core/tests`,
-  skill-local test dirs, root `tests/`, `examples/solid-review-ab/tests`, and the scripts dirs that
-  host colocated tests). A test file outside every entry never runs — the coverage guard below
-  fails rather than letting it rot silently.
+- **Test discovery**: `pyproject.toml`'s `[tool.pytest.ini_options] testpaths` is the list — read it
+  there rather than trusting a summary here, which drifts. It covers plugin test directories,
+  module-local and skill-local ones, root `tests/`, and every scripts directory that hosts colocated
+  tests. A test file outside every entry never runs anywhere; the coverage guard below fails instead
+  of letting it rot silently.
 - **Type checker exclusions**: Test files get relaxed rules in `pyproject.toml` per-file overrides
 - **Test file placement**: A test lives beside the code it exercises. Tests for code inside a
   plugin go in that plugin's own test directory (`plugins/{name}/tests/`, or the module-local
