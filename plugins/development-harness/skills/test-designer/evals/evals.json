@@ -1,0 +1,53 @@
+{
+  "skill_name": "test-designer",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Design the next TDD test for enqueue(key, payload). The approved API contract says repeated requests with the same key and payload return the same receipt and create one job; reuse with a different payload is rejected without mutation. No implementation exists yet. Plan only; do not write files.",
+      "expected_output": "Design the next bounded contract-derived case without requiring complete implementation. State independent expected receipt/job-count or rejection observations, a meaningful missing-behavior red, and distinguish absent API/collection failures from behavioral sensitivity. Include subsequent duplicate/conflict protection without imposing exhaustive upfront work.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "A build writes plugin.json from a configuration file. We commit that manifest and an application loads it. Plan tests for this feature. The generator already has a test comparing its returned object to generate_manifest(config).",
+      "expected_output": "Separate preserved checked-in freshness, independently expected generator fixtures, and actual consumer compatibility. Reject the self-oracle as correctness evidence; do not regenerate before checking freshness.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Two workers can claim the same hardware device. The approved guarantee is exclusive use until release, including a worker crash. A proposed unit test mocks acquire() to always succeed. What tests should be designed?",
+      "expected_output": "Identify concurrency/ownership and crash-recovery guarantees, meaningful interleavings and forbidden dual use, faithful real synchronization boundary where required, justified doubles only, and safe isolated execution. Do not demand a particular framework or production hardware access.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "We need a function that returns the uppercase spelling of an ASCII status, rejecting an empty string. No external state exists. Plan tests before code.",
+      "expected_output": "Produce a short independently justified normal/rejection design with realistic wrong-result control. Do not demand benchmark suites, fixed coverage ratios, mocks, per-method tests, or an elaborate design artifact.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "A ticket says expired tokens must be rejected. A current test expects refresh to accept an expired token. The API contract is unavailable. Plan regression protection without changing files.",
+      "expected_output": "Expose unresolved distinction between rejected resource access and permitted refresh rather than choose security policy from current test or names. Continue separable cases; identify exact authoritative decision/evidence required before conflicting assertion.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "Plan validation for new agent instructions. We have a JSON fixture listing scenarios and a test asserting the instruction file contains \"verify permissions\". No agent scenario has been executed.",
+      "expected_output": "Distinguish structural fixture/link/phrase checks from observed agent behavior. Propose safe representative execution with relevant permission outcomes and explicit NOT RUN evidence. Do not report behavioral success from text assertions.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "Read the supplied queue requirement and plan the next TDD increment. Return the test design without writing code.",
+      "expected_output": "Derive a bounded test from the supplied contract; choose an independently justified observation without prescribing a receipt format or storage technology. Do not require preexisting implementation. State intended red and unresolved test seams, and keep later duplicate/conflict obligations visible without exhaustive upfront planning.",
+      "files": ["fixtures/queue-contract.md"]
+    },
+    {
+      "id": 8,
+      "prompt": "Use /dh:add-new-feature to plan the queue API described in the supplied requirement in this isolated evaluation workspace. Produce the normal plan and its verification cases; do not implement the feature.",
+      "expected_output": "In a fixture-backed isolated DH environment, follow the normal architecture and swarm-planning dispatch. Reach test-designer through the planner loading clear-cove-task-design, not an evaluator-injected skill. Carry contract, oracle, boundary, failure case and gaps into existing acceptance/verification fields. Preserve stage altitude, authorized backend, and normal artifact/STATUS protocols. Missing harness/backend prerequisites mean an unvalidated route, never a passing activation claim.",
+      "files": ["fixtures/queue-contract.md"]
+    }
+  ]
+}

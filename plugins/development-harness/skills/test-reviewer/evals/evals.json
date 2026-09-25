@@ -1,0 +1,77 @@
+{
+  "skill_name": "test-reviewer",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Review test_total: expected = production_total(items); actual = production_total(items); assert actual == expected. It covers every line. The requirement is that tax applies once to each taxable item.",
+      "expected_output": "Identify circular oracle and no demonstrated detection; classify important guarantee separately from weak test and recommend independently calculated controlled example or invariant with relevant negative control. Coverage does not rescue it.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Review a publication test that replaces publish() with a stub returning success, invokes the stub, and asserts success. Requirement: failed publication preserves the previously valid artifact.",
+      "expected_output": "Trace that no production publication or old-state observation occurs, recommend strengthening/replacing with faithful boundary and no-corruption observation. Do not interpret stub success as exercised product behavior.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Review a test that records calls and asserts authorize happens before the first write; for denied authorization it asserts zero writes. The public security contract expressly requires both.",
+      "expected_output": "Keep contractual interaction assertions, assess their real seam and evidence, and do not dismiss them as implementation detail solely because they inspect ordering/counts.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "A test runs the packaged CLI --help in a clean environment and fails on nonzero exit. It has no explicit assert statement. The supported installation contract requires that command to start without optional developer dependencies.",
+      "expected_output": "Recognize a justified packaging/startup smoke oracle, keep its scoped value, investigate relevant dependency isolation and diagnostics, and avoid inventing one-assertion/per-function rules.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "A unit test checks encode(record) field values. An integration test passes the encoded record to the real downstream parser and checks the consumed values. Their names sound similar. Should one be deleted?",
+      "expected_output": "Differentiate encoding correctness from consumer compatibility; no automatic duplicate classification. Require comparable claims/variants/boundaries/fault mechanisms and surviving protection before a removal recommendation.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "A test named legacy_rotation_case fails once then passes on retry. Its requirement document cannot be found. A teammate says it has no point and should be removed. Review only.",
+      "expected_output": "Keep failure evidence and separate missing authority from absence of value. Trace callers/history or propose controlled investigation; mark unresolved rather than deleting or declaring retries a fix.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "A mutation run reports killed after deleting a source import: the suite fails during collection before any assertion. Does this prove our retry-limit test catches off-by-one errors?",
+      "expected_output": "Reject this as relevant sensitivity evidence; propose a bounded retry behavior mutation/control that reaches the intended observation. Do not change runner configuration to force a result.",
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "A freshness test regenerates all committed manifests, then asserts generator output equals the files. The project mandates 90 percent line coverage; current coverage is 92 percent. Review the freshness claim.",
+      "expected_output": "Identify destruction of pre-check freshness evidence; preserve original artifacts before comparison. Respect the established coverage gate while explaining it does not establish freshness or generator correctness.",
+      "files": []
+    },
+    {
+      "id": 9,
+      "prompt": "Tests cover all ordinary failed transfers by checking the returned error. The required contract also says balances remain unchanged. No test inspects balances after a partial write failure. Review the suite.",
+      "expected_output": "Identify high-consequence missing forbidden-effect/rollback observation, propose isolated fault scenario and independently expected pre/post state, prioritize over cosmetic issues; do not execute destructive live transfer probes.",
+      "files": []
+    },
+    {
+      "id": 10,
+      "prompt": "Review these isolated tests before a refactor: A and B have identical inputs, boundary, independent expected output and no additional assertions; C covers the same requirement through a real network adapter. No runtime measurements or fault controls have been run.",
+      "expected_output": "Consider A/B consolidation with explicit evidence and residual sensitivity uncertainty, preserve C distinct boundary, avoid claiming measured cost/fault sensitivity or deleting files. Account for missing execution evidence.",
+      "files": []
+    },
+    {
+      "id": 11,
+      "prompt": "Review the supplied review_project tests against the application and its contract. Report which protection should be kept or changed, with evidence from the files. Do not edit the supplied project. Execution of this local project and experiments in a disposable copy are authorized; no external services are available.",
+      "expected_output": "Discover the tax oracle problem from code rather than a supplied diagnosis. Trace and retain the contractual authorization observations and distinguish producer-field protection from consumer compatibility. Separate source findings from actually executed controls. Preserve the original project; propose justified dispositions and missing protection without claiming measured sensitivity unless observed.",
+      "files": [
+        "fixtures/review_project/__init__.py",
+        "fixtures/review_project/app.py",
+        "fixtures/review_project/test_app.py",
+        "fixtures/review_project/pytest.ini",
+        "fixtures/review_project/CONTRACT.md"
+      ]
+    }
+  ]
+}

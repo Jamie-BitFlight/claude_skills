@@ -68,6 +68,13 @@ Use this canonical ordering:
 
 ### E: Explicit
 
+When a task or plan defines software tests as acceptance or verification evidence, load
+`/dh:test-designer` before composing those cases. Reuse any supplied test design and carry its
+claim, oracle, boundary, important failure case, and evidence gaps in the existing acceptance
+criteria and verification sections. Keep planning at the current useful resolution; this does not
+authorize test implementation or require a complete upfront suite for TDD. Continue independent
+planning when a design is partial; expose consequential missing decisions before execution.
+
 Every worker task must specify:
 
 - scope boundaries (what is in and out)
