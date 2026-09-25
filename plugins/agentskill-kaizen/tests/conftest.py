@@ -5,13 +5,17 @@ Provides reusable test fixtures for:
 - Pre-extracted tool sequence dicts
 - FastMCP Context mock factory
 
-``mcp/`` is prepended to ``sys.path`` so ``import server`` resolves to
-``plugins/agentskill-kaizen/mcp/server.py``. MCP protocol tests use
-``Client(mcp)`` in ``test_server_mcp.py`` (FastMCP v3 in-memory transport).
+``mcp/`` is prepended to ``sys.path`` so ``server``'s sibling imports
+(``process_model``, ``session_cluster``) resolve, and ``sys.modules["server"]``
+is then bound from an explicit path. Another suite in this repo also puts a
+directory holding a top-level ``server.py`` on ``sys.path``, so a bare
+``import server`` resolves to whichever suite inserted last. MCP protocol tests
+use ``Client(mcp)`` in ``test_server_mcp.py`` (FastMCP v3 in-memory transport).
 """
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -45,9 +49,16 @@ def pytest_configure(config: pytest.Config) -> None:
 
 
 # Ensure `import server` resolves to plugins/agentskill-kaizen/mcp/server.py
-_MCP_DIR = str(Path(__file__).resolve().parent.parent / "mcp")
-if _MCP_DIR not in sys.path:
-    sys.path.insert(0, _MCP_DIR)
+_MCP_DIR = Path(__file__).resolve().parent.parent / "mcp"
+if str(_MCP_DIR) not in sys.path:
+    sys.path.insert(0, str(_MCP_DIR))
+
+_spec = importlib.util.spec_from_file_location("server", _MCP_DIR / "server.py")
+assert _spec is not None
+assert _spec.loader is not None
+_server = importlib.util.module_from_spec(_spec)
+sys.modules["server"] = _server
+_spec.loader.exec_module(_server)
 
 # ---------------------------------------------------------------------------
 # JSONL transcript record builders

@@ -242,6 +242,24 @@ def local_import_names(file_path: Path) -> set[str]:
     return names
 
 
+def external_import_names(file_path: Path, imports: set[str], pep723_dependencies: set[str]) -> set[str]:
+    """Return the imports that must be satisfied by a declared external dependency.
+
+    Args:
+        file_path: Path to the script whose imports these are.
+        imports: Top-level module names the script imports.
+        pep723_dependencies: Normalized dependency names declared in PEP 723 metadata.
+
+    Returns:
+        Imports that are neither stdlib, nor a sibling module importable from the
+        script's own directory, nor rich when typer is declared (rich ships with typer).
+    """
+    external = imports - get_stdlib_modules() - local_import_names(file_path)
+    if "rich" in external and "typer" in pep723_dependencies:
+        external.discard("rich")
+    return external
+
+
 def is_part_of_package(file_path: Path) -> bool:
     """Check if the file is a module inside an importable package.
 
@@ -483,13 +501,8 @@ def determine_applicable_rule(file_path: Path, content: str) -> tuple[int, str, 
     is_in_package = is_part_of_package(file_path)
     has_pep723, pep723_deps = extract_pep723_dependencies(content)
     imports = extract_imports(content)
-    stdlib = get_stdlib_modules()
 
-    # Classify imports
-    external_imports = imports - stdlib
-    # Rich is included with Typer, not external
-    if "rich" in external_imports and "typer" in pep723_deps:
-        external_imports.discard("rich")
+    external_imports = external_import_names(file_path, imports, pep723_deps)
 
     has_external_deps = len(external_imports) > 0
     uses_stdlib_only = len(external_imports) == 0
@@ -601,13 +614,8 @@ def _analyze_content(file_path: Path, content: str) -> tuple[str, set[str], set[
 
     _has_pep723, pep723_deps = extract_pep723_dependencies(content)
     imports = extract_imports(content)
-    stdlib = get_stdlib_modules()
-    stdlib_imports = imports & stdlib
-    external_imports = imports - stdlib
-
-    # Rich is included with Typer
-    if "rich" in external_imports and "typer" in pep723_deps:
-        external_imports.discard("rich")
+    stdlib_imports = imports & get_stdlib_modules()
+    external_imports = external_import_names(file_path, imports, pep723_deps)
 
     return (current_shebang, pep723_deps, stdlib_imports, external_imports, is_executable(file_path))
 
