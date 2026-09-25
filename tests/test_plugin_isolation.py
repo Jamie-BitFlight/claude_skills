@@ -7,7 +7,8 @@ from pathlib import Path
 
 SCRIPT = Path(__file__).parents[1] / "scripts" / "check_plugin_isolation.py"
 spec = importlib.util.spec_from_file_location("check_plugin_isolation", SCRIPT)
-assert spec and spec.loader
+assert spec
+assert spec.loader
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
 
