@@ -341,8 +341,10 @@ deletion, read `docs/branch-transfer-preflight.md`.
 
 - Never commit credentials. `.mcp.json` references API keys by environment indirection
   (`$REF_API_KEY`, `$CONTEXT7_API_KEY`), not literal values — follow that pattern.
-- Live e2e tests create real GitHub issues in a sandbox repo and are gated to CI on `main` with
-  `GITHUB_TOKEN`; do not run them locally against the production backlog.
+- Live e2e tests create real GitHub issues in a sandbox repo. CI runs them on `main` and on manual
+  dispatch, with the dedicated `DH_E2E_TOKEN` secret supplied as `GITHUB_TOKEN`, never the source
+  repository's automatic token. Read `plugins/development-harness/docs/live-e2e-validation.md`
+  before running the lane; never run it locally against the production backlog.
 - Git hooks are mandatory (see Commit Conventions); `conventional-pre-commit`, `skilllint`, and
   the manifest-sync hook all mutate or validate on commit — do not bypass them.
 
