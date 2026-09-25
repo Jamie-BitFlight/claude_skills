@@ -46,6 +46,12 @@ since changing a provider can break unchanged callers. The dependency evidence
 audit always remains global: removing the last use from prose or commands matters
 as well as removing a Python import.
 
+File hygiene deliberately keeps the full tracked-file inventory, including
+symlink and case-conflict checks. Deleting a target can break an unchanged symlink
+outside the diff; these are cross-file invariants rather than file-local lint.
+The runner's unnamed `prek` operation is this global hygiene lane. Only explicitly
+named language hooks use changed-file selection.
+
 Integration tests keep their existing marker expressions and execution roots,
 partitioned into development-harness, research-backlinks and rebase-publication
 shards. Pinned versioner integration remains in the manifest lane. Research-vault
