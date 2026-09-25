@@ -18,7 +18,8 @@ ROOT = Path(__file__).resolve().parents[1]
 def load_module(name: str, path: Path) -> ModuleType:
     """Load a CI entry point without adding its generic names to sys.path."""
     spec = importlib.util.spec_from_file_location(name, path)
-    assert spec is not None and spec.loader is not None
+    assert spec is not None
+    assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -104,7 +105,8 @@ def test_shared_imports_and_fixtures_expand_tests_not_file_lint(repository: Path
 def test_shared_or_unknown_inputs_fail_safe_to_full_checks(repository: Path, path: str) -> None:
     """An unclassified dependency cannot produce a falsely narrow success."""
     plan = planner.build_plan(repository, [path])
-    assert plan["full_tests"] and plan["lint_all"]
+    assert plan["full_tests"]
+    assert plan["lint_all"]
     assert plan["allowed_skips"] == ""
 
 
@@ -115,7 +117,8 @@ def test_documentation_keeps_global_guards_without_plugin_suites(repository: Pat
     assert names(plan) == {"global"}
     assert not plan["checks"]["validate-plugins"]
     assert not plan["checks"]["manifest-sync"]
-    assert plan["checks"]["audit-dependencies"] and plan["checks"]["file-hygiene"]
+    assert plan["checks"]["audit-dependencies"]
+    assert plan["checks"]["file-hygiene"]
 
 
 def test_research_selects_its_integration_lane_and_advisory_scan(repository: Path) -> None:
@@ -176,7 +179,8 @@ def test_skip_allowlist_contains_exactly_unselected_blocking_jobs(repository: Pa
 def test_non_pr_events_use_full_validation(repository: Path, event: str) -> None:
     """Full validation does not depend on a possibly incomplete last-commit diff."""
     paths, base, head, reason = planner.changed_paths(repository, event, "", "")
-    assert paths is None and base == head == ""
+    assert paths is None
+    assert base == head == ""
     assert "full regression run" in reason
 
 
@@ -215,7 +219,8 @@ def test_real_git_diff_handles_renames_deletions_and_base_only_changes(repositor
     git(repository, "commit", "-m", "advance base independently")
     base = git(repository, "rev-parse", "HEAD")
     paths, merge_base, selected_head, _reason = planner.changed_paths(repository, "pull_request", base, head)
-    assert merge_base == common and selected_head == head
+    assert merge_base == common
+    assert selected_head == head
     assert set(paths) == {str(old.relative_to(repository)), str(new.relative_to(repository))}
     assert names(planner.build_plan(repository, paths)) == {"alpha", "beta", "global"}
 
@@ -229,7 +234,7 @@ def test_large_diff_has_no_path_filter_truncation(repository: Path) -> None:
 @pytest.mark.parametrize("paths", [[], None, ["../escape"], ["--collect-only"], ["/absolute"]])
 def test_runner_rejects_empty_or_unsafe_pytest_targets(paths: object) -> None:
     """No target must fail, rather than falling back to all testpaths."""
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="non-empty|Unsafe target path"):
         runner.command("pytest", {}, {"paths": paths})
 
 
@@ -237,7 +242,8 @@ def test_runner_preserves_marker_coverage_defaults_and_argv_boundaries() -> None
     """Coverage/xdist remain in addopts, and paths are not shell-expanded."""
     argv = runner.command("pytest", {}, {"paths": ["plugins/a directory/tests"], "marker": "integration and not research_vault"})
     assert argv == ["uv", "run", "--locked", "pytest", "-m", "integration and not research_vault", "-v", "plugins/a directory/tests"]
-    assert "--no-cov" not in argv and "-o" not in argv
+    assert "--no-cov" not in argv
+    assert "-o" not in argv
 
 
 def test_runner_lints_diff_or_full_tree_explicitly() -> None:
@@ -257,7 +263,7 @@ def test_runner_propagates_actual_child_failure(tmp_path: Path, exit_code: int) 
     fake_uv.write_text(f"#!/bin/sh\nexit {exit_code}\n", encoding="utf-8")
     fake_uv.chmod(0o755)
     env = dict(os.environ, PATH=f"{tmp_path}{os.pathsep}{os.environ['PATH']}", CI_PLAN='{"version":1}', CI_SHARD='{"paths":["tests"]}')
-    result = subprocess.run([sys.executable, str(ROOT / ".github/ci/run.py"), "pytest"], env=env, capture_output=True, text=True, timeout=10)
+    result = subprocess.run([sys.executable, str(ROOT / ".github/ci/run.py"), "pytest"], env=env, check=False, capture_output=True, text=True, timeout=10)
     assert result.returncode == exit_code
 
 
@@ -292,4 +298,5 @@ def test_marketplace_version_bump_does_not_expand_plugin_content_change(reposito
 def test_marketplace_comparison_without_history_is_conservative(repository: Path) -> None:
     """Unavailable manifest evidence does not become an assumed version-only bump."""
     plan = planner.build_plan(repository, [".claude-plugin/marketplace.json", "plugins/alpha/README.md"])
-    assert plan["full_tests"] and plan["lint_all"]
+    assert plan["full_tests"]
+    assert plan["lint_all"]

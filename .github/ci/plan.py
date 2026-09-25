@@ -14,6 +14,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import tomllib
 from pathlib import Path, PurePosixPath
@@ -75,7 +76,7 @@ def plugin_owner(path: str) -> str | None:
         Directory ownership, or None for repository-global paths.
     """
     parts = PurePosixPath(path).parts
-    return parts[1] if len(parts) >= 2 and parts[0] == "plugins" else None
+    return parts[1] if len(parts) > 1 and parts[0] == "plugins" else None
 
 
 def under(path: str, directory: str) -> bool:
@@ -94,7 +95,7 @@ def valid_path(value: str) -> str:
         The normalized relative POSIX path.
     """
     path = PurePosixPath(value)
-    if not value or path.is_absolute() or ".." in path.parts or value.startswith("-") or path == PurePosixPath("."):
+    if not value or path.is_absolute() or ".." in path.parts or value.startswith("-") or path == PurePosixPath():
         raise ValueError(f"Not a repository-relative path: {value!r}")
     return path.as_posix()
 
@@ -127,7 +128,10 @@ def git(root: Path, *args: str) -> bytes:
     Returns:
         The command's complete standard output as bytes.
     """
-    return subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True, timeout=60).stdout
+    executable = shutil.which("git")
+    if executable is None:
+        raise FileNotFoundError("Git executable is unavailable")
+    return subprocess.run([executable, "-C", str(root), *args], check=True, capture_output=True, timeout=60).stdout
 
 
 def changed_paths(root: Path, event: str, base: str, head: str) -> tuple[list[str] | None, str, str, str]:
@@ -181,7 +185,6 @@ def shared_source(path: str, imports: list[str]) -> bool:
     )
 
 
-
 def marketplace_version_only(root: Path, base: str, head: str) -> bool:
     """Check that only marketplace metadata.version changed, not its registry.
 
@@ -214,35 +217,30 @@ def build_plan(root: Path, paths: list[str] | None, base: str = "", head: str = 
     suites, imports = read_pytest_config(root)
     changed = paths or []
     owners = {owner for path in changed if (owner := plugin_owner(path))}
-    marketplace_changed = ".claude-plugin/marketplace.json" in changed
-    version_only = marketplace_changed and marketplace_version_only(root, base, head)
+    version_only = ".claude-plugin/marketplace.json" in changed and marketplace_version_only(root, base, head)
     shared = [
         path for path in changed
         if (not local_input(path) or PurePosixPath(path).name in LINT_CONFIG_NAMES)
         and not (version_only and path == ".claude-plugin/marketplace.json")
     ]
-    providers = [path for path in changed if shared_source(path, imports)]
     full_checks = paths is None or bool(shared)
-    full_tests = full_checks or bool(providers)
+    full_tests = full_checks or any(shared_source(path, imports) for path in changed)
     reasons = [reason]
     if version_only:
         reasons.append("Marketplace metadata.version-only change: retain targeted selection")
     reasons.extend(f"Shared/configuration input: {path}" for path in shared)
-    reasons.extend(f"Shared Python import/fixture input: {path}" for path in providers)
-    selected = set(suites) if full_tests else owners | {"global"}
+    reasons.extend(f"Shared Python import/fixture input: {path}" for path in changed if shared_source(path, imports))
     unit: list[Shard] = [
         {"name": owner, "paths": targets, "marker": ""}
-        for owner, targets in sorted(suites.items()) if owner in selected
+        for owner, targets in sorted(suites.items()) if full_tests or owner == "global" or owner in owners
     ]
-    dh = full_tests or "development-harness" in owners
-    research = full_tests or any(under(path, "research") for path in changed)
     integration: list[Shard] = []
-    if dh:
+    if full_tests or "development-harness" in owners:
         integration.append({
             "name": "development-harness", "paths": ["plugins/development-harness/tests"],
             "marker": "integration and not research_vault",
         })
-    if research:
+    if full_tests or any(under(path, "research") for path in changed):
         integration.append({
             "name": "research-backlinks", "paths": ["tests/research_backlinks"],
             "marker": "integration and not research_vault",
@@ -265,14 +263,14 @@ def build_plan(root: Path, paths: list[str] | None, base: str = "", head: str = 
         "typecheck-ty": full_checks or extensionless or any(PurePosixPath(path).suffix in {".py", ".pyi"} for path in changed),
         "audit-dependencies": True,
         "validate-plugins": bool(validation),
-        "manifest-sync": full_checks or bool(owners) or marketplace_changed,
+        "manifest-sync": full_checks or bool(owners) or ".claude-plugin/marketplace.json" in changed,
         "file-hygiene": True,
         "test-python": bool(unit),
-        "test-cross-backend": dh,
+        "test-cross-backend": full_tests or "development-harness" in owners,
         "test-integration": bool(integration),
     })
     allowed_skips = ",".join(sorted(job for job, selected_job in checks.items() if not selected_job))
-    checks["research-validation"] = research
+    checks["research-validation"] = full_tests or any(under(path, "research") for path in changed)
     return {
         "version": 1, "full_tests": full_tests, "lint_all": full_checks, "reasons": reasons,
         "base": base, "head": head, "unit_matrix": {"include": unit},

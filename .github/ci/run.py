@@ -25,7 +25,7 @@ def paths_from(value: object) -> list[str]:
         raise ValueError("A non-empty list of target paths is required")
     for path in value:
         parsed = PurePosixPath(path)
-        if not path or parsed.is_absolute() or ".." in parsed.parts or path.startswith("-") or parsed == PurePosixPath("."):
+        if not path or parsed.is_absolute() or ".." in parsed.parts or path.startswith("-") or parsed == PurePosixPath():
             raise ValueError(f"Unsafe target path: {path!r}")
     return value
 
@@ -74,7 +74,7 @@ def main() -> None:
         raise ValueError("Expected CI plan version 1")
     shard = json.loads(os.environ.get("CI_SHARD", "{}"))
     if not isinstance(shard, dict):
-        raise ValueError("Expected a matrix object")
+        raise TypeError("Expected a matrix object")
     argv = command(args.operation, plan, shard, args.hook)
     print(json.dumps({"command": argv}, separators=(",", ":")), flush=True)
     os.execvp(argv[0], argv)
