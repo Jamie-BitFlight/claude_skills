@@ -24,8 +24,8 @@ def test_checked_in_matrix_matches_declared_plugin_skills() -> None:
     regenerate = "uv run --script scripts/generate_codex_skill_activation_matrix.py"
 
     assert actual_targets == expected_targets, (
-        f"Missing targets: {sorted(expected_targets - actual_targets)}; "
-        f"extra targets: {sorted(actual_targets - expected_targets)}. Run: {regenerate}"
+        f"Missing targets: {sorted(expected_targets - actual_targets, key=str)}; "
+        f"extra targets: {sorted(actual_targets - expected_targets, key=str)}. Run: {regenerate}"
     )
     assert parsed_rows == rows, f"Matrix inventory/evidence differs from its declared inputs. Run: {regenerate}"
     # Retain exact freshness: semantic equality alone would miss canonical-byte drift.
@@ -190,10 +190,7 @@ def test_cli_check_flag_passes_on_fresh_matrix(matrix_workspace: Path, monkeypat
 
 @pytest.mark.parametrize("drift", ["serialization", "evidence", "missing-row"])
 def test_cli_check_flag_rejects_existing_matrix_drift(
-    matrix_workspace: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    drift: str,
+    matrix_workspace: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], drift: str
 ) -> None:
     """Reject corrupted existing artifacts, including PR #3910's compact JSON."""
     assert generator.main() == 0
