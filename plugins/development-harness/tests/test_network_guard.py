@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import tomllib
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -23,6 +24,26 @@ import pytest
 from tests.network_blocked import NetworkBlocked
 
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
+_REPO_ROOT = _PLUGIN_ROOT.parent.parent
+_ROOT_PYPROJECT = _REPO_ROOT / "pyproject.toml"
+_PLUGIN_PREFIX = "plugins/development-harness/"
+
+
+def _configured_testpaths() -> list[str]:
+    """Return this plugin's root ``testpaths`` entries, relative to the plugin root.
+
+    Reading the entries rather than listing them keeps the guard covering every
+    directory the default lane collects, including ones added after this test was
+    written. Empty for a standalone bundle, which ships no root ``pyproject.toml``.
+    """
+    if not _ROOT_PYPROJECT.exists():
+        return []
+    testpaths = tomllib.loads(_ROOT_PYPROJECT.read_text(encoding="utf-8"))["tool"]["pytest"]["ini_options"]["testpaths"]
+    return [
+        path.removeprefix(_PLUGIN_PREFIX)
+        for path in testpaths
+        if path.startswith(_PLUGIN_PREFIX) and (_REPO_ROOT / path).is_dir()
+    ]
 
 
 def _probe_command(probe: Path, *args: str) -> list[str]:
@@ -250,7 +271,7 @@ def test_guard_restores_sockets_after_session() -> None:
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("testpath", ["tests", "tests_sam", "tests_backlog", "sam_schema/tests"])
+@pytest.mark.parametrize("testpath", _configured_testpaths())
 def test_guard_covers_testpath(testpath: str) -> None:
     """The root conftest guard applies to every configured testpath.
 

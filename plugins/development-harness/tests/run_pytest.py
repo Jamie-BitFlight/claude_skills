@@ -34,7 +34,15 @@ from pathlib import Path
 import pytest
 
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
-_DEFAULT_TEST_PATHS = ["tests", "tests_sam", "sam_schema/tests", "backlog_core/tests"]
+_DEFAULT_TEST_PATHS = [
+    "tests",
+    "tests_sam",
+    "tests_backlog",
+    "sam_schema/tests",
+    "backlog_core/tests",
+    "skills/implementation-manager/scripts",
+    "skills/kage-bunshin/tests",
+]
 _REQUIRED_ARGS = ["--asyncio-mode=auto", "--strict-config"]
 
 

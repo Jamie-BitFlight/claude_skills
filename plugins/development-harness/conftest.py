@@ -1,8 +1,9 @@
 """Session-level network guard for the development-harness test suite.
 
-This file lives at the pytest rootdir so it applies to every path in
-``[tool.pytest.ini_options] testpaths`` (``tests``, ``tests_sam``,
-``tests_backlog``, ``sam_schema/tests``).
+This file lives above every test directory in the plugin subtree, so it applies to
+each of this plugin's ``[tool.pytest.ini_options] testpaths`` entries without
+naming them here — ``tests/test_network_guard.py`` reads that list from
+``pyproject.toml`` and proves the guard reaches every entry.
 
 Unit tests must never perform real network I/O: it is slow, non-deterministic,
 credential-dependent, and -- as observed with the GitHub backend -- capable of
@@ -228,12 +229,10 @@ def _disable_startup_sync(monkeypatch: pytest.MonkeyPatch, request: pytest.Fixtu
     exercises the MCP server starts a live GitHub sync task, which dominates
     wall-clock time and causes the CI timeout.
 
-    Lives at the pytest rootdir (rather than ``tests/conftest.py``) so it
-    applies to every sibling test directory in the plugin subtree --
-    ``tests``, ``tests_sam``, ``sam_schema/tests``, ``backlog_core/tests``,
-    and any directory added later (e.g. ``tests_backlog``, once it joins
-    ``testpaths``) -- not just ``tests/``. A test that needs the real gate
-    opts back in with ``@pytest.mark.allow_startup_sync``.
+    Lives above the plugin's test directories (rather than in
+    ``tests/conftest.py``) so it applies to every one of them, including any
+    added later, not just ``tests/``. A test that needs the real gate opts back
+    in with ``@pytest.mark.allow_startup_sync``.
 
     Skips for tests marked ``@pytest.mark.e2e`` so that live end-to-end tests
     exercise the real startup path, and for tests marked

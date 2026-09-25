@@ -61,9 +61,11 @@ null until the validation runner records an observed result. It is not a passing
   one `research_vault` test reads the production corpus only in the advisory research-validation job;
   e2e tests need the explicit sandbox configuration above and run on main or manual dispatch.
 - **Async mode**: `asyncio_mode = "auto"` — tests auto-detect async
-- **Test discovery**: Multiple test directories configured in `pyproject.toml [tool.pytest.ini_options] testpaths`
-  (plugin `tests/` dirs, `development-harness`'s `tests_sam`/`sam_schema/tests`/`backlog_core/tests`,
-  root `tests/`, `examples/solid-review-ab/tests`, and the scripts dirs that host colocated tests)
+- **Test discovery**: `pyproject.toml`'s `[tool.pytest.ini_options] testpaths` is the list — read it
+  there rather than trusting a summary here, which drifts. It covers plugin test directories,
+  module-local and skill-local ones, root `tests/`, and every scripts directory that hosts colocated
+  tests. A test file outside every entry never runs anywhere; the coverage guard below fails instead
+  of letting it rot silently.
 - **Type checker exclusions**: Test files get relaxed rules in `pyproject.toml` per-file overrides
 - **Test file placement**: A test lives beside the code it exercises. Tests for code inside a
   plugin go in that plugin's own test directory (`plugins/{name}/tests/`, or the module-local
@@ -83,9 +85,16 @@ null until the validation runner records an observed result. It is not a passing
   `assert result["error"]`.
 - **pytest parallelism**: Tests run with `-n 2 --dist loadgroup` (xdist): one controller plus two
   workers. Tests marked with `@pytest.mark.xdist_group` run in same worker.
-- **conftest name collision**: `plugins/scientific-method/mcp/experiment-registry/tests` is
-  excluded from pytest testpaths because its conftest collides with development-harness's conftest
-  (both resolve as "tests.conftest").
+- **conftest name collision**: a test directory carrying `__init__.py` makes its conftest resolve
+  as `tests.conftest`, which collides with any other `tests/__init__.py` directory in the repo
+  (pytest refuses with "Plugin already registered under a different name"). Leave a test directory
+  a plain directory unless its tests actually need package-relative imports.
+- **top-level module squatting**: a conftest that puts a plugin's own source directory on
+  `sys.path` claims generic module names (`server`, `models`) for the whole session, so the suite
+  whose conftest ran last wins. Load the module by explicit path instead — see
+  `plugins/frustration-analyzer/tests/_server.py` and `plugins/agentskill-kaizen/tests/conftest.py`.
+- **testpaths coverage guard**: `tests/test_testpaths_collection_coverage.py` fails when a tracked
+  test file sits outside every `testpaths` entry, since the default lane would never collect it.
 - **Validation warnings**: Warnings fail validation unless a versioned, scope-limited exception is
   recorded in the relevant plan with an expiry/review condition. Never disable pytest's strict
   configuration to make a warning non-fatal; a minimal runner must explicitly retain
