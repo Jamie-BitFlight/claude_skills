@@ -49,13 +49,7 @@ class GitSandbox:
     def run(self, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
         """Run a bounded Git command and retain its complete result."""
         return subprocess.run(
-            ["git", *args],
-            cwd=self.work,
-            env=self.env,
-            capture_output=True,
-            text=True,
-            check=check,
-            timeout=10,
+            ["git", *args], cwd=self.work, env=self.env, capture_output=True, text=True, check=check, timeout=10
         )
 
     def commit(self, value: str) -> str:

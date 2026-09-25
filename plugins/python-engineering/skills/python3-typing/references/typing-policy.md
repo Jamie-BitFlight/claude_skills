@@ -65,7 +65,9 @@ def parse_incoming(data: object) -> IncomingPayload:
         raise TypeError("user_id must be an integer")
     if not isinstance(email, str):
         raise TypeError("email must be a string")
-    if not isinstance(metadata, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in metadata.items()):
+    if not isinstance(metadata, dict) or not all(
+        isinstance(k, str) and isinstance(v, str) for k, v in metadata.items()
+    ):
         raise TypeError("metadata must map strings to strings")
     return IncomingPayload(user_id=user_id, email=email, metadata=metadata)
 ```

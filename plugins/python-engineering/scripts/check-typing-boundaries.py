@@ -7,7 +7,19 @@ import ast
 import sys
 from pathlib import Path
 
-BOUNDARY_PATTERNS = {"boundary", "boundaries", "adapter", "adapters", "parser", "parsers", "validator", "validators", "external", "inbound", "coerce"}
+BOUNDARY_PATTERNS = {
+    "boundary",
+    "boundaries",
+    "adapter",
+    "adapters",
+    "parser",
+    "parsers",
+    "validator",
+    "validators",
+    "external",
+    "inbound",
+    "coerce",
+}
 
 
 def is_boundary_module(filepath: Path) -> bool:

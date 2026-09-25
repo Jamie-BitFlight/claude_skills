@@ -39,17 +39,14 @@ def communicated_cycle(
     """Build provider-shaped terminal delivery evidence, separate from disposition."""
     original = canonical_snapshot()
     target = ChangeRequestTarget(
-        repository=RepositoryTarget(provider=provider, hostname=f"{provider}.com", full_name="acme/widgets"),
-        number=17,
+        repository=RepositoryTarget(provider=provider, hostname=f"{provider}.com", full_name="acme/widgets"), number=17
     )
     item = canonical_input().model_copy(
         update={
             "input_id": f"{provider}:comment:42",
             "provider": provider,
             "provider_ids": ProviderInputIdentity(
-                object_id="42",
-                reply_target_id="42" if inline else None,
-                resolution_target_id="T1" if inline else None,
+                object_id="42", reply_target_id="42" if inline else None, resolution_target_id="T1" if inline else None
             ),
             "source_kind": "review_comment" if inline else "issue_comment",
             "location": "inline" if inline else "top_level",
@@ -131,9 +128,7 @@ def communicated_cycle(
 
 @pytest.mark.parametrize("provider", ["github", "gitlab"])
 @pytest.mark.parametrize("inline", [False, True], ids=["unresolvable-top-level", "externally-resolved-inline"])
-def test_clarification_remains_nonterminal_after_delivery(
-    provider: Literal["github", "gitlab"], inline: bool
-) -> None:
+def test_clarification_remains_nonterminal_after_delivery(provider: Literal["github", "gitlab"], inline: bool) -> None:
     """Zero provider backlog and a sent question do not answer the pending question."""
     snapshot, cycle = communicated_cycle(provider, inline=inline)
     before = cycle.model_dump_json()
@@ -146,9 +141,7 @@ def test_clarification_remains_nonterminal_after_delivery(
 
 @pytest.mark.parametrize("provider", ["github", "gitlab"])
 @pytest.mark.parametrize("disposition", ["accepted_change", "no_change", "superseded"])
-def test_resolved_disposition_can_complete(
-    provider: Literal["github", "gitlab"], disposition: str
-) -> None:
+def test_resolved_disposition_can_complete(provider: Literal["github", "gitlab"], disposition: str) -> None:
     """Completed dispositions retain the existing completion path after reassessment."""
     snapshot, cycle = communicated_cycle(provider)
     cycle = cycle.model_copy(
