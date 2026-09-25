@@ -23,7 +23,10 @@ function object(value) {
 }
 
 function visibleMarkdown(text) {
-  const lines = text.replace(/\r\n/g, '\n').split('\n');
+  const normalized = text.replace(/\r\n/g, '\n');
+  const withoutFrontmatter = normalized.replace(/^---\n[\s\S]*?\n---(?:\n|$)/, '');
+  const withoutComments = withoutFrontmatter.replace(/<!--[\s\S]*?-->/g, '');
+  const lines = withoutComments.split('\n');
   let fence = null;
   return lines
     .filter((line) => {
@@ -64,6 +67,37 @@ function validateJson(text) {
     for (const key of METADATA) {
       if (!(key in value.metadata)) errors.push(`Missing metadata.${key}`);
     }
+    if (!['file', 'url', 'image', 'multi-source'].includes(value.metadata.source_type))
+      errors.push('Invalid source_type.');
+    const sourcePath = value.metadata.source_path;
+    if (
+      !(
+        (typeof sourcePath === 'string' && sourcePath.trim()) ||
+        (Array.isArray(sourcePath) &&
+          sourcePath.length > 0 &&
+          sourcePath.every((item) => typeof item === 'string' && item.trim()))
+      )
+    )
+      errors.push('source_path must be a nonempty string or array of nonempty strings.');
+    if (typeof value.metadata.summarized_at !== 'string' || !value.metadata.summarized_at.trim())
+      errors.push('summarized_at must be a nonempty string.');
+    if (!['extractive', 'abstractive', 'hybrid'].includes(value.metadata.method))
+      errors.push('Invalid method.');
+    if (
+      value.metadata.word_count_source !== null &&
+      (!Number.isInteger(value.metadata.word_count_source) || value.metadata.word_count_source < 0)
+    )
+      errors.push('word_count_source must be a nonnegative integer or null.');
+    if (!Number.isInteger(value.metadata.word_count_summary) || value.metadata.word_count_summary < 0)
+      errors.push('word_count_summary must be a nonnegative integer.');
+    if (
+      'compression_ratio' in value.metadata &&
+      value.metadata.compression_ratio !== null &&
+      (typeof value.metadata.compression_ratio !== 'number' ||
+        !Number.isFinite(value.metadata.compression_ratio) ||
+        value.metadata.compression_ratio < 0)
+    )
+      errors.push('compression_ratio must be a nonnegative finite number or null.');
     if (!['high', 'medium', 'low'].includes(value.metadata.confidence))
       errors.push('Invalid confidence.');
     if (
@@ -77,6 +111,12 @@ function validateJson(text) {
     errors.push('summary must be nonempty.');
   for (const key of ['findings', 'not_found', 'uncertain', 'sources']) {
     if (!Array.isArray(value[key])) errors.push(`${key} must be an array.`);
+  }
+  for (const key of ['not_found', 'uncertain']) {
+    for (const item of Array.isArray(value[key]) ? value[key] : []) {
+      if (typeof item !== 'string' || !item.trim())
+        errors.push(`Each ${key} item must be a nonempty string.`);
+    }
   }
   for (const finding of Array.isArray(value.findings) ? value.findings : []) {
     if (
