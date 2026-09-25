@@ -1,6 +1,6 @@
 """Live GitHub contracts in an explicitly authorized, non-production sandbox.
 
-Run with the configuration in docs/live-e2e-validation.md and pytest -m e2e -n 0.
+Run with the configuration in plugins/development-harness/docs/live-e2e-validation.md and pytest -m e2e -n 0.
 Missing configuration fails before mutation; the default test lane deselects E2E.
 Each scenario owns its setup, observations and cleanup, with no test-order coupling.
 """

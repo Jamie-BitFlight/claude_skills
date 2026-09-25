@@ -15,6 +15,7 @@ from backlog_core.models import (
     BacklogItem,
     BacklogItemMetadata,
     PatchResult,
+    ProviderItem,
     ProviderPatch,
     ProviderSnapshot,
     ReconcileRequest,
@@ -320,3 +321,60 @@ def test_offline_github_grooming_queues_one_pending_mutation(tmp_path: Path, mon
     stored_section = next(iter(pending[0].item.sections.values()))
     assert isinstance(stored_section, Section)
     assert stored_section.entries[-1].content == "Durable offline"
+
+
+def test_targeted_pull_writes_an_unstructured_provider_body_into_the_writer_cache(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A human body edit that drops the ``## Description`` heading still reaches the cache.
+
+    Offline reproduction of the live-e2e "pull observes an independent provider
+    edit" phase. ``work_item_version`` deliberately makes a human-edited issue
+    body authoritative again (the root revision moves with the body), so a
+    targeted pull must carry that body's text into the writer cache the same
+    way it carries the renamed title.
+    """
+    # Given: one cached item reconciled from a provider body in the rendered shape
+    cache = FileCache(tmp_path / "writer")
+    backend = GitHubBackend(cache=cache)
+    monkeypatch.setattr(backend, "_apply_patches", lambda patches: [])
+    monkeypatch.setattr(
+        models, "_config", models.BacklogConfig(repo_root=tmp_path, backlog_dir=tmp_path / "backlog", default_repo="")
+    )
+    set_config(BacklogConfig(backend=backend))
+
+    def _snapshot_of(title: str, body: str, revision: str) -> ProviderSnapshot:
+        return ProviderSnapshot(
+            items=[
+                ProviderItem(
+                    provider_id="I_kw1",
+                    reference="#42",
+                    title=title,
+                    body=body,
+                    state="OPEN",
+                    labels=[],
+                    revision=revision,
+                )
+            ],
+            sync_started_at="2026-08-12T01:00:00Z",
+            pages_fetched=1,
+        )
+
+    rendered = (
+        "<!-- backlog-metadata:\npriority: P1\ntype: Feature\nstatus: open\nadded: 2026-01-01\n-->\n\n"
+        "## Description\n\n<!-- dh-e2e-run:1-1 -->\n\nLive validation fixture: companion\n"
+    )
+    monkeypatch.setattr(backend, "_fetch_snapshot", lambda request: _snapshot_of("companion", rendered, "rev-1"))
+    pull_by_selector("#42")
+
+    # When: the provider edits the issue natively, replacing title and whole body
+    edited = "<!-- dh-e2e-run:1-1 -->\n\nProvider edit not present in the writer cache."
+    monkeypatch.setattr(
+        backend, "_fetch_snapshot", lambda request: _snapshot_of("companion changed remotely", edited, "rev-2")
+    )
+    pull_by_selector("#42")
+
+    # Then: both the renamed title and the edited body are in the writer cache
+    cached = backend.get_work_item("#42")
+    assert cached.title == "companion changed remotely"
+    assert "Provider edit not present in the writer cache." in cached.description
