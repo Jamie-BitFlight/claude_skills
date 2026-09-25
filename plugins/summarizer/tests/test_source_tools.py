@@ -61,10 +61,7 @@ def test_failure_preserves_reason_and_does_not_inherit_success(tmp_path: Path) -
     _, _, plan = store_plan(tmp_path, "abcdef", 3)
     receipts = receipts_for(plan)
     receipts.outcomes[1] = Receipt(
-        chunk_id=plan.chunks[1].id,
-        chunk_sha256=plan.chunks[1].sha256,
-        state="failed",
-        reason="reader timed out",
+        chunk_id=plan.chunks[1].id, chunk_sha256=plan.chunks[1].sha256, state="failed", reason="reader timed out"
     )
     result = reconcile(plan, receipts)
     assert result["status"] == "RECORDED_PARTIAL"
@@ -185,7 +182,9 @@ def test_invalid_later_encoding_is_not_silently_replaced(tmp_path: Path) -> None
     assert file_metrics.format_human_readable(result).startswith("Error:")
 
 
-def test_read_failure_is_not_a_successful_binary_classification(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_read_failure_is_not_a_successful_binary_classification(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The public metrics boundary propagates access failures instead of hiding them as binary."""
     source = tmp_path / "source.txt"
     source.write_text("content", encoding="utf-8")

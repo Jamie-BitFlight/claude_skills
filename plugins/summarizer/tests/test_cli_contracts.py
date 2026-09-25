@@ -91,7 +91,12 @@ def test_record_cli_binds_final_output_and_rejects_later_mutation(tmp_path: Path
                 "transport": "inline",
                 "media_type": "text/plain",
                 "revision": None,
-                "coverage": {"state": "complete", "scope": "supplied text", "inspected": ["supplied text"], "omitted": []},
+                "coverage": {
+                    "state": "complete",
+                    "scope": "supplied text",
+                    "inspected": ["supplied text"],
+                    "omitted": [],
+                },
             }
         ],
         "findings": [
