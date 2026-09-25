@@ -374,6 +374,10 @@ def evaluate_review_complete(snapshot: ReviewSnapshot, cycle: ReviewCycleState) 
         "provider snapshot has outstanding work",
     )
     validate_cycle_coverage(snapshot, cycle)
+    require_authorization(
+        all(assessment.disposition != "clarification_required" for assessment in cycle.assessments),
+        "clarification-required inputs must remain non-terminal until reassessed",
+    )
     validate_implementation_states(snapshot, cycle, allow_pending=False)
     inbound_ids = {item.input_id for item in snapshot.review_inputs if item.direction == "inbound"}
     require_authorization(set(cycle.terminal_annotations) == inbound_ids, "every input requires a terminal annotation")
