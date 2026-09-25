@@ -25,7 +25,13 @@ def paths_from(value: object) -> list[str]:
         raise ValueError("A non-empty list of target paths is required")
     for path in value:
         parsed = PurePosixPath(path)
-        if not path or parsed.is_absolute() or ".." in parsed.parts or path.startswith("-") or parsed == PurePosixPath():
+        if (
+            not path
+            or parsed.is_absolute()
+            or ".." in parsed.parts
+            or path.startswith("-")
+            or parsed == PurePosixPath()
+        ):
             raise ValueError(f"Unsafe target path: {path!r}")
     return value
 
@@ -51,7 +57,9 @@ def command(operation: str, plan: dict[str, object], shard: dict[str, object], h
     args = ["uv", "run", "--locked", "prek", "run"]
     if hook:
         args.append(hook)
-    if plan.get("lint_all") is True:
+    # Hygiene includes cross-file invariants: deleting a target can break an
+    # unchanged symlink. Only explicitly named language hooks are file-local.
+    if hook is None or plan.get("lint_all") is True:
         args.append("--all-files")
     elif plan.get("lint_all") is False:
         refs = [plan.get("base"), plan.get("head")]
