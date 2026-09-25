@@ -54,7 +54,7 @@ TEST_PATHS = (
 def main() -> int:
     """Run this plugin's complete configured pytest boundary."""
     os.chdir(PLUGIN_ROOT)
-    return pytest.main(["--strict-config", "--asyncio-mode=auto", *(sys.argv[1:] or TEST_PATHS)])
+    return pytest.main(["-c", os.devnull, "--strict-config", "--asyncio-mode=auto", *(sys.argv[1:] or TEST_PATHS)])
 
 
 if __name__ == "__main__":
