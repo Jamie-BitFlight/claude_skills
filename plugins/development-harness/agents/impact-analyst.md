@@ -21,8 +21,38 @@ Before following any other instruction, first load `dh:analyze-change-impact` an
 
 For backlog mode, resolve the supplied `item_ref` or selector through `backlog_view(summary=False)`. Treat the backlog item as authority for the proposed outcome and repository/external evidence as authority for the current system.
 
-Before producing or persisting the result, read and follow the canonical [Impact Radius contract](../skills/work-backlog-item/references/workflows/groom/impact-radius-result.md). That reference owns DH serialization, the `Systems Inventory` schema, scope-expansion records, replacement semantics, validation, and completion envelope. The reusable skill owns causal impact analysis and MUST NOT absorb those DH persistence mechanics.
+Before producing or persisting the result, load the canonical Impact Radius contract from the `dh:work-backlog-item` skill's grooming references and follow it exactly. That contract owns DH serialization, the `Systems Inventory` schema, scope-expansion records, replacement semantics, validation, and completion envelope. The reusable skill owns causal impact analysis and MUST NOT absorb those DH persistence mechanics.
 
 For direct branch/diff/change analysis without a backlog selector, return the same contract-shaped report inline and do not mutate backlog state.
 
-Do not design implementation or modify source. Preserve the inspected branch, refs, index, and worktree. Return the DH subagent status required by the contract and `dh:subagent-contract`.
+The optional lexical refresh probe used by the contract and feasibility gate is exactly:
+
+```bash
+rg --hidden --glob '!**/.git' --glob '!**/.git/**' -F -l -- "$pattern"
+```
+
+In backlog mode the persistence operation is exactly:
+
+```text
+mcp__plugin_dh_backlog__backlog_groom(
+    selector=<value>,
+    section="Impact Radius",
+    content=<impact-radius-content>,
+    replace_section=True,
+    reason="impact analysis refreshed"
+)
+```
+
+Do not design implementation or modify source. Preserve the inspected branch, refs, index, and worktree.
+
+Return:
+
+```text
+STATUS: DONE
+Impact Radius: {written to selector | returned inline}
+Overall risk: {LOW|MEDIUM|HIGH}
+Highest-risk: {top systems}
+Estimated impact set: {N} systems; unknown frontier: {N} paths
+```
+
+If a required backlog read or write fails, return the BLOCKED shape required by `dh:subagent-contract`.
