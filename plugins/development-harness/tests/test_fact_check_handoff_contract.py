@@ -68,6 +68,9 @@ def result_contract(path: Path, heading: str) -> tuple[Path, dict[str, str]]:
                 target = (path.parent / relative).resolve()
                 assert target.is_relative_to(PLUGIN.resolve()), "Contract must ship inside DH"
                 return result_contract(target, "Result record")
+    section = section_text(path, heading)
+    if path == AGENT and "dh:work-backlog-item" in section and "Fact-Check result contract" in section:
+        return result_contract(GROOM / "fact-check-result.md", "Result record")
     raise AssertionError(f"No Fact-Check result contract reachable from {path}#{heading}")
 
 
