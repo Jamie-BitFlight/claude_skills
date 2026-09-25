@@ -89,7 +89,7 @@ def test_receipt_contract_rejects_false_completion(tmp_path: Path, fault: str) -
         receipts.outcomes[0].evidence_ref = None
     else:
         receipts.outcomes[0].state = "failed"
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Receipt|Receipts|Inspected|Failed"):
         reconcile(plan, receipts)
 
 
