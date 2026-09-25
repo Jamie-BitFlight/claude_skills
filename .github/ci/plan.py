@@ -53,13 +53,34 @@ class Plan(TypedDict):
 
 # A change to any of these can affect files beyond the changed directory.
 LINT_CONFIG_NAMES = frozenset({
-    ".pre-commit-config.yaml", "pyproject.toml", "uv.lock", ".python-version",
-    "biome.json", "biome.jsonc", "ruff.toml", ".ruff.toml", "ty.toml",
-    ".markdownlint.json", ".markdownlint.jsonc", ".markdownlint.yaml",
-    ".markdownlint.yml", ".markdownlint-cli2.jsonc", ".markdownlint-cli2.yaml",
-    ".markdownlint-cli2.yml", ".markdownlint-cli2.json", ".markdownlint-cli2.cjs", ".markdownlint-cli2.mjs", ".markdownlint.cjs",
-    ".shellcheckrc", ".editorconfig", "package.json", "package-lock.json",
-    "pnpm-lock.yaml", "yarn.lock", ".gitignore", ".gitattributes",
+    ".pre-commit-config.yaml",
+    "pyproject.toml",
+    "uv.lock",
+    ".python-version",
+    "biome.json",
+    "biome.jsonc",
+    "ruff.toml",
+    ".ruff.toml",
+    "ty.toml",
+    ".markdownlint.json",
+    ".markdownlint.jsonc",
+    ".markdownlint.yaml",
+    ".markdownlint.yml",
+    ".markdownlint-cli2.jsonc",
+    ".markdownlint-cli2.yaml",
+    ".markdownlint-cli2.yml",
+    ".markdownlint-cli2.json",
+    ".markdownlint-cli2.cjs",
+    ".markdownlint-cli2.mjs",
+    ".markdownlint.cjs",
+    ".shellcheckrc",
+    ".editorconfig",
+    "package.json",
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    "yarn.lock",
+    ".gitignore",
+    ".gitattributes",
 })
 LANGUAGE_SUFFIXES = {
     "lint-python": {".py", ".pyi"},
@@ -180,8 +201,10 @@ def shared_source(path: str, imports: list[str]) -> bool:
     if name == "conftest.py":
         return True
     is_test = name.startswith("test_") or name.endswith("_test.py")
-    return not is_test and PurePosixPath(path).suffix in {".py", ".pyi"} and any(
-        under(path, directory) for directory in imports
+    return (
+        not is_test
+        and PurePosixPath(path).suffix in {".py", ".pyi"}
+        and any(under(path, directory) for directory in imports)
     )
 
 
@@ -208,7 +231,9 @@ def marketplace_version_only(root: Path, base: str, head: str) -> bool:
     return values[0] == values[1]
 
 
-def build_plan(root: Path, paths: list[str] | None, base: str = "", head: str = "", reason: str = "Explicit selection") -> Plan:
+def build_plan(
+    root: Path, paths: list[str] | None, base: str = "", head: str = "", reason: str = "Explicit selection"
+) -> Plan:
     """Select work, preserving global guards and conservative shared fallbacks.
 
     Returns:
@@ -219,7 +244,8 @@ def build_plan(root: Path, paths: list[str] | None, base: str = "", head: str = 
     owners = {owner for path in changed if (owner := plugin_owner(path))}
     version_only = ".claude-plugin/marketplace.json" in changed and marketplace_version_only(root, base, head)
     shared = [
-        path for path in changed
+        path
+        for path in changed
         if (not local_input(path) or PurePosixPath(path).name in LINT_CONFIG_NAMES)
         and not (version_only and path == ".claude-plugin/marketplace.json")
     ]
@@ -232,7 +258,8 @@ def build_plan(root: Path, paths: list[str] | None, base: str = "", head: str = 
     reasons.extend(f"Shared Python import/fixture input: {path}" for path in changed if shared_source(path, imports))
     unit: list[Shard] = [
         {"name": owner, "paths": targets, "marker": ""}
-        for owner, targets in sorted(suites.items()) if full_tests or owner == "global" or owner in owners
+        for owner, targets in sorted(suites.items())
+        if full_tests or owner == "global" or owner in owners
     ]
     integration: list[Shard] = []
     if full_tests or "development-harness" in owners:
@@ -260,7 +287,9 @@ def build_plan(root: Path, paths: list[str] | None, base: str = "", head: str = 
         for job, suffixes in LANGUAGE_SUFFIXES.items()
     }
     checks.update({
-        "typecheck-ty": full_checks or extensionless or any(PurePosixPath(path).suffix in {".py", ".pyi"} for path in changed),
+        "typecheck-ty": full_checks
+        or extensionless
+        or any(PurePosixPath(path).suffix in {".py", ".pyi"} for path in changed),
         "audit-dependencies": True,
         "validate-plugins": bool(validation),
         "manifest-sync": full_checks or bool(owners) or ".claude-plugin/marketplace.json" in changed,
@@ -272,10 +301,17 @@ def build_plan(root: Path, paths: list[str] | None, base: str = "", head: str = 
     allowed_skips = ",".join(sorted(job for job, selected_job in checks.items() if not selected_job))
     checks["research-validation"] = full_tests or any(under(path, "research") for path in changed)
     return {
-        "version": 1, "full_tests": full_tests, "lint_all": full_checks, "reasons": reasons,
-        "base": base, "head": head, "unit_matrix": {"include": unit},
-        "integration_matrix": {"include": integration}, "validation_paths": validation,
-        "checks": checks, "allowed_skips": allowed_skips,
+        "version": 1,
+        "full_tests": full_tests,
+        "lint_all": full_checks,
+        "reasons": reasons,
+        "base": base,
+        "head": head,
+        "unit_matrix": {"include": unit},
+        "integration_matrix": {"include": integration},
+        "validation_paths": validation,
+        "checks": checks,
+        "allowed_skips": allowed_skips,
     }
 
 
