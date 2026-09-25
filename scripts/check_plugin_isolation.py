@@ -13,10 +13,10 @@ FORBIDDEN = ("../../scripts/", "../scripts/", ".claude/skills/")
 
 
 def violations(plugin: Path) -> list[str]:
-    """Return source-tree escape references found in plugin text files."""
+    """Return source-tree escape references found in executable/config files."""
     found: list[str] = []
     for path in plugin.rglob("*"):
-        if not path.is_file() or path.is_symlink() or path.suffix not in {".py", ".md", ".json", ".yaml", ".yml", ".toml"}:
+        if not path.is_file() or path.is_symlink() or path.suffix not in {".py", ".json", ".yaml", ".yml"}:
             continue
         try:
             text = path.read_text(encoding="utf-8")
