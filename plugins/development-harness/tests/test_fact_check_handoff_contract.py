@@ -4,6 +4,7 @@ Load the real producer and consumer instructions as Markdown. These tests detect
 schema/routing drift; they do not prove a model followed the instructions or that
 a live backlog write succeeded. Behavioral cases live with work-backlog-item.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
