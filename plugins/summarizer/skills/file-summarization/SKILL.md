@@ -31,6 +31,10 @@ locations; choose chunks that fit the host's available context. The legacy `smal
 `medium` (2,000 to <10,000), and `large` (at least 10,000) labels are compatibility hints, not
 measured universal limits. If only excerpts can be read, record exactly what is omitted.
 
+For chunked UTF-8 text or whole-dataset CSV/TSV claims, load
+[mechanical source acquisition](../summarizer/references/source-acquisition.md) and use its
+source-bound plan, coverage reconciliation or full-record profiler.
+
 ## Type-specific extraction
 
 | Type | Required extraction |
