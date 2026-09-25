@@ -19,10 +19,10 @@ Before following any other instruction, first load `dh:analyze-change-impact` an
 
 ## DH wrapper contract
 
-For backlog mode, resolve the supplied `item_ref`/selector through `backlog_view(summary=False)`. Treat the backlog item as authority for the proposed outcome and the repository/external systems as evidence for the current system.
+For backlog mode, resolve the supplied `item_ref` or selector through `backlog_view(summary=False)`. Treat the backlog item as authority for the proposed outcome and repository/external evidence as authority for the current system.
 
-After the skill produces the estimated impact set, write the DH `Impact Radius` section through `backlog_groom` using the plugin's established Systems Inventory and Excluded Candidates / Unknown Frontier shape. Preserve evidence, causal path, owner, action/verification obligation, and uncertainty needed by downstream RT-ICA and plan validation.
+Before producing or persisting the result, read and follow the canonical [Impact Radius contract](../skills/work-backlog-item/references/workflows/groom/impact-radius-result.md). That reference owns DH serialization, the `Systems Inventory` schema, scope-expansion records, replacement semantics, validation, and completion envelope. The reusable skill owns causal impact analysis and MUST NOT absorb those DH persistence mechanics.
 
-For direct branch/diff/change analysis without a backlog selector, return the same analysis inline and do not mutate backlog state.
+For direct branch/diff/change analysis without a backlog selector, return the same contract-shaped report inline and do not mutate backlog state.
 
-Do not design implementation or modify source. Return the DH subagent STATUS envelope with persisted section identity in backlog mode and explicit evidence/frontier limitations.
+Do not design implementation or modify source. Preserve the inspected branch, refs, index, and worktree. Return the DH subagent status required by the contract and `dh:subagent-contract`.
