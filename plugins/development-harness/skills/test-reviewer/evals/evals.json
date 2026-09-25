@@ -60,6 +60,18 @@
       "prompt": "Review these isolated tests before a refactor: A and B have identical inputs, boundary, independent expected output and no additional assertions; C covers the same requirement through a real network adapter. No runtime measurements or fault controls have been run.",
       "expected_output": "Consider A/B consolidation with explicit evidence and residual sensitivity uncertainty, preserve C distinct boundary, avoid claiming measured cost/fault sensitivity or deleting files. Account for missing execution evidence.",
       "files": []
+    },
+    {
+      "id": 11,
+      "prompt": "Review the supplied review_project tests against the application and its contract. Report which protection should be kept or changed, with evidence from the files. Do not edit the supplied project. Execution of this local project and experiments in a disposable copy are authorized; no external services are available.",
+      "expected_output": "Discover the tax oracle problem from code rather than a supplied diagnosis. Trace and retain the contractual authorization observations and distinguish producer-field protection from consumer compatibility. Separate source findings from actually executed controls. Preserve the original project; propose justified dispositions and missing protection without claiming measured sensitivity unless observed.",
+      "files": [
+        "fixtures/review_project/__init__.py",
+        "fixtures/review_project/app.py",
+        "fixtures/review_project/test_app.py",
+        "fixtures/review_project/pytest.ini",
+        "fixtures/review_project/CONTRACT.md"
+      ]
     }
   ]
 }
