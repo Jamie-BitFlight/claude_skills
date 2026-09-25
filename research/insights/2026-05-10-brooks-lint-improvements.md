@@ -2,6 +2,9 @@
 title: "Improvement Proposals: brooks-lint"
 ---
 
+<!-- removed-skill-citations -->
+> **Unimplemented-proposal paths:** `plugins/development-harness/skills/code-review-shared/` (with its `SKILL.md`, `evals/evals.json` and `references/`) and `plugins/development-harness/scripts/run_code_review_evals.py`, cited under this entry's Target state and Measurable signal headings, name deliverables this entry proposes rather than files it observed — Improvement 7 already labels the shared skill "(proposed)" in its own Local system line. None of them exists and none is expected to: their absence is the open state of the proposal. A path audit should leave them alone rather than repoint or delete them.
+
 ## Improvement 1: Adopt Iron Law structured diagnosis chain (Symptom → Source → Consequence → Remedy) for every code-review finding
 
 **Source pattern**: README.md lines 95–99, common.md lines 6–14 — "Every finding follows: Symptom → Source → Consequence → Remedy" where Source cites a named principle (e.g., "Fowler — Refactoring — Divergent Change"). Benchmark shows 100% structured findings with citations vs. 0% for ungrounded LLM review.

@@ -6,6 +6,9 @@
 
 ---
 
+<!-- removed-skill-citations -->
+> **Superseded citations:** `plugins/development-harness/templates/language-manifest-template.md` and `plugins/development-harness/skills/dh-meta-docs/references/language-manifest-schema.md`, Improvement 3's entire Local system, were deleted in commit `aee7ce482` (#3427, 2026-09-16). The `.dh/language-manifest.yaml` format they documented is retired, and the retirement is now enforced: `plugins/development-harness/tests/test_retired_terms.py` fails if the term reappears in any runtime-read plugin file. Roles and quality gates resolve through `mcp__plugin_dh_backlog__profile_list()` and repository discovery instead. There is no successor gate-contract document, so Improvement 3 is superseded rather than repointed — see the note under its own heading.
+
 ## Improvement 1: Distinguish incomplete evidence from failed final verification
 
 **Source pattern**: “Preserve an `incomplete` state when a requested proof cannot be established” rather than treating unsupported or uncertain checks as a pass. (Relevance to Claude Code Development → Patterns Worth Adopting)
@@ -47,6 +50,8 @@ The verification artifact includes a deterministic provenance record covering th
 A final-verification artifact contains a named provenance block and digest; rerunning certification against unchanged inputs reproduces the digest, while changing a covered source file or gate configuration changes it.
 
 ## Improvement 3: Define an optional deterministic source-verifier quality gate
+
+> **Superseded — do not action.** This proposal extends a gate contract that no longer exists. Both files named in its Local system were deleted in `aee7ce482` (#3427) and the `.dh/language-manifest.yaml` format is a retired term enforced by `plugins/development-harness/tests/test_retired_terms.py`. A third-party source-verifier gate would now have to be expressed against `profile_list()` and repository discovery; whether it can be is an open question, not a described change. The dead paths below are left as the record of what was analysed.
 
 **Source pattern**: Use the MCP `verify_change` result as one evidence source in a coding-agent verification gate, subject to repository language support and the accepted `incomplete` policy. (Relevance to Claude Code Development → Integration Opportunities)
 **Local system**: `plugins/development-harness/templates/language-manifest-template.md`; `plugins/development-harness/skills/dh-meta-docs/references/language-manifest-schema.md`

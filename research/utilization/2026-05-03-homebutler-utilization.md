@@ -2,6 +2,9 @@
 title: "HomeButler Utilization Assessment"
 ---
 
+<!-- removed-skill-citations -->
+> **Unimplemented-proposal path:** `plugins/development-harness/skills/development-harness/references/`, cited under this entry's Files Affected list, is the "new reference file (optional)" that list proposes adding, not a directory this entry observed. It does not exist and is not expected to: its absence is the open state of the proposal. A path audit should leave it alone rather than repoint or delete it.
+
 ## Status
 
 **UTILIZATION SURFACE**: `has_utilization_surface`
@@ -203,8 +206,8 @@ HomeButler presents **direct integration opportunities** as an MCP server depend
 
 If Phase 1–2 integrated:
 - `.claude-plugin/plugin.json` — add optional homebutler MCP server
-- `plugins/development-harness/SKILL.md` — reference and use cases
-- `plugins/development-harness/references/` — new reference file (optional)
+- `plugins/development-harness/skills/development-harness/SKILL.md` — reference and use cases
+- `plugins/development-harness/skills/development-harness/references/` — new reference file (optional)
 
 ---
 

@@ -124,7 +124,7 @@ The SAM pipeline includes T0-baseline-capture (pre-implementation state) and TN-
 ## Improvement 6: Cross-project solution search
 
 **Source pattern**: "When working on multiple Claude Code projects, --global search surfaces solutions and patterns from prior projects without manual knowledge transfer." — Relevance section, point 6, lines 399
-**Local system**: `plugins/development-harness/skills/backlog/SKILL.md`, research directory
+**Local system**: `dh:work-backlog-item`, research directory
 **Confidence**: Low
 **Impact**: Low
 **Backlog**: Deferred — confidence low: the local system might have equivalent behavior via research entries (which catalog external solutions) and backlog search (which is project-scoped but could be extended). The gap is inferred — the research system and backlog system are project-scoped by design, but whether cross-project search would provide value depends on the user having multiple active projects, which has not been verified.

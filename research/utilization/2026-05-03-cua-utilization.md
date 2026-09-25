@@ -2,6 +2,9 @@
 title: "CUA Utilization Assessment"
 ---
 
+<!-- removed-skill-citations -->
+> **Unimplemented-proposal path:** `plugins/development-harness/scripts/run_cua_server.py`, cited under this entry's Phase 1 (Immediate): Infrastructure list, names a deliverable this entry proposes creating rather than a file it observed. It does not exist and is not expected to: its absence is the open state of the proposal. A path audit should leave it alone rather than repoint or delete it.
+
 ## STATUS: has_utilization_surface
 
 CUA presents **4 direct integration surfaces** for this codebase. The platform is feature-complete, actively maintained (476 releases, last update May 2, 2026), and provides infrastructure that complements the agent-centric architecture already present in claude_skills.

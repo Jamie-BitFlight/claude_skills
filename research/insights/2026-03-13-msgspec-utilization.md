@@ -181,7 +181,7 @@ The refactored version consolidates eight explicit validation checks into a sing
 
 | Local System | Reason skipped |
 |---|---|
-| ./plugins/development-harness/scripts/manifest_resolver.py (lines 68-75) | Integration surface present: `json.loads()` is used to read plugin.json files. However, the manifest files are read only once during startup by the manifest discovery system. The performance benefit of msgspec (6-12x faster parsing) is not material for one-off startup reads. Additionally, the function is shared utility code in a multi-language development harness; introducing Python serialization library dependencies would increase coupling to that plugin. Scope does not justify integration cost. |
+| ./plugins/development-harness/agent_profile/discovery.py (`_build_manifest_name_index`, line 242) | Integration surface present: `json.loads()` is used to read plugin.json files. (Originally assessed at `scripts/manifest_resolver.py` lines 68-75, deleted in `66ed5094d`, #3392; the equivalent read now lives here with the same one-off-startup shape, so the assessment below transfers unchanged.) However, the manifest files are read only once during startup by the manifest discovery system. The performance benefit of msgspec (6-12x faster parsing) is not material for one-off startup reads. Additionally, the function is shared utility code in a multi-language development harness; introducing Python serialization library dependencies would increase coupling to that plugin. Scope does not justify integration cost. |
 
 ---
 

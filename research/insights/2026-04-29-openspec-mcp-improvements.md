@@ -6,7 +6,7 @@ title: "Improvement Proposals: OpenSpec MCP"
 
 **Source pattern**: "State progression: `draft` -> `pending_approval` -> `approved` -> `implementing` -> `completed` -> `archived`. Rejection cycles back to `draft` for revision, preserving the audit trail."
 
-**Local system**: `plugins/development-harness/skills/backlog/SKILL.md` and `plugins/development-harness/skills/complete-implementation/SKILL.md`
+**Local system**: `plugins/development-harness/docs/backlog-lifecycle.md`, `plugins/development-harness/docs/adr-9-close-resolve-semantics.md` and `plugins/development-harness/skills/complete-implementation/SKILL.md`
 
 **Confidence**: High
 
@@ -16,9 +16,9 @@ title: "Improvement Proposals: OpenSpec MCP"
 
 ### Current state
 
-The backlog lifecycle implements state transitions via GitHub issue labels (`status:groomed`, `status:in-progress`, `status:done`) but does not enforce a strict state machine. The `backlog_close` tool accepts any terminal reason (`duplicate`, `out_of_scope`, `superseded`, `wontfix`, `blocked`) without validation of prior state or audit trail. The SAM task state model (`Task.status`) supports `{not-started, in-progress, complete, blocked, deferred, skipped}` but rejection (returning to draft) is not modeled — once a task is blocked or rejected, there is no structured recovery path.
+The backlog lifecycle implements state transitions via GitHub issue labels (`status:groomed`, `status:in-progress`, `status:done`) but does not enforce a strict state machine. The `backlog_close` tool validates its reason against a fixed set (`duplicate`, `out_of_scope`, `superseded`, `wontfix`, `blocked`) at `backlog_core/operations.py:3989` and records `close_reason`, `close_reference` and `close_comment` as item metadata, so the reason and the dismissal itself are auditable. What it does not validate is the transition: the only prior-state check is an already-closed short-circuit (`operations.py:4023`), and `close` is reachable from every non-terminal stage. The SAM task state model (`Task.status`) supports `{not-started, in-progress, complete, blocked, deferred, skipped}` but rejection (returning to draft) is not modeled — once a task is blocked or rejected, there is no structured recovery path.
 
-File: `plugins/development-harness/skills/backlog/SKILL.md` (lines 22-142) documents `backlog_close` and `backlog_resolve` operations without mentioning state validation or audit trail preservation on rejection.
+Files: `plugins/development-harness/docs/backlog-lifecycle.md` § "Transitions made by the workflows" and `plugins/development-harness/docs/adr-9-close-resolve-semantics.md` document `backlog_close` and `backlog_resolve`, including the already-closed and already-resolved short-circuits and the audit/retrospective trail `resolve` creates. Neither models a rejection cycle back to an earlier stage, and no transition carries an actor or a timestamp.
 
 ### Target state
 
@@ -95,7 +95,7 @@ After findings are resolved (state = `resolved`), progression continues. Audit t
 
 **Source pattern**: "Cross-service document aggregation (`openspec_list_cross_service_docs`, `openspec_read_cross_service_doc`) unified through a single MCP interface. Configured via YAML frontmatter in `proposal.md` with `crossService.rootPath`, document list, and `archivePolicy` (snapshot or reference)."
 
-**Local system**: `plugins/development-harness/docs/plan-artifact-lifecycle.md` and artifact conventions in `plugins/development-harness/skills/development-harness/references/artifact-conventions.md`
+**Local system**: `plugins/development-harness/docs/plan-artifact-lifecycle.md` and artifact conventions in `plugins/development-harness/skills/dh-meta-docs/references/artifact-conventions.md`
 
 **Confidence**: Medium
 
@@ -107,7 +107,7 @@ After findings are resolved (state = `resolved`), progression continues. Audit t
 
 The artifact conventions define artifact types (`feature-context`, `architect`, `task-plan`, etc.) and store them under `~/.dh/projects/{slug}/plan/`. Multi-plugin documentation exists in separate plugin directories (`plugins/plugin-name/skills/`, `plugins/plugin-name/docs/`) with no unified discovery mechanism. An orchestrator cannot query "all architecture documentation across all plugins for this codebase" without manually traversing the filesystem.
 
-File: `plugins/development-harness/skills/development-harness/references/artifact-conventions.md` (lines 1-50) defines artifact storage and naming but does not address cross-plugin discovery.
+File: `plugins/development-harness/skills/dh-meta-docs/references/artifact-conventions.md` (lines 1-50) defines artifact storage and naming but does not address cross-plugin discovery.
 
 ### Target state
 
@@ -179,7 +179,7 @@ Open `http://localhost:3001/dashboard` during feature implementation. Task state
 
 **Source pattern**: "State machine enforcement via MCP tools: each state transition is a distinct named tool (e.g., `request_approval`, `approve_change`) rather than a generic 'update status' call, making agent intent explicit and auditable"
 
-**Local system**: `plugins/development-harness/skills/backlog/SKILL.md` and `complete-implementation` skill
+**Local system**: `plugins/development-harness/docs/backlog-lifecycle.md` and `complete-implementation` skill
 
 **Confidence**: Medium
 
@@ -191,7 +191,7 @@ Open `http://localhost:3001/dashboard` during feature implementation. Task state
 
 State transitions in the backlog use a generic `backlog_update(selector, status=...)` call. An agent calling `backlog_update(selector='#42', status='approved')` provides no semantic clarity about whether it is the approver, the implementer, or the task-worker making the change.
 
-File: `plugins/development-harness/skills/backlog/SKILL.md` (lines 144-150) documents `backlog_update` as a single catch-all tool.
+File: `plugins/development-harness/docs/backlog-lifecycle.md` documents `backlog_update` as a single catch-all tool.
 
 ### Target state
 

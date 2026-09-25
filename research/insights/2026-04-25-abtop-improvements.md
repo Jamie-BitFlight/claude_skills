@@ -2,6 +2,9 @@
 title: "Improvement Proposals: abtop"
 ---
 
+<!-- removed-skill-citations -->
+> **Unimplemented-proposal paths:** `plugins/development-harness/monitoring/`, `plugins/development-harness/redact.py`, `plugins/development-harness/tests/test_redact.py` and `plugins/development-harness/scripts/claude_session_reader.py`, cited under this entry's Target state and Measurable signal headings, name deliverables this entry proposes rather than files it observed. None of them exists and none is expected to: their absence is the open state of the proposal. A path audit should leave them alone rather than repoint or delete them.
+
 ## Improvement 1: Stalled-session detection using LastActivity timestamp
 
 **Source pattern**: "Real-time session status detection: Thinking (generating, no active tool), Executing (tool active), Waiting (idle, user input), RateLimited (quota exceeded), or Done (finished)" (Key Features → Session Discovery and Monitoring; src/model/session.rs `SessionStatus` enum).

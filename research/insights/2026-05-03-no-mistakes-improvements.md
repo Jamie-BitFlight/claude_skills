@@ -2,6 +2,9 @@
 title: "Improvement Proposals: no-mistakes"
 ---
 
+<!-- removed-skill-citations -->
+> **Unimplemented-proposal paths:** `plugins/development-harness/skills/ci-watcher/SKILL.md` and `plugins/development-harness/skills/complete-implementation/references/gate-config-schema.md`, cited under this entry's Target state and Measurable signal headings, name deliverables this entry proposes rather than files it observed. None of them exists and none is expected to: their absence is the open state of the proposal. A path audit should leave them alone rather than repoint or delete them.
+
 ## Improvement 1: Run /complete-implementation quality gates in an isolated worktree
 
 **Source pattern**: "Non-Blocking Isolated Worktree — Push to no-mistakes starts validation in a temporary worktree without interrupting local development. Your working directory remains unchanged while the gate processes your code." (Key Features section). Also "Isolated Validation Worktree: Non-blocking validation that doesn't interrupt developer workflow" (Patterns Worth Adopting).

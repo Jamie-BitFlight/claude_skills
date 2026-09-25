@@ -2,6 +2,9 @@
 title: "Utilization Proposals: MemPalace"
 ---
 
+<!-- removed-skill-citations -->
+> **Fabricated caller path:** `plugins/development-harness/hooks/SubagentStop.cjs`, named as Utilization 1's **Caller**, has never existed on any branch of this repository — the entry named a file after the hook event instead of reading `hooks/hooks.json`. On this entry's own date the registered `SubagentStop` handler was already `plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py` (commit `11ec4833a`), and the behaviour Utilization 1 describes was real there: that day's copy carried `delete_task_context()` with a `context_file.unlink()`. It no longer is. `handle_subagent_stop` now settles the attempt into the work ledger and deletes nothing, so the gap this utilization targets — session metadata discarded on hook fire — is closed by other means. The path is left dead deliberately: repointing it would make it resolve while leaving a description that no longer matches the hook.
+
 > **Review note (2026-04-08)**: All three proposals below need comparing against Claude Code's built-in `memory: project` agent frontmatter field before proceeding. Sub-agents are normally disposable — their context is discarded after task completion. When persistence is needed, agents can be given `memory: project` which provides persistent storage at `.claude/agent-memory/{agent-name}/`. Agents with this field can be instructed on what to track in project memory via their prompt. This native mechanism addresses the same gap MemPalace targets (cross-session knowledge retention) without an external dependency. Evaluate whether MemPalace offers capabilities beyond what `memory: project` provides (e.g., semantic search across all agent memories, palace-structured retrieval, cross-agent knowledge sharing) before adopting.
 
 ---

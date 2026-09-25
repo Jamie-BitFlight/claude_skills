@@ -2,7 +2,12 @@
 title: "Improvement Proposals: tori-cli"
 ---
 
+<!-- removed-skill-citations -->
+> **Superseded citation:** `plugins/development-harness/docs/TASK_FILE_FORMAT.md`, where Improvement 1's Measurable signal expects the `conditions` field to be documented, was deleted in commit `e59772805` ("remove file-based SAM task language"). Improvement 1's subject is task YAML frontmatter, which that refactor removed; no `conditions` field exists anywhere in `sam_schema/` or `dh_core/`. The path is left dead rather than repointed to the work-ledger spec, because a live path under an unbuildable proposal reads as actionable — see the note under its own heading.
+
 ## Improvement 1: Declarative condition syntax for task readiness and acceptance criteria
+
+> **Superseded — do not action.** The Target state below adds a `conditions` field to task YAML frontmatter. File-based SAM tasks were removed in `e59772805`; tasks live in the work ledger (`plugins/development-harness/dh_core/ledger_spec.py`) and no `conditions` field survives. Re-expressing conditional readiness as a ledger precondition is a new design question, not the change described here.
 
 **Source pattern**: "Tori's 3-token condition format (`scope.field op value`) could be adapted to define task readiness conditions, success criteria, or SLA alerts in Claude Code's task management system." (Integration Opportunities section)
 **Local system**: `plugins/development-harness/skills/implementation-manager/scripts/implementation_manager.py`
