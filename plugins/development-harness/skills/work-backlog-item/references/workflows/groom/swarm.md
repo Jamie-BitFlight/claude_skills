@@ -145,9 +145,9 @@ on every run and the halt looks like a correct gate doing its job.
 
 ## Impact Radius — what the impact-analyst produces
 
-The canonical procedure and output contract live in
-[impact-analyst.md](../../../../../agents/impact-analyst.md). Do not restate or narrow that schema
-here.
+The reusable analysis procedure lives in `dh:analyze-change-impact`. The canonical DH output and
+persistence schema lives in [impact-radius-result.md](./impact-radius-result.md). The impact-analyst
+agent is the workflow adapter between them. Do not restate or narrow either contract here.
 
 Downstream stages must treat the `### Systems Inventory` rows as the authoritative estimated
 impact set. Categorized lists are human-readable views. `pattern:` and `pattern_count:` fields are
