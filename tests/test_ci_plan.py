@@ -33,8 +33,13 @@ runner = load_module("ci_run_under_test", ROOT / ".github/ci/run.py")
 def repository(tmp_path: Path) -> Path:
     """Create distinct plugin, nested, colocated, and global test boundaries."""
     paths = [
-        "plugins/alpha/tests", "plugins/alpha/model/tests", "plugins/alpha/scripts",
-        "plugins/beta/tests", "plugins/development-harness/tests", "tests", ".agents/tool/scripts",
+        "plugins/alpha/tests",
+        "plugins/alpha/model/tests",
+        "plugins/alpha/scripts",
+        "plugins/beta/tests",
+        "plugins/development-harness/tests",
+        "tests",
+        ".agents/tool/scripts",
     ]
     for path in [*paths, "plugins/content-only", ".claude", "tests/research_backlinks"]:
         (tmp_path / path).mkdir(parents=True, exist_ok=True)
@@ -71,8 +76,13 @@ def test_full_partition_equals_authoritative_testpaths_once(repository: Path) ->
     plan = planner.build_plan(repository, None)
     actual = [path for shard in plan["unit_matrix"]["include"] for path in shard["paths"]]
     expected = [
-        "plugins/alpha/tests", "plugins/alpha/model/tests", "plugins/alpha/scripts",
-        "plugins/beta/tests", "plugins/development-harness/tests", "tests", ".agents/tool/scripts",
+        "plugins/alpha/tests",
+        "plugins/alpha/model/tests",
+        "plugins/alpha/scripts",
+        "plugins/beta/tests",
+        "plugins/development-harness/tests",
+        "tests",
+        ".agents/tool/scripts",
     ]
     assert sorted(actual) == sorted(expected)
     assert len(actual) == len(set(actual))
@@ -97,11 +107,20 @@ def test_shared_imports_and_fixtures_expand_tests_not_file_lint(repository: Path
     assert not plan["lint_all"]
 
 
-@pytest.mark.parametrize("path", [
-    "pyproject.toml", "uv.lock", "scripts/shared.py", "tests/test_guard.py",
-    ".github/workflows/code-quality.yml", ".agents/tool/scripts/helper.py",
-    "new-unclassified-directory/input.data", "plugins/alpha/.ruff.toml", ".pre-commit-config.yaml",
-])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "pyproject.toml",
+        "uv.lock",
+        "scripts/shared.py",
+        "tests/test_guard.py",
+        ".github/workflows/code-quality.yml",
+        ".agents/tool/scripts/helper.py",
+        "new-unclassified-directory/input.data",
+        "plugins/alpha/.ruff.toml",
+        ".pre-commit-config.yaml",
+    ],
+)
 def test_shared_or_unknown_inputs_fail_safe_to_full_checks(repository: Path, path: str) -> None:
     """An unclassified dependency cannot produce a falsely narrow success."""
     plan = planner.build_plan(repository, [path])
@@ -309,7 +328,9 @@ def test_runner_propagates_actual_child_failure(tmp_path: Path, exit_code: int) 
 
 
 @pytest.mark.parametrize("registry_changed", [False, True])
-def test_marketplace_version_bump_does_not_expand_plugin_content_change(repository: Path, registry_changed: bool) -> None:
+def test_marketplace_version_bump_does_not_expand_plugin_content_change(
+    repository: Path, registry_changed: bool
+) -> None:
     """Normal version bumps stay local; changed registration still tests everything."""
     git(repository, "init", "-b", "main")
     git(repository, "config", "user.name", "CI fixture")
@@ -332,7 +353,9 @@ def test_marketplace_version_bump_does_not_expand_plugin_content_change(reposito
     paths, resolved, tip, reason = planner.changed_paths(repository, "pull_request", base, head)
     plan = planner.build_plan(repository, paths, resolved, tip, reason)
     assert plan["full_tests"] is registry_changed
-    assert names(plan) == ({"alpha", "beta", "development-harness", "global"} if registry_changed else {"alpha", "global"})
+    assert names(plan) == (
+        {"alpha", "beta", "development-harness", "global"} if registry_changed else {"alpha", "global"}
+    )
     assert plan["checks"]["manifest-sync"]
 
 
