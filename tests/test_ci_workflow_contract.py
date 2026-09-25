@@ -55,10 +55,7 @@ def test_selected_lanes_use_the_same_plan_and_exact_job_key(workflow: dict) -> N
 def test_matrix_executes_paths_via_json_not_shell(workflow: dict, name: str, lane: str) -> None:
     """Matrix targets remain data, and a failing shard does not cancel its peers."""
     job = workflow["jobs"][name]
-    assert job["strategy"] == {
-        "fail-fast": False,
-        "matrix": f"${{{{ fromJSON(needs.changes.outputs.plan).{lane} }}}}",
-    }
+    assert job["strategy"] == {"fail-fast": False, "matrix": f"${{{{ fromJSON(needs.changes.outputs.plan).{lane} }}}}"}
     assert job["env"]["CI_SHARD"] == "${{ toJSON(matrix) }}"
     assert job["env"]["CI_PLAN"] == "${{ needs.changes.outputs.plan }}"
     assert [step["run"] for step in job["steps"] if "run" in step] == [
@@ -69,7 +66,9 @@ def test_matrix_executes_paths_via_json_not_shell(workflow: dict, name: str, lan
 def test_scoped_linters_have_history_after_composite_checkout(workflow: dict) -> None:
     """The setup action's inner checkout must not shallow the required diff history."""
     for name in ("lint-python", "lint-js", "lint-markdown", "lint-shell", "file-hygiene", "manifest-sync"):
-        setup = next(step for step in workflow["jobs"][name]["steps"] if step.get("uses") == "./.github/actions/setup-python")
+        setup = next(
+            step for step in workflow["jobs"][name]["steps"] if step.get("uses") == "./.github/actions/setup-python"
+        )
         assert setup["with"]["fetch-depth"] == 0
     action = YAML(typ="safe").load((ROOT / ".github/actions/setup-python/action.yml").read_text(encoding="utf-8"))
     assert action["inputs"]["fetch-depth"]["default"] == "1"
