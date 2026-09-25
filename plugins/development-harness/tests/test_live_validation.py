@@ -1,340 +1,233 @@
-"""Live validation tests for the backlog MCP server.
+"""Live GitHub contracts in an explicitly authorized, non-production sandbox.
 
-Suite 2: No mocks — calls go through real operations and GitHub API.
-Requires ``GITHUB_TOKEN`` environment variable.
-
-Marked with ``pytest.mark.e2e`` — excluded from default test runs.
-Run with: ``uv run pytest plugins/development-harness/tests/test_live_validation.py -m e2e -v``
-
-No ``@pytest.mark.asyncio`` decorators — global ``asyncio_mode = "auto"``.
+Run with the configuration in docs/live-e2e-validation.md and pytest -m e2e -n 0.
+Missing configuration fails before mutation; the default test lane deselects E2E.
+Each scenario owns its setup, observations and cleanup, with no test-order coupling.
 """
 
 from __future__ import annotations
 
-import logging
+import asyncio
 import os
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 import backlog_core.models as bc_models
 import backlog_core.server as backlog_server
 import pytest
-from backlog_core.backend_protocol import reset_config as bp_reset_config, set_config as bp_set_config
-from backlog_core.backend_types import BacklogConfig as BPBacklogConfig
+from backlog_core.backend_protocol import get_config, reset_config, set_config
+from backlog_core.backend_types import BacklogConfig
 from backlog_core.backends.github_backend import GitHubBackend
-from backlog_core.models import BacklogConfig
-from backlog_core.server import mcp
+from backlog_core.file_cache import FileCache
+from backlog_core.models import ReconcileRequest, ReconcileScope
+from close_test_issues import open_sandbox
+from fastmcp.client import Client
+from live_test_scope import LiveTestScope, cleanup_run
 
-from tests.helpers import call_mcp_tool
+from tests.live_test_support import Journal, LiveCalls, collect_items, issue_number
 
-logger = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from github.Issue import Issue
+    from github.Repository import Repository
 
-
-# ---------------------------------------------------------------------------
-# Module-level skip + mark
-# ---------------------------------------------------------------------------
-
-_HAS_TOKEN = bool(os.environ.get("GITHUB_TOKEN"))
-
-pytestmark = [pytest.mark.e2e, pytest.mark.skipif(not _HAS_TOKEN, reason="GITHUB_TOKEN not set — skipping live tests")]
+pytestmark = pytest.mark.e2e
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+@dataclass
+class LiveEnvironment:
+    scope: LiveTestScope
+    repository: Repository
+    backend: GitHubBackend
+    root: Path
+    journal: Journal
 
-
-async def _call(tool_name: str, params: dict | None = None) -> dict:
-    """Call MCP tool via in-memory transport and parse JSON response.
-
-    Delegates to tests.helpers.call_mcp_tool bound to this module's mcp server.
-    """
-    return await call_mcp_tool(mcp, tool_name, params)
-
-
-# ---------------------------------------------------------------------------
-# Fixture: live_items (class-scoped, creates temp backlog dir + cleanup)
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture(scope="class")
-def live_items(tmp_path_factory, monkeypatch_class):
-    """Class-scoped fixture for live validation tests.
-
-    - Redirects BACKLOG_DIR to a temp directory
-    - Generates a unique test UUID for issue title prefixing
-    - Tracks created issue numbers for teardown cleanup
-    - Cleans up ALL created GitHub issues via PyGithub on teardown
-    """
-    import dh_paths
-
-    tmp_root = tmp_path_factory.mktemp("live_backlog")
-    monkeypatch_class.setattr(backlog_server, "_startup_sync_enabled", lambda: False)
-    monkeypatch_class.setenv("DH_STATE_HOME", str(tmp_root / "dh_state"))
-
-    fake_project_root = tmp_root / "project"
-    fake_project_root.mkdir(parents=True, exist_ok=True)
-
-    bd = dh_paths.backlog_dir(project_root=fake_project_root)
-    bd.mkdir(parents=True, exist_ok=True)
-
-    existing = bc_models._config
-    # Prefer GITHUB_REPO env var (set in CI) over the already-resolved default_repo.
-    # The fixture replaces _config directly, bypassing _discover_via_env(), so without
-    # this the env var is never consulted and default_repo stays "" in CI — causing 404s.
-    resolved_repo = os.environ.get("GITHUB_REPO", existing.default_repo if existing is not None else "")
-    monkeypatch_class.setattr(
-        bc_models, "_config", BacklogConfig(repo_root=fake_project_root, backlog_dir=bd, default_repo=resolved_repo)
-    )
-
-    # operations.py imports get_config from backend_protocol (a separate singleton from
-    # bc_models._config). Without patching backend_protocol._active_config, all
-    # operations.py calls (add_item, sync_items, etc.) hit the real ~/.dh backlog with
-    # 800+ issues instead of the test temp directory — causing a 10-minute hang in
-    # backlog_sync (L8) as it fetches the entire real issue list from GitHub.
-    # GitHubBackend() with no repo arg falls through to resolve_repo("") →
-    # models.get_default_repo() → the already-patched bc_models._config.default_repo.
-    bp_set_config(BPBacklogConfig(backend=GitHubBackend()))
-
-    test_id = str(uuid.uuid4())[:8]
-    ctx: dict = {
-        "test_id": test_id,
-        "backlog_dir": bd,
-        "issues": [],  # track created issue numbers for cleanup
-        "title_prefix": f"[MCP-TEST-{test_id}]",
-        # Populated by test_l1_add_with_real_issue on success.
-        # Pre-initialised to None so dependent tests can pytest.skip instead of KeyError.
-        "item_title": None,
-        "item_issue_num": None,
-        "item_filepath": None,
-        # Set to True only when L1 fully completes. Downstream guards check this sentinel.
-        "l1_ok": False,
-    }
-
-    yield ctx
-
-    # Restore backend_protocol singleton so later tests don't inherit the test config.
-    bp_reset_config()
-
-    # Teardown: close all created issues — log failures instead of swallowing silently
-    token = os.environ.get("GITHUB_TOKEN", "")
-    if token and ctx["issues"]:
+    @contextmanager
+    def fresh_reader(self) -> Iterator[GitHubBackend]:
+        """Replace the writer cache with an empty, real provider cache for readback."""
+        previous = get_config()
+        backend = GitHubBackend(
+            repo=self.scope.repository, cache=FileCache(self.root / f"reader-{uuid.uuid4().hex}")
+        )
+        set_config(BacklogConfig(backend=backend))
         try:
-            from github import Auth, Github, GithubException
-        except ImportError:
-            logger.warning(
-                "PyGithub not available — cannot clean up %d test issues: %s", len(ctx["issues"]), ctx["issues"]
-            )
-        else:
-            try:
-                from backlog_core.models import RepoDiscoveryError, discover_repo
-
-                try:
-                    repo_slug = discover_repo()
-                except RepoDiscoveryError:
-                    # repo_root is a temp non-git dir and GITHUB_REPO is unset;
-                    # fall back to the pre-patched default_repo if available
-                    repo_slug = existing.default_repo if existing is not None else ""
-                if not repo_slug:
-                    logger.warning("Cannot determine repo slug for teardown cleanup of issues: %s", ctx["issues"])
-                else:
-                    g = Github(auth=Auth.Token(token))
-                    repo = g.get_repo(repo_slug)
-                    for issue_num in ctx["issues"]:
-                        try:
-                            issue = repo.get_issue(issue_num)
-                            issue.edit(state="closed")
-                        except GithubException:
-                            logger.warning(
-                                "Failed to close test issue #%d — will remain open as orphan", issue_num, exc_info=True
-                            )
-            except GithubException:
-                logger.warning(
-                    "Failed to connect to GitHub for teardown cleanup of issues: %s", ctx["issues"], exc_info=True
-                )
+            yield backend
+        finally:
+            set_config(previous)
 
 
-@pytest.fixture(scope="class")
-def monkeypatch_class():
-    """Class-scoped monkeypatch for use with class-scoped fixtures."""
-    from _pytest.monkeypatch import MonkeyPatch
+@pytest.fixture
+def live_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest):
+    if request.config.getoption("numprocesses", default=0) not in (None, 0):
+        pytest.fail("Live scenarios share one configured MCP backend; run this lane with -n 0")
+    scope = LiveTestScope.from_environment(os.environ)
+    repository = open_sandbox(scope)
+    report_dir = Path(os.environ.get("DH_E2E_REPORT_DIR", str(tmp_path / "reports")))
+    journal = Journal(report_dir / f"{request.node.name}.jsonl")
+    journal.record("scope", repository=scope.repository, run_id=scope.run_id, scenario=request.node.name)
+    monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "state"))
+    monkeypatch.setenv("GITHUB_REPO", scope.repository)
+    project = tmp_path / "project"
+    project.mkdir()
+    monkeypatch.setattr(
+        bc_models,
+        "_config",
+        bc_models.BacklogConfig(repo_root=project, backlog_dir=tmp_path / "backlog", default_repo=scope.repository),
+    )
+    # Controlled CRUD and cold-read scenarios, not a claim about background startup.
+    monkeypatch.setattr(backlog_server, "_startup_sync_enabled", lambda: False)
+    backend = GitHubBackend(repo=scope.repository, cache=FileCache(tmp_path / "writer"))
+    set_config(BacklogConfig(backend=backend))
+    try:
+        yield LiveEnvironment(scope, repository, backend, tmp_path, journal)
+    finally:
+        reset_config()
+        with journal.phase("cleanup"):
+            # Revalidate the remote marker and canonical target, not a cached identity.
+            closed = cleanup_run(scope, open_sandbox(scope))
+            journal.record("cleanup", closed=closed)
 
-    mp = MonkeyPatch()
-    yield mp
-    mp.undo()
 
-
-# ---------------------------------------------------------------------------
-# Live Lifecycle Tests (L1-L11)
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.xdist_group("live_lifecycle")
-class TestLiveLifecycle:
-    """Live validation lifecycle: L1 creates an item, L2-L10 operate on it,
-    L11 creates and resolves a second item. Tests execute in declaration order
-    on a single xdist worker (grouped via xdist_group marker).
-    """
-
-    async def test_l1_add_with_real_issue(self, live_items):
-        """L1: backlog_add creates a real GitHub issue."""
-        prefix = live_items["title_prefix"]
-        result = await _call(
+async def create_item(calls: LiveCalls, env: LiveEnvironment, suffix: str) -> tuple[int, str]:
+    title = f"{env.scope.title_prefix} {suffix} {uuid.uuid4().hex}"
+    with env.journal.phase(f"create {suffix}"):
+        result = await calls.call(
             "backlog_add",
             {
-                "title": f"{prefix} Live Test Item",
+                "title": title,
                 "priority": "P1",
-                "description": "Live validation test item",
+                "description": f"{env.scope.body_marker}\n\nLive validation fixture: {suffix}",
                 "source": "test",
                 "force": True,
             },
         )
+        number = issue_number(result)
+        env.journal.record("created", issue=number)
+        stored_title = result.get("title")
+        assert isinstance(stored_title, str), result
+        assert title in stored_title, result
+        remote = await asyncio.to_thread(env.repository.get_issue, number)
+        assert remote.title == stored_title
+        assert env.scope.owns(remote.title, remote.body, remote.pull_request)
+        assert f"Live validation fixture: {suffix}" in (remote.body or "")
+        return number, stored_title
 
-        # backlog_add returns item_ref="#N" (str); parse to int for tracking/cleanup.
-        assert "item_ref" in result, f"Expected item_ref in result, got: {list(result.keys())}"
-        item_ref: str = result["item_ref"]
-        assert item_ref.startswith("#"), f"Expected item_ref like '#N', got: {item_ref!r}"
-        issue_num = int(item_ref.lstrip("#"))
-        # Track the issue for cleanup before any further assertion: a failure between here
-        # and the fixture teardown would otherwise leave the live issue open, and only the
-        # workflow's always-run sweeper would catch it.
-        live_items["issues"].append(issue_num)
 
-        assert issue_num > 0
-        # backlog_add reports the title as stored, which BacklogAddResponse.title documents.
-        # create_issue_for_item prefixes it with the item's conventional-commit type for the
-        # live issue, so assert containment rather than equality — the test states the
-        # contract without duplicating gh_client's type-prefix map.
-        assert f"{prefix} Live Test Item" in result["title"], f"Expected the raw title within: {result['title']!r}"
-        assert isinstance(result["file_path"], str)
-        assert isinstance(result["messages"], list)
-        # Track for later tests
-        live_items["item_title"] = result["title"]
-        live_items["item_filepath"] = result["file_path"]
-        live_items["item_issue_num"] = issue_num
-        live_items["l1_ok"] = True
+async def native_issue(env: LiveEnvironment, number: int) -> Issue:
+    return await asyncio.to_thread(env.repository.get_issue, number)
 
-    async def test_l2_list_includes_created_item(self, live_items):
-        """L2: backlog_list returns the item created in L1."""
-        if not live_items["l1_ok"]:
-            pytest.skip("L1 (test_l1_add_with_real_issue) did not complete — skipping dependent test")
-        result = await _call("backlog_list", {})
 
-        assert isinstance(result["items"], list)
-        assert result["count"] >= 1
-        matching = [i for i in result["items"] if live_items["title_prefix"] in i.get("title", "")]
-        assert matching, f"Expected item with prefix {live_items['title_prefix']} in list"
+def listed_references(items: list[dict[str, object]]) -> set[str]:
+    return {str(item.get("issue", "")) for item in items}
 
-    async def test_l3_view_by_issue_number(self, live_items):
-        """L3: backlog_view by issue number returns full item data."""
-        if not live_items["l1_ok"]:
-            pytest.skip("L1 (test_l1_add_with_real_issue) did not complete — skipping dependent test")
-        issue_num = live_items["item_issue_num"]
-        result = await _call("backlog_view", {"selector": f"#{issue_num}", "summary": False})
 
-        # backlog_view may return a GitHub-normalised title (e.g. "feat: ..." prefix)
-        # so verify the original title text is present in the returned title.
-        assert live_items["item_title"] in result["title"] or result["title"] == live_items["item_title"]
-        assert isinstance(result["body"], str)
-        assert isinstance(result["priority"], str)
-        assert isinstance(result["labels"], list)
-
-    async def test_l4_update_attach_plan(self, live_items):
-        """L4: backlog_update attaches a plan path to the item."""
-        if not live_items["l1_ok"]:
-            pytest.skip("L1 (test_l1_add_with_real_issue) did not complete — skipping dependent test")
-        result = await _call("backlog_update", {"selector": live_items["item_title"], "plan": "plan/live-test-plan.md"})
-
-        assert result["title"] == live_items["item_title"]
-        assert result["plan"] == "plan/live-test-plan.md"
-
-    async def test_l5_update_set_status_in_progress(self, live_items):
-        """L5: backlog_update sets status to in-progress via GitHub label."""
-        if not live_items["l1_ok"]:
-            pytest.skip("L1 (test_l1_add_with_real_issue) did not complete — skipping dependent test")
-        result = await _call("backlog_update", {"selector": live_items["item_title"], "status": "in-progress"})
-
-        assert result["title"] == live_items["item_title"]
-        assert result["status"] == "in-progress"
-
-    async def test_l6_groom_write_full_content(self, live_items):
-        """L6: backlog_groom writes full groomed content to item and syncs to GitHub."""
-        if not live_items["l1_ok"]:
-            pytest.skip("L1 (test_l1_add_with_real_issue) did not complete — skipping dependent test")
-        result = await _call(
-            "backlog_groom",
-            {
-                "selector": live_items["item_title"],
-                "section": "Groomed",
-                "content": "Live test groomed content.\n\n### Reproducibility\n\nSteps here.",
-            },
+async def test_live_crud_persists_changes_and_preserves_other_sections(live_environment: LiveEnvironment) -> None:
+    env = live_environment
+    # Warm CRUD has an explicit, real open-issue snapshot. Historical cold-cache
+    # recovery belongs to the independent scenario below, not an accidental list side effect.
+    with env.journal.phase("warm snapshot setup"):
+        reconciled = await asyncio.to_thread(
+            env.backend.reconcile, ReconcileRequest(scope=ReconcileScope.INITIAL, apply_local_patches=False)
         )
+        assert reconciled.failures == 0, reconciled
+        assert env.backend.has_synced_snapshot()
+    async with Client(backlog_server.mcp, timeout=30, init_timeout=30) as client:
+        calls = LiveCalls(client, env.journal)
+        with env.journal.phase("warm lifecycle"):
+            primary, title = await create_item(calls, env, "primary")
+            companion, companion_title = await create_item(calls, env, "companion")
 
-        assert result["groomed_updated"] is True
-        assert isinstance(result["messages"], list)
+            with env.journal.phase("list membership across pages"):
+                items = await collect_items(calls.call, {"limit": 1})
+                assert {f"#{primary}", f"#{companion}"}.issubset(listed_references(items)), items
 
-    async def test_l7_groom_incremental_section(self, live_items):
-        """L7: backlog_groom updates a specific section incrementally."""
-        if not live_items["l1_ok"]:
-            pytest.skip("L1 (test_l1_add_with_real_issue) did not complete — skipping dependent test")
-        result = await _call(
-            "backlog_groom",
-            {"selector": live_items["item_title"], "section": "Dependencies", "content": "No external dependencies."},
-        )
+            with env.journal.phase("numeric view"):
+                view = await calls.call("backlog_view", {"selector": f"#{primary}", "summary": False})
+                assert view["title"] == title, view
+                assert isinstance(view["body"], str), view
+                assert view["status_source"] == "live", view
 
-        assert result["groomed_updated"] is True
+            with env.journal.phase("plan association and status"):
+                plan = "plan/live-test-plan.md"
+                updated = await calls.call("backlog_update", {"selector": title, "plan": plan})
+                assert updated["plan"] == plan, updated
+                associated = await calls.call("backlog_view", {"selector": title, "summary": False})
+                assert associated["plan"] == plan, associated
+                updated = await calls.call("backlog_update", {"selector": title, "status": "in-progress"})
+                assert updated["status"] == "in-progress", updated
+                remote = await native_issue(env, primary)
+                assert "status:in-progress" in {label.name for label in remote.labels}
 
-    @pytest.mark.usefixtures("live_items")
-    async def test_l8_sync_push_groomed(self):
-        """L8: backlog_sync pushes groomed content to GitHub issues."""
-        result = await _call("backlog_sync")
+            groomed = "Live test groomed content.\n\n### Reproducibility\n\nSteps here."
+            dependencies = "No external dependencies."
+            with env.journal.phase("groom and incremental section preservation"):
+                groom = await calls.call(
+                    "backlog_groom", {"selector": title, "section": "Groomed", "content": groomed}
+                )
+                assert groom["groomed_updated"] is True, groom
+                incremental = await calls.call(
+                    "backlog_groom", {"selector": title, "section": "Dependencies", "content": dependencies}
+                )
+                assert incremental["groomed_updated"] is True, incremental
+                synced = await calls.call("backlog_sync", {})
+                assert isinstance(synced["created"], int), synced
+                assert isinstance(synced["pushed"], int), synced
+                # Native comments and an empty-cache MCP reader are distinct observations.
+                # The issue body is human-owned; grooming must not be tested as a body rewrite.
+                remote = await native_issue(env, primary)
+                comments = await asyncio.to_thread(lambda: [comment.body for comment in remote.get_comments()])
+                assert any("Live test groomed content." in body for body in comments), comments
+                assert any(dependencies in body for body in comments), comments
+                with env.fresh_reader():
+                    persisted = await calls.call("backlog_view", {"selector": f"#{primary}", "summary": False})
+                    assert persisted["status_source"] == "live", persisted
+                    assert "Live test groomed content." in str(persisted["body"]), persisted
+                    assert dependencies in str(persisted["body"]), persisted
 
-        assert isinstance(result["created"], int)
-        assert isinstance(result["pushed"], int)
-        assert isinstance(result["messages"], list)
+            with env.journal.phase("pull observes an independent provider edit"):
+                remote = await native_issue(env, companion)
+                changed_title = companion_title + " changed remotely"
+                changed_body = f"{env.scope.body_marker}\n\nProvider edit not present in the writer cache."
+                await asyncio.to_thread(remote.edit, title=changed_title, body=changed_body)
+                await calls.call("backlog_pull", {"selector": f"#{companion}"})
+                # A title lookup without refresh reads the cache populated by pull. A
+                # numeric lookup here would mask a no-op pull by fetching GitHub again.
+                pulled = await calls.call("backlog_view", {"selector": changed_title, "summary": False})
+                assert pulled["title"] == changed_title, pulled
+                assert "Provider edit not present in the writer cache." in str(pulled["body"]), pulled
 
-    @pytest.mark.usefixtures("live_items")
-    async def test_l9_pull_refresh_from_github(self):
-        """L9: backlog_pull refreshes local files from GitHub issue bodies."""
-        result = await _call("backlog_pull")
+            with env.journal.phase("close and resolve are native terminal transitions"):
+                closed = await calls.call("backlog_close", {"selector": title, "reason": "wontfix"})
+                assert closed["closed"] is True, closed
+                assert (await native_issue(env, primary)).state == "closed"
+                resolved = await calls.call(
+                    "backlog_resolve", {"selector": f"#{companion}", "summary": "Live validation completed"}
+                )
+                assert resolved["resolved"] is True, resolved
+                assert (await native_issue(env, companion)).state == "closed"
 
-        assert isinstance(result["messages"], list)
 
-    async def test_l10_close_full_lifecycle_end(self, live_items):
-        """L10: backlog_close with reason closes the item."""
-        if not live_items["l1_ok"]:
-            pytest.skip("L1 (test_l1_add_with_real_issue) did not complete — skipping dependent test")
-        result = await _call("backlog_close", {"selector": live_items["item_title"], "reason": "wontfix"})
-
-        assert result["closed"] is True
-        assert isinstance(result["messages"], list)
-
-    async def test_l11_resolve_alternative_end(self, live_items):
-        """L11: Create a second item and resolve it (alternative lifecycle end)."""
-        prefix = live_items["title_prefix"]
-
-        # Create second item
-        create_result = await _call(
-            "backlog_add",
-            {
-                "title": f"{prefix} Live Resolve Item",
-                "priority": "P2",
-                "description": "Item to be resolved",
-                "source": "test",
-                "force": True,
-            },
-        )
-        # backlog_add returns item_ref="#N" (str); parse to int for tracking/cleanup.
-        assert "item_ref" in create_result, f"Expected item_ref, got: {list(create_result.keys())}"
-        l11_issue_num = int(create_result["item_ref"].lstrip("#"))
-        # Track before asserting, so a later failure cannot leave the live issue open.
-        live_items["issues"].append(l11_issue_num)
-        assert l11_issue_num > 0
-
-        # Resolve it
-        resolve_result = await _call(
-            "backlog_resolve",
-            {"selector": f"{prefix} Live Resolve Item", "summary": "No longer needed — live test cleanup"},
-        )
-
-        assert resolve_result["resolved"] is True
-        assert isinstance(resolve_result["messages"], list)
+async def test_live_cold_cache_recovers_open_and_closed_items(live_environment: LiveEnvironment) -> None:
+    env = live_environment
+    async with Client(backlog_server.mcp, timeout=30, init_timeout=30) as client:
+        calls = LiveCalls(client, env.journal)
+        with env.journal.phase("cold-cache recovery"):
+            opened, _ = await create_item(calls, env, "cold-open")
+            closed, _ = await create_item(calls, env, "cold-closed")
+            remote = await native_issue(env, closed)
+            await asyncio.to_thread(remote.edit, state="closed")
+            assert (await native_issue(env, closed)).state == "closed"
+            with env.fresh_reader() as backend:
+                assert not backend.has_synced_snapshot()
+                items = await collect_items(calls.call, {"limit": 1})
+                assert f"#{opened}" in listed_references(items), items
+                # Recovery completeness is a provider-cache contract, independent of
+                # the MCP listing's open-item presentation/filtering policy.
+                records = backend.list_work_items()
+                recovered = [item for item in records if item.issue == f"#{closed}"]
+                assert len(recovered) == 1, records
+                assert recovered[0].status == "closed", recovered
+                assert backend.has_synced_snapshot()
