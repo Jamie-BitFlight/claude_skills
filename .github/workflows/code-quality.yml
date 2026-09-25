@@ -310,12 +310,17 @@ jobs:
     name: Python / E2E live tests
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    # Serialize consumers of this disposable sandbox; do not cancel its cleanup.
+    concurrency:
+      group: dh-live-e2e-${{ vars.DH_E2E_REPOSITORY }}
+      cancel-in-progress: false
     permissions:
       contents: read
-      issues: write
     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      GITHUB_REPO: Jamie-BitFlight/claude_skills
+      DH_E2E_REPOSITORY: ${{ vars.DH_E2E_REPOSITORY }}
+      GITHUB_REPO: ${{ vars.DH_E2E_REPOSITORY }}
+      DH_E2E_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+      DH_E2E_REPORT_DIR: ${{ runner.temp }}/dh-e2e
       DH_ALLOW_TEST_NETWORK: "1"
     steps:
       - uses: actions/checkout@v6
@@ -323,17 +328,56 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-python
 
+      # Setup and credentials: plugins/development-harness/docs/live-e2e-validation.md
+      # Never fall back to this repository or its automatic GITHUB_TOKEN.
+      - name: Validate live sandbox
+        id: sandbox
+        timeout-minutes: 2
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.DH_E2E_TOKEN }}
+        run: |
+          set -o pipefail
+          mkdir -p "$DH_E2E_REPORT_DIR"
+          uv run --locked python scripts/run_bounded.py --timeout-seconds 60 -- \
+            uv run --locked python plugins/development-harness/scripts/close_test_issues.py --check-only \
+            2>&1 | tee "$DH_E2E_REPORT_DIR/preflight.log"
+
       - name: Run e2e tests
         timeout-minutes: 10
-        run: uv run -q --locked pytest -m e2e -v plugins/development-harness/tests/test_live_validation.py
-
-      - name: Emergency cleanup (always runs)
-        if: always()
-        continue-on-error: true
+        shell: bash
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-        run: uv run plugins/development-harness/scripts/close_test_issues.py
+          GITHUB_TOKEN: ${{ secrets.DH_E2E_TOKEN }}
+        run: |
+          set -o pipefail
+          uv run --locked python scripts/run_bounded.py --timeout-seconds 480 -- \
+            uv run --locked pytest -m e2e -n 0 -x -v --tb=long --capture=tee-sys \
+              -o faulthandler_timeout=60 --junitxml="$DH_E2E_REPORT_DIR/junit.xml" \
+              plugins/development-harness/tests/test_live_validation.py \
+            2>&1 | tee "$DH_E2E_REPORT_DIR/pytest.log"
+
+      - name: Emergency cleanup (always runs after successful preflight)
+        if: always() && steps.sandbox.outcome == 'success'
+        timeout-minutes: 2
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.DH_E2E_TOKEN }}
+        run: |
+          set -o pipefail
+          uv run --locked python scripts/run_bounded.py --timeout-seconds 90 -- \
+            uv run --locked python plugins/development-harness/scripts/close_test_issues.py \
+            2>&1 | tee "$DH_E2E_REPORT_DIR/cleanup.log"
+
+      - name: Preserve live validation evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: live-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/dh-e2e/*.log
+            ${{ runner.temp }}/dh-e2e/*.jsonl
+            ${{ runner.temp }}/dh-e2e/junit.xml
+          if-no-files-found: error
 
   # =============================================================================
   # Summary job that requires all checks to pass

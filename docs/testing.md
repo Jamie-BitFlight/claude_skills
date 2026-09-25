@@ -28,6 +28,13 @@ explains baseline/candidate scenario runs, independent grading, Python entry-poi
 validation limits. These agent evaluations are separate from pytest and are not automatically
 executed by the CI commands above. Do not report authored scenarios as passing behavior.
 
+## Live GitHub E2E
+
+Read the [live validation runbook](../plugins/development-harness/docs/live-e2e-validation.md)
+for the explicit sandbox, scoped credential, run identity, and cleanup requirements. The lane
+uses `-n 0`, immediate failure journals, a process-tree deadline, and independently observed
+remote outcomes. Missing sandbox configuration is a failure, not a passing skip.
+
 ## Plugin installation testing
 
 ```bash
@@ -52,7 +59,7 @@ null until the validation runner records an observed result. It is not a passing
   so a bare `uv run pytest` runs the fast in-process suite only. Integration tests (real-subprocess
   CLI/network-guard behavior, ~2-30s each) and cross-backend tests run as separate CI jobs; the
   one `research_vault` test reads the production corpus only in the advisory research-validation job;
-  e2e tests need a live `GITHUB_TOKEN` and run only on main.
+  e2e tests need the explicit sandbox configuration above and run on main or manual dispatch.
 - **Async mode**: `asyncio_mode = "auto"` — tests auto-detect async
 - **Test discovery**: Multiple test directories configured in `pyproject.toml [tool.pytest.ini_options] testpaths`
   (plugin `tests/` dirs, `development-harness`'s `tests_sam`/`sam_schema/tests`/`backlog_core/tests`,
