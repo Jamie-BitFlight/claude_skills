@@ -320,9 +320,15 @@ jobs:
       DH_E2E_REPOSITORY: ${{ vars.DH_E2E_REPOSITORY }}
       GITHUB_REPO: ${{ vars.DH_E2E_REPOSITORY }}
       DH_E2E_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
-      DH_E2E_REPORT_DIR: ${{ runner.temp }}/dh-e2e
       DH_ALLOW_TEST_NETWORK: "1"
     steps:
+      - name: Prepare live validation evidence
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/dh-e2e"
+          echo "DH_E2E_REPORT_DIR=$RUNNER_TEMP/dh-e2e" >> "$GITHUB_ENV"
+          printf '%s\n' 'Live E2E preflight has not completed.' > "$RUNNER_TEMP/dh-e2e/preflight.log"
+
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
