@@ -205,7 +205,7 @@ Skill(skill="python-engineering:pypi-readme-creator")
 Skill(skill="holistic-linting:holistic-linting")
 ```
 
-This skill behaves differently for orchestrators vs sub-agents. Orchestrators delegate to `linting-root-cause-resolver` agent; sub-agents run formatters and linters directly on touched files before completing.
+Holistic Linting owns the same discover → execute → diagnose/route → integrity-check → verify contract regardless of caller role. Existing compatibility agents may adapt legacy calls, but new callers should invoke the core skill directly. Resolve optional cross-plugin capabilities before use; do not assume that another plugin is installed merely because it exists in this repository.
 
 ---
 
