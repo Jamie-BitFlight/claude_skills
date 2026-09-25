@@ -58,9 +58,7 @@ def test_matrix_executes_paths_via_json_not_shell(workflow: dict, name: str, lan
     assert job["strategy"] == {"fail-fast": False, "matrix": f"${{{{ fromJSON(needs.changes.outputs.plan).{lane} }}}}"}
     assert job["env"]["CI_SHARD"] == "${{ toJSON(matrix) }}"
     assert job["env"]["CI_PLAN"] == "${{ needs.changes.outputs.plan }}"
-    assert [step["run"] for step in job["steps"] if "run" in step] == [
-        "uv run --script .github/ci/run.py pytest"
-    ]
+    assert [step["run"] for step in job["steps"] if "run" in step] == ["uv run --script .github/ci/run.py pytest"]
 
 
 def test_scoped_linters_have_history_after_composite_checkout(workflow: dict) -> None:
