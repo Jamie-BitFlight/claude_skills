@@ -27,6 +27,17 @@ The workflow does not autonomously suppress, downgrade, bypass, or narrow config
 
 Unresolved and out-of-scope diagnostics remain visible.
 
+## Installation
+
+For Claude Code:
+
+    /plugin marketplace add Jamie-BitFlight/claude_skills
+    /plugin install holistic-linting@jamie-bitflight-skills
+
+The core plugin requires a supported plugin host plus the quality tools configured by the target repository. Python Engineering and Development Harness improve domain/causal routing when installed; they are optional external capabilities. When absent, continue within bounded local evidence or report the missing capability when it is necessary for a safe decision.
+
+Repository co-location alone does not prove cross-plugin invocation in a separately installed host.
+
 ## Usage
 
 Invoke the core skill directly:
@@ -39,7 +50,7 @@ The existing `/lint` command and compatibility orchestrator/resolver entry point
 
 ## Discovery and execution
 
-The plugin can use its bundled deterministic helpers to discover configured checks and select a pre-commit-compatible runner. Repository configuration remains authoritative. Run checks at the smallest useful scope unless the repository's configured gate or the user requires a broader run.
+Repository configuration is authoritative. Runtime discovery is read-only and distinguishes complete discovery, no applicable gates, and incomplete/unsupported discovery. The bundled `discover_linters.py` utility writes setup documentation and is not the runtime discovery API. A passing command may still emit advisory diagnostics; gate status and diagnostic disposition are reported separately.
 
 Typical configured tools can include Ruff, MyPy, Pyright/BasedPyright, Bandit, ESLint, Prettier, ShellCheck, shfmt, Markdownlint, pre-commit, or prek. This list is illustrative, not a hardcoded contract.
 
@@ -51,6 +62,6 @@ For Python, route implementation judgment to Python Engineering. Broader indepen
 
 ## Verification
 
-Completion reports the scope, configured gates executed, observed result, resolved diagnostics, unresolved diagnostics, out-of-scope diagnostics, and any additional validation still required.
+Completion reports scope, discovery status, gates/results, diagnostic dispositions, correction-integrity evidence, unresolved items, out-of-scope delivery/return status, and additional validation. Missing required evidence, authority, or capability produces a blocked status rather than a manufactured pass.
 
 A passing rerun verifies only the exercised gate and scope; it is not general proof of architecture correctness.
