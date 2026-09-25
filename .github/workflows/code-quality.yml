@@ -294,6 +294,12 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-python
 
+      - name: Run summarizer CLI contracts
+        run: uv run -q --locked pytest -m integration -v plugins/summarizer/tests/test_cli_contracts.py --no-cov
+
+      - name: Run summarizer output contracts
+        run: node --test plugins/summarizer/tests/test_output_contract.cjs
+
       - name: Run integration tests
         run: uv run -q --locked pytest -m "integration and not research_vault" -v plugins/development-harness/tests/ tests/research_backlinks/
 
