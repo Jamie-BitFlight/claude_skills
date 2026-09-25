@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Run repository-owned pytest tests from the root development environment."""
 
 from __future__ import annotations
@@ -20,7 +19,11 @@ TEST_PATHS = (
 
 
 def main() -> int:
-    """Run repository-owned tests from a stable root."""
+    """Run repository-owned tests from a stable root.
+
+    Returns:
+        The pytest process exit code.
+    """
     os.chdir(REPO_ROOT)
     return pytest.main([*(sys.argv[1:] or TEST_PATHS)])
 
