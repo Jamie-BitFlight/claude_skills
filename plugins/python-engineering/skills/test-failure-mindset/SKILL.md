@@ -1,99 +1,79 @@
 ---
 name: test-failure-mindset
-description: Establishes a dual-hypothesis investigation mindset for every test failure — treating failures as diagnostic signals that may indicate a real bug OR an incorrect test, never defaulting to automatic code changes or test dismissal. Use when encountering failing tests, debugging test errors, running a test suite that shows regressions, or any request involving "test failure analysis", "why is this test failing", or "should I fix the test or the code". Loads a 5-step protocol covering failure reading, implementation tracing, requirement context, reasoned decision-making, and learning extraction. Works alongside analyze-test-failures for detailed per-failure analysis and comprehensive-test-review for full suite review.
+description: Investigate pytest failures without treating tests or implementation as automatic authority. Use when diagnosing regressions, debugging test errors, or deciding whether to fix a test or code; trace the contract, product, fixture, and observation before choosing an evidence-backed correction.
 user-invocable: true
 ---
 
 # Test Failure Analysis Mindset
 
-Establish a balanced investigative approach for all test failures encountered in this session.
+Establish the governing contract before choosing a product or test correction.
 
-## Core Principle
+Load [Python Development Standards](../standards-for-python-development/SKILL.md) for shared
+rules, preserving the target repository's supported versions, configuration, and conventions.
 
-Load and follow the standards in `/python-engineering:standards-for-python-development` when shared testing or quality rules from this plugin apply.
+## Core principle
 
-Tests are specifications - they define expected behavior. When they fail, it's a critical moment requiring balanced investigation, not automatic dismissal.
+Tests encode claims about expected behavior. Validate those claims against authoritative intent;
+neither the test nor the current implementation is automatically correct. Documents can establish
+intent without proving execution. Preserve requirements and established project gates while
+investigating; do not invent policy to reconcile conflicting artifacts.
 
-## Dual Hypothesis Approach
+## Competing hypotheses
 
-Always consider both possibilities when a test fails:
+Consider an implementation defect, an incorrect or outdated expectation, a producer/consumer
+contract mismatch, and a fixture, mock, observation, or CI/environment defect. More than one can
+apply. Name a discriminating observation before changing either the test or the product.
 
-| Hypothesis A                    | Hypothesis B             |
-| ------------------------------- | ------------------------ |
-| Test expectations are incorrect | Implementation has a bug |
-| Test is outdated                | Test caught a regression |
-| Test has wrong assumptions      | Test found an edge case  |
+## Investigation protocol
 
-## Investigation Protocol
+1. **Preserve and reproduce.** Record the tested revision, actual checkout, command, configuration,
+   dependencies, complete failure output, and relevant ordering/parallelism before changing state.
+   Reproduce safely under those conditions, then reduce without losing the mechanism. Distinguish
+   your execution from supplied logs; report unavailable reproduction instead of claiming success.
+2. **Establish authority.** Read the test's name, comments, assertions, and relevant history. State
+   the purpose, consumer, observable guarantee, invariants, authoritative source, and falsifier.
+   Resolve factual unknowns through available evidence; escalate only consequential intent/safety
+   decisions that cannot be resolved that way.
+3. **Trace both paths.** Follow the product from entry point to consumer and the test from fixture
+   through observation to assertion. Cite the earliest demonstrated contract divergence, including
+   setup, cleanup, side effects, and material caller/callee boundaries. A failing assertion is a
+   symptom until its mechanism is established.
+4. **Choose the correction.** Correct a product violation, an invalid oracle, or a misleading
+   harness according to the evidence; record why an expectation changes. For an architectural
+   change, identify the causal condition removed and why a smaller fix is insufficient. Preserve
+   useful behavior; do not add abstractions or mock around the failing boundary just to pass.
+5. **Validate and learn.** Before a material edit, record the expected improvement, baseline,
+   protected invariants, and unacceptable regressions. Show the relevant fault is detected and
+   the corrected behavior passes; verify the failure is at the intended assertion, not setup or
+   collection. Cover related boundary cases proportionately and document residual uncertainty.
 
-For EVERY test failure:
+For intermittent failures, compare controlled conditions with a predeclared observation and
+stopping rule. Report failures/trials and confounds; an effect need not cause failure on every
+run. Neither a successful rerun nor insufficient evidence of an effect establishes a fix.
 
-### 1. Pause and Read
+## Decision record
 
-- Understand what the test is trying to verify
-- Read its name, comments, and assertions carefully
-- Check the test's history (git blame) for context
+Return the violated contract and its authority, reproduction/evidence limits, causal mechanism,
+correction category (product, architecture/interface, test oracle, harness/CI, or intent decision),
+and claim-to-validation evidence. Keep trigger, mechanism, and structural contributors distinct.
+State an unresolved cause explicitly rather than choosing whichever side is easier to change.
 
-### 2. Trace the Implementation
+## Reject these shortcuts
 
-- Follow the code path that leads to the failure
-- Understand actual behavior vs. expected behavior
-- Check if recent changes affected this code path
+- Changing expectations to match implementation, or assuming either side is authoritative.
+- Bulk-updating snapshots or removing inconvenient cases without individual contract analysis.
+- Using a mock/stub, skip, warning suppression, retry-until-green, or relaxed gate to hide the defect.
+- Regenerating a stale artifact before a freshness assertion and calling the original state valid.
+- Counting coverage, a mapped task, source inspection, or unexecuted scenarios as behavioral proof.
 
-### 3. Consider the Context
+Name tests by observable behavior. Explain corrected expectations with the requirement evidence,
+not a comment that merely says the code changed. Retain appropriate fakes/mocks at genuine seams;
+the defect is masking the guarantee under investigation, not the existence of a test double.
 
-- Is this testing a documented requirement?
-- Would current behavior surprise a user?
-- What would be the impact of each possible fix?
+## Related skills
 
-### 4. Make a Reasoned Decision
-
-| Situation               | Action                             |
-| ----------------------- | ---------------------------------- |
-| Implementation is wrong | Fix the bug                        |
-| Test is wrong           | Fix test AND document why          |
-| Unclear                 | Seek clarification before changing |
-
-### 5. Learn from the Failure
-
-- What can this teach about the system?
-- Should additional tests cover related cases?
-- Is there a pattern being missed?
-
-## Red Flags (Dangerous Patterns)
-
-- 🚫 Immediately changing tests to match implementation
-- 🚫 Assuming implementation is always correct
-- 🚫 Bulk-updating tests without individual analysis
-- 🚫 Removing "inconvenient" test cases
-- 🚫 Adding mock/stub workarounds instead of fixing root causes
-
-## Good Practices
-
-- ✅ Treat each test failure as a potential bug discovery
-- ✅ Document analysis in comments when fixing tests
-- ✅ Write clear test names that explain intent
-- ✅ When changing a test, explain why the original was wrong
-- ✅ Consider adding more tests when finding ambiguity
-
-## Example Responses
-
-**Good**: "I see test_user_validation is failing. Let me trace through the validation logic to understand if this is catching a real bug or if the test's expectations are incorrect."
-
-**Bad**: "The test is failing so I'll update it to match what the code does."
-
-## Remember
-
-Every test failure is an opportunity to:
-
-- Discover and fix a bug before users do
-- Clarify ambiguous requirements
-- Improve system understanding
-- Strengthen the test suite
-
-**The goal is NOT to make tests pass quickly. The goal IS to ensure the system behaves correctly.**
-
-## Related Skills
-
-- **analyze-test-failures**: Use `/python-engineering:analyze-test-failures` for detailed analysis of specific test failures
-- **comprehensive-test-review**: Use `/python-engineering:comprehensive-test-review` for full test suite review
+Use [Analyze Test Failures](../analyze-test-failures/SKILL.md) for detailed failure analysis and
+[Comprehensive Test Review](../comprehensive-test-review/SKILL.md) to assess the resulting tests.
+When `dh:root-cause-tracing-process` is available, pass the existing evidence record to it for
+expanded causal tracing. Otherwise use the protocol above; the Python plugin must remain usable
+without DH or Process Siren. Do not assume an optional plugin is installed.

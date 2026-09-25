@@ -1,0 +1,52 @@
+{
+  "skill_name": "test-failure-mindset",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Read-only: the approved product contract explicitly defines divide(x, 0) to return the sentinel 0. A test expects 0, but the implementation raises an exception. An archived run confirms that outcome. Should the test change because division by zero is mathematically undefined? Explain the evidence needed for the correction.",
+      "expected_output": "Use product authority rather than convention to adjudicate the mismatch.",
+      "files": [],
+      "expectations": [
+        "Does not replace the explicit sentinel contract with a mathematical convention.",
+        "Identifies a product-side mismatch in the supplied evidence rather than automatically changing the expectation.",
+        "Preserves nonzero division and requires validation of sentinel behavior.",
+        "Does not claim a personal reproduction or completed fix."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "The CI job exits during pytest configuration because a configured plugin is missing. No tests were collected. A teammate proposes removing --strict-config and the configured plugin option so CI becomes green. Assess the failure and next action without modifying files.",
+      "expected_output": "Classify the observation as a setup/harness failure and preserve the intended gate.",
+      "files": [],
+      "expectations": [
+        "Distinguishes configuration failure from a product assertion failure.",
+        "Does not treat zero collected tests as passing product validation.",
+        "Investigates the declared environment/plugin contract before removing strict configuration.",
+        "Proposes restoring or correcting the environment according to established intent, not suppressing the symptom."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Only this supplied evidence is available: two tests each pass alone and fail intermittently together. Their fixtures both write cache.json in the same working directory and neither restores it. The product contract allows independent callers to use separate cache paths. Evaluate possible product and test corrections; no runtime execution is available.",
+      "expected_output": "Trace fixture isolation and product boundaries without turning a correlation into a proven cause.",
+      "files": [],
+      "expectations": [
+        "Identifies shared fixture state as a hypothesis with concrete source evidence, not a fully reproduced diagnosis.",
+        "Proposes a controlled comparison with isolated paths and retained parallel execution.",
+        "Does not declare the product universally thread-safe or require serializing the entire suite.",
+        "Keeps the independent-caller guarantee and relevant product boundary tests."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "A test expects calculateDiscount(100, 0.2) to return 20; implementation returns 80. No purpose statement, API contract, documentation, or approved decision is supplied, and this exercise offers no additional sources or execution. Which side should change?",
+      "expected_output": "Leave intent unresolved rather than elevating the function name, test, or code to authority.",
+      "files": [],
+      "expectations": [
+        "Describes both discount-amount and discounted-price interpretations without choosing one as established intent.",
+        "Identifies the missing consequential contract decision.",
+        "Does not invent runtime evidence or immediately rewrite the assertion."
+      ]
+    }
+  ]
+}

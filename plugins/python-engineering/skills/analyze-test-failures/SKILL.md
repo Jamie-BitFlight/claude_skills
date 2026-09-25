@@ -1,135 +1,50 @@
 ---
 name: analyze-test-failures
-description: Analyzes failing test cases to determine whether failures indicate genuine bugs or incorrect test implementations. Use when debugging test failures, investigating test errors, classifying failures as test bugs vs implementation bugs vs ambiguous behavior, or when given specific failing test names or pytest output. Applies balanced investigative reasoning — never auto-fixes tests without establishing root cause first.
+description: Analyze specific pytest failures using authoritative contracts and a cited product/test evidence chain. Use for failing test names or pytest output, distinguishing product, interface, oracle, and harness defects without automatically changing expectations or forcing an architectural redesign.
 argument-hint: <test_file_or_test_name>
 user-invocable: true
 ---
 
 # Analyze Test Failures
 
-Analyze failing test cases with a balanced, investigative approach.
+Read and follow [Test Failure Mindset](../test-failure-mindset/SKILL.md), including its Python
+standards route. It owns the investigation protocol; this skill applies it to each supplied
+failure. Reuse an existing evidence record instead of restarting completed investigation.
 
-## Context
+## Per-failure application
 
-Load and follow the standards in `/python-engineering:standards-for-python-development` when shared testing or quality rules from this plugin apply.
+Read the complete relevant test, fixtures, setup/cleanup, stack trace, and product path. Preserve
+the failed revision and conditions; reproduce safely when permitted. Trace the product and test
+observation to their earliest demonstrated contract divergence.
 
-When tests fail, there are two primary possibilities:
+For each candidate explanation, identify a discriminating observation and separate observed facts
+from unverified inference. Verify which requirement governs the expected behavior. A familiar
+mathematical, library, or API convention alone does not establish this product's contract.
 
-1. **False positive**: The test itself is incorrect
-2. **True positive**: The test discovered a genuine bug
+Classify supported defects separately as product implementation, interface/architecture, test
+oracle, or harness/CI; several may coexist. For missing authority, report the intent decision.
+For missing execution, report unvalidated behavior rather than silently choosing a side.
 
-Assuming tests are wrong by default is a dangerous anti-pattern that defeats the purpose of testing.
+Example: `divide(10, 0)` returning a sentinel versus raising an exception cannot be adjudicated
+from the operation's name. A current approved sentinel contract makes a raising implementation
+incorrect; an approved error contract makes a sentinel expectation incorrect. Without that
+authority, report the ambiguity and the evidence or decision required.
 
-## Analysis Process
-
-### 1. Initial Analysis
-
-- Read the failing test carefully, understanding its intent
-- Examine the test's assertions and expected behavior
-- Review the error message and stack trace
-
-### 2. Investigate the Implementation
-
-- Check the actual implementation being tested
-- Trace through the code path that leads to the failure
-- Verify that implementation matches documented behavior
-
-### 3. Apply Critical Thinking
-
-For each failing test, ask:
-
-- What behavior is the test trying to verify?
-- Is this behavior clearly documented or implied by the API design?
-- Does the current implementation actually provide this behavior?
-- Could this be an edge case the implementation missed?
-
-### 4. Make a Determination
-
-Classify the failure as one of:
-
-| Classification         | Meaning                           |
-| ---------------------- | --------------------------------- |
-| **Test Bug**           | Test's expectations are incorrect |
-| **Implementation Bug** | Code doesn't behave as it should  |
-| **Ambiguous**          | Intended behavior is unclear      |
-
-### 5. Document Reasoning
-
-Provide clear explanation including:
-
-- Evidence supporting the conclusion
-- Specific mismatch between expectation and reality
-- Recommended fix (to test or implementation)
-
-## Example Analyses
-
-### Example 1: Ambiguous Behavior
-
-**Scenario**: Test expects `calculateDiscount(100, 0.2)` to return 20, but it returns 80
-
-**Analysis**:
-
-- Test assumes function returns discount amount
-- Implementation returns price after discount
-- Function name is ambiguous
-
-**Determination**: Ambiguous
-**Recommendation**: Check documentation or clarify intended behavior
-
-### Example 2: Implementation Bug
-
-**Scenario**: Test expects `validateEmail("user@example.com")` to return true, but it returns false
-
-**Analysis**:
-
-- Test provides a valid email format
-- Implementation regex is missing support for dots in domain
-- Other valid emails also fail
-
-**Determination**: Implementation Bug
-**Recommendation**: Fix the regex to properly validate email addresses per RFC standards
-
-### Example 3: Test Bug
-
-**Scenario**: Test expects `divide(10, 0)` to return 0, but it throws an error
-
-**Analysis**:
-
-- Test assumes division by zero returns 0
-- Implementation throws DivisionByZeroError
-- Standard mathematical behavior is to treat as undefined/error
-
-**Determination**: Test Bug
-**Recommendation**: Update test to expect an error, not 0
-
-## Output Format
-
-For each failing test, provide:
+## Output
 
 ```text
-Test: [test name/description]
-Failure: [what failed and how]
-
-Investigation:
-- Test expects: [expected behavior]
-- Implementation does: [actual behavior]
-- Root cause: [why they differ]
-
-Determination: [Test Bug | Implementation Bug | Ambiguous]
-
-Recommendation:
-[Specific fix to either test or implementation]
+TEST / REVISION / FAILURE:
+CONTRACT / AUTHORITY / INVARIANTS:
+EXPECTED / OBSERVED / REPRODUCTION LIMITS:
+EVIDENCE CHAIN / FIRST DIVERGENCE:
+SUPPORTED CAUSE / UNVERIFIED HYPOTHESES:
+CORRECTION CATEGORY / RATIONALE:
+PROPOSED CHANGE / PRESERVED BEHAVIOR:
+VALIDATION: original fault -> intended failure; corrected behavior -> success
+REMAINING UNCERTAINTY / NEXT OBSERVATION OR INTENT DECISION:
 ```
 
-## Key Principles
-
-- NEVER automatically assume the test is wrong
-- ALWAYS consider that the test might have found a real bug
-- When uncertain, lean toward investigating the implementation
-- Tests are often your specification - they define expected behavior
-- A failing test is a gift - it's either catching a bug or clarifying requirements
-
-## Related Skills
-
-- **test-failure-mindset**: Use `/python-engineering:test-failure-mindset` to set investigative approach for session
-- **comprehensive-test-review**: Use `/python-engineering:comprehensive-test-review` for full test suite review
+Do not manufacture cause from an assertion mismatch. Keep correction proposals distinct from
+work actually performed. When changing a test, explain the authoritative reason and show its
+relevant fault sensitivity; a collection or setup error does not establish regression protection.
+Use [Comprehensive Test Review](../comprehensive-test-review/SKILL.md) for the broader assessment.

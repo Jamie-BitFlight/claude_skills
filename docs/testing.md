@@ -13,6 +13,21 @@ uv run pytest plugins/development-harness/tests/test_migrate_tasks_to_github.py 
 
 Coverage (`--cov=scripts --cov=plugins`) is always on via addopts — passing `--cov` again is redundant.
 
+## Failure investigation and test effectiveness
+
+For a CI failure, use
+[Root-Cause Tracing Process](../plugins/development-harness/skills/root-cause-tracing-process/SKILL.md)
+to preserve the failing state, establish contract authority, trace product and test boundaries,
+and choose an evidence-backed correction. Use
+[Comprehensive Test Review](../plugins/development-harness/skills/comprehensive-test-review/SKILL.md)
+to assess oracle validity, relevant fault sensitivity, refactor tolerance, and boundary fidelity.
+Read those skills directly when their invocation routes are unavailable.
+
+The [regression evaluation guide](../plugins/development-harness/skills/root-cause-tracing-process/evals/README.md)
+explains baseline/candidate scenario runs, independent grading, Python entry-point checks, and
+validation limits. These agent evaluations are separate from pytest and are not automatically
+executed by the CI commands above. Do not report authored scenarios as passing behavior.
+
 ## Plugin installation testing
 
 ```bash

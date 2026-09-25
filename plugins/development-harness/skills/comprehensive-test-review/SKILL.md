@@ -1,87 +1,112 @@
 ---
 name: comprehensive-test-review
-description: Use when reviewing test suites for coverage, isolation, mock usage, naming conventions, or completeness. Activates on "review test coverage", "audit test quality", or "check tests for completeness" requests. Performs thorough checklist-driven review covering test isolation, mock correctness, AAA pattern adherence, and naming standards.
+description: Review test effectiveness against authoritative contracts, relevant fault detection, refactor tolerance, boundary fidelity, isolation, and diagnostic value. Use when auditing test quality, reviewing coverage gaps, improving regression protection, or assessing tests after a change.
 argument-hint: <test_file_or_directory>
 user-invocable: true
 ---
 
 # Comprehensive Test Review
 
-Perform test review for the specified test files or directories.
+Review whether the specified tests distinguish required behavior from relevant faults. Establish
+the product purpose, supported environments, and governing contracts before judging coverage or
+style. Treat each expectation as a claim, not as authority merely because it is already a test.
 
-## Test Review Process
+## Effectiveness checks
 
-### Standard Checklist
+For each material claim, record the contract authority, failure excluded, observation, and evidence.
 
-**Coverage Requirements:**
+| Property | Review question and evidence |
+| --- | --- |
+| Oracle validity | Does the expected answer follow from an authoritative requirement/interface, independently of the implementation under test? Identify stale or contradictory requirements rather than silently selecting a convenient answer. |
+| Fault sensitivity | Does the test fail on the original defect or a relevant deliberately seeded fault? Confirm it reaches the intended assertion: collection, import, setup, or unrelated errors do not demonstrate detection. |
+| Refactor tolerance | Does a behavior-preserving change leave the expectation valid? Avoid incidental helper names, ordering, serialization, or call counts unless those details are contractual. |
+| Boundary fidelity | Does the test exercise the entry point, handoff, state transition, or external contract carrying the guarantee? Check what a mock, fake, fixture, or bypassed adapter removes from observation. |
+| Isolation | Are time, randomness, environment, shared state, ordering, concurrency, and cleanup controlled where relevant? Record what isolated/full-suite or serial/parallel comparisons actually establish. |
+| Diagnostic value | Does failure identify the violated property and relevant input/state difference, without replacing useful evidence with a generic pass/fail? |
 
-- [ ] Minimum 80% line and branch coverage
-- [ ] Critical paths have 95%+ coverage
-- [ ] All public functions have at least one test
-- [ ] Edge cases are explicitly tested
+Do not require executing mutations for every test. For a changed regression test or an important
+untested guarantee, choose the cheapest relevant negative control. When execution is unavailable,
+record a proposed control and mark fault sensitivity unvalidated; do not infer it from source or
+coverage. Keep destructive or external effects in a safe, authorized test environment.
 
-**Test Quality:**
+## Review procedure
 
-- [ ] Tests follow AAA (Arrange-Act-Assert) pattern
-- [ ] Test names describe behavior, not implementation
-- [ ] Each test verifies one logical unit
-- [ ] Tests are isolated and independent
+1. **Read the target and contract.** Read the complete relevant tests, fixtures, product entry
+   points, and authoritative requirements. Locate the test in the product-to-consumer path and
+   identify the first boundary its observation can actually see.
+2. **Capture a baseline.** Discover the repository's real test command and selection from its
+   testing guidance/configuration/CI. Preserve strict configuration, warning policy, configured
+   plugins, and supported runtimes. Record revision, command, collected/selected cases, outcomes,
+   skips/xfails, and unavailable environments. Do not claim a subset represents the whole suite.
+3. **Challenge meaningful faults.** Use the effectiveness checks above. For changed regression
+   protection, compare original defect and corrected behavior under comparable conditions. Check
+   that a harmless implementation variation remains accepted where practical. Inspect both the
+   final assertion and the execution that reached it.
+4. **Inspect risk coverage and maintainability.** Apply the supporting checks below. Prioritize
+   missing or misleading guarantees over cosmetic consistency. Group related findings by
+   demonstrated mechanism, while accounting for each affected claim.
+5. **Propose or apply only authorized corrections.** Name product, interface/architecture, oracle,
+   or harness defects separately; several may coexist. For a material change, predeclare the
+   expected improvement, preserved invariants, unacceptable regressions, and baseline. Explain
+   why an architectural correction is necessary instead of prescribing layers by default.
+6. **Validate the delta.** Run affected positive, negative, boundary, and integration cases.
+   Preserve meaningful guarantees when replacing or removing tests. Record before/after evidence
+   and remaining uncertainty; use independent and additional unseen cases for substantial
+   redesign where practical. Revalidate evidence invalidated by subsequent edits.
 
-**Mocking Standards:**
+## Supporting checks
 
-- [ ] Uses the project's mocking framework appropriately
-- [ ] Mocks are scoped appropriately
-- [ ] No over-mocking of implementation details
-- [ ] External dependencies are properly stubbed
+**Coverage:** Respect an established project gate, but do not invent universal line/branch
+percentages or require a test per symbol. Inspect changed branches, public contracts, critical
+paths, boundary cases, and meaningful failure/recovery behavior for uncovered risk. Coverage
+shows execution, not whether a wrong result would be rejected. A percentage cannot compensate
+for a missed required guarantee.
 
-**Type Safety:**
+**Structure:** Keep Arrange-Act-Assert legible, use behavior-oriented names, and give each test a
+coherent claim. Multiple assertions are appropriate when they establish that claim, including
+absence of forbidden side effects. Prefer useful diagnostics over assertion-count rules.
 
-- [ ] All fixtures have complete type hints
-- [ ] Test functions have explicit return types
-- [ ] Using modern language features for type annotations
+**Doubles:** Follow the project's framework and scope fixtures/mocks appropriately. Preserve
+valid fakes and dependency injection at meaningful seams. Do not mock away the boundary whose
+contract is being assessed. Interaction assertions remain appropriate when ordering, a prohibited
+write, authorization, or another interaction is itself the guarantee.
 
-### Additional Examination Points
+**Maintainability:** Follow applicable type-hint, naming, and fixture conventions. Identify slow
+or flaky patterns and measure relevant runtime before proposing optimization. Verify cleanup of
+resources and worker/thread/process activity where used. Do not introduce a dependency merely
+to replace a coherent existing test idiom.
 
-Beyond the standard checklist:
+## Generated artifacts and agent skills
 
-- **Execution Time**: Identifying slow tests for optimization
-- **Flaky Patterns**: Tests dependent on timing, order, or external state
+Keep these claims separate:
 
-## Analysis Process
+- Inventory or generated-artifact freshness: compare the preserved checked-in state with the
+  declared inputs. Report missing, extra, and changed semantic identities; keep a separate
+  canonical-byte check when deterministic serialization is part of the contract.
+- Generator correctness: use independent, deliberately constructed fixtures and meaningful
+  invalid/boundary cases. Comparing a generator with its own output is not an independent oracle.
+- Consumer or agent behavior: execute the real consumer or representative tasks and inspect
+  consequential routing, handoffs, side effects, and completion evidence.
 
-1. **Gather test files** in specified path
-2. **Run coverage analysis** with the project's test command. Activate `dh:dh-meta-docs` for the Role Resolution Protocol's quality-gate discovery sequence if the command isn't already known.
-3. **Check each test** against the standard checklist
-4. **Identify gaps** in coverage and quality
-5. **Generate recommendations** prioritized by impact
+Do not regenerate immediately before a freshness assertion and treat the result as evidence the
+original state was current. A valid file, an instruction phrase, or a mapped but unexecuted task
+does not prove behavior. For nondeterministic agents, predeclare acceptable outcomes and critical
+invariants, preserve traces, and report repeated-run uncertainty rather than a universal pass claim.
 
-## Output Format
+## Result contract
 
-Provide findings in this structure:
+Return scope/revision, authoritative contracts, and prioritized findings. For every material finding
+include the violated claim, location, counterexample or missing evidence, correction category,
+recommended change, and required validation. Keep observed defects separate from proposed probes.
 
-```markdown
-## Test Review Summary
+Report claim -> validator -> observed result -> evidence boundary. Distinguish passed, failed,
+blocked, and unvalidated claims; list omitted suites, skips, and residual risks. Report coverage
+and cost separately from correctness. Do not turn source review or authored eval fixtures into
+passing behavioral evidence.
 
-### Coverage Analysis
-- Overall: X%
-- Critical modules: Y%
-- Gaps identified: [list]
+## Related skills
 
-### Quality Issues
-**HIGH Priority:**
-- [Issue with location and fix]
-
-**MEDIUM Priority:**
-- [Issue with recommendation]
-
-**LOW Priority:**
-- [Minor improvements]
-
-### Recommendations
-1. [Prioritized action items]
-```
-
-## Related Skills
-
-- **analyze-test-failures**: Detailed analysis of specific test failures
-- **test-failure-mindset**: Set investigative approach for session
+Use [Test Failure Mindset](../test-failure-mindset/SKILL.md) for initial adjudication and
+[Root-Cause Tracing Process](../root-cause-tracing-process/SKILL.md) when a finding needs causal
+investigation. Reuse its evidence record rather than restarting the investigation. If the project
+command is unknown, `dh:dh-meta-docs` provides quality-gate discovery guidance.
