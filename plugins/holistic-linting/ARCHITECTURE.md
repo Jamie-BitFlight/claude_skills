@@ -6,93 +6,78 @@ Holistic Linting owns quality-gate discovery, execution, diagnostic routing, and
 
 ## System boundary
 
-The plugin is responsible for this lifecycle:
-
 ```text
-changed work
+requested or changed work
   -> discover configured quality gates
   -> execute applicable gates
-  -> preserve diagnostics as evidence
-  -> classify and cluster related diagnostics
+  -> preserve gate results and every emitted diagnostic
+  -> classify and cluster diagnostics
   -> route diagnosis/correction
+  -> verify correction integrity
   -> rerun affected gates
-  -> report observed result and unresolved diagnostics
+  -> report terminal state and finding handoffs
 ```
+
+Gate verdict, diagnostic disposition, and workflow status are separate dimensions. A gate can pass while emitting advisory diagnostics; a workflow can remain blocked after a gate passes if required evidence or authority is missing.
 
 ## Ownership
 
-### Holistic Linting
+Holistic Linting owns discovery of configured gates, execution evidence, diagnostic accounting, causal clustering, routing, correction-integrity verification, final reruns, and explicit unresolved/out-of-scope handoffs.
 
-Owns:
+It does not own Python design standards, a duplicate general root-cause methodology, unconditional architecture review, repository backlog implementation, or copied upstream rule documentation when a current authoritative source is available.
 
-- discovering configured formatters, linters, type checkers, hook runners, and other quality gates;
-- executing the applicable configured gates at the smallest useful scope;
-- preserving the command, scope, exit status, and diagnostics;
-- grouping diagnostics when they share a likely causal surface and keeping independent failures separable;
-- routing failures to an appropriate causal/domain capability;
-- rerunning affected gates after an authorized correction;
-- exposing unresolved and out-of-scope diagnostics.
+External causal and language/domain plugins are optional capabilities unless the installed host provisions them. Resolve availability before invocation. If an unavailable capability is necessary for a safe correction, return a blocked/unresolved outcome with the missing capability and evidence. Read-only assessment does not imply authority to edit; an authorized caller/writer owns resulting corrections.
 
-It does not own:
+## Evidence and discovery contract
 
-- Python design standards or canned Python repairs;
-- general architecture review;
-- a duplicate root-cause methodology;
-- repository backlog implementation;
-- copied upstream rule documentation when an authoritative runtime/current source is available.
+For each gate retain enough evidence to identify the gate, command, working directory, requested scope, target revision/configuration, tool identity/version when material, exit status, and emitted diagnostics. Evidence invalidated by a later edit cannot be reused as final-state proof.
 
-### Causal diagnosis
-
-When a diagnostic needs investigation rather than an obvious mechanically safe correction, use the Development Harness root-cause tracing process. A quality-tool diagnostic is an observation, not proof that the implementation is defective or that the tool's suggested local edit is the right correction.
-
-Diagnosis should establish, as far as evidence permits:
-
-```text
-conditions -> failure -> mechanism -> governing contract -> correction boundary
-```
-
-### Domain correction
-
-Route implementation judgment to the relevant language/domain capability. For Python, Python Engineering owns Python-specific standards and review. Escalate to independent smell/modernization/review lanes only when consequence, uncertainty, or structural scope warrants them; do not run broad review machinery for every diagnostic.
-
-## Invariants
-
-- A green quality gate must come from an observed successful execution, not an assumption or stale report.
-- Do not weaken a configured quality gate merely to manufacture success.
-- Do not treat a diagnostic as authority for product intent.
-- Preserve required product behavior while correcting quality failures.
-- Do not silently discard a diagnostic because it is pre-existing or outside the immediate edit.
-- Do not parallelize corrections that can modify a shared causal surface without establishing independence.
-- Keep correctness/contract evidence separate from qualitative design judgments and efficiency telemetry.
-- Increase investigation and review depth with consequence and uncertainty rather than applying one heavyweight workflow to every failure.
+Discovery terminates as exactly one of **COMPLETE**, **NO_APPLICABLE_GATES**, or **INCOMPLETE**. An empty detector result is not by itself evidence of no applicable gates. Missing executable, timeout, malformed configuration, and unsupported/custom mechanisms remain explicit.
 
 ## Diagnostic outcomes
 
-A diagnostic may resolve as:
+Every material diagnostic, including warnings from a successful command, receives a disposition:
 
-- **DEFECT** - established behavior violates a governing contract; correct the cause.
-- **TOOLING_OR_CONFIGURATION_DEFECT** - the configured analysis does not correctly represent the intended boundary; correct the owning tooling/configuration when authorized.
-- **JUSTIFIED_EXCEPTION** - behavior is valid but requires an explicit, evidence-backed quality-policy exception. Do not create the exception autonomously when it weakens a gate.
-- **UNRESOLVED** - evidence or authority is insufficient; report what is missing.
-- **OUT_OF_SCOPE** - the diagnostic is real but correction is outside the requested boundary; hand it to repository policy rather than inventing a plugin-local backlog system.
+- **DEFECT** - behavior violates an established contract.
+- **TOOLING_OR_CONFIGURATION_DEFECT** - analysis/configuration does not correctly represent the intended boundary.
+- **JUSTIFIED_EXCEPTION** - valid behavior needs an explicit, evidence-backed and authorized policy exception.
+- **UNRESOLVED** - evidence or authority is insufficient.
+- **OUT_OF_SCOPE** - correction is outside the authorized boundary.
+
+UNRESOLVED retains the diagnostic, material attempts/observations, constraint or unknown, and next evidence/decision required. OUT_OF_SCOPE retains tool/gate, rule when available, location/scope, exact diagnostic, reproduction context, and discovery revision/date. Deliver that payload to an available authorized repository consumer and record destination/receipt; otherwise return it explicitly to the caller. Never invent a plugin-local backlog.
+
+Blocking versus advisory follows the configured repository/task contract, not diagnostic presence alone.
 
 ## Concurrency boundary
 
-Files are not the default unit of independent resolution. Cluster diagnostics by demonstrated or plausible shared causal surface first. Parallelize only clusters whose corrections cannot contend on the same implementation, contract, configuration, generated artifact, or dependency boundary.
+A filename neither proves independence nor dependence. Cluster by shared implementation, contract, configuration, generated-artifact, or dependency surfaces. Parallelize only correction clusters whose relevant read/write surfaces are established as independent.
+
+## Correction-integrity contract
+
+Before completion compare the correction against the pre-correction state and governing contract. Verify success was not manufactured by new/broadened suppressions, configuration ignore/exclusion/severity/applicability weakening, bypass/removal of a configured gate, or deletion of required behavior solely to remove a diagnostic.
+
+Interpret matches semantically: suppression-like text in fixtures/string literals and unchanged pre-existing comments are not new weakening. Authorized exceptions remain explicit. A failed or unverified required integrity check feeds back into correction/diagnosis; a green linter alone is not completion.
 
 ## Validation contract
 
-A restructuring of this plugin must preserve these observable behaviors:
+Preserve these observable cases:
 
-1. Configured quality gates relevant to the requested/changed scope are discovered rather than assumed.
-2. A clean result records actual gate execution.
-3. Failed gates retain enough evidence to reproduce or continue diagnosis.
-4. Failure resolution does not silently suppress, downgrade, or delete behavior merely to obtain green output.
-5. Python-specific design decisions are routed to Python Engineering rather than reimplemented here.
-6. Non-Python diagnostics remain routable without loading Python-only methodology.
-7. Related cross-file diagnostics can be investigated as one causal problem.
-8. Independent failures can be investigated independently.
-9. Unresolved diagnostics remain visible at completion.
-10. Out-of-scope findings are handed to repository policy without being silently lost.
+1. Explicit unchanged files/directories remain valid requested scope.
+2. Unknown/custom gate mechanisms produce INCOMPLETE rather than false completeness.
+3. Discovery is read-only unless setup mutation is separately authorized.
+4. Successful commands with warnings retain diagnostic dispositions.
+5. Missing executable, timeout, malformed configuration, no-applicable-gate, and incomplete discovery remain distinct.
+6. Incidental formatter/correction edits expand verification.
+7. Unauthorized gate weakening cannot manufacture success.
+8. Authorized exceptions retain evidence and authority.
+9. Fixture/string suppression text and unchanged comments are not false weakening.
+10. Shared cross-file causes can form one correction boundary; independent work may still parallelize.
+11. File-only and supplied-evidence compatibility callers both have defined entry paths.
+12. Missing external capabilities have explicit continuation/blocker outcomes.
+13. Rule interpretation is version-aware where possible and has an offline/missing-evidence outcome.
+14. Out-of-scope findings have a reproducible payload and delivery/return outcome.
+15. Relevant later edits invalidate final evidence.
+16. Read-only domain findings hand back to an authorized writer/caller.
+17. Clean/no-findings and blocked outcomes are explicit.
 
-These assertions protect behavior, not the current agent names, report paths, rule database, or orchestration implementation.
+These assertions protect behavior, not current agent names, report paths, corpus layout, or orchestration implementation.
