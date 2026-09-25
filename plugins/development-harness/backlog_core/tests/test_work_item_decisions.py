@@ -204,6 +204,29 @@ def test_select_memoizes_one_targeted_snapshot_for_equivalent_exact_references()
     ]
 
 
+def test_select_purpose_controls_pending_journal_access_and_mutation_base(mocker: MockerFixture) -> None:
+    pending = BacklogItem(title="queued title", description="queued edit", issue="#7")
+    backend = DecisionBackend(live_items=[provider_item("#7", "live title")], pending_items=[pending])
+    pending_work_items = mocker.spy(backend, "pending_work_items")
+    context = WorkItemDecisionContext(backend)
+
+    read = context.select("#7", purpose="read")
+
+    assert read.provider is not None
+    assert read.provider.title == "live title"
+    assert read.pending is None
+    assert read.mutation_base is None
+    pending_work_items.assert_not_called()
+
+    mutation = context.select("#7", purpose="mutation")
+
+    assert mutation.provider == read.provider
+    assert mutation.pending == pending
+    assert mutation.mutation_base == pending
+    pending_work_items.assert_called_once_with()
+    assert len(backend.snapshot_requests) == 1
+
+
 def test_targeted_then_global_reads_each_live_scope_once() -> None:
     backend = DecisionBackend(live_items=[provider_item("#7", "live title")])
     context = WorkItemDecisionContext(backend)

@@ -88,9 +88,10 @@ class WorkItemDecisionContext:
         """Select live provider fact and separately indexed queued local intent.
 
         Returns:
-            Provider fact, pending intent, and mutation base for the selector.
+            Read selections return provider fact and snapshot without pending intent or a mutation base.
+            Mutation selections may also return pending intent and use pending intent or the provider fact as
+            the mutation base.
         """
-        del purpose
         exact = parse_issue_selector(selector)
         if self._bulk is not None or not self._is_github or exact is None:
             read = self.all()
@@ -120,12 +121,16 @@ class WorkItemDecisionContext:
                     ),
                     None,
                 )
-        pending_selector = (
-            provider.reference if provider is not None else f"#{exact}" if exact is not None else selector
-        )
-        pending = find_item(self._pending(), pending_selector)
+        pending = None
+        mutation_base = None
+        if purpose == "mutation":
+            pending_selector = (
+                provider.reference if provider is not None else f"#{exact}" if exact is not None else selector
+            )
+            pending = find_item(self._pending(), pending_selector)
+            mutation_base = pending or provider
         return DecisionTarget(
-            provider=provider, pending=pending, mutation_base=pending or provider, provider_snapshot=snapshot
+            provider=provider, pending=pending, mutation_base=mutation_base, provider_snapshot=snapshot
         )
 
     def snapshot_for(self, request: ReconcileRequest) -> ProviderSnapshot:
