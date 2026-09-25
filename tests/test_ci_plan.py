@@ -234,7 +234,7 @@ def test_large_diff_has_no_path_filter_truncation(repository: Path) -> None:
 @pytest.mark.parametrize("paths", [[], None, ["../escape"], ["--collect-only"], ["/absolute"]])
 def test_runner_rejects_empty_or_unsafe_pytest_targets(paths: object) -> None:
     """No target must fail, rather than falling back to all testpaths."""
-    with pytest.raises(ValueError, match="non-empty|Unsafe target path"):
+    with pytest.raises(ValueError, match=r"non-empty|Unsafe target path"):
         runner.command("pytest", {}, {"paths": paths})
 
 
