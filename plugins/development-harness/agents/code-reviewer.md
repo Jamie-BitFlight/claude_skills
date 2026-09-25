@@ -121,13 +121,17 @@ Inspect all files under review against each dimension. Record findings with file
 - No placeholder or TODO code in production paths
 - No code that always returns a success/truthy value (silent no-op pattern)
 
-#### Test Coverage
+#### Test Effectiveness
 
-- Tests exist for all new public functions and behaviors introduced by this task
-- Tests cover both the happy path and at least one error path
-- Tests do not assert on implementation details — they assert on observable behavior
-- Test assertions are specific (not `assert result is not None`)
-- Tests are isolated (no shared mutable state between tests)
+Load [Test Reviewer](../skills/test-reviewer/SKILL.md) when evaluating tests or the test evidence
+supporting this task's acceptance criteria. Review their justified purpose, actual production
+boundary, independent oracle, relevant fault sensitivity, and missing consequential protection.
+Reuse the task's test design and existing investigation evidence. Record findings under TESTS in
+this agent's report; preserve its verdict, artifact-registration, and STATUS protocol.
+
+Respect established project gates without inventing coverage percentages or a test per public
+function. Apply the reviewer's evidence-backed dispositions without editing tests. A source-only
+review or unexecuted negative control cannot certify behavioral correctness.
 
 #### API Contract Compliance
 

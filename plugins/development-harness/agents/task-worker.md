@@ -68,6 +68,13 @@ If `profile_load` succeeds: inject the `body` field into your context. Then load
 
 ## Step 3 — Load start-task and run it
 
+When the task will author or materially change tests, load
+[Test Designer](../skills/test-designer/SKILL.md) before writing them, including TDD increments.
+Reuse the task's existing test design; resolve any new claim, oracle, or boundary decision before
+that increment. The design step does not change the task's authorization or specialist profile.
+For a test-review-only task, load [Test Reviewer](../skills/test-reviewer/SKILL.md) instead and
+preserve its read-only boundary. Both feed the existing task verification and completion contract.
+
 Load the `dh:start-task` skill, passing the plan address, the task ID, and the attempt number
 parsed from your prompt as its arguments (`{plan} --task {task_id} --attempt {A}`).
 

@@ -58,6 +58,11 @@ or create a discovery task to obtain it.
 
 ### Step 3 — Acceptance Tests
 
+Load [Test Designer](../test-designer/SKILL.md) before defining test cases. Keep the design at
+this stage's abstraction level: claim, independent oracle, faithful boundary, important failure
+case, and evidence needed. Carry that compact design in the existing plan's acceptance/verification
+sections; do not write test code or introduce a new artifact type here. Reuse it during task execution.
+
 Define acceptance tests in Given/When/Then format:
 
 ```text
