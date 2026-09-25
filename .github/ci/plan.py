@@ -264,17 +264,20 @@ def build_plan(
     integration: list[Shard] = []
     if full_tests or "development-harness" in owners:
         integration.append({
-            "name": "development-harness", "paths": ["plugins/development-harness/tests"],
+            "name": "development-harness",
+            "paths": ["plugins/development-harness/tests"],
             "marker": "integration and not research_vault",
         })
     if full_tests or any(under(path, "research") for path in changed):
         integration.append({
-            "name": "research-backlinks", "paths": ["tests/research_backlinks"],
+            "name": "research-backlinks",
+            "paths": ["tests/research_backlinks"],
             "marker": "integration and not research_vault",
         })
     if full_tests:
         integration.append({
-            "name": "rebase-publication", "paths": ["tests/test_rebase_publication_identity.py"],
+            "name": "rebase-publication",
+            "paths": ["tests/test_rebase_publication_identity.py"],
             "marker": "integration",
         })
     validation = ["plugins", ".claude"] if full_checks else [f"plugins/{owner}" for owner in sorted(owners)]
