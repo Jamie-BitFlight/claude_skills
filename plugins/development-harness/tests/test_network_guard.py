@@ -281,7 +281,7 @@ def test_guard_covers_testpath(testpath: str) -> None:
     regardless of which testpath the probe lives in.
     """
     probe_dir = _PLUGIN_ROOT / testpath
-    probe = probe_dir / "_guard_path_probe.py"
+    probe = probe_dir / "test_guard_path_probe.py"
     probe.write_text(
         textwrap.dedent(
             """
@@ -327,7 +327,7 @@ def plugin_root_probe(body: str) -> Iterator[Path]:
     """
     probe_dir = _PLUGIN_ROOT / ".guard_probes"
     probe_dir.mkdir(exist_ok=True)
-    fd, name = tempfile.mkstemp(suffix="_probe_test.py", prefix="guard_", dir=str(probe_dir))
+    fd, name = tempfile.mkstemp(suffix=".py", prefix="test_guard_probe_", dir=str(probe_dir))
     os.close(fd)
     path = Path(name)
     path.write_text(textwrap.dedent(body), encoding="utf-8")
