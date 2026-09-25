@@ -11,7 +11,7 @@ spec:
       description: Consumer-owned build job that supplies the artifact.
       type: array
     image:
-      description: Digest-pinned curl image.
+      description: Digest-pinned curl image with cmp, mktemp, and rm.
     artifact-path:
       description: Consumer-built artifact path.
     asset-name:
@@ -37,8 +37,17 @@ spec:
     - test -z "${CI_COMMIT_BRANCH:-}"
     - test "$CI_COMMIT_REF_PROTECTED" = "true"
     - test -f "$RELEASE_ASSET_PATH"
-    - >-
-      curl --location --fail-with-body
-      --header "JOB-TOKEN: ${CI_JOB_TOKEN}"
-      --upload-file "${RELEASE_ASSET_PATH}"
-      "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${GENERIC_PACKAGE_NAME}/${CI_COMMIT_TAG}/${RELEASE_ASSET_NAME}"
+    - |
+      set -eu
+      command -v cmp >/dev/null
+      command -v rm >/dev/null
+      readback_path="$(mktemp)"
+      trap 'rm -f "$readback_path"' 0
+      package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${GENERIC_PACKAGE_NAME}/${CI_COMMIT_TAG}/${RELEASE_ASSET_NAME}"
+      curl --location --fail-with-body \
+        --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        --upload-file "$RELEASE_ASSET_PATH" "$package_url"
+      curl --location --fail-with-body \
+        --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        --output "$readback_path" "$package_url"
+      cmp "$RELEASE_ASSET_PATH" "$readback_path"
