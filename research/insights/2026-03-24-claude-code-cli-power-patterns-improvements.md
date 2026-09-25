@@ -2,6 +2,9 @@
 title: "Improvement Proposals: Claude Code CLI Power Patterns"
 ---
 
+<!-- removed-skill-citations -->
+> **Unimplemented-proposal path:** `plugins/development-harness/skills/work-milestone/schemas/wave-item-result.schema.json`, cited under this entry's Target state and Measurable signal headings, names a deliverable this entry proposes rather than a file it observed. It does not exist and is not expected to: its absence is the open state of the proposal. A path audit should leave it alone rather than repoint or delete it.
+
 ## Improvement 1: Add effort level control to kage-bunshin spawn and work-milestone dispatch
 
 **Source pattern**: "Opus 4.6 Effort Levels (`/model` command + `CLAUDE_CODE_EFFORT_LEVEL` env var) [...] Being intentional about compute allocation across hundreds of automated invocations adds up fast in both cost and pipeline speed." (Relevance section, pattern 5; Key Features section 5)

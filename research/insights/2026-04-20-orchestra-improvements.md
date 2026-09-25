@@ -2,6 +2,9 @@
 title: "Improvement Proposals: Orchestra"
 ---
 
+<!-- removed-skill-citations -->
+> **Unimplemented-proposal path:** `plugins/development-harness/scripts/extract_conventions.py`, cited under this entry's Target state and Measurable signal headings, names a deliverable this entry proposes rather than a file it observed. It does not exist and is not expected to: its absence is the open state of the proposal. A path audit should leave it alone rather than repoint or delete it.
+
 ## Improvement 1: Per-task token budget field on the Task model
 
 **Source pattern**: "Context Curator — During dispatch — assembling focused prompts for sub-agents... Each task has a configurable token budget (default 80,000 tokens)... Simple tasks: 50% of default budget; Standard tasks: 100% of default budget; Complex tasks: 150% of default budget" (Orchestra README / SKILL.md Step 5; decomposer.md).

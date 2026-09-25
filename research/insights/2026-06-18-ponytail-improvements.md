@@ -2,6 +2,9 @@
 title: "Improvement Proposals: Ponytail"
 ---
 
+<!-- removed-skill-citations -->
+> **Unimplemented-proposal path:** `plugins/development-harness/agents/reviewer-simplicity.md`, cited under this entry's Measurable signal heading, names a deliverable Improvement 1 proposes rather than a file this entry observed. It does not exist and is not expected to: its absence is the open state of the proposal. A path audit should leave it alone rather than repoint or delete it.
+
 ## Improvement 1: Add a simplicity / over-engineering reviewer perspective to multi-perspective-review
 
 **Source pattern**: Relevance §1 "Embedded agent instruction" — the `AGENTS.md` and skill definitions can be imported to "enforce simplicity on downstream agents." Backed by Key Features §"The Decision Ladder" (six-rung YAGNI → stdlib → native → installed dep → one-line → minimum-code ladder), §"Companion Skills" `ponytail-review` ("Analyzes the current diff for over-engineering and returns a delete-list"), and §"Protective Rules" (laziness enforced only where safe — never simplifies away input validation, error handling, security, accessibility, or explicitly-requested behavior).

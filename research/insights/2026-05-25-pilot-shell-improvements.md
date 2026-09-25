@@ -2,6 +2,9 @@
 title: "Improvement Proposals: Pilot Shell"
 ---
 
+<!-- removed-skill-citations -->
+> **Unimplemented-proposal paths:** `plugins/development-harness/skills/fix/SKILL.md`, `plugins/development-harness/skills/benchmark/SKILL.md` and `plugins/development-harness/skills/implementation-manager/scripts/tdd_phase_hook.py`, cited under this entry's Target state and Measurable signal headings, name deliverables this entry proposes rather than files it observed. None of them exists and none is expected to: their absence is the open state of the proposal. A path audit should leave them alone rather than repoint or delete them.
+
 ## Improvement 1: Add `/spec` orchestration skill that gates implementation on user plan approval with inline annotations
 
 **Source pattern**: Quote from research entry, "## /spec — Spec-Driven Development Workflow" section: "Waits for user approval with inline annotation support (select text or click + to annotate; agent reads annotations at next review checkpoint)" and "Spec-review sub-agent validates completeness".
