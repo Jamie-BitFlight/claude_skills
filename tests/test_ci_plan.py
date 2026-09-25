@@ -107,6 +107,13 @@ def test_shared_or_unknown_inputs_fail_safe_to_full_checks(repository: Path, pat
     plan = planner.build_plan(repository, [path])
     assert plan["full_tests"]
     assert plan["lint_all"]
+
+
+def test_file_hygiene_retains_full_inventory_for_cross_file_invariants() -> None:
+    """A deleted target can break an unchanged symlink outside the diff."""
+    argv = runner.command("prek", {"lint_all": False, "base": "a" * 40, "head": "b" * 40}, {})
+    assert "--all-files" in argv
+    assert "--from-ref" not in argv
     assert plan["allowed_skips"] == ""
 
 
@@ -193,7 +200,7 @@ def test_missing_or_unavailable_diff_is_full_not_empty(repository: Path) -> None
 def git(repo: Path, *args: str) -> str:
     """Exercise actual Git semantics in a disposable, credential-free repository."""
     return subprocess.run(
-        ["git", "-C", str(repo), *args], check=True, capture_output=True, text=True, timeout=30,
+        ["git", "-C", str(repo), *args], check=True, capture_output=True, text=True, timeout=30
     ).stdout.strip()
 
 
@@ -240,8 +247,19 @@ def test_runner_rejects_empty_or_unsafe_pytest_targets(paths: object) -> None:
 
 def test_runner_preserves_marker_coverage_defaults_and_argv_boundaries() -> None:
     """Coverage/xdist remain in addopts, and paths are not shell-expanded."""
-    argv = runner.command("pytest", {}, {"paths": ["plugins/a directory/tests"], "marker": "integration and not research_vault"})
-    assert argv == ["uv", "run", "--locked", "pytest", "-m", "integration and not research_vault", "-v", "plugins/a directory/tests"]
+    argv = runner.command(
+        "pytest", {}, {"paths": ["plugins/a directory/tests"], "marker": "integration and not research_vault"}
+    )
+    assert argv == [
+        "uv",
+        "run",
+        "--locked",
+        "pytest",
+        "-m",
+        "integration and not research_vault",
+        "-v",
+        "plugins/a directory/tests",
+    ]
     assert "--no-cov" not in argv
     assert "-o" not in argv
 
@@ -249,7 +267,19 @@ def test_runner_preserves_marker_coverage_defaults_and_argv_boundaries() -> None
 def test_runner_lints_diff_or_full_tree_explicitly() -> None:
     """A missing diff must not be treated as an empty passing check."""
     argv = runner.command("prek", {"lint_all": False, "base": "a" * 40, "head": "b" * 40}, {}, "ruff")
-    assert argv == ["uv", "run", "--locked", "prek", "run", "ruff", "--from-ref", "a" * 40, "--to-ref", "b" * 40, "--show-diff-on-failure"]
+    assert argv == [
+        "uv",
+        "run",
+        "--locked",
+        "prek",
+        "run",
+        "ruff",
+        "--from-ref",
+        "a" * 40,
+        "--to-ref",
+        "b" * 40,
+        "--show-diff-on-failure",
+    ]
     assert "--all-files" in runner.command("prek", {"lint_all": True}, {}, "ruff")
     with pytest.raises(ValueError, match="immutable comparison"):
         runner.command("prek", {"lint_all": False}, {}, "ruff")
@@ -262,8 +292,20 @@ def test_runner_propagates_actual_child_failure(tmp_path: Path, exit_code: int) 
     fake_uv = tmp_path / "uv"
     fake_uv.write_text(f"#!/bin/sh\nexit {exit_code}\n", encoding="utf-8")
     fake_uv.chmod(0o755)
-    env = dict(os.environ, PATH=f"{tmp_path}{os.pathsep}{os.environ['PATH']}", CI_PLAN='{"version":1}', CI_SHARD='{"paths":["tests"]}')
-    result = subprocess.run([sys.executable, str(ROOT / ".github/ci/run.py"), "pytest"], env=env, check=False, capture_output=True, text=True, timeout=10)
+    env = dict(
+        os.environ,
+        PATH=f"{tmp_path}{os.pathsep}{os.environ['PATH']}",
+        CI_PLAN='{"version":1}',
+        CI_SHARD='{"paths":["tests"]}',
+    )
+    result = subprocess.run(
+        [sys.executable, str(ROOT / ".github/ci/run.py"), "pytest"],
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
     assert result.returncode == exit_code
 
 
