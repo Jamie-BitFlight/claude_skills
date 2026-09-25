@@ -19,17 +19,32 @@ def example() -> dict[str, Any]:
     return {
         "schema_version": 1,
         "request_id": "request-1",
-        "sources": [{
-            "id": "A", "path": "source-A", "transport": "local", "media_type": "text/plain", "revision": "sha-A",
-            "coverage": {"state": "complete", "scope": "lines 1-2", "inspected": ["lines 1-2"], "omitted": []},
-        }],
-        "findings": [{
-            "id": "F1", "claim": "100 requests per minute", "basis": "observed",
-            "support": [{"source_id": "A", "locator": "line 1"}], "qualifiers": [],
-        }],
-        "selected_findings": ["F1"], "gaps": [], "conflicts": [],
-        "confidence": "high", "confidence_notes": "Direct claim from the inspected scope.",
-        "output_format": "tldr", "output_sha256": hashlib.sha256(b"summary").hexdigest(),
+        "sources": [
+            {
+                "id": "A",
+                "path": "source-A",
+                "transport": "local",
+                "media_type": "text/plain",
+                "revision": "sha-A",
+                "coverage": {"state": "complete", "scope": "lines 1-2", "inspected": ["lines 1-2"], "omitted": []},
+            }
+        ],
+        "findings": [
+            {
+                "id": "F1",
+                "claim": "100 requests per minute",
+                "basis": "observed",
+                "support": [{"source_id": "A", "locator": "line 1"}],
+                "qualifiers": [],
+            }
+        ],
+        "selected_findings": ["F1"],
+        "gaps": [],
+        "conflicts": [],
+        "confidence": "high",
+        "confidence_notes": "Direct claim from the inspected scope.",
+        "output_format": "tldr",
+        "output_sha256": hashlib.sha256(b"summary").hexdigest(),
     }
 
 
@@ -39,33 +54,55 @@ def test_valid_record_binds_to_caller_and_bytes(tmp_path: Path) -> None:
     output = tmp_path / "summary.md"
     record_path.write_text(json.dumps(example()), encoding="utf-8")
     output.write_bytes(b"summary")
-    record = validate_record(record_path, request_id="request-1", source_paths=["source-A"], output=output, output_format="tldr")
+    record = validate_record(
+        record_path, request_id="request-1", source_paths=["source-A"], output=output, output_format="tldr"
+    )
     assert record.findings[0].support[0].source_id == "A"
     output.write_bytes(b"changed summary")
     with pytest.raises(ValueError, match="current output bytes"):
-        validate_record(record_path, request_id="request-1", source_paths=["source-A"], output=output, output_format="tldr")
+        validate_record(
+            record_path, request_id="request-1", source_paths=["source-A"], output=output, output_format="tldr"
+        )
 
 
-@pytest.mark.parametrize(("field", "value"), [
-    ("request_id", "another-request"), ("source_paths", ["another-source"]), ("output_format", "json"),
-])
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("request_id", "another-request"), ("source_paths", ["another-source"]), ("output_format", "json")],
+)
 def test_rejects_caller_mismatch(tmp_path: Path, field: str, value: object) -> None:
     """A worker cannot redefine the request from its own response."""
     record_path = tmp_path / "evidence.json"
     output = tmp_path / "summary.md"
     record_path.write_text(json.dumps(example()), encoding="utf-8")
     output.write_bytes(b"summary")
-    kwargs: dict[str, Any] = {"request_id": "request-1", "source_paths": ["source-A"], "output": output, "output_format": "tldr"}
+    kwargs: dict[str, Any] = {
+        "request_id": "request-1",
+        "source_paths": ["source-A"],
+        "output": output,
+        "output_format": "tldr",
+    }
     kwargs[field] = value
     with pytest.raises(ValueError, match="caller"):
         validate_record(record_path, **kwargs)
 
 
-@pytest.mark.parametrize("fault", [
-    "duplicate_source", "duplicate_finding", "missing_source", "unavailable_support", "false_complete",
-    "missing_failure_reason", "missing_selected_finding", "duplicate_selected", "missing_conflict", "self_conflict",
-    "unavailable_absence", "unknown_gap_source",
-])
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "duplicate_source",
+        "duplicate_finding",
+        "missing_source",
+        "unavailable_support",
+        "false_complete",
+        "missing_failure_reason",
+        "missing_selected_finding",
+        "duplicate_selected",
+        "missing_conflict",
+        "self_conflict",
+        "unavailable_absence",
+        "unknown_gap_source",
+    ],
+)
 def test_rejects_contract_violations(fault: str) -> None:
     """Each mutation violates a declared invariant, not current output wording."""
     data = example()
@@ -77,12 +114,18 @@ def test_rejects_contract_violations(fault: str) -> None:
         data["findings"][0]["support"][0]["source_id"] = "unknown"
     elif fault in {"unavailable_support", "unavailable_absence"}:
         data["sources"][0]["coverage"] = {
-            "state": "unavailable", "scope": "whole source", "inspected": [], "omitted": ["whole source"], "reason": "HTTP 403"
+            "state": "unavailable",
+            "scope": "whole source",
+            "inspected": [],
+            "omitted": ["whole source"],
+            "reason": "HTTP 403",
         }
         if fault == "unavailable_absence":
             data["findings"] = []
             data["selected_findings"] = []
-            data["gaps"] = [{"state": "searched_absent", "source_ids": ["A"], "scope": "whole source", "detail": "No feature"}]
+            data["gaps"] = [
+                {"state": "searched_absent", "source_ids": ["A"], "scope": "whole source", "detail": "No feature"}
+            ]
     elif fault == "false_complete":
         data["sources"][0]["coverage"]["omitted"] = ["line 2"]
     elif fault == "missing_failure_reason":
@@ -92,9 +135,13 @@ def test_rejects_contract_violations(fault: str) -> None:
     elif fault == "duplicate_selected":
         data["selected_findings"] *= 2
     elif fault in {"missing_conflict", "self_conflict"}:
-        data["conflicts"] = [{"finding_ids": ["F1", "unknown" if fault == "missing_conflict" else "F1"], "explanation": "Conflict"}]
+        data["conflicts"] = [
+            {"finding_ids": ["F1", "unknown" if fault == "missing_conflict" else "F1"], "explanation": "Conflict"}
+        ]
     elif fault == "unknown_gap_source":
-        data["gaps"] = [{"state": "not_assessed", "source_ids": ["unknown"], "scope": "whole source", "detail": "Not assessed"}]
+        data["gaps"] = [
+            {"state": "not_assessed", "source_ids": ["unknown"], "scope": "whole source", "detail": "Not assessed"}
+        ]
     with pytest.raises(ValidationError):
         SummaryRecord.model_validate(data)
 
@@ -103,8 +150,18 @@ def test_partial_sources_remain_explicit_and_do_not_erase_successful_findings() 
     """Partial acquisition is not the same as absence or an invalid record."""
     data = example()
     data["sources"].append({
-        "id": "B", "path": "source-B", "transport": "url", "media_type": "unknown", "revision": None,
-        "coverage": {"state": "unavailable", "scope": "whole page", "inspected": [], "omitted": ["whole page"], "reason": "HTTP 403"},
+        "id": "B",
+        "path": "source-B",
+        "transport": "url",
+        "media_type": "unknown",
+        "revision": None,
+        "coverage": {
+            "state": "unavailable",
+            "scope": "whole page",
+            "inspected": [],
+            "omitted": ["whole page"],
+            "reason": "HTTP 403",
+        },
     })
     data["gaps"] = [{"state": "inaccessible", "source_ids": ["B"], "scope": "whole page", "detail": "HTTP 403"}]
     result = SummaryRecord.model_validate(data)
@@ -119,8 +176,11 @@ def test_qualifier_keeps_its_own_support() -> None:
     source_b.update(id="B", path="source-B")
     data["sources"].append(source_b)
     data["findings"].append({
-        "id": "F2", "claim": "100 requests per minute per key", "basis": "observed",
-        "support": [{"source_id": "B", "locator": "line 7"}], "qualifiers": ["per key"],
+        "id": "F2",
+        "claim": "100 requests per minute per key",
+        "basis": "observed",
+        "support": [{"source_id": "B", "locator": "line 7"}],
+        "qualifiers": ["per key"],
     })
     result = SummaryRecord.model_validate(data)
     assert [item.source_id for item in result.findings[1].support] == ["B"]
