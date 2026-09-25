@@ -43,7 +43,11 @@ class Coverage(RecordModel):
 
     @model_validator(mode="after")
     def coherent(self) -> Self:
-        """Require explicit evidence of partial/unavailable scope."""
+        """Require explicit evidence of partial/unavailable scope.
+
+        Returns:
+            This coverage record after its state invariants pass.
+        """
         if self.state == "complete" and (self.omitted or not self.inspected):
             raise ValueError("Complete coverage requires inspected scope and no omissions.")
         if self.state == "unavailable" and self.inspected:
@@ -120,14 +124,22 @@ class SummaryRecord(RecordModel):
     @field_validator("schema_version", mode="before")
     @classmethod
     def integer_version(cls, value: object) -> object:
-        """JSON true is not schema version 1, despite Python equality."""
+        """JSON true is not schema version 1, despite Python equality.
+
+        Returns:
+            The unchanged integer version for literal validation.
+        """
         if type(value) is not int:
             raise ValueError("Schema version must be an integer.")
         return value
 
     @model_validator(mode="after")
     def references(self) -> Self:
-        """Check identity, provenance edges and impossible coverage claims."""
+        """Check identity, provenance edges and impossible coverage claims.
+
+        Returns:
+            This record after identity and support references pass.
+        """
         sources = {source.id: source for source in self.sources}
         findings = {finding.id: finding for finding in self.findings}
         if len(sources) != len(self.sources) or len(findings) != len(self.findings):
@@ -145,7 +157,11 @@ class SummaryRecord(RecordModel):
 
     @model_validator(mode="after")
     def gap_references(self) -> Self:
-        """Preserve the distinction between searched absence and inaccessible scope."""
+        """Preserve the distinction between searched absence and inaccessible scope.
+
+        Returns:
+            This record after gap scope references pass.
+        """
         sources = {source.id: source for source in self.sources}
         for gap in self.gaps:
             if len(set(gap.source_ids)) != len(gap.source_ids) or not set(gap.source_ids).issubset(sources):
@@ -162,7 +178,11 @@ class SummaryRecord(RecordModel):
 
     @model_validator(mode="after")
     def conflict_references(self) -> Self:
-        """Bind disagreements to distinct recorded findings."""
+        """Bind disagreements to distinct recorded findings.
+
+        Returns:
+            This record after conflict references pass.
+        """
         findings = {finding.id for finding in self.findings}
         for conflict in self.conflicts:
             if len(set(conflict.finding_ids)) != len(conflict.finding_ids):
@@ -173,7 +193,11 @@ class SummaryRecord(RecordModel):
 
 
 def unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
-    """Reject duplicate JSON keys rather than silently accepting the last value."""
+    """Reject duplicate JSON keys rather than silently accepting the last value.
+
+    Returns:
+        The object with duplicate keys rejected.
+    """
     result: dict[str, object] = {}
     for key, value in pairs:
         if key in result:
@@ -185,7 +209,11 @@ def unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
 def validate_record(
     record_path: Path, *, request_id: str, source_paths: list[str], output: Path, output_format: str
 ) -> SummaryRecord:
-    """Bind a record to caller expectations, not values selected by the record."""
+    """Bind a record to caller expectations, not values selected by the record.
+
+    Returns:
+        The record bound to the supplied caller and output bytes.
+    """
     data = json.loads(record_path.read_text(encoding="utf-8"), object_pairs_hook=unique_object)
     record = SummaryRecord.model_validate(data)
     if record.request_id != request_id:
@@ -200,7 +228,11 @@ def validate_record(
 
 
 def main() -> int:
-    """Emit compact machine-readable results; never infer semantic success."""
+    """Emit compact machine-readable results; never infer semantic success.
+
+    Returns:
+        Zero for a valid operation, one for invalid records, or two for unavailable inputs.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("schema", help="Emit the generated evidence JSON Schema.")

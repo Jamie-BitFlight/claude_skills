@@ -46,7 +46,7 @@ def test_valid_record_binds_to_caller_and_bytes(tmp_path: Path) -> None:
         validate_record(record_path, request_id="request-1", source_paths=["source-A"], output=output, output_format="tldr")
 
 
-@pytest.mark.parametrize("field,value", [
+@pytest.mark.parametrize(("field", "value"), [
     ("request_id", "another-request"), ("source_paths", ["another-source"]), ("output_format", "json"),
 ])
 def test_rejects_caller_mismatch(tmp_path: Path, field: str, value: object) -> None:
@@ -55,7 +55,7 @@ def test_rejects_caller_mismatch(tmp_path: Path, field: str, value: object) -> N
     output = tmp_path / "summary.md"
     record_path.write_text(json.dumps(example()), encoding="utf-8")
     output.write_bytes(b"summary")
-    kwargs: dict[str, Any] = dict(request_id="request-1", source_paths=["source-A"], output=output, output_format="tldr")
+    kwargs: dict[str, Any] = {"request_id": "request-1", "source_paths": ["source-A"], "output": output, "output_format": "tldr"}
     kwargs[field] = value
     with pytest.raises(ValueError, match="caller"):
         validate_record(record_path, **kwargs)
@@ -64,7 +64,7 @@ def test_rejects_caller_mismatch(tmp_path: Path, field: str, value: object) -> N
 @pytest.mark.parametrize("fault", [
     "duplicate_source", "duplicate_finding", "missing_source", "unavailable_support", "false_complete",
     "missing_failure_reason", "missing_selected_finding", "duplicate_selected", "missing_conflict", "self_conflict",
-    "unavailable_absence", "unknown_gap_source", "unknown_field", "wrong_version", "empty_reference",
+    "unavailable_absence", "unknown_gap_source",
 ])
 def test_rejects_contract_violations(fault: str) -> None:
     """Each mutation violates a declared invariant, not current output wording."""
@@ -95,12 +95,6 @@ def test_rejects_contract_violations(fault: str) -> None:
         data["conflicts"] = [{"finding_ids": ["F1", "unknown" if fault == "missing_conflict" else "F1"], "explanation": "Conflict"}]
     elif fault == "unknown_gap_source":
         data["gaps"] = [{"state": "not_assessed", "source_ids": ["unknown"], "scope": "whole source", "detail": "Not assessed"}]
-    elif fault == "unknown_field":
-        data["verified"] = True
-    elif fault == "wrong_version":
-        data["schema_version"] = 2
-    else:
-        data["findings"][0]["support"][0]["locator"] = " "
     with pytest.raises(ValidationError):
         SummaryRecord.model_validate(data)
 
@@ -144,4 +138,21 @@ def test_boolean_is_not_a_schema_version() -> None:
     data = example()
     data["schema_version"] = True
     with pytest.raises(ValidationError, match="integer"):
+        SummaryRecord.model_validate(data)
+
+
+@pytest.mark.parametrize(("field", "value"), [("verified", True), ("schema_version", 2)])
+def test_rejects_unknown_field_or_version(field: str, value: object) -> None:
+    """Unknown claims and versions cannot extend the contract silently."""
+    data = example()
+    data[field] = value
+    with pytest.raises(ValidationError):
+        SummaryRecord.model_validate(data)
+
+
+def test_rejects_empty_source_location() -> None:
+    """A blank locator cannot carry claim provenance."""
+    data = example()
+    data["findings"][0]["support"][0]["locator"] = " "
+    with pytest.raises(ValidationError):
         SummaryRecord.model_validate(data)
