@@ -196,7 +196,7 @@ provider; a test reads each `ledger_spec.CONFIG` key with its default; and "What
 
 ## Slice 7 — projection checks
 
-Per backend, with GitHub under the `main` plus `GITHUB_TOKEN` gate the repository `AGENTS.md`
+Per backend, with GitHub under the `main` plus sandbox-credential gate the repository `AGENTS.md`
 names, SQLite on every pull request, and Beads where `bd` is installed on the CI machine: export
 twice and assert one record whose revision advanced once; edit the record out of band, export,
 and assert `divergences` lists it and the record equals the projection. Done when green, with
