@@ -16,82 +16,72 @@
 # [tool.ty.environment]
 # extra-paths = ["..", "."]
 # ///
-"""Close orphaned [MCP-TEST-*] GitHub issues left by failed e2e test teardown.
+"""Validate a designated sandbox or close only the current run's test issues.
 
-Fetches all open issues via backlog_core shared GraphQL client, filters for titles
-containing '[MCP-TEST-', and closes each one with an explanatory comment.
-
-Usage:
-    uv run plugins/development-harness/scripts/close_test_issues.py --repo <owner/repo>
-    uv run plugins/development-harness/scripts/close_test_issues.py  # uses REPO env var
-
-Environment:
-    REPO          owner/repo string (required if --repo not supplied)
-    GITHUB_TOKEN  GitHub token for authentication (required)
+Requires DH_E2E_REPOSITORY, DH_E2E_RUN_ID, DH_ALLOW_TEST_NETWORK=1 and the
+sandbox GITHUB_TOKEN. The target must contain the .dh-e2e-sandbox marker.
+Use --check-only for a read-only preflight. A legacy --repo argument must
+agree with DH_E2E_REPOSITORY; there is no production or broad-sweep fallback.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-# Make backlog_core importable when run via `uv run` against the project workspace
-# (which does not install development-harness as an editable package).
-# Pattern mirrors run_backlog_server.py.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from backlog_core.gh_client import GitHubUnavailableError, close_github_issue, get_github, sync_issues_graphql
-from backlog_core.models import Output
+from backlog_core.gh_client import GitHubUnavailableError, get_github
+from github import GithubException
+from live_test_scope import SANDBOX_MARKER, SANDBOX_MARKER_PATH, LiveTestScope, cleanup_run
+
+if TYPE_CHECKING:
+    from github.Repository import Repository
 
 
-def main() -> None:
-    """Entry point: resolve repo, fetch issues, close orphans."""
+def open_sandbox(scope: LiveTestScope) -> Repository:
+    """Read and validate sandbox identity before any resource mutation.
+
+    Returns:
+        A repository whose canonical identity and explicit marker were checked.
+    """
+    scope.check_repository(scope.repository)
+    repository = get_github(scope.repository)
+    scope.check_repository(repository.full_name)
+    marker = repository.get_contents(SANDBOX_MARKER_PATH, ref=repository.default_branch)
+    if isinstance(marker, list) or marker.decoded_content != SANDBOX_MARKER:
+        raise ValueError(f"Sandbox must contain {SANDBOX_MARKER_PATH} with the documented exact contents")
+    return repository
+
+
+def main() -> int:
+    """Run read-only preflight or ownership-checked cleanup with a truthful exit code.
+
+    Returns:
+        Zero after successful validation/cleanup, one on any failure.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--repo", default=os.environ.get("REPO", ""), help="owner/repo string (defaults to REPO env var)"
-    )
+    parser.add_argument("--repo", help="Optional legacy target; must match DH_E2E_REPOSITORY")
+    parser.add_argument("--check-only", action="store_true", help="Validate the sandbox without modifying it")
     args = parser.parse_args()
-
-    repo = args.repo
-    if not repo:
-        print("Emergency cleanup: REPO not set and --repo not supplied, skipping", file=sys.stderr)
-        sys.exit(1)
-
+    environment = dict(os.environ)
+    if args.repo:
+        environment["REPO"] = args.repo
     try:
-        repository = get_github(repo)
-    except GitHubUnavailableError as exc:
-        print(f"Emergency cleanup: GitHub unavailable — {exc}", file=sys.stderr)
-        sys.exit(1)
-
-    owner, repo_name = repository.full_name.split("/", 1)
-    issues = sync_issues_graphql(repository, owner, repo_name, state="OPEN")
-
-    orphans = [i for i in issues if "[MCP-TEST-" in i.get("title", "") and "pull_request" not in i]
-
-    swept = 0
-    failed = 0
-    for issue in orphans:
-        number = issue["number"]
-        out = Output()
-        close_github_issue(
-            str(number),
-            reason="emergency-sweep",
-            comment="Closed by CI emergency sweep: orphaned e2e test issue",
-            repo=repo,
-            output=out,
-        )
-        if out.warnings:
-            for msg in out.warnings:
-                print(f"Emergency cleanup: issue #{number}: {msg}", file=sys.stderr)
-            failed += 1
-        else:
-            swept += 1
-
-    print(f"Swept {swept} orphaned test issues" + (f", failed {failed}" if failed else ""))
+        scope = LiveTestScope.from_environment(environment)
+        repository = open_sandbox(scope)
+        closed = [] if args.check_only else cleanup_run(scope, repository)
+    except (GithubException, GitHubUnavailableError, OSError, RuntimeError, ValueError) as exc:
+        print(f"Live-test preflight/cleanup failed: {exc}", file=sys.stderr, flush=True)
+        return 1
+    print(json.dumps({"repository": scope.repository, "run_id": scope.run_id, "check_only": args.check_only, "closed": closed}))
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
