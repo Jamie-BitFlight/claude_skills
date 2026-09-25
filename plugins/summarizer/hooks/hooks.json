@@ -2,7 +2,7 @@
   "hooks": {
     "SubagentStop": [
       {
-        "matcher": "^(file-summarizer|url-summarizer|image-summarizer)$",
+        "matcher": "^(summarizer:)?(file-summarizer|url-summarizer|image-summarizer)$",
         "hooks": [
           {
             "type": "command",
