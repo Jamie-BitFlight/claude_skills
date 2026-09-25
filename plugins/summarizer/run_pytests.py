@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
@@ -21,7 +20,11 @@ TEST_PATHS = ("tests",)
 
 
 def main() -> int:
-    """Run this plugin's tests without relying on repository pytest discovery."""
+    """Run this plugin's tests without relying on repository pytest discovery.
+
+    Returns:
+        The pytest process exit code.
+    """
     os.chdir(PLUGIN_ROOT)
     return pytest.main(["-c", os.devnull, "--strict-config", "--asyncio-mode=auto", *(sys.argv[1:] or TEST_PATHS)])
 
