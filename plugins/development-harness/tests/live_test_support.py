@@ -83,7 +83,9 @@ async def collect_items(call: ToolCall, parameters: dict[str, object]) -> list[d
     while True:
         result = require_success("backlog_list", await call("backlog_list", {**parameters, "offset": offset}))
         items = result.get("items")
-        assert isinstance(items, list), f"backlog_list withheld its collection: {json.dumps(result, ensure_ascii=False)}"
+        assert isinstance(items, list), (
+            f"backlog_list withheld its collection: {json.dumps(result, ensure_ascii=False)}"
+        )
         page = [require_success("backlog_list item", item) for item in items]
         if result.get("count") != len(page):
             raise AssertionError(f"backlog_list count disagrees with its page: {result!r}")

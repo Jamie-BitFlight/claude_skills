@@ -81,7 +81,12 @@ def main() -> int:
         print(f"Live-test preflight/cleanup failed: {exc}", file=sys.stderr, flush=True)
         return 1
     print(
-        json.dumps({"repository": scope.repository, "run_id": scope.run_id, "check_only": args.check_only, "closed": closed})
+        json.dumps({
+            "repository": scope.repository,
+            "run_id": scope.run_id,
+            "check_only": args.check_only,
+            "closed": closed,
+        })
     )
     return 0
 

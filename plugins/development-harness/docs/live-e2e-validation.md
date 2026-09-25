@@ -15,7 +15,7 @@ development-harness live-test sandbox
 ```
 
 Configure the source repository's Actions variable `DH_E2E_REPOSITORY` as `owner/repository` and
-secret `DH_E2E_TOKEN` as a credential scoped to that sandbox, with Issues and Contents read/write.
+secret `DH_E2E_TOKEN` as a credential scoped to that sandbox, with Issues and Contents read/write and Pull requests read for closure safety checks.
 An installation token or fine-grained token restricted to the sandbox is preferable to a broad
 personal credential. The automatic source-repository `GITHUB_TOKEN` cannot provide cross-repository
 access; increasing its permissions would not fix the target mismatch.
@@ -89,7 +89,7 @@ provider contracts.
 | L4 associates a plan | Separate writer-backend view confirms the association, not only the update echo; this does not execute the plan or claim cross-cache plan recovery | STRENGTHEN |
 | L5 changes status | Native GitHub labels independently confirm in-progress state | STRENGTHEN |
 | L6/L7 full and incremental grooming | Native audit comments and a fresh-cache MCP reader retain both known content values; raw issue bodies remain human-owned | STRENGTHEN |
-| L8 sync publishes changes | Independent content observations follow explicit sync, rather than accepting integer counters alone | STRENGTHEN |
+| L8 sync publishes changes | Seed an unacknowledged mutation through the public backend queue, confirm it is absent remotely, then explicit sync and a fresh reader must observe it while preserving earlier grooming | STRENGTHEN |
 | L9 pull refreshes cached work | An independent native title/body edit followed by targeted pull and a non-refresh title lookup; a numeric lookup would mask a no-op pull | REPLACE |
 | L10/L11 close and resolve | Each API transition is followed by native closed-state verification on a separately created issue | STRENGTHEN |
 | Implicit cold bootstrap | A separate empty-cache scenario triggers default listing; the public backend cache must recover a known closed issue as well as the listed open issue | REPLACE |
@@ -98,6 +98,11 @@ The cold scenario checks recovery at the backend-cache boundary, independently o
 listing's presentation filters. Its source dataset includes a natively closed fixture, so an
 open-only recovery cannot satisfy the assertion. Warm CRUD explicitly establishes a real open-item
 snapshot in setup; it does not fabricate a checkpoint or disable cold-read behavior in production.
+
+The sync setup uses the public backend queue to represent an accepted offline mutation. Grooming
+reconciles immediately, so a sync performed only after successful grooming would let a no-op sync
+pass. Separate fresh readers before and after sync distinguish pending local intent from published
+content without reaching into cache files or changing production behavior.
 
 Pure helper tests challenge unsafe target selection, lookalike ownership, no-op cleanup, stale
 ownership, first-page-only membership, nonadvancing pages, withheld/error responses, and failure

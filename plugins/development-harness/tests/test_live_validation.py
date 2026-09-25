@@ -162,17 +162,12 @@ async def test_live_crud_persists_changes_and_preserves_other_sections(live_envi
             groomed = "Live test groomed content.\n\n### Reproducibility\n\nSteps here."
             dependencies = "No external dependencies."
             with env.journal.phase("groom and incremental section preservation"):
-                groom = await calls.call(
-                    "backlog_groom", {"selector": title, "section": "Groomed", "content": groomed}
-                )
+                groom = await calls.call("backlog_groom", {"selector": title, "section": "Groomed", "content": groomed})
                 assert groom["groomed_updated"] is True, groom
                 incremental = await calls.call(
                     "backlog_groom", {"selector": title, "section": "Dependencies", "content": dependencies}
                 )
                 assert incremental["groomed_updated"] is True, incremental
-                synced = await calls.call("backlog_sync", {})
-                assert isinstance(synced["created"], int), synced
-                assert isinstance(synced["pushed"], int), synced
                 # Native comments and an empty-cache MCP reader are distinct observations.
                 # The issue body is human-owned; grooming must not be tested as a body rewrite.
                 remote = await native_issue(env, primary)
@@ -184,6 +179,28 @@ async def test_live_crud_persists_changes_and_preserves_other_sections(live_envi
                     assert persisted["status_source"] == "live", persisted
                     assert "Live test groomed content." in str(persisted["body"]), persisted
                     assert dependencies in str(persisted["body"]), persisted
+
+            with env.journal.phase("sync publishes an unacknowledged queued mutation"):
+                sync_content = f"Queued sync content {uuid.uuid4().hex}"
+                queued = next(item for item in env.backend.list_work_items() if item.issue == f"#{primary}")
+                queued = queued.model_copy(deep=True)
+                queued.description = f"{env.scope.body_marker}\n\n{sync_content}"
+                # The public backend queue is the setup boundary for offline replay.
+                # Grooming itself reconciles immediately, so syncing an already-groomed
+                # item alone would let a no-op backlog_sync pass this scenario.
+                env.backend.put_work_item(queued)
+                assert env.backend.has_pending_writes()
+                with env.fresh_reader():
+                    before_sync = await calls.call("backlog_view", {"selector": f"#{primary}", "summary": False})
+                    assert sync_content not in str(before_sync["body"]), before_sync
+                synced = await calls.call("backlog_sync", {})
+                assert isinstance(synced["created"], int), synced
+                assert isinstance(synced["pushed"], int), synced
+                with env.fresh_reader():
+                    after_sync = await calls.call("backlog_view", {"selector": f"#{primary}", "summary": False})
+                    assert sync_content in str(after_sync["body"]), after_sync
+                    assert "Live test groomed content." in str(after_sync["body"]), after_sync
+                    assert dependencies in str(after_sync["body"]), after_sync
 
             with env.journal.phase("pull observes an independent provider edit"):
                 remote = await native_issue(env, companion)
