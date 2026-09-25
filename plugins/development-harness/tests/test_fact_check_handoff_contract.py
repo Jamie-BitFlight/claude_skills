@@ -4,6 +4,7 @@ Load the real producer and consumer instructions as Markdown. These tests detect
 schema/routing drift; they do not prove a model followed the instructions or that
 a live backlog write succeeded. Behavioral cases live with work-backlog-item.
 """
+from __future__ import annotations
 
 from pathlib import Path
 
@@ -59,7 +60,8 @@ def result_contract(path: Path, heading: str) -> tuple[Path, dict[str, str]]:
         for child in token.children or ():
             if child.type != "link_open":
                 continue
-            href = child.attrGet("href") or ""
+            href = child.attrGet("href")
+            assert isinstance(href, str), "Link target must be text"
             relative = href.split("#", 1)[0]
             if Path(relative).name == "fact-check-result.md":
                 target = (path.parent / relative).resolve()
@@ -72,8 +74,8 @@ def test_producer_template_satisfies_existing_consumer_fields() -> None:
     """The original uppercase producer fails the actual lowercase swarm contract."""
     _, producer = result_contract(AGENT, "Step 4: Return Verdict")
     _, consumer = result_contract(GROOM / "swarm.md", "Fact-Checker output contract")
-    assert REQUIRED_FIELDS <= consumer.keys()
-    assert REQUIRED_FIELDS <= producer.keys(), f"Producer fields: {sorted(producer)}"
+    assert consumer.keys() >= REQUIRED_FIELDS
+    assert producer.keys() >= REQUIRED_FIELDS, f"Producer fields: {sorted(producer)}"
     assert producer["verdict"] == consumer["verdict"]
 
 
@@ -82,12 +84,8 @@ def test_each_reader_reaches_the_same_bundled_contract(path: Path, heading: str)
     """Publication, field validation and identity matching have one schema owner."""
     owner, fields = result_contract(path, heading)
     assert owner == (GROOM / "fact-check-result.md").resolve()
-    assert REQUIRED_FIELDS <= fields.keys()
-    assert {value.strip() for value in fields["verdict"].split("|")} == {
-        "VERIFIED",
-        "REFUTED",
-        "INCONCLUSIVE",
-    }
+    assert fields.keys() >= REQUIRED_FIELDS
+    assert {value.strip() for value in fields["verdict"].split("|")} == {"VERIFIED", "REFUTED", "INCONCLUSIVE"}
 
 
 def test_unavailable_evidence_example_is_an_explicit_inconclusive_result() -> None:
@@ -96,7 +94,7 @@ def test_unavailable_evidence_example_is_an_explicit_inconclusive_result() -> No
     blocks = [token.content for token in MarkdownIt().parse(text) if token.type == "fence"]
     assert len(blocks) == 1
     fields = dict(line.split(": ", 1) for line in blocks[0].splitlines() if ": " in line)
-    assert REQUIRED_FIELDS <= fields.keys()
+    assert fields.keys() >= REQUIRED_FIELDS
     assert fields["verdict"] == "INCONCLUSIVE"
     assert fields["evidence"].startswith("unavailable — ")
     assert fields["source"].startswith("unavailable — ")
