@@ -65,16 +65,15 @@ async def test_a_repeated_page_cannot_be_mistaken_for_progress() -> None:
 
 @pytest.mark.parametrize("payload", [{"errors": ["write rejected"]}, {"error": "write rejected"}])
 def test_payload_errors_are_not_hidden_by_later_field_assertions(payload) -> None:
-    with pytest.raises(AssertionError, match="backlog_groom.*write rejected"):
+    with pytest.raises(AssertionError, match=r"backlog_groom.*write rejected"):
         require_success("backlog_groom", payload)
 
 
 def test_failure_is_written_before_control_returns_to_client_teardown(tmp_path) -> None:
     path = tmp_path / "events.jsonl"
     journal = Journal(path)
-    with pytest.raises(AssertionError, match="remote content missing"):
-        with journal.phase("fresh-cache readback"):
-            raise AssertionError("remote content missing")
+    with pytest.raises(AssertionError, match="remote content missing"), journal.phase("fresh-cache readback"):
+        raise AssertionError("remote content missing")
     events = [json.loads(line) for line in path.read_text().splitlines()]
     assert [event["event"] for event in events] == ["started", "failed"]
     assert events[-1]["phase"] == "fresh-cache readback"

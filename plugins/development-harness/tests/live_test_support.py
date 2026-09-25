@@ -70,8 +70,7 @@ class LiveCalls:
             if not response.content:
                 raise AssertionError(f"{operation}: MCP returned no content")
             text = getattr(response.content[0], "text", None)
-            if not isinstance(text, str):
-                raise AssertionError(f"{operation}: expected JSON text content, received {response.content!r}")
+            assert isinstance(text, str), f"{operation}: expected JSON text content, received {response.content!r}"
             self.journal.record("response", operation=operation, text=text)
             payload = json.loads(text)
             return require_success(operation, payload)
@@ -84,8 +83,7 @@ async def collect_items(call: ToolCall, parameters: dict[str, object]) -> list[d
     while True:
         result = require_success("backlog_list", await call("backlog_list", {**parameters, "offset": offset}))
         items = result.get("items")
-        if not isinstance(items, list):
-            raise AssertionError(f"backlog_list withheld its collection: {json.dumps(result, ensure_ascii=False)}")
+        assert isinstance(items, list), f"backlog_list withheld its collection: {json.dumps(result, ensure_ascii=False)}"
         page = [require_success("backlog_list item", item) for item in items]
         if result.get("count") != len(page):
             raise AssertionError(f"backlog_list count disagrees with its page: {result!r}")
@@ -93,8 +91,7 @@ async def collect_items(call: ToolCall, parameters: dict[str, object]) -> list[d
         if not isinstance(pagination, dict) or pagination.get("offset") != offset:
             raise AssertionError(f"backlog_list returned invalid pagination at offset {offset}: {result!r}")
         has_more = pagination.get("has_more")
-        if not isinstance(has_more, bool):
-            raise AssertionError(f"backlog_list omitted an explicit continuation verdict: {result!r}")
+        assert isinstance(has_more, bool), f"backlog_list omitted an explicit continuation verdict: {result!r}"
         collected.extend(page)
         if not has_more:
             return collected

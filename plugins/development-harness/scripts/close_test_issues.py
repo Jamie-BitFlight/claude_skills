@@ -38,6 +38,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from backlog_core.gh_client import GitHubUnavailableError, get_github
 from github import GithubException
+
 from live_test_scope import SANDBOX_MARKER, SANDBOX_MARKER_PATH, LiveTestScope, cleanup_run
 
 if TYPE_CHECKING:
@@ -79,7 +80,9 @@ def main() -> int:
     except (GithubException, GitHubUnavailableError, OSError, RuntimeError, ValueError) as exc:
         print(f"Live-test preflight/cleanup failed: {exc}", file=sys.stderr, flush=True)
         return 1
-    print(json.dumps({"repository": scope.repository, "run_id": scope.run_id, "check_only": args.check_only, "closed": closed}))
+    print(
+        json.dumps({"repository": scope.repository, "run_id": scope.run_id, "check_only": args.check_only, "closed": closed})
+    )
     return 0
 
 

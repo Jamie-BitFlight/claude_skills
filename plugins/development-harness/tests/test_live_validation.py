@@ -24,10 +24,10 @@ from backlog_core.backend_types import BacklogConfig
 from backlog_core.backends.github_backend import GitHubBackend
 from backlog_core.file_cache import FileCache
 from backlog_core.models import ReconcileRequest, ReconcileScope
-from close_test_issues import open_sandbox
 from fastmcp.client import Client
-from live_test_scope import LiveTestScope, cleanup_run
 
+from close_test_issues import open_sandbox
+from live_test_scope import LiveTestScope, cleanup_run
 from tests.live_test_support import Journal, LiveCalls, collect_items, issue_number
 
 if TYPE_CHECKING:
@@ -49,9 +49,7 @@ class LiveEnvironment:
     def fresh_reader(self) -> Iterator[GitHubBackend]:
         """Replace the writer cache with an empty, real provider cache for readback."""
         previous = get_config()
-        backend = GitHubBackend(
-            repo=self.scope.repository, cache=FileCache(self.root / f"reader-{uuid.uuid4().hex}")
-        )
+        backend = GitHubBackend(repo=self.scope.repository, cache=FileCache(self.root / f"reader-{uuid.uuid4().hex}"))
         set_config(BacklogConfig(backend=backend))
         try:
             yield backend

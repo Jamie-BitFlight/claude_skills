@@ -5,9 +5,10 @@ from __future__ import annotations
 import sys
 from unittest.mock import MagicMock
 
-import close_test_issues
 import pytest
 from github import GithubException
+
+import close_test_issues
 from live_test_scope import SANDBOX_MARKER, LiveTestScope
 
 
