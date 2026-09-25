@@ -2,6 +2,8 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = ["pydantic>=2.12.5"]
+# [tool.ty.environment]
+# root = ["."]
 # ///
 """Plan source chunks, reconcile recorded coverage, and profile complete CSV/TSV data.
 
@@ -198,7 +200,7 @@ def classify_value(value: str) -> tuple[str, Decimal | None]:
     Returns:
         Observed scalar kind and a finite decimal when numeric.
     """
-    if value == "":
+    if not value:
         return "empty", None
     if value.lower() in {"true", "false"}:
         return "boolean", None

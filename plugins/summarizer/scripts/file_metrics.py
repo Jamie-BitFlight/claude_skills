@@ -28,6 +28,7 @@ from typing import Any
 # Strategy thresholds (word counts)
 SMALL_THRESHOLD = 2000
 MEDIUM_THRESHOLD = 10000
+TEXT_PROBE_BYTES = 8192
 
 # File type categories for summarization strategy selection
 FILE_CATEGORIES: dict[str, list[str]] = {
@@ -123,11 +124,11 @@ def probe_text(file_path: Path) -> bool:
         Whether the available UTF-8 prefix appears textual.
     """
     with file_path.open("rb") as stream:
-        chunk = stream.read(8192)
+        chunk = stream.read(TEXT_PROBE_BYTES)
     if b"\x00" in chunk:
         return False
     try:
-        codecs.getincrementaldecoder("utf-8")().decode(chunk, final=len(chunk) < 8192)
+        codecs.getincrementaldecoder("utf-8")().decode(chunk, final=len(chunk) < TEXT_PROBE_BYTES)
     except UnicodeDecodeError:
         return False
     return True
