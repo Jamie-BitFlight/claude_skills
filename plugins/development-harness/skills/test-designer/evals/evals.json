@@ -41,17 +41,13 @@
       "id": 7,
       "prompt": "Read the supplied queue requirement and plan the next TDD increment. Return the test design without writing code.",
       "expected_output": "Derive a bounded test from the supplied contract; choose an independently justified observation without prescribing a receipt format or storage technology. Do not require preexisting implementation. State intended red and unresolved test seams, and keep later duplicate/conflict obligations visible without exhaustive upfront planning.",
-      "files": [
-        "fixtures/queue-contract.md"
-      ]
+      "files": ["fixtures/queue-contract.md"]
     },
     {
       "id": 8,
       "prompt": "Use /dh:add-new-feature to plan the queue API described in the supplied requirement in this isolated evaluation workspace. Produce the normal plan and its verification cases; do not implement the feature.",
       "expected_output": "In a fixture-backed isolated DH environment, follow the normal architecture and swarm-planning dispatch. Reach test-designer through the planner loading clear-cove-task-design, not an evaluator-injected skill. Carry contract, oracle, boundary, failure case and gaps into existing acceptance/verification fields. Preserve stage altitude, authorized backend, and normal artifact/STATUS protocols. Missing harness/backend prerequisites mean an unvalidated route, never a passing activation claim.",
-      "files": [
-        "fixtures/queue-contract.md"
-      ]
+      "files": ["fixtures/queue-contract.md"]
     }
   ]
 }

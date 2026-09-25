@@ -21,11 +21,7 @@ FIXTURE_ROOT = (
     ("original", "replacement", "expected_failures"),
     [
         (None, None, set()),
-        (
-            "return net_cents + net_cents * tax_percent // 100",
-            "return net_cents",
-            set(),
-        ),
+        ("return net_cents + net_cents * tax_percent // 100", "return net_cents", set()),
         (
             '    if not allowed:\n        raise PermissionError("Publication denied")\n    events.append("write")',
             '    events.append("write")\n    if not allowed:\n        raise PermissionError("Publication denied")',

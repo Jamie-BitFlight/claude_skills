@@ -142,6 +142,7 @@ extra-paths = [
     "./scripts",
     "./plugins/development-harness",
     "./plugins/development-harness/skills/kage-bunshin/scripts",
+    "./plugins/development-harness/skills/test-reviewer/evals/fixtures",
     "./plugins/development-harness/tests",
     "./.claude/skills/create-merge-request-changelog/scripts",
     "./.claude/skills/gh/scripts",
