@@ -21,7 +21,7 @@ from . import rendering
 from .artifact_registry import parse_manifest_section, render_manifest_section, replace_manifest_in_body
 from .entry_blocks import _deduplicate_timestamps, _render_entry_raw, parse_entries
 from .models import BacklogItem, GroomedData, Section, ValidationError, parse_issue_number
-from .parsing import _GROOMED_DATE_RE, extract_sections
+from .parsing import _GROOMED_DATE_RE, extract_sections, split_body_sections
 
 __all__ = [
     "SECTION_HEADING",
@@ -211,6 +211,26 @@ def _parse_metadata_block(body: str) -> dict[str, str]:
     return result
 
 
+def _body_preamble(body: str) -> str:
+    """Return the body text preceding every ``## `` section, metadata block removed.
+
+    A provider body a human rewrote by hand often carries its whole content
+    here rather than under ``## Description`` -- the heading
+    :func:`render_issue_body` emits. ``parse_issue_body`` falls back to this
+    text so that content reaches ``BacklogItem.description`` instead of being
+    dropped in favour of a stale carried-over description.
+
+    Args:
+        body: Issue body text.
+
+    Returns:
+        Stripped preamble text, or ``""`` when the body starts at a section.
+    """
+    spans = split_body_sections(body, levels=frozenset({2}))
+    preamble = body[: spans[0].start] if spans else body
+    return _METADATA_BLOCK_RE.sub("", preamble).strip()
+
+
 def _parse_groomed_section(heading_name: str, content: str) -> GroomedData:
     """Parse a ``Groomed (date)`` heading name + body into a GroomedData model.
 
@@ -274,6 +294,7 @@ def parse_issue_body(body: str, existing: BacklogItem | None = None) -> BacklogI
 
     parsed_sections: dict[str, Section | GroomedData] = {}
     description = base.description
+    saw_description = False
 
     for heading, content in sections_raw.items():
         # Strip leading "## " to get the plain heading name
@@ -281,6 +302,7 @@ def parse_issue_body(body: str, existing: BacklogItem | None = None) -> BacklogI
 
         if heading_name == "Description":
             description = content.strip()
+            saw_description = True
             continue
 
         # Groomed section: heading matches the canonical "## Groomed (date)" form only.
@@ -325,6 +347,17 @@ def parse_issue_body(body: str, existing: BacklogItem | None = None) -> BacklogI
             entries = [*existing_section.entries, *entries]
             _deduplicate_timestamps(entries)
         parsed_sections[target_key] = Section(entries=entries)
+
+    # A body with no ``## Description`` heading is the shape a human leaves behind after
+    # rewriting the issue body by hand -- which ``_github_work_item_versions.root_revision``
+    # deliberately makes authoritative again, abandoning the agent-managed head. Without this
+    # fallback the rewritten text has nowhere to land, ``base.description`` survives untouched,
+    # and reconciliation writes the stale description back into the writer cache while the
+    # renamed title (read from the provider item, not the body) propagates normally. Falling
+    # back only on non-empty preamble text keeps a structured, description-less body carrying
+    # ``existing``'s description forward as before.
+    if not saw_description:
+        description = _body_preamble(body) or description
 
     # This is the boundary where a provider issue body becomes a model: reconciliation calls it
     # for every pulled item, and the metadata block it reads is free-form remote text. The
