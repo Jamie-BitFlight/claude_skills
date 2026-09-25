@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
 # ///
@@ -22,14 +21,20 @@ def violations(plugin: Path) -> list[str]:
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             continue
-        for token in FORBIDDEN:
-            if token in text:
-                found.append(f"{path.relative_to(plugin)}: forbidden repository escape {token!r}")
+        found.extend(
+            f"{path.relative_to(plugin)}: forbidden repository escape {token!r}"
+            for token in FORBIDDEN
+            if token in text
+        )
     return found
 
 
 def main() -> int:
-    """Validate one plugin boundary."""
+    """Validate one plugin boundary.
+
+    Returns:
+        Zero when no static isolation violation is found.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("plugin", type=Path)
     args = parser.parse_args()
