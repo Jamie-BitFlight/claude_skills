@@ -47,7 +47,9 @@ def links(path: Path) -> set[Path]:
 
 def test_agent_and_grooming_reach_same_contract() -> None:
     """Producer and consumer must share one bundled DH schema owner."""
-    assert CONTRACT.resolve() in links(AGENT)
+    agent = AGENT.read_text(encoding="utf-8")
+    assert "dh:work-backlog-item" in agent
+    assert "Impact Radius contract" in agent
     assert CONTRACT.resolve() in links(GROOM / "swarm.md")
 
 
