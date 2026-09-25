@@ -6,7 +6,7 @@ user-invocable: false
 
 # Python Data
 
-Load `python3-core` for standing defaults. Load `python3-typing` for boundary schemas. Load `python3-testing` for parser and edge-case tests.
+Load `standards-for-python-development` for the shared rules. Load `python3-typing` for boundary schemas. Load `python3-testing` for parser and edge-case tests.
 
 ## Quality Checklist
 

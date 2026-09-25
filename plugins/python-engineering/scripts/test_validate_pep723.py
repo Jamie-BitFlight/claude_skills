@@ -21,13 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from validate_pep723 import (
-    UV_SHEBANG,
-    auto_fix_file,
-    determine_applicable_rule,
-    is_part_of_package,
-    validate_file,
-)
+from validate_pep723 import UV_SHEBANG, auto_fix_file, determine_applicable_rule, is_part_of_package, validate_file
 
 RULE_PACKAGE_EXECUTABLE = 2
 RULE_UV_SCRIPT = 3
@@ -183,10 +177,7 @@ def test_auto_fix_preserves_existing_pep723_metadata(distribution: Path) -> None
 # retain_this = true
 # ///
 """
-    script.write_text(
-        "#!/usr/bin/env -S uv run --script\n" + metadata + "import httpx\n",
-        encoding="utf-8",
-    )
+    script.write_text("#!/usr/bin/env -S uv run --script\n" + metadata + "import httpx\n", encoding="utf-8")
     script.chmod(0o755)
 
     before = script.read_text(encoding="utf-8")
@@ -198,7 +189,7 @@ def test_auto_fix_preserves_existing_pep723_metadata(distribution: Path) -> None
     assert after.startswith(UV_SHEBANG + "\n")
     assert after.removeprefix(UV_SHEBANG + "\n") == before.split("\n", 1)[1]
     assert 'requires-python = ">=3.12"' in after
-    assert '"httpx==0.28.1; python_version >= \'3.12\'"' in after
+    assert "\"httpx==0.28.1; python_version >= '3.12'\"" in after
     assert "# retain_this = true" in after
 
 
@@ -219,20 +210,13 @@ def test_rule3_without_dependency_metadata_is_not_repaired_as_success(distributi
     assert validate_file(script).is_correct is False
 
 
-@pytest.mark.parametrize(
-    "requirement",
-    [
-        '"httpx[http2]>=0.27"',
-        "'httpx>=0.27'",
-        '"httpx~=0.28"',
-    ],
-)
+@pytest.mark.parametrize("requirement", ['"httpx[http2]>=0.27"', "'httpx>=0.27'", '"httpx~=0.28"'])
 def test_rule3_accepts_valid_pep723_requirement_forms(distribution: Path, requirement: str) -> None:
     script = distribution / "scripts" / "requirements.py"
     script.parent.mkdir(parents=True)
     script.write_text(
         UV_SHEBANG
-        + "\n# /// script\n# requires-python = \">=3.11\"\n# dependencies = ["
+        + '\n# /// script\n# requires-python = ">=3.11"\n# dependencies = ['
         + requirement
         + "]\n# ///\nimport httpx\n",
         encoding="utf-8",
@@ -248,7 +232,7 @@ def test_rule3_ignores_sibling_local_module(distribution: Path) -> None:
     script = scripts / "tool.py"
     script.write_text(
         UV_SHEBANG
-        + "\n# /// script\n# requires-python = \">=3.11\"\n# dependencies = [\"httpx>=0.27\"]\n# ///\n"
+        + '\n# /// script\n# requires-python = ">=3.11"\n# dependencies = ["httpx>=0.27"]\n# ///\n'
         + "import httpx\nfrom local_helper import run\n",
         encoding="utf-8",
     )

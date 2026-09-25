@@ -6,7 +6,7 @@ user-invocable: false
 
 # Python Tooling
 
-Consult `python3-core` for standing defaults.
+Consult `standards-for-python-development` for the shared rules.
 
 Command defaults and quick reference for uv, the type checker, ruff, the build backend,
 pre-commit, TOML, and PyPI packaging: `references/tooling-defaults.md`.

@@ -7,7 +7,7 @@ user-invocable: true
 
 # TDD Workflow
 
-Consult `python3-core` for standing defaults. Load `python3-testing` for detailed test patterns.
+Consult `standards-for-python-development` for the shared rules. Load `python3-testing` for detailed test patterns.
 
 ## Input
 

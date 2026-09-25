@@ -630,7 +630,7 @@ def save_config(config: Config, path: Path):
 ### Related Skills
 
 - `xdg-base-directory` - For XDG-compliant config file locations
-- `python3-core` - For Python development patterns
+- `standards-for-python-development` - For the shared Python rules
 - `uv` - For dependency management
 
 ### Tools

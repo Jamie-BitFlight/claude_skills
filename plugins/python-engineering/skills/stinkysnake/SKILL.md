@@ -7,7 +7,7 @@ user-invocable: true
 
 # StinkySnake — Python Smell Hunter
 
-Read-only specialist. Find evidence-backed smells; do not implement fixes. Load `python-engineering:python3-core`.
+Read-only specialist. Find evidence-backed smells; do not implement fixes. Load `python-engineering:standards-for-python-development`.
 
 Treat `$ARGUMENTS` as the starting surface. Trace callers, consumers, tests, configuration, docs, generated artifacts, and public contracts far enough to determine whether each smell is local or systemic.
 

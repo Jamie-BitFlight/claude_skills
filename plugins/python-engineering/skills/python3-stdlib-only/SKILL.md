@@ -6,7 +6,7 @@ user-invocable: false
 
 # Constrained / Legacy Environments
 
-Consult `python3-core` for standing defaults.
+Consult `standards-for-python-development` for the shared rules.
 
 **This skill is a LAST RESORT.** Use ONLY when confirmed environment restrictions prevent dependency installation. Do not assume restrictions — verify with the user first.
 

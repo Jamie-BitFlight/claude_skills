@@ -8,7 +8,8 @@ Opinionated Python 3.11+ engineering system. Establishes strong defaults and rou
 
 ### One Automatic Router
 
-- `python-engineering:python3-core` — loads on every Python task, establishes defaults, routes to specialists
+- `python-engineering:standards-for-python-development` — the shared rules every skill and agent applies
+- `python-engineering:python3-core` — loads on every Python task, loads those rules, routes to specialists
 
 ### Entrypoints (user and model invocable)
 

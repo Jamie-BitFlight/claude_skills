@@ -6,7 +6,7 @@ user-invocable: false
 
 # Testing Patterns
 
-Consult `python3-core` for standing defaults (coverage, test naming, AAA).
+Consult `standards-for-python-development` for the shared rules (coverage, test naming, AAA).
 
 ## Test Failure Mindset
 

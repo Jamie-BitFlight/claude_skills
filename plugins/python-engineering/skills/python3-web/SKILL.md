@@ -6,7 +6,7 @@ user-invocable: false
 
 # Python Web
 
-Load `python3-core` for standing defaults. Load `python3-typing` for request/response modeling. Load `python3-testing` for endpoint and auth tests.
+Load `standards-for-python-development` for the shared rules. Load `python3-typing` for request/response modeling. Load `python3-testing` for endpoint and auth tests.
 
 ## Quality Checklist
 
