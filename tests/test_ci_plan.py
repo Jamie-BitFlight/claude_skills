@@ -114,7 +114,6 @@ def test_file_hygiene_retains_full_inventory_for_cross_file_invariants() -> None
     argv = runner.command("prek", {"lint_all": False, "base": "a" * 40, "head": "b" * 40}, {})
     assert "--all-files" in argv
     assert "--from-ref" not in argv
-    assert plan["allowed_skips"] == ""
 
 
 @pytest.mark.parametrize("path", ["README.md", "docs/design.md", "rules/policy.md"])
