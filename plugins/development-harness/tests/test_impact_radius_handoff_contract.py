@@ -1,5 +1,7 @@
 """Structural regression tests for the Impact Radius producer/consumer contract."""
 
+from __future__ import annotations
+
 from pathlib import Path
 
 from markdown_it import MarkdownIt
@@ -64,7 +66,7 @@ def test_contract_preserves_machine_consumed_scope() -> None:
     text = CONTRACT.read_text(encoding="utf-8")
     assert "SCOPE_EXPANSION:" in text
     assert "IMPACT_RADIUS_COMPLETE:" in text
-    assert REQUIRED_HEADINGS <= headings(CONTRACT)
+    assert headings(CONTRACT) >= REQUIRED_HEADINGS
     assert "Systems Inventory" in text
     assert "replace_section=True" in text
 
