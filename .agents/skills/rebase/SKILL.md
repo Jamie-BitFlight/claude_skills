@@ -1,6 +1,6 @@
 ---
 name: rebase
-description: Start a local Git rebase when the user explicitly requests replay of a named source ref onto a named target, or continue or abort an active rebase. Use only when local history replay will start or is active; do not use for merge-based branch updates, repository merge settings, pull-request or merge-request merging, or push-only requests.
+description: Start a local Git rebase when the user explicitly requests replay of a named source ref, or of the current branch, onto a named target, including a rebase-then-push request, or continue or abort an active rebase. Use only when local history replay will start or is active; do not use for merge-based branch updates, repository merge settings, pull-request or merge-request merging, or push-only requests.
 ---
 
 **Keywords**: rebase, git rebase, history replay, rebase conflict, continue rebase, abort rebase, git worktree, rewritten history, authorized force-with-lease publication
