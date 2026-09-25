@@ -250,10 +250,18 @@ def main() -> int:
         return 0
     try:
         if args.command == "digest":
-            print(json.dumps({"output_sha256": hashlib.sha256(args.output.read_bytes()).hexdigest()}, separators=(",", ":")))
+            print(
+                json.dumps(
+                    {"output_sha256": hashlib.sha256(args.output.read_bytes()).hexdigest()}, separators=(",", ":")
+                )
+            )
             return 0
         record = validate_record(
-            args.record, request_id=args.request_id, source_paths=args.source, output=args.output, output_format=args.format
+            args.record,
+            request_id=args.request_id,
+            source_paths=args.source,
+            output=args.output,
+            output_format=args.format,
         )
     except (OSError, UnicodeError) as exc:
         print(json.dumps({"status": "UNVERIFIED", "error": str(exc)}, separators=(",", ":")))
