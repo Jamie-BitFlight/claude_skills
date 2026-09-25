@@ -17,10 +17,27 @@ function textOf(message) {
 function requestFrom(records) {
   const first = records.find((record) => record.type === 'user' && record.message?.role === 'user');
   const text = textOf(first?.message);
-  const formats = [...text.matchAll(/^SUMMARIZER_FORMAT:\s*(\S+)\s*$/gm)];
-  const outputs = [...text.matchAll(/^SUMMARIZER_OUTPUT:[ \t]*(.+?)[ \t]*\r?$/gm)];
+  const lines = text.replace(/\\r\\n/g, '\\n').split('\\n');
+  const controls = [];
+  let index = 0;
+  while (index < lines.length) {
+    const line = lines[index];
+    if (/^SUMMARIZER_(?:FORMAT|OUTPUT):/.test(line)) {
+      controls.push(line);
+      index += 1;
+      continue;
+    }
+    if (!line.trim() && controls.length) {
+      index += 1;
+      continue;
+    }
+    break;
+  }
+  const trusted = controls.join('\\n');
+  const formats = [...trusted.matchAll(/^SUMMARIZER_FORMAT:\\s*(\\S+)\\s*$/gm)];
+  const outputs = [...trusted.matchAll(/^SUMMARIZER_OUTPUT:[ \\t]*(.+?)[ \\t]*$/gm)];
   if (formats.length !== 1 || !FORMATS.includes(formats[0][1]) || outputs.length > 1) {
-    throw new Error('Expected one caller SUMMARIZER_FORMAT control in the initial task.');
+    throw new Error('Expected one caller SUMMARIZER_FORMAT control in the initial task prefix.');
   }
   const output = outputs[0]?.[1];
   if (output && !path.isAbsolute(output))
