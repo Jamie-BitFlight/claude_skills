@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
 # ///
@@ -29,7 +28,7 @@ def violations(plugin: Path) -> list[str]:
 
 
 def main() -> int:
-    """Validate one plugin boundary."""
+    """Validate one plugin boundary.\n\n    Returns:\n        Zero when no static isolation violation is found.\n    """
     parser = argparse.ArgumentParser()
     parser.add_argument("plugin", type=Path)
     args = parser.parse_args()
