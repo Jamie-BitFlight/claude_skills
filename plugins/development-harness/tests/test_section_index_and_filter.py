@@ -152,18 +152,33 @@ class TestRenderSectionsAsBodyIndex:
         # Index appears before the section content
         assert body.index("## Sections") < body.index("## Fact-Check")
 
-    def test_no_index_when_empty_sections(self) -> None:
-        """No sections → empty string (no index, no body)."""
+    def test_description_is_the_whole_body_when_there_are_no_sections(self) -> None:
+        """No sections → no index, and the description is still the body."""
         item = _item(sections={})
+        body = render_sections_as_body(item)
+        assert "## Sections" not in body
+        assert body == "## Description\n\ndesc\n\n"
+
+    def test_empty_string_when_neither_description_nor_sections(self) -> None:
+        """Nothing to render → empty string."""
+        item = _item(sections={})
+        item.description = ""
         assert render_sections_as_body(item) == ""
 
+    def test_description_renders_between_the_index_and_the_sections(self) -> None:
+        """The description reaches the body under the ``## Description`` heading the write path emits."""
+        item = _item(sections={"fact_check": Section(entries=[_entry("x")])})
+        body = render_sections_as_body(item)
+        assert body.index("## Sections") < body.index("## Description") < body.index("## Fact-Check")
+
     def test_no_index_when_section_filter_active(self) -> None:
-        """When section filter is active, no index block is prepended."""
+        """When section filter is active, no index block and no description is prepended."""
         item = _item(
             sections={"fact_check": Section(entries=[_entry("fc")]), "rt_ica": Section(entries=[_entry("rt")])}
         )
         body = render_sections_as_body(item, section="0")
         assert "## Sections" not in body
+        assert "## Description" not in body
         assert "## Fact-Check" in body
 
     def test_groomed_rendered_correctly(self) -> None:

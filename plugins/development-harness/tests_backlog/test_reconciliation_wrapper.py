@@ -31,6 +31,7 @@ from backlog_core.operations import (
     pull_items,
     refresh_local_cache_from_github,
     sync_items,
+    view_item,
 )
 
 
@@ -378,3 +379,61 @@ def test_targeted_pull_writes_an_unstructured_provider_body_into_the_writer_cach
     cached = backend.get_work_item("#42")
     assert cached.title == "companion changed remotely"
     assert "Provider edit not present in the writer cache." in cached.description
+
+
+def test_view_after_targeted_pull_renders_the_provider_body_for_a_title_selector(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A cache-served view returns the pulled provider text in ``body``, not only ``description``.
+
+    Offline reproduction of the live-e2e "pull observes an independent provider
+    edit" phase, which reads the pulled item back through a title selector so the
+    answer comes from the writer cache rather than a second provider fetch. Every
+    other body-producing view path (live enrichment, the legacy ``.md`` file)
+    returns the item's whole markdown, so the cache-served path must too.
+    """
+    # Given: one cached item reconciled from a provider body in the rendered shape
+    cache = FileCache(tmp_path / "writer")
+    backend = GitHubBackend(cache=cache)
+    monkeypatch.setattr(backend, "_apply_patches", lambda patches: [])
+    monkeypatch.setattr(
+        models, "_config", models.BacklogConfig(repo_root=tmp_path, backlog_dir=tmp_path / "backlog", default_repo="")
+    )
+    set_config(BacklogConfig(backend=backend))
+
+    def _snapshot_of(title: str, body: str, revision: str) -> ProviderSnapshot:
+        return ProviderSnapshot(
+            items=[
+                ProviderItem(
+                    provider_id="I_kw1",
+                    reference="#42",
+                    title=title,
+                    body=body,
+                    state="OPEN",
+                    labels=[],
+                    revision=revision,
+                )
+            ],
+            sync_started_at="2026-08-12T01:00:00Z",
+            pages_fetched=1,
+        )
+
+    rendered = (
+        "<!-- backlog-metadata:\npriority: P1\ntype: Feature\nstatus: open\nadded: 2026-01-01\n-->\n\n"
+        "## Description\n\n<!-- dh-e2e-run:1-1 -->\n\nLive validation fixture: companion\n"
+    )
+    monkeypatch.setattr(backend, "_fetch_snapshot", lambda request: _snapshot_of("companion", rendered, "rev-1"))
+    pull_by_selector("#42")
+
+    # When: the provider rewrites the whole body by hand, dropping every heading
+    edited = "<!-- dh-e2e-run:1-1 -->\n\nProvider edit not present in the writer cache."
+    monkeypatch.setattr(
+        backend, "_fetch_snapshot", lambda request: _snapshot_of("companion changed remotely", edited, "rev-2")
+    )
+    pull_by_selector("#42")
+
+    # Then: a non-refresh title lookup serves that text as the item's body
+    viewed = view_item("companion changed remotely")
+    assert viewed.title == "companion changed remotely"
+    assert viewed.status_source == "cache", viewed
+    assert "Provider edit not present in the writer cache." in viewed.body, viewed

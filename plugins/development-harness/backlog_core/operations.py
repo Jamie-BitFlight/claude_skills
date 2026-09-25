@@ -2879,26 +2879,35 @@ def _filter_sections(item: BacklogItem, section: str) -> dict[str, Section | Gro
 
 
 def render_sections_as_body(item: BacklogItem, section: str | None = None) -> str:
-    r"""Render a YAML BacklogItem's structured sections into a markdown body string.
+    r"""Render a YAML BacklogItem's description and structured sections into a markdown body.
 
     Prepends a ``## Sections`` index block (unless *section* filter is active
-    or *item.sections* is empty).  Renders ``## {title}\\n\\n{content}`` for
-    each section.  Returns ``""`` when *item.sections* is empty.
+    or *item.sections* is empty), then ``## Description`` when the item carries
+    one, then ``## {title}\\n\\n{content}`` for each section.  Returns ``""``
+    only when the item has neither a description nor a renderable section.
+
+    The description is body preamble, not a section: ``parse_issue_body`` splits
+    it out of the provider body's ``## Description`` heading and
+    ``render_issue_body`` writes it back under that same heading, so a body
+    rendered without it is not the provider body's round-trip.  It stays out of
+    ``item.sections`` (and so out of the index and the ordinal space
+    :func:`_filter_sections` addresses), which is why it is emitted here rather
+    than as a section, and why a *section* filter -- a request for numbered or
+    named sections -- excludes it.
 
     Args:
-        item: The BacklogItem whose sections to render.
+        item: The BacklogItem whose description and sections to render.
         section: Optional filter expression forwarded to :func:`_filter_sections`.
-            When ``None`` all sections are rendered (with index).
+            When ``None`` the description and all sections are rendered (with index).
 
     Returns:
-        Markdown string representation of sections, or ``""`` if none exist.
+        Markdown string representation of the body, or ``""`` if there is nothing
+        to render.
     """
-    if not item.sections:
-        return ""
-
     sections_to_render = _filter_sections(item, section) if section is not None else dict(item.sections)
+    description = (item.description or "").strip() if section is None else ""
 
-    if not sections_to_render:
+    if not sections_to_render and not description:
         return ""
 
     parts: list[str] = []
@@ -2907,6 +2916,9 @@ def render_sections_as_body(item: BacklogItem, section: str | None = None) -> st
         index_block = _render_section_index(item)
         if index_block:
             parts.append(index_block.rstrip("\n"))
+
+    if description:
+        parts.append(f"## Description\n\n{description}")
 
     for key, sec_data in sections_to_render.items():
         if isinstance(sec_data, GroomedData):
@@ -3592,13 +3604,18 @@ def _assemble_view_content(
             elif not paginate:
                 result.sections = _sections_from_body_or_yaml(body, item, show, since)
                 pending_index = _build_sections_index_from_body(body)
-        elif item and item.sections:
+        elif item is not None:
             # YAML fallback: ``_populate_yaml_item_content`` builds the richer
             # structured-section metadata via ``_build_sections_from_yaml_item``
             # (preserving struck counts and unknown-section shapes).  Do NOT
             # overwrite it with a body re-parse -- that loses information the YAML
             # path carries.  When pagination runs the metadata is re-bounded to the
             # paginated slice below (mirroring the pre-#2495 behaviour).
+            # Reached for an item with no section at all as well: a targeted pull of
+            # a hand-rewritten provider body leaves the whole content in
+            # ``description``, and gating this arm on ``item.sections`` left ``body``
+            # empty for exactly that item while every other view path returned the
+            # item's whole markdown (#3939 follow-up).
             _populate_yaml_item_content(result, item, section)
         # Pagination (when requested) re-bounds the body and its section metadata
         # to the paginated slice so a paged request cannot overflow the view budget
