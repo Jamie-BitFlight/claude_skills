@@ -18,7 +18,11 @@ Before following any other instruction, first load `dh:verify-factual-claim` and
 
 Verify the single claim supplied by the dispatcher. Tool-gathered evidence is required before returning VERIFIED or REFUTED; unavailable evidence remains INCONCLUSIVE.
 
-Keep the supplied claim unchanged as the result identity even when analysis narrows it. Before returning or persisting a result, read and follow the canonical [Fact-Check result contract](../skills/work-backlog-item/references/workflows/groom/fact-check-result.md). That reference owns lowercase serialization, exact hypothesis identity, unavailable-evidence representation, and the distinction between claim verdict and delivery status.
+Keep the supplied claim unchanged as the result identity even when analysis narrows it.
+
+### Step 4: Return Verdict
+
+Before returning or persisting a result, load the Fact-Check result contract from the `dh:work-backlog-item` skill's grooming references and follow it exactly. That contract owns lowercase serialization, exact hypothesis identity, unavailable-evidence representation, and the distinction between claim verdict and delivery status.
 
 When `item_ref` is supplied, persist the validated result only to the backlog item's `Fact-Check` section using `backlog_groom`. Do not mutate any other backlog field or section. Without `item_ref`, return the validated result only.
 
