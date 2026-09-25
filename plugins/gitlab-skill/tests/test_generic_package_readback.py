@@ -32,7 +32,8 @@ def component_script() -> str:
     documents = list(yaml.safe_load_all(COMPONENT.read_text(encoding="utf-8")))
     job = documents[1]["$[[ inputs.job-name ]]"]
     commands = job["script"]
-    assert isinstance(commands, list) and all(isinstance(command, str) for command in commands)
+    assert isinstance(commands, list)
+    assert all(isinstance(command, str) for command in commands)
     return "set -eu\n" + "\n".join(commands)
 
 
@@ -96,7 +97,7 @@ def test_publication_requires_matching_readback(
             self.end_headers()
             self.wfile.write(download_bytes)
 
-        def log_message(self, format: str, *args: object) -> None:
+        def log_message(self, message: str, *args: object) -> None:
             pass
 
     artifact = tmp_path / "build output.bin"
