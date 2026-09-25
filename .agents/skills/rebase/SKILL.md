@@ -5,6 +5,23 @@ description: Start a local Git rebase when the user explicitly requests replay o
 
 **Keywords**: rebase, git rebase, history replay, rebase conflict, continue rebase, abort rebase, git worktree, rewritten history, authorized force-with-lease publication
 
+## Result-bound verification
+
+For start/continue completion, bind validation to the immutable result commit `R`.
+Run repository-required and changed-interaction checks on a clean detached worktree
+or equivalent isolated checkout of `R`, separately from restored user changes.
+Preserve unrelated work; a passing dirty worktree does not validate its commit.
+Record the checked OID and environment; verify checks left tracked source unchanged.
+Source-mutating checks invalidate that evidence. Commit a required correction within
+the existing task authority, then rebind `R` and rerun its checks. When that commit
+is blocked or unauthorized, pause rather than reporting the correction published.
+Every result change, including remote reconciliation, invalidates earlier result
+validation. Reobserve the named result ref before completion; it must still name
+`R`. A decision or stopped-state path cannot become a success merely because its
+refs or ancestry still satisfy the goal.
+
+## Workflow
+
 ```mermaid
 flowchart TD
     Start([Agent receives explicit start, continue, or abort request]) --> Kind{Request?}
@@ -72,17 +89,18 @@ flowchart TD
     RestoreIntent -->|Failure or unobservable| Recover
     RestoreFinish --> RestoreFinishResult{Checks zero, no unmerged entries, exact entry absent?}; RestoreFinishResult -->|Yes| FinishMode; RestoreFinishResult -->|No or unobservable| Recover
     FinishMode -->|Explicit abort| OrientAbort[Agent: inventory interactions; verify restored assumptions]
-    FinishMode -->|Start or continue| Orient[Agent: run repository-required checks plus checks for changed producers/consumers/interfaces]
-    Orient --> VerifyResult{All those checks zero; no unmerged entries; intersections recorded?}
+    FinishMode -->|Start or continue| Orient[Agent: bind committed result R; run repository and changed-interaction checks on its isolated tree]
+    Orient --> VerifyResult{Checks pass on unchanged tracked tree of R; result ref equals R; no unmerged entries; intersections recorded?}
     VerifyResult -->|Yes| Publish{Publication bound and authorized?}
-    VerifyResult -->|Failure attributable to replay; one correction within bound goal| Correct[Agent: apply that correction]; VerifyResult -->|Not attributable, outside goal, missing intent, or alternatives| Decision
+    VerifyResult -->|Failure attributable to replay; one correction within bound goal| Correct[Agent: apply and commit only the task-authorized replay correction]; VerifyResult -->|Not attributable, outside goal, missing intent, or alternatives| Decision
     VerifyResult -->|Failure or unobservable| Recover
-    Correct --> CorrectResult{Correction applied?}
-    CorrectResult -->|Yes; rerun repository and changed-interaction checks| Orient; CorrectResult -->|Failure or unobservable| Recover
+    Correct --> CorrectResult{Correction committed within task authority?}
+    CorrectResult -->|Yes; invalidate old evidence and rebind R| Orient; CorrectResult -->|Commit blocked or unauthorized| Decision; CorrectResult -->|Failure or unobservable| Recover
     Publish -->|No| Handoff; Publish -->|Yes| Remote["`Agent: read [publication](./references/publication.md); reconcile one authorized attempt`"]
     Remote --> RemoteResult{Remote stage result?}
-    RemoteResult -->|Final fetch unchanged; exact lease OID current| Push[Agent: perform authorized exact-lease push]
+    RemoteResult -->|Final fetch unchanged; exact lease current; R revalidated; result ref equals R| Push[Agent: push immutable R with the authorized exact lease]
     RemoteResult -->|Destination moved after one reconciliation/final observation| Retry
+    RemoteResult -->|Unexpected result-ref change| Decision
     RemoteResult -->|Conflict| RemoteConflict["`Agent: read [conflict and ambiguity](./references/conflict-and-ambiguity.md); resolve remote intent`"]
     RemoteResult -->|Failure or unobservable| Recover
     RemoteConflict --> RemoteIntent{Exactly one outcome preserves compatible intent and passes checks?}
@@ -95,14 +113,14 @@ flowchart TD
     NoChange --> Handoff; NoActive --> Handoff; Decision[Agent: stop mutation; report missing fact/alternatives and evidence] --> Handoff
     Recover["`Agent: read [active recovery](./references/active-rebase-recovery.md); stop mutation and collect report`"] --> Handoff
     OrientAbort --> Handoff; LeaseStop --> Handoff
-    Handoff[Agent: check acquired worker obligation] --> Worker{Worker obligation?}
-    Worker -->|None| Terminal{Observed path predicate?}; Worker -->|Acquired| Deliver[Agent: deliver summary and resume/stop decision]
+    Handoff[Agent: carry the reached lifecycle path; check acquired worker obligation] --> Worker{Worker obligation?}
+    Worker -->|None| Terminal{Reached lifecycle path and current evidence?}; Worker -->|Acquired| Deliver[Agent: deliver summary and resume/stop decision]
     Worker -->|Unknown or unobservable| Pending([Agent: stop mutation; preserve repo; report last worker state, handoff attempt, missing ack/observation; no completion])
     Deliver --> HandoffResult{Acknowledged summary/resume, or worker observed stopped with handoff?}
     HandoffResult -->|Yes| Terminal; HandoffResult -->|No or unobservable| Pending
     Terminal -->|Abort request and restored pre-state| Aborted([Aborted and restored])
-    Terminal -->|Start/continue; post-push destination resolves to R| Published([Published completion])
-    Terminal -->|Start/continue; result ref resolves to R; bound goal relation true; no publication| Local([Local completion])
+    Terminal -->|Successful start/continue path; validation current for R; result ref and post-push destination equal R| Published([Published completion])
+    Terminal -->|Successful start/continue path; validation current for R; result ref equals R; goal relation true; no publication| Local([Local completion])
     Terminal -->|No-change evidence complete| NoChangeDone([No change]); Terminal -->|Metadata absent; no mutation| NoActiveDone([No active rebase])
     Terminal -->|Decision report complete| Paused([Paused for decision]); Terminal -->|Stopped-state report complete| Stopped([Stopped with observed state])
     Terminal -->|Inconsistent or unobservable| Recover
