@@ -45,16 +45,6 @@ def links(path: Path) -> set[Path]:
     return result
 
 
-def headings(path: Path) -> set[str]:
-    """Return Markdown heading text from an authored contract."""
-    tokens = MarkdownIt().parse(path.read_text(encoding="utf-8"))
-    return {
-        tokens[index + 1].content
-        for index, token in enumerate(tokens[:-1])
-        if token.type == "heading_open"
-    }
-
-
 def test_agent_and_grooming_reach_same_contract() -> None:
     """Producer and consumer must share one bundled DH schema owner."""
     assert CONTRACT.resolve() in links(AGENT)
@@ -66,7 +56,7 @@ def test_contract_preserves_machine_consumed_scope() -> None:
     text = CONTRACT.read_text(encoding="utf-8")
     assert "SCOPE_EXPANSION:" in text
     assert "IMPACT_RADIUS_COMPLETE:" in text
-    assert headings(CONTRACT) >= REQUIRED_HEADINGS
+    assert all(f"### {heading}" in text for heading in REQUIRED_HEADINGS)
     assert "Systems Inventory" in text
     assert "replace_section=True" in text
 
