@@ -36,6 +36,13 @@ Each agent reads its source skill directly. Do not assume that a parent's loaded
 inherited by a fresh context. When native subagents are absent, execute the same skill directly;
 do not simulate a delegation or claim a fresh verifier ran.
 
+## Evidence handoff
+
+For delegated, chunked, multi-source or audit-requested work, follow the
+[evidence record](./evidence-record.md). The caller assigns request/source/output identity;
+workers retain findings, coverage and qualifications before rendering. Keep a short inline
+summary lightweight when no persistent handoff is needed.
+
 ## Completion and validation
 
 Before returning a result, review its claims against the original evidence, including exact
