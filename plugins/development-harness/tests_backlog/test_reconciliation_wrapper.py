@@ -33,6 +33,7 @@ from backlog_core.operations import (
     sync_items,
     view_item,
 )
+from backlog_core.parsing import build_issue_body
 
 
 class _SyncProviderStub(InMemoryBackend):
@@ -447,3 +448,51 @@ def test_view_after_targeted_pull_renders_the_provider_body_for_a_title_selector
     assert viewed.title == "companion changed remotely"
     assert viewed.status_source == "cache", viewed
     assert "Provider edit not present in the writer cache." in viewed.body, viewed
+
+
+@pytest.mark.parametrize("cold_cache", [False, True], ids=["live-listing", "cold-cache-refresh"])
+def test_list_includes_issues_whose_priority_is_only_in_the_priority_label(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cold_cache: bool
+) -> None:
+    """``backlog_add`` issues carry priority in a label, not a metadata block; listing keeps them.
+
+    Offline reproduction of the live-e2e "list membership across pages" and
+    "cold-cache recovery" phases, which listed ``[]`` for issues just created.
+    """
+    # Given: a provider issue in the exact shape backlog_add creates on GitHub
+    body = build_issue_body(BacklogItem(title="primary", priority="P1", description="fixture", source="test"))
+    assert "backlog-metadata" not in body
+    snapshot = ProviderSnapshot(
+        items=[
+            ProviderItem(
+                provider_id="I_kw1",
+                reference="#43",
+                title="feat: primary",
+                body=body,
+                state="OPEN",
+                labels=["priority:p1", "type:feature", "status:needs-grooming"],
+                revision="rev-1",
+            )
+        ],
+        sync_started_at="2026-09-26T12:55:00Z",
+        pages_fetched=1,
+    )
+    backend = GitHubBackend(cache=FileCache(tmp_path / "github-cache"))
+    monkeypatch.setattr(backend, "fetch_snapshot", lambda request: snapshot)
+    monkeypatch.setattr(backend, "_apply_patches", lambda patches, repo="": [])
+    monkeypatch.setattr(
+        models, "_config", models.BacklogConfig(repo_root=tmp_path, backlog_dir=tmp_path / "backlog", default_repo="")
+    )
+    set_config(BacklogConfig(backend=backend))
+
+    # When: the backlog is listed live, or refreshed into an empty cache and read from it
+    if cold_cache:
+        refresh_local_cache_from_github(full_refresh=True)
+        listed = [(item.reference, item.section) for item in backend.list_work_items()]
+    else:
+        items = list_items(repo="")["items"]
+        assert isinstance(items, list)
+        listed = [(str(item["issue"]), str(item["section"])) for item in items if isinstance(item, dict)]
+
+    # Then: the issue is listed under the priority its label names
+    assert listed == [("#43", "P1")]
