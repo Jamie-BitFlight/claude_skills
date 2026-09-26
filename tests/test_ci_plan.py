@@ -309,7 +309,9 @@ def test_runner_propagates_actual_child_failure(tmp_path: Path, exit_code: int) 
 
 
 @pytest.mark.parametrize("registry_changed", [False, True])
-def test_marketplace_version_bump_does_not_expand_plugin_content_change(repository: Path, registry_changed: bool) -> None:
+def test_marketplace_version_bump_does_not_expand_plugin_content_change(
+    repository: Path, registry_changed: bool
+) -> None:
     """Normal version bumps stay local; changed registration still tests everything."""
     git(repository, "init", "-b", "main")
     git(repository, "config", "user.name", "CI fixture")
@@ -332,7 +334,9 @@ def test_marketplace_version_bump_does_not_expand_plugin_content_change(reposito
     paths, resolved, tip, reason = planner.changed_paths(repository, "pull_request", base, head)
     plan = planner.build_plan(repository, paths, resolved, tip, reason)
     assert plan["full_tests"] is registry_changed
-    assert names(plan) == ({"alpha", "beta", "development-harness", "global"} if registry_changed else {"alpha", "global"})
+    assert names(plan) == (
+        {"alpha", "beta", "development-harness", "global"} if registry_changed else {"alpha", "global"}
+    )
     assert plan["checks"]["manifest-sync"]
 
 
