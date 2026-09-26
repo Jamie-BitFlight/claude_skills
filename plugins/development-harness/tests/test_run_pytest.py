@@ -18,6 +18,6 @@ _PLUGIN_ROOT = _run_pytest_mod._PLUGIN_ROOT
 
 def test_default_test_paths_are_plugin_owned() -> None:
     """The root plugin runner owns complete plugin-relative test topology."""
-    assert _PLUGIN_ROOT == Path(__file__).parent.parent
+    assert Path(__file__).parent.parent == _PLUGIN_ROOT
     assert _DEFAULT_TEST_PATHS
     assert all(not path.startswith("plugins/") for path in _DEFAULT_TEST_PATHS)
