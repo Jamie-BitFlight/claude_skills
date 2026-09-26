@@ -163,7 +163,8 @@ def test_deleted_plugin_is_not_sent_to_validator(repository: Path) -> None:
 
 def test_missing_configured_suite_is_an_error(repository: Path) -> None:
     """Removing a suite directory without updating testpaths cannot pass silently."""
-    (repository / "plugins/beta/tests").rmdir()
+    config = repository / "pyproject.toml"
+    config.write_text(config.read_text(encoding="utf-8").replace('"tests"', '"missing-tests"'), encoding="utf-8")
     with pytest.raises(ValueError, match="Configured testpath does not exist"):
         planner.build_plan(repository, ["README.md"])
 
