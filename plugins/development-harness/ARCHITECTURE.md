@@ -9,6 +9,24 @@ One loop, from a requirement to a closed change with evidence. Each stage below 
 reads and what it produces. The outcomes these exist to deliver are in
 [docs/PURPOSE.md](./docs/PURPOSE.md).
 
+Every source follows the same design seam:
+
+```text
+source → normalize Work Brief → ready for design → Design → Plan → Decomposition → Act
+```
+
+A provider-backed backlog item enters through Create and Groom. `/dh:work-brief` is the
+user-invocable ad-hoc entrypoint: an offline, one-off workflow that follows
+`/dh:work-backlog-item` while bypassing the configured backend to create a local-only backlog item.
+It covers feature development, bug fixes, and documentation changes in a project without a
+configured DH backend, or work that should proceed now without first being filed in the configured
+backlog. The resulting local backlog item stores the Work Brief and follows the ordinary downstream
+lifecycle.
+Interactive intake clarifies and investigates the source until the Work Brief is ready for design;
+unresolved user input or persistence failure stops the handoff instead of claiming readiness.
+After that handoff, each downstream stage retains its existing contract and human gates; Work Brief
+intake adds no extra human gate.
+
 **Create.** Steps through creating a requirement, feature or defect without speculating how it
 should work in the system before understanding the system as a whole. Produces the backlog item in
 the backend store. Implemented by `work-backlog-item`'s `create` route.
@@ -69,6 +87,8 @@ read as though the stage were already built out of that mechanism.
 
 Likewise **create** is the stage and the route; `intake` is a step inside grooming
 (`skills/work-backlog-item/references/workflows/groom/intake.md`) and does not name this stage.
+Groom Intake checks an existing item. `/dh:work-brief` owns the separate interactive Work Brief
+intake before an ad-hoc item enters the normal lifecycle.
 
 `ARTIFACT:{STAGE}({scope})` is a cross-reference token naming the stage that produced an artifact,
 and it is a separate namespace from `ArtifactType`. `ARTIFACT:DISCOVERY`, `ARTIFACT:CONTEXT`,
@@ -103,7 +123,7 @@ workflow above, and forcing either onto the other loses distinctions both make.
 
 | stage above | numbered pipeline |
 |---|---|
-| Create, Groom | outside it; `work-backlog-item`'s `create` and `groom` routes run before it, and `discovery` re-surveys more narrowly inside it |
+| Work Brief normalization, Create, Groom | outside it; normalization is a pre-Design intake seam, while `work-backlog-item`'s `create` and `groom` routes run before it, and `discovery` re-surveys more narrowly inside it |
 | Design, Plan | both inside `planning`, which produces one `architect` artifact for the two |
 | Decomposition | `task-decomposition` |
 | Orchestration | outside it; `dispatch` and `work-milestone` have no numbered slot |
@@ -581,6 +601,8 @@ approximated by writing a timestamp somewhere else.
 
 Agents work only with logical objects and relationships:
 
+- Work Brief source;
+- Work Brief;
 - backlog item;
 - research, reference, guide, or note;
 - architecture;
@@ -592,6 +614,34 @@ Agents work only with logical objects and relationships:
 
 An agent uses logical identifiers and relationships, not provider IDs, file
 paths, issue bodies, database rows, Gists, or API-specific objects.
+
+A source is normalized into a Work Brief. A provider-backed backlog item is one source or storage
+representation of that Work Brief, not the universal domain object. Design produces architecture;
+a Plan decomposes one Work Brief into atomic Tasks. Separate concerns that need independent
+decisions remain separate dependency-linked Work Briefs rather than being collapsed into Plan
+tasks.
+
+An expected output communicates state; it is not a production asset. Its contract is a name plus
+the stored-location reference, and every listed expected output is required. The Worker writes it,
+reads it back, verifies fidelity against what actually occurred, and records its reference and
+result. The judge independently reads and verifies it before acceptance. A failed, blocked, or
+needs-input result records each absent output and its reason without creating a placeholder.
+
+CLEAR/CoVe structures Tasks and validates Task results. Report fidelity is a separate comparison
+of persisted content with actual actions, observations, outputs, errors, and validation. DH roles
+use `dh:subagent-contract` with `DONE|BLOCKED` transport status, the durable
+`complete|failed|blocked|needs-input` result, and a separate domain verdict.
+
+Scratch files are not expected outputs. A standalone specialist outside a pipeline may use one for
+specialist-to-Orchestrator handoff. When neither an item nor a Plan exists, the Orchestrator owns
+persistence: dispatch supplies a parent-controlled destination, or the specialist returns the
+complete body inline for the Orchestrator to store. Agents do not invent child-worktree paths.
+
+Every non-complete attempt has a durable disposition: retrying, awaiting user, repairing blocker,
+backlogged, or accepted as terminal. Judge/reclaim consumes the attempt state and records one of
+those dispositions before work continues. A failure that invalidates architecture returns through
+Design and then Plan; missing intent returns to interactive intake; a separate concern is
+backlogged as its own dependency-linked Work Brief.
 
 ## The frontend contract
 
@@ -616,6 +666,10 @@ either one.
 The frontend contract must not depend on a selected provider's object model or
 addressing scheme.
 
+`artifact_read` with no artifact identity returns the artifact list, even when exactly one entry
+matches; an explicit identity returns content. No match returns an empty list with count zero.
+There is no default artifact selected by recency.
+
 ## The backend guarantee
 
 Storage is an implementation detail. Logical objects may be stored together or
@@ -630,10 +684,15 @@ MCP commands or workflow behavior.
 
 ## Storage and routing
 
-The configured backend is the single routing decision for work items, grooming, plans, tasks,
-artifact manifests, and artifact content. MCP and CLI expose interchangeable logical operations;
-`bd` remains the native interface for Beads issue graphs and readiness where that capability is
-stronger than the structured adapter.
+One composition boundary resolves the configured primary adapter plus the reserved `brief~` local
+SQLite overlay. Callers continue to use logical operations and never choose providers. The
+selected route covers the Work Brief, grooming content, artifacts, Plans and Tasks, concerns,
+gates, and completion. Plan creation durably binds the Plan address to its backend and Work Brief
+reference so later operations holding only that address follow the same route. The reserved route
+fails closed; every other reference remains governed by project configuration.
+
+MCP and CLI expose interchangeable logical operations; `bd` remains the native interface for
+Beads issue graphs and readiness where that capability is stronger than the structured adapter.
 
 Remote-capable providers privately own `FileCache` for stale snapshots, durable queued offline
 mutations, revisions, and provider-specific persistence. Beads, SQLite, and Memory use native

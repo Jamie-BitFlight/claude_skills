@@ -108,6 +108,30 @@ nothing, so it is outside this rationale. The runtime rule is in `skills/dispatc
 
 ## Language
 
+**Work Brief**:
+The supplier-neutral, normalized problem or outcome dataset against which architecture, design,
+and planning begin. A backlog item may store or supply one, but a Work Brief is neither a backlog
+item nor the Plan or Tasks produced from it; lowercase “brief” remains the ordinary name for the
+instructions handed to a delegated agent.
+_Avoid_: Design Workbook, fully groomed item, implementation plan
+
+**Work Brief source**:
+A backlog item, conversation, interview, or brainstorming session from which a Work Brief is
+normalized. This source kind is distinct from the free-text metadata field named `source`.
+_Avoid_: treating provider identity or the metadata field named `source` as the source kind
+
+**Ready for design**:
+The state in which a Work Brief is sufficiently defined for architecture, design, and planning:
+its relevant question frontier is empty, the user has confirmed shared understanding, and its
+durable representation has been verified to preserve the normalized dataset. It is distinct from
+the backlog lifecycle status `groomed` and from RT-ICA planning decision tokens.
+_Avoid_: fully groomed, ready to implement
+
+**Interactive Work Brief intake**:
+The activity that clarifies, investigates, and normalizes a conversational source into a Work
+Brief. It is distinct from Groom Intake, which checks an existing backlog item for grooming.
+_Avoid_: Groom Intake for pre-creation conversation
+
 **SAM (Stateless Agent Methodology)**:
 A constraint-driven development framework, external to this repo, treating an agent as a
 stateless computation engine — complete context in, one verified artifact out, no memory carried
