@@ -21,7 +21,7 @@ def violations(plugin: Path) -> list[str]:
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             continue
-        found.extend(f"{path.relative_to(plugin)}: forbidden repository escape {token!r}" for token in FORBIDDEN if token in text)
+        found.extend(\n            f"{path.relative_to(plugin)}: forbidden repository escape {token!r}" for token in FORBIDDEN if token in text\n        )
     return found
 
 
