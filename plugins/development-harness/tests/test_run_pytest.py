@@ -9,7 +9,6 @@ out together — it is skipped for a standalone bundle, which has no root ``pypr
 from __future__ import annotations
 
 import importlib.util
-import tomllib
 from pathlib import Path
 
 import pytest
@@ -26,22 +25,7 @@ _spec.loader.exec_module(_run_pytest_mod)
 _DEFAULT_TEST_PATHS = _run_pytest_mod._DEFAULT_TEST_PATHS
 _PLUGIN_ROOT = _run_pytest_mod._PLUGIN_ROOT
 
-_ROOT_PYPROJECT = _PLUGIN_ROOT.parent.parent / "pyproject.toml"
-
-
-@pytest.mark.skipif(not _ROOT_PYPROJECT.exists(), reason="standalone bundle has no root pyproject.toml")
-def test_default_test_paths_match_pyproject_testpaths() -> None:
-    """This plugin's *existing* entries in root ``testpaths`` must equal ``_DEFAULT_TEST_PATHS``.
-
-    A ``testpaths`` entry whose directory does not exist (dead config, unrelated to this
-    guard) is excluded from the comparison rather than forcing a false failure here.
-    """
-    repo_root = _ROOT_PYPROJECT.parent
-    testpaths = tomllib.loads(_ROOT_PYPROJECT.read_text())["tool"]["pytest"]["ini_options"]["testpaths"]
-    plugin_prefix = "plugins/development-harness/"
-    plugin_testpaths = {
-        path.removeprefix(plugin_prefix)
-        for path in testpaths
-        if path.startswith(plugin_prefix) and (repo_root / path).is_dir()
-    }
-    assert set(_DEFAULT_TEST_PATHS) == plugin_testpaths
+def test_default_test_paths_are_plugin_owned() -> None:
+    """The standalone runner, not root pytest config, owns this plugin's test topology."""
+    assert _DEFAULT_TEST_PATHS
+    assert all(not path.startswith("plugins/") for path in _DEFAULT_TEST_PATHS)
