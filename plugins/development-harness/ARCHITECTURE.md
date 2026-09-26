@@ -24,8 +24,8 @@ backlog. The resulting local backlog item stores the Work Brief and follows the 
 lifecycle.
 Interactive intake clarifies and investigates the source until the Work Brief is ready for design;
 unresolved user input or persistence failure stops the handoff instead of claiming readiness.
-After that handoff, Design, Plan, Decomposition, and Act use their common contracts without user
-interaction unless a genuine blocker or `needs-input` decision occurs.
+After that handoff, Design, Plan, Decomposition, and Act use their common contracts and configured
+autonomy mode; Work Brief intake adds no extra human gate to those contracts.
 
 **Create.** Steps through creating a requirement, feature or defect without speculating how it
 should work in the system before understanding the system as a whole. Produces the backlog item in
