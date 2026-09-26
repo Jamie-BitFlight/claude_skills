@@ -14,9 +14,9 @@ import subprocess
 import sys
 import tempfile
 import textwrap
-import tomllib
 from collections.abc import Iterator
 from contextlib import contextmanager
+from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
 import pytest
@@ -24,26 +24,22 @@ import pytest
 from tests.network_blocked import NetworkBlocked
 
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
-_REPO_ROOT = _PLUGIN_ROOT.parent.parent
-_ROOT_PYPROJECT = _REPO_ROOT / "pyproject.toml"
-_PLUGIN_PREFIX = "plugins/development-harness/"
 
 
 def _configured_testpaths() -> list[str]:
-    """Return this plugin's root ``testpaths`` entries, relative to the plugin root.
+    """Return the test roots this plugin's ``run_pytests.py`` declares.
 
-    Reading the entries rather than listing them keeps the guard covering every
-    directory the default lane collects, including ones added after this test was
-    written. Empty for a standalone bundle, which ships no root ``pyproject.toml``.
+    Reading the runner rather than listing the roots keeps the guard covering every
+    directory the plugin's suite collects, including ones added after this test was
+    written. The runner ships with the plugin, so the list is the same inside the
+    monorepo and in a standalone bundle.
     """
-    if not _ROOT_PYPROJECT.exists():
-        return []
-    testpaths = tomllib.loads(_ROOT_PYPROJECT.read_text(encoding="utf-8"))["tool"]["pytest"]["ini_options"]["testpaths"]
-    return [
-        path.removeprefix(_PLUGIN_PREFIX)
-        for path in testpaths
-        if path.startswith(_PLUGIN_PREFIX) and (_REPO_ROOT / path).is_dir()
-    ]
+    spec = spec_from_file_location("dh_run_pytests", _PLUGIN_ROOT / "run_pytests.py")
+    assert spec is not None
+    assert spec.loader is not None
+    runner = module_from_spec(spec)
+    spec.loader.exec_module(runner)
+    return list(runner._DEFAULT_TEST_PATHS)
 
 
 def _probe_command(probe: Path, *args: str) -> list[str]:

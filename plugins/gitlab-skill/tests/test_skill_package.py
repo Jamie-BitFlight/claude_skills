@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import re
+import signal
 import ssl
 import subprocess
 import threading
@@ -21,7 +22,7 @@ from marko.inline import Link
 
 PLUGIN_ROOT = Path(__file__).parents[1]
 SKILL_ROOT = PLUGIN_ROOT / "skills" / "gitlab-skill"
-REPOSITORY_ROOT = PLUGIN_ROOT.parents[1]
+BOUNDED_TIMEOUT_SECONDS = 10
 
 OBSOLETE_STEPS_TERMS = ("CI/CD Steps", "`step:`", "`step.yml`", "${{ step_dir }}", "${{ job.")
 
@@ -839,25 +840,30 @@ def write_fake_release_command(path: Path) -> None:
 def run_bounded(
     arguments: list[str], cwd: Path, environment: dict[str, str] | None = None
 ) -> subprocess.CompletedProcess[str]:
-    """Run a subprocess through the repository's process-group timeout wrapper."""
-    return subprocess.run(
-        [
-            "uv",
-            "run",
-            "--script",
-            str(REPOSITORY_ROOT / "scripts" / "run_bounded.py"),
-            "--timeout-seconds",
-            "10",
-            "--",
-            *arguments,
-        ],
+    """Run a subprocess in its own process group and kill the whole group on timeout.
+
+    These tests already require a POSIX shell. The helper lives here rather than
+    calling the repository's ``scripts/run_bounded.py``, which a standalone copy of
+    this plugin does not have. A timeout returns 124, matching that script.
+    """
+    with subprocess.Popen(
+        arguments,
         cwd=cwd,
         env=environment,
         text=True,
-        capture_output=True,
-        check=False,
-        timeout=20,
-    )
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        start_new_session=True,
+    ) as process:
+        try:
+            stdout, stderr = process.communicate(timeout=BOUNDED_TIMEOUT_SECONDS)
+        except subprocess.TimeoutExpired:
+            os.killpg(process.pid, signal.SIGKILL)
+            stdout, stderr = process.communicate()
+            return subprocess.CompletedProcess(
+                arguments, 124, stdout, f"{stderr}timed out after {BOUNDED_TIMEOUT_SECONDS} seconds\n"
+            )
+    return subprocess.CompletedProcess(arguments, process.returncode, stdout, stderr)
 
 
 def create_http_git_repository(tmp_path: Path) -> Path:
