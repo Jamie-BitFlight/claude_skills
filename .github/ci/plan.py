@@ -83,7 +83,8 @@ LINT_CONFIG_NAMES = frozenset({
     ".gitignore",
     ".gitattributes",
 })
-FAST_PLUGIN_MARKER = "not e2e and not cross_backend and not integration and not research_vault"\nLANGUAGE_SUFFIXES = {
+FAST_PLUGIN_MARKER = "not e2e and not cross_backend and not integration and not research_vault"
+LANGUAGE_SUFFIXES = {
     "lint-python": {".py", ".pyi"},
     "lint-js": {".js", ".jsx", ".cjs", ".mjs", ".ts", ".tsx", ".mts", ".cts", ".json", ".jsonc", ".css"},
     "lint-markdown": {".md", ".markdown", ".mdown", ".mkd"},
