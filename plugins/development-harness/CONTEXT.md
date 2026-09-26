@@ -122,9 +122,9 @@ _Avoid_: treating provider identity or the metadata field named `source` as the 
 
 **Ready for design**:
 The state in which a Work Brief is sufficiently defined for architecture, design, and planning:
-its relevant question frontier is empty, shared understanding is confirmed, and its durable
-representation has been verified to preserve the normalized dataset. It is distinct from the
-backlog lifecycle status `groomed` and from RT-ICA planning decision tokens.
+its relevant question frontier is empty, the user has confirmed shared understanding, and its
+durable representation has been verified to preserve the normalized dataset. It is distinct from
+the backlog lifecycle status `groomed` and from RT-ICA planning decision tokens.
 _Avoid_: fully groomed, ready to implement
 
 **Interactive Work Brief intake**:

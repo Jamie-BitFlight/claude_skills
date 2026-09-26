@@ -141,7 +141,7 @@ evidence references, concerns, and the remaining question frontier.
 flowchart TD
     Entry{"entrypoint?"}
     Entry -->|/dh:work-brief| BriefIntake["Interactive Work Brief intake"]
-    BriefIntake --> BriefReady{"question frontier empty and<br>shared understanding confirmed?"}
+    BriefIntake --> BriefReady{"question frontier empty and<br>user confirmed shared understanding?"}
     BriefReady -->|No, input required| BriefInput(["Stop — needs input; preserve grilling state"])
     BriefReady -->|Yes| BriefCreate["Run Create lifecycle write"]
     BriefCreate --> BriefCreated{"reference, route, and<br>needs-grooming state verified?"}
@@ -281,10 +281,8 @@ The supported identifiers are `github`, `memory`, `sqlite`, and `beads`. See
 [Backend Providers](./backend-providers.md) for the Protocol reference, method groups, and
 configuration.
 
-The reserved `brief~<mandatory-2-3-word-slug>-<4-lowercase-hex>` prefix is the only
-reference-level exception. It selects the existing project-local SQLite adapter without changing
-the configured primary backend and never falls back remotely. All other references use the
-resolution order above.
+Reference-level routing is owned by [Backend Providers](./backend-providers.md). Lifecycle callers
+pass references unchanged and do not infer a provider from any identifier shape.
 
 ### Fields Stored Per Item
 
