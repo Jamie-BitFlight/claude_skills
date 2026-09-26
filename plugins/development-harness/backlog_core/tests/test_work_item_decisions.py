@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+from github import GithubException
 
 from backlog_core.backends.github_backend import GitHubBackend
 from backlog_core.backends.memory_backend import InMemoryBackend
@@ -15,11 +16,14 @@ from backlog_core.models import (
     BackendUnavailableError,
     BacklogError,
     BacklogItem,
+    BranchConflictError,
+    ContentConflictError,
     Output,
     ProviderItem,
     ProviderSnapshot,
     ReconcileRequest,
     ReconcileScope,
+    ValidationError,
 )
 from backlog_core.work_item_decisions import WorkItemDecisionContext
 
@@ -140,6 +144,83 @@ def test_explicit_cached_fallback_attempts_live_first_and_reads_cache_once() -> 
     assert target.provider.title == "cached title"
     assert target.provider_snapshot is None
     assert output.warnings == ["Live provider read failed; using cached work items: offline"]
+
+
+@pytest.mark.parametrize(
+    ("failure_path", "read_kind"),
+    [
+        pytest.param("repository", "bulk", id="repository-bulk"),
+        pytest.param("repository", "targeted", id="repository-targeted"),
+        pytest.param("content", "bulk", id="content-bulk"),
+        pytest.param("content", "targeted", id="content-targeted"),
+    ],
+)
+def test_explicit_cached_fallback_handles_real_provider_failures(
+    tmp_path: Path, mocker: MockerFixture, failure_path: str, read_kind: str
+) -> None:
+    repo = "owner/repository"
+    backend = GitHubBackend(repo=repo, cache=FileCache(tmp_path))
+    backend.reconcile(
+        ReconcileRequest(scope=ReconcileScope.INITIAL, repo=repo, apply_local_patches=False),
+        snapshot=ProviderSnapshot(
+            items=[provider_item("#7", "cached title")], sync_started_at="2026-09-24T00:00:00+00:00"
+        ),
+    )
+    expected_message = "provider offline" if failure_path == "repository" else "content offline"
+    client = mocker.Mock()
+    mocker.patch("backlog_core.gh_client.make_github_client", return_value=client)
+    if failure_path == "repository":
+        client.get_repo.side_effect = GithubException(503, {"message": expected_message})
+    else:
+        issue = {"number": 7}
+        repository = mocker.Mock(full_name=repo)
+        repository.get_branch.side_effect = GithubException(503, {"message": expected_message})
+        client.get_repo.return_value = repository
+        backend._fetch_issues_graphql = mocker.Mock(return_value=[issue])
+        backend._fetch_targeted_issues = mocker.Mock(return_value={"#7": issue})
+    live_fetch = mocker.spy(backend, "fetch_snapshot")
+    output = Output()
+    context = WorkItemDecisionContext(backend, repo=repo, allow_cached=True, output=output)
+
+    if read_kind == "bulk":
+        read = context.all()
+        assert [item.title for item in read.provider_items] == ["cached title"]
+        assert read.from_cache is True
+        expected_scope = ReconcileScope.INCREMENTAL
+    else:
+        target = context.select("#7", purpose="read")
+        assert target.provider is not None
+        assert target.provider.title == "cached title"
+        assert target.provider_snapshot is None
+        expected_scope = ReconcileScope.TARGETED
+
+    live_fetch.assert_called_once()
+    assert live_fetch.call_args.args[0].scope is expected_scope
+    assert len(output.warnings) == 1
+    assert expected_message in output.warnings[0]
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        pytest.param(ValidationError("invalid"), id="validation"),
+        pytest.param(BranchConflictError("head", "base"), id="branch-conflict"),
+        pytest.param(ContentConflictError("conflict"), id="content-conflict"),
+        pytest.param(RuntimeError("bug"), id="runtime"),
+    ],
+)
+def test_explicit_cached_fallback_does_not_hide_semantic_or_programming_errors(error: Exception) -> None:
+    backend = DecisionBackend(live_items=[], cached_items=[BacklogItem(title="cached title", issue="#7")])
+    backend.live_error = error
+    output = Output()
+    context = WorkItemDecisionContext(backend, allow_cached=True, output=output)
+
+    with pytest.raises(type(error)) as raised:
+        context.all()
+
+    assert raised.value is error
+    assert backend.cached_list_calls == 0
+    assert output.warnings == []
 
 
 def test_cached_fallback_withholds_rows_overlaid_by_the_pending_journal(tmp_path: Path, mocker: MockerFixture) -> None:

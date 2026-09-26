@@ -15,6 +15,7 @@ from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.file_cache import FileCache
 from backlog_core.models import (
     ArtifactManifest,
+    BackendUnavailableError,
     BacklogError,
     BacklogItem,
     ContentConflictError,
@@ -28,8 +29,10 @@ from backlog_core.models import (
     ProviderPatch,
     ReconcileRequest,
     ReconcileScope,
+    ValidationError,
 )
 from backlog_core.reconciliation import synchronized_fingerprint
+from github import GithubException
 from sam_schema.core.artifact_registry_client import ArtifactRegistryClient, PlanIndexUnavailableError
 from sam_schema.core.plan_id_index import PlanIndexEntry, _serialize_index_yaml
 
@@ -92,6 +95,44 @@ def test_github_sync_provider_normalizes_bounded_snapshot() -> None:
     assert snapshot.items[0].labels == ["feature"]
     assert snapshot.items[0].revision == root_revision("#1", "node-1", "body")
     assert backend._fetch_issues_graphql.call_args.kwargs["first"] == 100
+
+
+@pytest.mark.parametrize(
+    ("error", "retryable"),
+    [
+        pytest.param(GithubException(503, {"message": "provider offline"}), True, id="github-503"),
+        pytest.param(TimeoutError("transport timed out"), True, id="transport-timeout"),
+        pytest.param(ContentUnavailableError("content offline", retryable=True), True, id="content-unavailable"),
+    ],
+)
+def test_fetch_snapshot_normalizes_provider_availability(error: Exception, retryable: bool) -> None:
+    backend = GitHubBackend()
+    backend._work_items.fetch_snapshot = MagicMock(side_effect=error)
+
+    with pytest.raises(BackendUnavailableError) as unavailable:
+        backend.fetch_snapshot(ReconcileRequest(scope=ReconcileScope.INITIAL))
+
+    assert unavailable.value.__cause__ is error
+    assert unavailable.value.retryable is retryable
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        pytest.param(ContentNotFoundError("missing"), id="content-not-found"),
+        pytest.param(ContentConflictError("conflict"), id="content-conflict"),
+        pytest.param(ValidationError("invalid"), id="validation"),
+        pytest.param(RuntimeError("bug"), id="runtime"),
+    ],
+)
+def test_fetch_snapshot_does_not_normalize_semantic_or_programming_errors(error: Exception) -> None:
+    backend = GitHubBackend()
+    backend._work_items.fetch_snapshot = MagicMock(side_effect=error)
+
+    with pytest.raises(type(error)) as raised:
+        backend.fetch_snapshot(ReconcileRequest(scope=ReconcileScope.INITIAL))
+
+    assert raised.value is error
 
 
 def test_github_sync_provider_forwards_label_scope_to_snapshot_query() -> None:

@@ -29,7 +29,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Literal
 
 import dh_paths
-from github import GithubObject
+from github import GithubException, GithubObject
 
 from backlog_core import gh_client, github_branches, github_sync, rendering
 from backlog_core.artifact_provider import ArtifactBackend, GitHubGistArtifactProvider
@@ -48,11 +48,14 @@ from backlog_core.backends.github_contents import _GitHubContentsStore
 from backlog_core.backends.github_work_items import _TARGET_BATCH_SIZE, _GitHubReconciliation, _GitHubWorkItemSync
 from backlog_core.file_cache import FileCache
 from backlog_core.models import (
+    BackendUnavailableError,
     BacklogError,
     BacklogItem,
+    ContentNotFoundError,
     ContentQuery,
     ContentRecord,
     ContentRef,
+    ContentUnavailableError,
     ContentWrite,
     PatchResult,
     ProviderPatch,
@@ -63,6 +66,7 @@ from backlog_core.models import (
     ViewEnrichmentResult,
     parse_issue_number,
 )
+from backlog_core.sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS, SyncErrorKind, classify_sync_error
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -282,7 +286,20 @@ class GitHubBackend:
         Returns:
             Provider snapshot whose pagination remains private to this adapter.
         """
-        return self._work_items.fetch_snapshot(request)
+        try:
+            return self._work_items.fetch_snapshot(request)
+        except ContentNotFoundError:
+            raise
+        except BacklogError:
+            raise
+        except (GithubException, ContentUnavailableError, *RETRYABLE_TRANSIENT_EXCEPTIONS) as exc:
+            retryable = getattr(exc, "retryable", None)
+            if retryable is None:
+                kind = classify_sync_error(exc)
+                retryable = (
+                    True if kind is SyncErrorKind.RETRYABLE else False if kind is SyncErrorKind.NON_RETRYABLE else None
+                )
+            raise BackendUnavailableError(f"GitHub snapshot unavailable: {exc}", retryable=retryable) from exc
 
     def pending_work_items(self, repo: str = "") -> list[BacklogItem]:
         """Return configured-repository intent only when that repository is selected."""

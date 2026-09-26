@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from ._capability_gates import require_github_extras
 from .backend_types import GitHubExtras, RepositoryScopedCachedListing, WorkItemBackend
 from .models import (
+    BackendUnavailableError,
     BacklogError,
     BacklogItem,
     IssueStatus,
@@ -76,7 +77,9 @@ class WorkItemDecisionContext:
         try:
             snapshot = self._github.fetch_snapshot(request)
         except BacklogError as exc:
-            if not self.allow_cached:
+            if not self.allow_cached or (
+                type(exc) is not BacklogError and not isinstance(exc, BackendUnavailableError)
+            ):
                 raise
             self._warn_cached_fallback(exc)
             self._bulk = self._cached_items()
@@ -106,7 +109,9 @@ class WorkItemDecisionContext:
             try:
                 snapshot = self._targeted_snapshot(reference)
             except BacklogError as exc:
-                if not self.allow_cached:
+                if not self.allow_cached or (
+                    type(exc) is not BacklogError and not isinstance(exc, BackendUnavailableError)
+                ):
                     raise
                 self._warn_cached_fallback(exc)
                 read = self._cached_items()
