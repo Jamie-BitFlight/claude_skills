@@ -1,5 +1,8 @@
 # Backlog Item Groomed Schema
 
+> **Status: desired schema contract.** Implementation conformance is audited against this contract;
+> an observed gap belongs in the backlog and does not weaken the contract.
+
 **Purpose**: Define the structure of groomed content written into backlog item files. Grooming (backlog refinement) transforms items from vague ("this problem happens") to ready for planning — problem is clear, facts are verified, resources are mapped, effort is estimated, and blockers are surfaced. The agent does this autonomously: fact-checking claims, searching the codebase for related work, and identifying gaps. It does NOT produce architecture, task decomposition, or implementation plans — those happen in the SAM planning phase.
 
 **Scope**: This document defines the groomed *content* schema — frontmatter shape, body sections, and `## Groomed` subsections — passed through `backlog_groom(selector=..., section=..., content=...)` (`backlog_core/server.py:2550`). This content is identical regardless of which backend (github, sqlite, memory, beads) stores it; physical storage format and location are backend internals (see `plugins/development-harness/AGENTS.md` §Backend Providers) and are out of scope here. Frontmatter uses the research-style `metadata:` block (aligned with `./research/` entries). Body has no duplication of frontmatter — only extra fields when present, plus `## Groomed` when groomed.

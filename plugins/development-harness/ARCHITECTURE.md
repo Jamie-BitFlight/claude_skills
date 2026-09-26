@@ -20,9 +20,12 @@ user-invocable ad-hoc entrypoint: an offline, one-off workflow that follows
 `/dh:work-backlog-item` while bypassing the configured backend to create a local-only backlog item.
 It covers feature development, bug fixes, and documentation changes in a project without a
 configured DH backend, or work that should proceed now without first being filed in the configured
-backlog. The resulting item is a Work Brief and follows the ordinary downstream lifecycle.
+backlog. The resulting local backlog item stores the Work Brief and follows the ordinary downstream
+lifecycle.
 Interactive intake clarifies and investigates the source until the Work Brief is ready for design;
 unresolved user input or persistence failure stops the handoff instead of claiming readiness.
+After that handoff, Design, Plan, Decomposition, and Act use their common contracts without user
+interaction unless a genuine blocker or `needs-input` decision occurs.
 
 **Create.** Steps through creating a requirement, feature or defect without speculating how it
 should work in the system before understanding the system as a whole. Produces the backlog item in

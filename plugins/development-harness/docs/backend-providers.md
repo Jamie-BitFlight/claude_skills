@@ -1,5 +1,8 @@
 # Development Harness Backend Providers
 
+> **Status: desired architecture contract.** Implementation conformance is audited against this
+> contract; an observed gap belongs in the backlog and does not weaken the contract.
+
 This document is the backend contract for the development harness. Configure one primary backend
 for a process. The routing boundary adds only the reserved local Work Brief overlay and keeps every
 logical record on its selected route.
@@ -208,6 +211,7 @@ Creation is create-only. A collision never overwrites, retries automatically, fa
 update, or becomes bypassable with `force`. The error identifies the colliding reference and
 existing title, reports `retryable: false`, directs the caller to update or groom that reference
 for the same work, and directs the caller to invoke creation again for distinct work.
+Existing update and groom operations continue to modify the exact reference the caller supplies.
 
 For caller-assigned references, the provider boundary performs creation as one atomic
 insert-if-absent operation. A frontend existence check followed by an ordinary write does not
@@ -219,8 +223,9 @@ Completed local briefs remain until explicit cleanup.
 
 ### Listing provenance
 
-A mixed listing may contain primary-provider and local-overlay records. Every record carries route
-provenance so it remains attributable and subsequent operations use the same owner.
+The provider-neutral list operation queries the configured primary and the local overlay; when
+SQLite is already primary, it queries that adapter only once. Every record carries route provenance
+so it remains attributable and subsequent operations use the same owner.
 
 On a never-synced remote cache, `operations.list_items()` performs one
 unlabeled, fetch-only reconciliation before serving the listing. The unlabeled
@@ -407,6 +412,9 @@ routing and configuration context, then calls the selected adapter's `status()`.
 returns `availability` plus an extensible `details` object. SQLite details may include the database
 path and record counts; GitHub details may include authentication state, username, and offline-cache
 state.
+
+This adapter-owned `status()` evolves or replaces the existing `probe_backend_status()` seam; no
+parallel provider-status mechanism is added.
 
 Online adapters check availability and authentication under one 30-second overall timeout.
 Reachable status exits zero. Timeout, authentication, rate-limit, and provider errors exit nonzero
