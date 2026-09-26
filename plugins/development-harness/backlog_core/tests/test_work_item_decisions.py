@@ -180,6 +180,7 @@ def test_cached_fallback_selects_the_requested_repository_baseline(tmp_path: Pat
             items=[provider_item("#7", "repository B item")], sync_started_at="2026-02-01T00:00:00+00:00"
         ),
     )
+    backend.put_work_item(BacklogItem(title="repository A queued intent", issue="#7"), repo=repo_a)
     mocker.patch.object(backend, "fetch_snapshot", side_effect=BackendUnavailableError("offline"))
 
     target = WorkItemDecisionContext(backend, repo=repo_b, allow_cached=True).select("#7", purpose="mutation")

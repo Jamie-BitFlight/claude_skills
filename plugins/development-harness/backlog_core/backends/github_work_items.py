@@ -721,7 +721,9 @@ class _GitHubReconciliation:
         )
         records_by_reference = {item.reference: LogicalCacheRecord(key=key, item=item) for key, item in batch.snapshots}
         for mutation in (
-            pending_work_items if pending_work_items is not None else self._cache._pending_work_item_mutations()
+            pending_work_items
+            if pending_work_items is not None
+            else self._cache._pending_work_item_mutations(selected_repo, default_repo=self._default_repo)
         ):
             snapshot = records_by_reference.get(mutation.item.reference)
             item = mutation.item

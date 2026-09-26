@@ -5139,7 +5139,7 @@ def pull_by_selector(
 def pull_items(
     repo: str = "", dry_run: bool = False, force: bool = False, diff: bool = False, output: Output | None = None
 ) -> dict[str, int | bool | str | list[str]]:
-    """Reconcile linked issue content through the configured sync backend.
+    """Reconcile issue content through the configured sync backend.
 
     Also auto-migrates P0/P1 items that lack GitHub Issues by creating them.
     Merges by section — keeps longer version of each section.
@@ -5150,9 +5150,10 @@ def pull_items(
     """
     out = output or Output()
     backend = get_config().backend
+    supports_github_extras = getattr(backend, "supports_github_extras", False)
     items = (
         require_github_extras(backend, "pending_work_items").pending_work_items(repo)
-        if getattr(backend, "supports_github_extras", False)
+        if supports_github_extras
         else backend.list_work_items()
     )
 
@@ -5166,20 +5167,20 @@ def pull_items(
         # Re-parse after migration to pick up updated issue numbers
         items = (
             require_github_extras(backend, "pending_work_items").pending_work_items(repo)
-            if getattr(backend, "supports_github_extras", False)
+            if supports_github_extras
             else backend.list_work_items()
         )
 
     candidates = [it for it in items if it.issue and not it.skip]
 
-    if not candidates:
+    if not candidates and not (supports_github_extras and isinstance(backend, SyncProvider)):
         out.info("No items with GitHub issue numbers found.")
         return {"pulled": 0, **out.to_dict()}
 
     if isinstance(backend, SyncProvider):
         result = backend.reconcile(
             ReconcileRequest(
-                scope=ReconcileScope.LINKED,
+                scope=ReconcileScope.INCREMENTAL if supports_github_extras else ReconcileScope.LINKED,
                 repo=repo,
                 references=list(dict.fromkeys(item.issue for item in candidates)),
                 dry_run=dry_run,
@@ -5188,7 +5189,7 @@ def pull_items(
             )
         )
         out.info(
-            f"Reconciled linked items: {result.fetched_pages} pages, {result.fetched_items} items, "
+            f"Reconciled items: {result.fetched_pages} pages, {result.fetched_items} items, "
             f"{result.local_updates} local updates, {result.provider_patches} patches, {result.no_ops} no-ops, "
             f"{result.conflicts} conflicts, {result.failures} failures."
         )

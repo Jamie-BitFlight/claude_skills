@@ -3450,6 +3450,21 @@ class TestStrikeEntryOperation:
 
 
 class TestPullItemsEntryAwareMerge:
+    def test_pull_with_empty_journal_reconciles_live_repository(self, mocker: MockerFixture) -> None:
+        from backlog_core.backend_protocol import get_config
+
+        backend = cast("Any", get_config().backend)
+        mocker.patch.object(backend, "pending_work_items", return_value=[])
+        mocker.patch.object(backend, "list_work_items", side_effect=AssertionError("cache queried during live pull"))
+        backend.reconcile_result = ReconcileResult(local_updates=1)
+
+        result = ops.pull_items(repo="owner/repository")
+
+        assert (result["pulled"], backend.reconcile_requests) == (
+            1,
+            [ReconcileRequest(scope=ReconcileScope.INCREMENTAL, repo="owner/repository")],
+        )
+
     def test_pull_dry_run_returns_entry_diff(self, mocker: MockerFixture) -> None:
         from backlog_core.backend_protocol import get_config
 
@@ -3460,7 +3475,7 @@ class TestPullItemsEntryAwareMerge:
         result = ops.pull_items(dry_run=True, diff=True)
         assert result["diff"] == "entry diff"
         assert backend.reconcile_requests[-1] == ReconcileRequest(
-            scope=ReconcileScope.LINKED, references=["#42"], dry_run=True, include_diff=True
+            scope=ReconcileScope.INCREMENTAL, references=["#42"], dry_run=True, include_diff=True
         )
 
     def test_pull_entry_aware_merge_keeps_struck(self) -> None:
