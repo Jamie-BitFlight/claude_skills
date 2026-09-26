@@ -2,7 +2,7 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Derive CI work from the event diff and pytest's authoritative testpaths.
+"""Derive CI work from the event diff and plugin-owned pytest runners.
 
 The bootstrap deliberately uses only the standard library: selecting work must
 not install the repository's application and test dependencies.
@@ -27,6 +27,7 @@ class Shard(TypedDict):
     name: str
     paths: list[str]
     marker: str
+    runner: str
 
 
 class Matrix(TypedDict):
@@ -82,6 +83,7 @@ LINT_CONFIG_NAMES = frozenset({
     ".gitignore",
     ".gitattributes",
 })
+FAST_PLUGIN_MARKER = "not e2e and not cross_backend and not integration and not research_vault"
 LANGUAGE_SUFFIXES = {
     "lint-python": {".py", ".pyi"},
     "lint-js": {".js", ".jsx", ".cjs", ".mjs", ".ts", ".tsx", ".mts", ".cts", ".json", ".jsonc", ".css"},
@@ -122,7 +124,7 @@ def valid_path(value: str) -> str:
 
 
 def read_pytest_config(root: Path) -> tuple[dict[str, list[str]], list[str]]:
-    """Read all configured suites and shared plugin import roots; reject drift.
+    """Discover plugin runners and repository-owned test roots.
 
     Returns:
         Suite roots grouped by owner, and shared plugin import roots.
@@ -131,14 +133,17 @@ def read_pytest_config(root: Path) -> tuple[dict[str, list[str]], list[str]]:
     options = config["tool"]["pytest"]["ini_options"]
     testpaths = options["testpaths"]
     if not isinstance(testpaths, list) or not testpaths:
-        raise ValueError("pytest testpaths must be a non-empty list")
-    suites: dict[str, list[str]] = {}
+        raise ValueError("repository pytest testpaths must be a non-empty list")
+    suites: dict[str, list[str]] = {"global": []}
     for value in testpaths:
         path = valid_path(value)
+        if plugin_owner(path):
+            raise ValueError(f"plugin test topology belongs in run_pytests.py, not root testpaths: {path}")
         if not (root / path).exists():
             raise ValueError(f"Configured testpath does not exist: {path}")
-        owner = plugin_owner(path) or "global"
-        suites.setdefault(owner, []).append(path)
+        suites["global"].append(path)
+    for runner in sorted((root / "plugins").glob("*/run_pytests.py")):
+        suites[runner.parent.name] = [runner.relative_to(root).as_posix()]
     imports = [valid_path(path) for path in options.get("pythonpath", []) if plugin_owner(path)]
     return suites, imports
 
@@ -257,25 +262,25 @@ def build_plan(
     reasons.extend(f"Shared/configuration input: {path}" for path in shared)
     reasons.extend(f"Shared Python import/fixture input: {path}" for path in changed if shared_source(path, imports))
     unit: list[Shard] = [
-        {"name": owner, "paths": targets, "marker": ""}
+        {"name": owner, "paths": ([] if owner != "global" else targets), "marker": (FAST_PLUGIN_MARKER if owner != "global" else ""), "runner": (targets[0] if owner != "global" else "")}
         for owner, targets in sorted(suites.items())
         if full_tests or owner == "global" or owner in owners
     ]
     integration: list[Shard] = []
     if full_tests or "development-harness" in owners:
         integration.append({
-            "name": "development-harness", "paths": ["plugins/development-harness/tests"],
-            "marker": "integration and not research_vault",
+            "name": "development-harness", "paths": ["tests"],
+            "marker": "integration and not research_vault", "runner": "plugins/development-harness/run_pytests.py",
         })
     if full_tests or any(under(path, "research") for path in changed):
         integration.append({
             "name": "research-backlinks", "paths": ["tests/research_backlinks"],
-            "marker": "integration and not research_vault",
+            "marker": "integration and not research_vault", "runner": "",
         })
     if full_tests:
         integration.append({
             "name": "rebase-publication", "paths": ["tests/test_rebase_publication_identity.py"],
-            "marker": "integration",
+            "marker": "integration", "runner": "",
         })
     validation = ["plugins", ".claude"] if full_checks else [f"plugins/{owner}" for owner in sorted(owners)]
     validation = [path for path in validation if (root / path).is_dir()]

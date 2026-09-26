@@ -1,6 +1,6 @@
 {
   "name": "gitlab-skill",
-  "version": "2.4.7",
+  "version": "2.4.8",
   "description": "Source-backed GitLab CI/CD, glab CLI, automatic release, component, Function, GLFM, and gitlab-ci-local guidance.",
   "author": {
     "name": "Jamie Nelson",

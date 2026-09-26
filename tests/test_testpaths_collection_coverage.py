@@ -22,6 +22,7 @@ subprocess raises and these tests error out; they never pass for want of evidenc
 
 from __future__ import annotations
 
+import ast
 import fnmatch
 import subprocess
 from collections.abc import Iterable, Mapping
@@ -78,16 +79,33 @@ def _tracked_test_files(patterns: Iterable[str]) -> set[str]:
     return {path for path in tracked if path and any(fnmatch.fnmatch(Path(path).name, pat) for pat in patterns)}
 
 
+def _plugin_runner_testpaths() -> list[str]:
+    """Return plugin test roots declared by literal TEST_PATHS runner constants."""
+    roots: list[str] = []
+    for runner in sorted((_REPO_ROOT / "plugins").glob("*/run_pytests.py")):
+        tree = ast.parse(runner.read_text(encoding="utf-8"), filename=str(runner))
+        assignment = next(
+            (node for node in tree.body if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id in {"TEST_PATHS", "_DEFAULT_TEST_PATHS"} for t in node.targets)),
+            None,
+        )
+        assert assignment is not None, f"{runner.relative_to(_REPO_ROOT)} has no literal test-path contract"
+        values = ast.literal_eval(assignment.value)
+        assert isinstance(values, (list, tuple))\n        assert values
+        plugin = runner.parent.relative_to(_REPO_ROOT)
+        roots.extend((plugin / value).as_posix() for value in values)
+    return roots
+
+
 def _derived_inputs(config: pytest.Config) -> tuple[list[str], set[str]]:
-    """Return the live ``testpaths`` and the tracked test files, proven usable first.
+    """Return all authoritative test roots and tracked test files, proven usable first.
 
     Guards against the vacuous pass: if either input came back empty, every comparison
     below would succeed while having examined nothing. "All clear" and "I could not
     look" must not produce the same verdict.
     """
-    testpaths = list(config.getini("testpaths"))
+    testpaths = [*config.getini("testpaths"), *_plugin_runner_testpaths()]
     patterns = list(config.getini("python_files"))
-    assert testpaths, "pytest reports no testpaths, so nothing here can judge collection coverage"
+    assert testpaths, "pytest and plugin runners report no test roots, so nothing here can judge collection coverage"
     assert patterns, "pytest reports no python_files patterns, so no file can be recognised as a test"
 
     test_files = _tracked_test_files(patterns)
@@ -100,7 +118,7 @@ def _derived_inputs(config: pytest.Config) -> tuple[list[str], set[str]]:
 
 
 def test_every_test_file_is_inside_a_configured_testpath(pytestconfig: pytest.Config) -> None:
-    """Each tracked test file sits under a ``testpaths`` entry or an explained exclusion."""
+    """Each tracked test file sits under a repo testpath or plugin runner root, or an explained exclusion."""
     testpaths, test_files = _derived_inputs(pytestconfig)
 
     unreachable = unreachable_test_files(testpaths, test_files, _NOT_OUR_TESTS)

@@ -1216,7 +1216,8 @@ def test_adapter_indexes_create_real_branch_boundaries() -> None:
         assert references.joinpath(destination).is_file(), destination
 
 
-def test_default_pytest_collection_includes_plugin_tests() -> None:
-    """The normal repository suite must collect this plugin's tests."""
-    pyproject = tomllib.loads((PLUGIN_ROOT.parents[1] / "pyproject.toml").read_text(encoding="utf-8"))
-    assert "plugins/gitlab-skill/tests" in pyproject["tool"]["pytest"]["ini_options"]["testpaths"]
+def test_plugin_owns_pytest_collection_entrypoint() -> None:
+    """The plugin test boundary is executable without root testpath registration."""
+    runner = PLUGIN_ROOT / "run_pytests.py"
+    assert runner.is_file()
+    assert '"tests"' in runner.read_text(encoding="utf-8")
