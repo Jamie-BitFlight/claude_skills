@@ -624,3 +624,148 @@ class TestOverBudgetMeasurementCountsClearedBodySoleContent:
             "the structured 'RT-ICA' key matched the request, so this is NOT a section_filter_miss — "
             "only the budget gate fires here."
         )
+
+
+# ---------------------------------------------------------------------------
+# The description is measured once, not once per delivered copy
+# ---------------------------------------------------------------------------
+
+
+def _description_whose_second_copy_breaches_the_budget() -> str:
+    """Grow a description until a second copy of it would push the payload over budget.
+
+    Sized against ``_VIEW_TOKEN_BUDGET`` rather than a transcribed number, so this
+    stays a test of the gate's arithmetic if the budget is ever retuned.  The loop
+    stops at the first crossing, which leaves a single copy comfortably under the
+    budget — asserted as a premise by the tests below rather than assumed.
+    """
+    from backlog_core import server
+
+    sentence = "The agent records the observed command output as the evidence for this step."
+    description = sentence
+
+    def _both_copies_fit(text: str) -> bool:
+        return server._token_count(json.dumps({"description": text, "body": text})) <= server._VIEW_TOKEN_BUDGET
+
+    while _both_copies_fit(description):
+        # No trailing whitespace: ``render_sections_as_body`` strips the description
+        # before emitting it, so a padded value would not appear in ``body`` verbatim.
+        description = f"{description} {sentence}"
+    return description
+
+
+def _large_description_view_result(description: str) -> ViewItemResult:
+    """Build the full-content view result a cache-served item with *description* yields.
+
+    Goes through ``view_result_from_local_item`` and ``_populate_yaml_item_content``
+    — the two production steps that put the description in the response twice, once
+    as the ``description`` field and once under the ``## Description`` heading in
+    ``body`` — rather than hand-assembling the payload.
+    """
+    from backlog_core.models import BacklogItem, Entry, Section
+    from backlog_core.parsing import view_result_from_local_item
+
+    item = BacklogItem(
+        title="Issue 2495",
+        description=description,
+        priority="P1",
+        item_type="Feature",
+        status="open",
+        added="2026-01-01",
+        sections={"fact_check": Section(entries=[Entry(id="2026-01-01T00:00:00Z", content="fact content")])},
+    )
+    result = view_result_from_local_item(item)
+    operations._populate_yaml_item_content(result, item, None)
+    return result
+
+
+class TestOverBudgetMeasurementCountsTheDescriptionOnce:
+    """The over-budget gate must not double-count the description against the budget.
+
+    ``render_sections_as_body`` emits ``BacklogItem.description`` under a
+    ``## Description`` heading in ``body`` while ``ViewItemResult.description``
+    still carries it, so the payload delivers it twice.  Counting both copies
+    halves the effective budget for a description-heavy item — and this
+    repository's convention gives a behavioural backlog item the full procedural
+    description, so descriptions of several thousand characters are normal.  An
+    item over the halved budget was answered with the compact section directory
+    instead of the content the caller asked for: silent truncation of a requested
+    read, which ``AGENTS.md``'s "No Invented Limits" forbids.
+    """
+
+    def test_over_budget_measurement_blanks_the_duplicated_description(self) -> None:
+        """The measured payload counts the description once, so the item stays under budget."""
+        from backlog_core import server
+
+        description = _description_whose_second_copy_breaches_the_budget()
+        payload = _large_description_view_result(description).model_dump()
+
+        assert payload.get("description") == description, (
+            "premise: the response must still deliver the description in its own field."
+        )
+        body = payload.get("body")
+        assert isinstance(body, str), f"premise: 'body' must be a str; got {type(body).__name__}."
+        assert description in body, (
+            "premise: the response body must carry the description under '## Description' — that "
+            "duplication is what the measurement has to subtract."
+        )
+        verbatim_tokens = server._token_count(json.dumps(payload))
+        assert verbatim_tokens > server._VIEW_TOKEN_BUDGET, (
+            "premise: with both copies counted the payload must EXCEED the budget; got "
+            f"{verbatim_tokens} tokens.  If not, the test no longer exercises the double-count."
+        )
+
+        measured = server._view_payload_token_count(payload)
+
+        assert measured <= server._VIEW_TOKEN_BUDGET, (
+            "the measurement must count the description once — 'body' already carries it, so the "
+            f"'description' field is the duplicate.  Got {measured} tokens against a budget of "
+            f"{server._VIEW_TOKEN_BUDGET}, which trips the directory for an item whose single copy "
+            "of its content fits."
+        )
+
+    def test_over_budget_gate_returns_a_large_description_inline(self, mocker: MockerFixture) -> None:
+        """backlog_view delivers the content rather than the compact directory.
+
+        End-to-end through the gate: an item whose description fits the budget once
+        must be answered with its content.  Pre-fix the doubled measurement returned
+        the section directory, dropping the description the caller asked to read.
+        """
+        from backlog_core import server
+
+        description = _description_whose_second_copy_breaches_the_budget()
+        result = _large_description_view_result(description)
+        mocker.patch.object(server.operations, "view_item", side_effect=lambda **_kwargs: result)
+
+        resp = _call_view(selector="2495", summary=False)
+
+        assert resp.get("_over_budget") is not True, (
+            "an item whose content fits the budget when counted once must be delivered inline, not "
+            "replaced by the compact section directory.  Got keys: " + repr(sorted(resp)) + "."
+        )
+        assert description in _resp_body(resp), (
+            "the delivered body must still carry the description the caller asked to read."
+        )
+
+    def test_over_budget_measurement_counts_a_description_the_body_omits(self) -> None:
+        """A narrowed body that drops the description leaves it a sole copy to count in full.
+
+        The de-duplication is containment-checked, not assumed: a section filter or a
+        page can ship a ``body`` the description is not part of, and subtracting it
+        there would under-count the payload the caller actually receives.
+        """
+        from backlog_core import server
+
+        description = _description_whose_second_copy_breaches_the_budget()
+        payload = _large_description_view_result(description).model_dump()
+        payload["body"] = "## Fact-Check\n\nfact content\n\n"
+        assert description not in payload["body"], "premise: the narrowed body must omit the description."
+
+        measured = server._view_payload_token_count(payload)
+        already_blank = server._view_payload_token_count({**payload, "description": ""})
+
+        assert measured > already_blank, (
+            "the description is not in this body, so it is the sole delivered copy and must weigh "
+            f"against the budget; got {measured} tokens, the same as the {already_blank} measured for "
+            "the payload whose description field is already empty."
+        )

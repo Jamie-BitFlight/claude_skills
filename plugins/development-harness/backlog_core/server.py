@@ -331,20 +331,25 @@ def _token_count(serialised: str) -> int:
 def _view_payload_token_count(full_response: dict[str, object]) -> int:
     """Token-count the delivered ``backlog_view`` payload without double-counting.
 
-    The full-content view can return section content twice: once in
-    ``full_response["body"]`` and again inside each
-    ``full_response["sections"][name]["entries"][i]["content"]``. Counting the
-    serialised payload verbatim would double that content's weight and could
-    falsely trip the over-budget directory.
+    The full-content view can return the same text twice. Section content
+    appears in ``full_response["body"]`` and again inside each
+    ``full_response["sections"][name]["entries"][i]["content"]``; the item's
+    description appears in ``full_response["description"]`` and again under the
+    ``## Description`` heading ``operations.render_sections_as_body`` emits into
+    ``body``. Counting the serialised payload verbatim would double each of
+    those and could falsely trip the over-budget directory — which for a
+    description of a few thousand characters (this repository's convention for a
+    behavioural backlog item) means a plain ``backlog_view`` returning the
+    compact section directory in place of the content the caller asked for.
 
-    The per-entry ``content`` is blanked for this measurement only when
-    ``body`` is non-empty (so it already carries that text once). When
+    Both de-duplications are conditional on ``body`` being non-empty, so they
+    subtract only a copy the caller demonstrably receives elsewhere. When
     ``body`` is empty — the structured-key drift path, where a structured
     ``sections`` match had no rendered body header to populate it — the
-    per-entry ``content`` is the only delivered copy and must be measured in
-    full, or a genuinely over-budget response would slip through the gate.
-    ``body`` itself is always measured in full, so a body that alone exceeds
-    the budget still gates.
+    per-entry ``content`` and the ``description`` are the only delivered copies
+    and must be measured in full, or a genuinely over-budget response would slip
+    through the gate. ``body`` itself is always measured in full, so a body that
+    alone exceeds the budget still gates.
 
     The returned payload is never mutated — only this measurement copy.
 
@@ -354,20 +359,25 @@ def _view_payload_token_count(full_response: dict[str, object]) -> int:
     Returns:
         Token count of the de-duplicated measurement copy.
     """
-    raw_sections = full_response.get("sections")
-    if not isinstance(raw_sections, dict) or not raw_sections:
-        # No structured sections dict to de-duplicate against — measure verbatim.
-        return _token_count(json.dumps(full_response))
-    body = full_response.get("body")
-    if not (isinstance(body, str) and body):
+    raw_body = full_response.get("body")
+    body = raw_body if isinstance(raw_body, str) else ""
+    if not body:
         # ``body`` is empty/cleared (e.g. the structured-key drift path): the
-        # per-entry ``content`` under ``sections`` is the SOLE delivered copy, so
-        # it must be counted in full.  Measure the payload verbatim.
+        # per-entry ``content`` under ``sections`` and the ``description`` are the
+        # SOLE delivered copies, so both must be counted in full.  Measure verbatim.
         return _token_count(json.dumps(full_response))
-    # ``body`` is non-empty and carries the content once; blank the redundant
-    # per-entry ``content`` so it is not double-counted against the budget.
     measured = dict(full_response)
-    measured["sections"] = {name: _section_without_entry_content(sec) for name, sec in raw_sections.items()}
+    # ``body`` is non-empty and carries each duplicated field's text once.
+    raw_description = full_response.get("description")
+    description = raw_description.strip() if isinstance(raw_description, str) else ""
+    if description and description in body:
+        # Containment-checked rather than assumed: a view path that narrows ``body``
+        # (a section filter, a page) can ship a ``body`` the description is NOT part
+        # of, and there the ``description`` field is a sole copy to count in full.
+        measured["description"] = ""
+    raw_sections = full_response.get("sections")
+    if isinstance(raw_sections, dict) and raw_sections:
+        measured["sections"] = {name: _section_without_entry_content(sec) for name, sec in raw_sections.items()}
     return _token_count(json.dumps(measured))
 
 
