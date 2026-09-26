@@ -113,6 +113,10 @@ bypassing the configured backend to create a local-only item. It supports featur
 documentation work in projects without a configured DH backend, and immediate work that should not
 first be filed remotely. The resulting Work Brief enters the same Groom → Work lifecycle.
 
+Work Brief intake performs the normal Create and Groom lifecycle writes, verifies the persisted
+Groom result by reading it back, and only then enters Work. It does not bypass or add a stage to the
+ordinary `create` → `groom` → `work` order.
+
 Interactive intake opens a scratch state file, names its exact path at the start of every grilling
 response, and reads and updates it every turn. It establishes the observable current problem or
 desired outcome and current relevance, then gathers only the clarification, discovery, research,
@@ -124,7 +128,7 @@ and the remaining question frontier.
 
 | Stage | Route | Workflow file | Output | Status write |
 |---|---|---|---|---|
-| Work Brief intake | `/dh:work-brief` | Interactive intake | Local Work Brief ready for design | Normal Create and Groom lifecycle writes |
+| Work Brief intake | `/dh:work-brief` | Interactive intake | Verified local Work Brief ready for design, then entry to Work | `needs-grooming` from Create, then `groomed` from Groom |
 | Create | `create` | `create/scope.md`, `create/start.md` | `item_ref` from `backlog_add` | `needs-grooming` |
 | Groom | `groom` | `groom/start.md` | Groomed sections on the item | `groomed` |
 | Work | `work` | `work/start.md` | Plan address on the item, written by `backlog_update(plan=...)` | `in-progress`, before any gate runs |
@@ -135,10 +139,13 @@ and the remaining question frontier.
 flowchart TD
     Entry{"entrypoint?"}
     Entry -->|/dh:work-brief| BriefIntake["Interactive Work Brief intake"]
-    BriefIntake --> BriefReady{"question frontier empty,<br>shared understanding confirmed,<br>and persisted copy verified?"}
+    BriefIntake --> BriefReady{"question frontier empty and<br>shared understanding confirmed?"}
     BriefReady -->|No, input required| BriefInput(["Stop — needs input; preserve grilling state"])
-    BriefReady -->|No, persistence failed| BriefBlocked(["Stop — blocked; preserve grilling state"])
-    BriefReady -->|Yes| WorkGate
+    BriefReady -->|Yes| BriefCreate["Run Create lifecycle write"]
+    BriefCreate --> BriefGroom["Run Groom lifecycle write"]
+    BriefGroom --> BriefPersisted{"Create and Groom succeeded,<br>and persisted copy verified?"}
+    BriefPersisted -->|No| BriefBlocked(["Stop — blocked; preserve grilling state"])
+    BriefPersisted -->|Yes| WorkGate
     Entry -->|/dh:work-backlog-item| Route
 
     Route{"route value?"}
@@ -164,10 +171,11 @@ flowchart TD
     WorkGate -->|No| Work["work/start.md"]
 ```
 
-Ready for design is reached only when the question frontier needed by architecture and planning is
-empty, the user confirms shared understanding, and persisted grooming provenance passes read-back.
-Missing input records the unanswered questions and ends `needs-input`; persistence or verification
-failure ends blocked. Both outcomes preserve grilling state and claim no readiness.
+Ready for design is reached only after the question frontier needed by architecture and planning is
+empty, the user confirms shared understanding, Create and Groom complete in order, and persisted
+grooming provenance passes read-back. Missing input records the unanswered questions and ends
+`needs-input`; Create, Groom, persistence, or verification failure ends blocked. Both outcomes
+preserve grilling state and claim no readiness.
 
 ### Checks inside the stages
 
