@@ -88,7 +88,7 @@ lighter guidance.
 ```yaml
 - when: "code changes touch linted modules or linting errors are reported in scope"
   use:
-    - holistic-linting:linting-root-cause-resolver
+    - holistic-linting:holistic-linting
 ```
 
 ---
@@ -102,7 +102,7 @@ lighter guidance.
 (B) Standard — major type errors only, warnings tolerated
 (C) Advisory — type errors are informational, not blocking"
 
-**Why it matters**: Strict type-checked projects need the linting resolver skill to fix type
+**Why it matters**: Strict type-checked projects need the holistic-linting skill to fix type
 errors to root cause. Advisory projects benefit from typing guidance but not blocking workflows.
 
 **Default if skipped**: C — Advisory
@@ -116,7 +116,7 @@ errors to root cause. Advisory projects benefit from typing guidance but not blo
 - when: "Python code changes involve typed modules, require new type annotations, or produce
   type checker errors"
   use:
-    - holistic-linting:linting-root-cause-resolver
+    - holistic-linting:holistic-linting
 ```
 
 ---
@@ -166,7 +166,8 @@ alongside implementation skills so docs are written in the same pass, not as a f
 ```yaml
 - when: "adding or modifying public functions, classes, modules, or API endpoints"
   use:
-    - documentation-expert
+    # Resolve from this run's candidate_skills, same as Q1 — no documentation skill ships in
+    # this marketplace; note the gap if none was found.
 ```
 
 ---
@@ -273,8 +274,8 @@ detected in*.py files
 - when: "adding database tables, modifying schema, writing SQL queries, or implementing
   schema migrations"
   use:
-    - sqlite-database-expert
-    - sql-optimization
+    # Resolve from this run's candidate_skills, same as Q1 — no database or SQL skill ships in
+    # this marketplace; note the gap if none was found.
 ```
 
 ---
@@ -300,12 +301,12 @@ shadcn variants vs MUI sx props are not interchangeable).
 ```yaml
 - when: "implementing React UI components, dashboard layouts, or interactive controls"
   use:
-    - frontend-design
-    - shadcn
+    # Resolve from this run's candidate_skills, same as Q1 — the installed frontend-design and
+    # shadcn/ui skills. No such skill ships in this marketplace; note the gap if none was found.
 ```
 
-*(For answer B: replace `shadcn` with `radix-ui-design-system` if available in your
-installed skills. For C: use `frontend-design` alone.)*
+*(For answer B: resolve a Radix UI design-system skill instead of shadcn/ui. For C: resolve a
+frontend-design skill alone.)*
 
 ---
 
