@@ -307,11 +307,7 @@ def test_empty_body_approval_and_rejection_are_normalized_inputs() -> None:
     ]
 
     normalized = review_inputs(
-        reviews,
-        own_login="agent",
-        pull_author_login="author",
-        head_revision="abc123",
-        is_empty_codex=lambda _review: False,
+        reviews, pull_author_login="author", head_revision="abc123", is_empty_codex=lambda _review: False
     )
 
     assert normalized[0].kinds == {"approval"}

@@ -108,7 +108,8 @@ def inline_inputs(
                     source_kind="review_comment",
                     kinds={"comment"},
                     location="inline",
-                    direction="outbound" if login == own_login else "inbound",
+                    # A thread opener is review input whoever wrote it; only an own reply is a response.
+                    direction="outbound" if index > 0 and login == own_login else "inbound",
                     actor=actor(
                         comment.author,
                         pull_author_login=pull_author_login,
@@ -140,7 +141,6 @@ def inline_inputs(
 def review_inputs(
     reviews: list[ReviewNode],
     *,
-    own_login: str,
     pull_author_login: str | None,
     head_revision: str,
     is_empty_codex: Callable[[ReviewNode], bool],
@@ -149,7 +149,6 @@ def review_inputs(
 
     Args:
         reviews: Every fetched submitted review.
-        own_login: Authenticated GitHub login used to determine direction.
         pull_author_login: Provider-reported pull-request author.
         head_revision: Current sampled remote head.
         is_empty_codex: Exact predicate for Codex's no-findings template.
@@ -170,7 +169,6 @@ def review_inputs(
             kinds.add("rejection")
         if not kinds:
             continue
-        login = review.author.login if review.author is not None else None
         inputs.append(
             ReviewInput.model_validate({
                 "input_id": f"github:review:{review.id}",
@@ -179,7 +177,8 @@ def review_inputs(
                 "source_kind": "review",
                 "kinds": kinds,
                 "location": "top_level",
-                "direction": "outbound" if login == own_login else "inbound",
+                # A submitted review is review input even when the authenticated account wrote it.
+                "direction": "inbound",
                 "actor": actor(review.author, pull_author_login=pull_author_login, observed_role="reviewer"),
                 "body": review.body,
                 "stable_reference": review.url,

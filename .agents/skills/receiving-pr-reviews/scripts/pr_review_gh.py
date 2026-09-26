@@ -217,7 +217,6 @@ def normalize_state(fetched: GitHubState, target: ChangeRequestTarget) -> Review
         ),
         *review_inputs(
             all_reviews,
-            own_login=fetched.authenticated_login,
             pull_author_login=pull_author_login,
             head_revision=head_revision,
             is_empty_codex=_is_codex_empty_review,

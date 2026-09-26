@@ -28,15 +28,35 @@ from typer.testing import CliRunner
 
 import pr_review_threads
 from pr_review_contracts import ReplyAction, ResolveAction, ReviewActionResult, TopLevelCommentAction
-from pr_review_github_normalize import communicated_inputs
+from pr_review_gh_wire import (
+    Author,
+    CommentNode,
+    CommentsConnection,
+    CommitIdentity,
+    PageInfo,
+    ReviewNode,
+    ReviewThreadNode,
+)
+from pr_review_github_normalize import communicated_inputs, inline_inputs, review_inputs
 from pr_review_gitlab_normalize import normalize_state
+from pr_review_gitlab_wire import GitLabApprovedBy, GitLabDiscussion
 from pr_review_output import action_view
+from pr_review_state import authorize_action
 from pr_review_threads import app
-from review_test_fixtures import canonical_input, canonical_snapshot, ready_cycle, write_ready_files
-from review_test_gitlab_fixtures import state as gitlab_state, target as gitlab_target
+from review_test_fixtures import (
+    canonical_input,
+    canonical_snapshot,
+    ready_cycle,
+    review_target,
+    state_for_input,
+    write_ready_files,
+)
+from review_test_gitlab_fixtures import note as gitlab_note, state as gitlab_state, target as gitlab_target
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
+
+    from pr_review_state_models import ReviewInput
 
 
 runner = CliRunner()
@@ -287,3 +307,102 @@ def test_combined_mutations_preserve_completed_reply_after_resolution_process_fa
     persisted = pr_review_threads.load_cycle(state_file)
     assert persisted.communication_states[canonical_input().input_id] == "completed"
     assert persisted.resolution_states[canonical_input().input_id] == "open"
+
+
+def own_review_thread() -> ReviewThreadNode:
+    """Return a thread the authenticated account opened on its own PR and then answered."""
+    comments = [
+        CommentNode(
+            databaseId=comment_id,
+            body=body,
+            line=12,
+            originalLine=12,
+            author=Author(login="agent", type="User"),
+            createdAt=datetime(2026, 1, day, tzinfo=UTC),
+            commit=CommitIdentity(oid="abc123"),
+        )
+        for comment_id, day, body in [(42, 1, "Self-review: this invariant is unguarded."), (43, 2, "Fixed in abc123.")]
+    ]
+    return ReviewThreadNode(
+        id="T1",
+        isResolved=False,
+        path="src/widget.py",
+        comments=CommentsConnection(totalCount=2, pageInfo=PageInfo(hasNextPage=False), nodes=comments),
+    )
+
+
+def own_inline_inputs() -> list[ReviewInput]:
+    """Normalize the self-review thread as the authenticated account."""
+    return inline_inputs(
+        review_target(), [own_review_thread()], own_login="agent", pull_author_login="agent", head_revision="abc123"
+    )
+
+
+def test_github_own_thread_opener_is_inbound_and_own_in_thread_reply_is_outbound() -> None:
+    """Direction is the input's role; an own thread opener is review input, an own reply is a response."""
+    assert [item.direction for item in own_inline_inputs()] == ["inbound", "outbound"]
+
+
+def test_github_own_submitted_review_is_inbound() -> None:
+    """A submitted review is review input whoever wrote it."""
+    review = ReviewNode(
+        id="own-review",
+        author=Author(login="agent"),
+        state="COMMENTED",
+        body="Self-review: rename the helper.",
+        submittedAt=datetime(2026, 1, 1, tzinfo=UTC),
+        lastEditedAt=None,
+        url="https://github.com/acme/widgets/pull/17#pullrequestreview-1",
+    )
+
+    normalized = review_inputs(
+        [review], pull_author_login="agent", head_revision="abc123", is_empty_codex=lambda _: False
+    )
+
+    assert [item.direction for item in normalized] == ["inbound"]
+
+
+def test_gitlab_own_discussion_opener_and_approval_are_inbound_and_own_reply_is_outbound() -> None:
+    """GitLab applies the same role rule to the current user's discussions and approvals."""
+    state = gitlab_state()
+    current = state.current_user
+    discussion = GitLabDiscussion(
+        id="discussion-self",
+        individual_note=False,
+        notes=[
+            gitlab_note(30, current, "Self-review concern", resolvable=True, resolved=False, head_sha="head-1"),
+            gitlab_note(31, current, "Fixed.", resolvable=True, resolved=False, head_sha="head-1"),
+        ],
+    )
+    approvals = state.approvals.model_copy(update={"approved_by": [GitLabApprovedBy(user=current)]})
+    state = state.model_copy(
+        update={
+            "discussions": [*state.discussions, discussion],
+            "notes": [*state.notes, *discussion.notes],
+            "approvals": approvals,
+            "awards": [],
+        }
+    )
+
+    directions = {item.input_id: item.direction for item in normalize_state(state, gitlab_target()).review_inputs}
+
+    assert directions["gitlab:note:30"] == "inbound"
+    assert directions["gitlab:note:31"] == "outbound"
+    assert directions[f"gitlab:approval:{current.id}"] == "inbound"
+
+
+def test_self_authored_review_thread_passes_validate_cycle_and_authorizes_a_reply(tmp_path: Path) -> None:
+    """A normalized self-review can be listed in the census, validated, and answered."""
+    item = own_inline_inputs()[0]
+    snapshot, cycle = state_for_input(item, ready_cycle().assessments[0])
+    snapshot_file, state_file = tmp_path / "snapshot.json", tmp_path / "state.json"
+    snapshot_file.write_text(snapshot.model_dump_json())
+    state_file.write_text(cycle.model_dump_json())
+
+    result = runner.invoke(
+        app, ["validate-cycle", "--snapshot-file", str(snapshot_file), "--state-file", str(state_file)]
+    )
+
+    assert result.exit_code == 0, result.output
+    authorized = authorize_action(snapshot, cycle, item.input_id, ReplyAction(body="Fixed in abc123."))
+    assert authorized.review_input.input_id == item.input_id
