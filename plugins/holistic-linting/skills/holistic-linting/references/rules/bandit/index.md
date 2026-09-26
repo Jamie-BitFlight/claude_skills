@@ -177,7 +177,7 @@ When Bandit reports a security issue:
 
 ## Related Documentation
 
-For linting root-cause resolution workflows, see the [linting-root-cause-resolver](../../agents/linting-root-cause-resolver.md) agent documentation.
+For linting root-cause resolution workflows, see the [holistic-linting](../../../SKILL.md) skill, which the linting-root-cause-resolver agent loads.
 
 For integration with Ruff (which includes Bandit checks in the "S" category), refer to Ruff's security plugin documentation.
 
