@@ -17,6 +17,7 @@
 #   "pytest-xdist>=3.5.0",
 #   "pytest>=8.4.1",
 #   "ruamel.yaml>=0.18.0",
+#   "ruff>=0.16.5",
 #   "tiktoken>=0.12.0",
 #   "tomlkit>=0.13.0",
 #   "typer>=0.21.0",
