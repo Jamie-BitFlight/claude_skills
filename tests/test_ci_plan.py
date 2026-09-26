@@ -37,12 +37,16 @@ def repository(tmp_path: Path) -> Path:
     for path in [*paths, *plugin_dirs, "plugins/content-only", ".claude", "tests/research_backlinks"]:
         (tmp_path / path).mkdir(parents=True, exist_ok=True)
     for plugin in plugin_dirs:
-        (tmp_path / plugin / "run_pytests.py").write_text("# runner\n", encoding="utf-8")
+        (tmp_path / plugin / "run_pytests.py").write_text("# runner
+", encoding="utf-8")
     (tmp_path / "tests/test_rebase_publication_identity.py").write_text("", encoding="utf-8")
     (tmp_path / "pyproject.toml").write_text(
-        "[tool.pytest.ini_options]\n"
-        f"testpaths = {json.dumps(paths)}\n"
-        'pythonpath = [".", "plugins/alpha/scripts", "plugins/development-harness"]\n',
+        "[tool.pytest.ini_options]
+"
+        f"testpaths = {json.dumps(paths)}
+"
+        'pythonpath = [".", "plugins/alpha/scripts", "plugins/development-harness"]
+',
         encoding="utf-8",
     )
     return tmp_path
@@ -211,19 +215,23 @@ def test_real_git_diff_handles_renames_deletions_and_base_only_changes(repositor
     git(repository, "init", "-b", "main")
     git(repository, "config", "user.name", "CI fixture")
     git(repository, "config", "user.email", "fixture@example.invalid")
-    old = repository / "plugins/alpha/old name\nwith newline.md"
-    old.write_text("moved content\n", encoding="utf-8")
+    old = repository / "plugins/alpha/old name
+with newline.md"
+    old.write_text("moved content
+", encoding="utf-8")
     git(repository, "add", ".")
     git(repository, "commit", "-m", "fixture baseline")
     common = git(repository, "rev-parse", "HEAD")
     git(repository, "switch", "-c", "topic")
-    new = repository / "plugins/beta/new name\nwith newline.md"
+    new = repository / "plugins/beta/new name
+with newline.md"
     old.rename(new)
     git(repository, "add", "-A")
     git(repository, "commit", "-m", "move between owners")
     head = git(repository, "rev-parse", "HEAD")
     git(repository, "switch", "main")
-    (repository / "base-only.txt").write_text("not a PR change\n", encoding="utf-8")
+    (repository / "base-only.txt").write_text("not a PR change
+", encoding="utf-8")
     git(repository, "add", ".")
     git(repository, "commit", "-m", "advance base independently")
     base = git(repository, "rev-parse", "HEAD")
@@ -292,7 +300,9 @@ def test_runner_lints_diff_or_full_tree_explicitly() -> None:
 def test_runner_propagates_actual_child_failure(tmp_path: Path, exit_code: int) -> None:
     """An actual child executable controls the runner exit code, including no tests."""
     fake_uv = tmp_path / "uv"
-    fake_uv.write_text(f"#!/bin/sh\nexit {exit_code}\n", encoding="utf-8")
+    fake_uv.write_text(f"#!/bin/sh
+exit {exit_code}
+", encoding="utf-8")
     fake_uv.chmod(0o755)
     env = dict(
         os.environ,
@@ -328,7 +338,8 @@ def test_marketplace_version_bump_does_not_expand_plugin_content_change(reposito
     if registry_changed:
         document["plugins"].append({"name": "beta", "source": "./plugins/beta"})
     manifest.write_text(json.dumps(document), encoding="utf-8")
-    (repository / "plugins/alpha/README.md").write_text("changed\n", encoding="utf-8")
+    (repository / "plugins/alpha/README.md").write_text("changed
+", encoding="utf-8")
     git(repository, "add", ".")
     git(repository, "commit", "-m", "fixture plugin change")
     head = git(repository, "rev-parse", "HEAD")
