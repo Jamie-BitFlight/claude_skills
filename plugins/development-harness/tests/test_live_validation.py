@@ -208,9 +208,24 @@ async def test_live_crud_persists_changes_and_preserves_other_sections(live_envi
                 changed_body = f"{env.scope.body_marker}\n\nProvider edit not present in the writer cache."
                 await asyncio.to_thread(remote.edit, title=changed_title, body=changed_body)
                 await calls.call("backlog_pull", {"selector": f"#{companion}"})
-                # A title lookup without refresh reads the cache populated by pull. A
-                # numeric lookup here would mask a no-op pull by fetching GitHub again.
-                pulled = await calls.call("backlog_view", {"selector": changed_title, "summary": False})
+                # Force the read-back through the writer cache populated by pull.
+                # Live-first title selection would otherwise re-fetch GitHub and let a
+                # no-op pull satisfy this phase.
+                with env.fresh_reader() as reader:
+                    original_fetch = reader.fetch_snapshot
+
+                    def unavailable_fetch(request: ReconcileRequest) -> ProviderSnapshot:
+                        raise BackendUnavailableError("offline read-back after pull")
+
+                    reader.fetch_snapshot = unavailable_fetch
+                    try:
+                        pulled = await calls.call(
+                            "backlog_view",
+                            {"selector": changed_title, "summary": False, "allow_cached": True},
+                        )
+                    finally:
+                        reader.fetch_snapshot = original_fetch
+                assert pulled["status_source"] == "cache", pulled
                 assert pulled["title"] == changed_title, pulled
                 assert "Provider edit not present in the writer cache." in str(pulled["body"]), pulled
 
