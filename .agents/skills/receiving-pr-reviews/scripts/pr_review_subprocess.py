@@ -37,7 +37,9 @@ def process_group_is_alive(process_group_id: int) -> bool:
     """
     try:
         os.killpg(process_group_id, 0)
-    except ProcessLookupError:
+    # Darwin answers EPERM, not ESRCH, when every member is an unreaped zombie. This module
+    # only probes groups it created under its own uid, so EPERM cannot mean another owner's group.
+    except (ProcessLookupError, PermissionError):
         return False
     return True
 
