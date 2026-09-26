@@ -65,3 +65,13 @@ For Python, route implementation judgment to Python Engineering. Broader indepen
 Completion reports scope, discovery status, gates/results, diagnostic dispositions, correction-integrity evidence, unresolved items, out-of-scope delivery/return status, and additional validation. Missing required evidence, authority, or capability produces a blocked status rather than a manufactured pass.
 
 A passing rerun verifies only the exercised gate and scope; it is not general proof of architecture correctness.
+## Legacy machinery
+
+The core skill no longer depends on the former CLAUDE.md-driven `lint_orchestrator.py` executor or the standalone `install_agents.py` copier. Those scripts were retired rather than repaired because the rebuilt runtime uses host plugin discovery and repository configuration directly. `discover_linters.py` remains a separately authorized setup/documentation utility, not runtime discovery.
+
+
+### Retired standalone CLI compatibility
+
+The removed `lint_orchestrator.py` and `install_agents.py` interfaces are intentionally unsupported after this migration. No active in-repository caller was found during the retirement review, but repository search cannot prove absence of external installations. External users should migrate lint execution to `/holistic-linting:holistic-linting` and agent availability to normal host plugin installation/discovery. The old CLAUDE.md LINTERS executor and manual agent-copy/hash/`--force` contracts are not compatibility guarantees of the rebuilt plugin.
+
+This is an explicit retirement decision, not a claim of behavioral equivalence. Historical planning/research references may continue to describe those scripts at older revisions.
