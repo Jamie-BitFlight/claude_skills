@@ -342,7 +342,7 @@ def test_targeted_pull_writes_an_unstructured_provider_body_into_the_writer_cach
     # Given: one cached item reconciled from a provider body in the rendered shape
     cache = FileCache(tmp_path / "writer")
     backend = GitHubBackend(cache=cache)
-    monkeypatch.setattr(backend, "_apply_patches", lambda patches: [])
+    monkeypatch.setattr(backend, "_apply_patches", lambda patches, repo="": [])
     monkeypatch.setattr(
         models, "_config", models.BacklogConfig(repo_root=tmp_path, backlog_dir=tmp_path / "backlog", default_repo="")
     )
@@ -369,13 +369,13 @@ def test_targeted_pull_writes_an_unstructured_provider_body_into_the_writer_cach
         "<!-- backlog-metadata:\npriority: P1\ntype: Feature\nstatus: open\nadded: 2026-01-01\n-->\n\n"
         "## Description\n\n<!-- dh-e2e-run:1-1 -->\n\nLive validation fixture: companion\n"
     )
-    monkeypatch.setattr(backend, "_fetch_snapshot", lambda request: _snapshot_of("companion", rendered, "rev-1"))
+    monkeypatch.setattr(backend, "fetch_snapshot", lambda request: _snapshot_of("companion", rendered, "rev-1"))
     pull_by_selector("#42")
 
     # When: the provider edits the issue natively, replacing title and whole body
     edited = "<!-- dh-e2e-run:1-1 -->\n\nProvider edit not present in the writer cache."
     monkeypatch.setattr(
-        backend, "_fetch_snapshot", lambda request: _snapshot_of("companion changed remotely", edited, "rev-2")
+        backend, "fetch_snapshot", lambda request: _snapshot_of("companion changed remotely", edited, "rev-2")
     )
     pull_by_selector("#42")
 
@@ -399,7 +399,7 @@ def test_view_after_targeted_pull_renders_the_provider_body_for_a_title_selector
     # Given: one cached item reconciled from a provider body in the rendered shape
     cache = FileCache(tmp_path / "writer")
     backend = GitHubBackend(cache=cache)
-    monkeypatch.setattr(backend, "_apply_patches", lambda patches: [])
+    monkeypatch.setattr(backend, "_apply_patches", lambda patches, repo="": [])
     monkeypatch.setattr(
         models, "_config", models.BacklogConfig(repo_root=tmp_path, backlog_dir=tmp_path / "backlog", default_repo="")
     )
@@ -426,13 +426,13 @@ def test_view_after_targeted_pull_renders_the_provider_body_for_a_title_selector
         "<!-- backlog-metadata:\npriority: P1\ntype: Feature\nstatus: open\nadded: 2026-01-01\n-->\n\n"
         "## Description\n\n<!-- dh-e2e-run:1-1 -->\n\nLive validation fixture: companion\n"
     )
-    monkeypatch.setattr(backend, "_fetch_snapshot", lambda request: _snapshot_of("companion", rendered, "rev-1"))
+    monkeypatch.setattr(backend, "fetch_snapshot", lambda request: _snapshot_of("companion", rendered, "rev-1"))
     pull_by_selector("#42")
 
     # When: the provider rewrites the whole body by hand, dropping every heading
     edited = "<!-- dh-e2e-run:1-1 -->\n\nProvider edit not present in the writer cache."
     monkeypatch.setattr(
-        backend, "_fetch_snapshot", lambda request: _snapshot_of("companion changed remotely", edited, "rev-2")
+        backend, "fetch_snapshot", lambda request: _snapshot_of("companion changed remotely", edited, "rev-2")
     )
     pull_by_selector("#42")
 
