@@ -11,7 +11,7 @@
 1. Declare dependencies in the script's PEP 723 frontmatter (runtime source of truth).
 2. Mirror them into the root `[dependency-groups] dev` so `ty`, `ruff`, and the IDE resolve them.
 
-Do not create a per-plugin `pyproject.toml` sub-project or a per-plugin `uv.lock`.
+Do not create a per-plugin `pyproject.toml` sub-project or a per-plugin `uv.lock`. See [Plugin project architecture](../docs/plugin-project-architecture.md) for the product-vs-development-policy boundary and extraction procedure.
 
 This extends to every directory a script imports (`backlog_core/`, `dh_core/`, `sam_schema/`,
 etc.): they have `__init__.py` and dotted imports for internal organization, but are not
