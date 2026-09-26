@@ -28,10 +28,23 @@ def test_requested_unchanged_scope_and_discovery_terminals_are_explicit() -> Non
     assert "empty/unknown result" in skill
 
 
-def test_runtime_discovery_does_not_route_through_setup_writer() -> None:
-    skill = text(SKILL)
-    assert "Do not use `discover_linters.py` for runtime discovery" in skill
-    assert "[detect_hook_tool.py](./scripts/detect_hook_tool.py)" in skill
+RETIRED_SCRIPTS = ("lint_orchestrator.py", "discover_linters.py", "install_agents.py")
+
+
+def test_retired_scripts_stay_absent_and_unreferenced() -> None:
+    assert "[detect_hook_tool.py](./scripts/detect_hook_tool.py)" in text(SKILL)
+    for name in RETIRED_SCRIPTS:
+        assert not (ROOT / "skills" / "holistic-linting" / "scripts" / name).exists(), name
+    surfaces = [
+        *(ROOT / "skills").rglob("SKILL.md"),
+        *(ROOT / "commands").glob("*.md"),
+        *(ROOT / "agents").glob("*.md"),
+    ]
+    assert surfaces
+    for surface in surfaces:
+        body = text(surface)
+        for name in RETIRED_SCRIPTS:
+            assert name not in body, f"{surface.relative_to(ROOT)} references retired {name}"
 
 
 def test_gate_success_is_separate_from_diagnostic_disposition() -> None:
