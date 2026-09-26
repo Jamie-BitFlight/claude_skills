@@ -39,9 +39,7 @@ from pathlib import Path
 import pytest
 
 PLUGIN_ROOT = Path(__file__).resolve().parent
-TEST_PATHS = (
-    "scripts",
-)
+TEST_PATHS = ("scripts",)
 
 
 def main() -> int:
