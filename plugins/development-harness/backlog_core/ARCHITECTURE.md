@@ -3,35 +3,23 @@
 > **Audience: contributor/developer.** This document describes package seams, ownership, and
 > implementation constraints for maintainers; consumer setup and usage belong in the plugin docs.
 >
-> **Status: current architecture with tracked migration boundaries.** Runtime work-item and content
-> operations resolve one configured backend through `create_backend()`; remote-provider cache
-> construction is factory-owned. Legacy Markdown/YAML parsing and independently selected artifact
-> providers remain only in migration tooling, not in `operations.py` or `server.py`. #3158 tracks
-> removal of the superseded artifact-provider surface, and #912 tracks the remaining task-storage
-> migration.
+> **Status: desired architecture.** Runtime work-item and content operations must resolve one
+> configured backend through `create_backend()`; remote-provider cache construction is
+> factory-owned. Legacy Markdown/YAML parsing and independently selected artifact providers are
+> permitted only in explicit migration tooling, never in `operations.py` or `server.py`.
 
 ## Overview
 
-Extract all business logic from `.claude/skills/backlog/scripts/backlog.py` into a clean Python package at `.claude/skills/backlog/backlog_core/`. The package exposes the same functionality through two thin wrappers:
+The package owns backlog business logic and exposes it through two thin wrappers:
 
 1. **CLI wrapper** (`backlog.py`) — Typer CLI, calls operations module
 2. **MCP server** (`server.py`) — FastMCP 3.x, calls operations module
-
-## Historical Source File
-
-The extracted logic originated in `.claude/skills/backlog/scripts/backlog.py`; current runtime
-ownership is defined by the package modules and configured backend contracts below.
-
-Use the source and focused tests as truth surfaces. To enumerate definitions before moving code, run
-`rg -n '^(async )?(def|class) ' plugins/development-harness/backlog_core`; validate the ownership
-boundary with `uv run pytest plugins/development-harness/backlog_core/tests/test_import_boundaries.py -q`.
-Do not treat this document's approximate line references as an extraction checklist.
 
 ## Storage Ownership and File Cache
 
 The configured backend is the only storage boundary visible to the CLI, MCP server, and operations
 layer for runtime work-item and content operations. Work items, grooming, plans, artifact manifests,
-and artifact content are accessed through that backend's protocols. Migration tooling still reads
+and artifact content are accessed through that backend's protocols. Migration tooling may read
 legacy local representations through the explicit exceptions described below.
 
 Backends fall into two storage categories:
@@ -128,7 +116,9 @@ has no workflow status label. An open fetched issue with no status label derives
 map remains unknown. Neither a closed nor an absent issue may be fabricated as a
 `needs-grooming` filter match.
 
-Functions that previously used `typer.echo()` for status/progress messages must instead use an `Output` object (defined in models.py). Each function that needs to communicate status takes an optional `output: Output | None = None` parameter.
+Functions communicate status and progress through an `Output` object defined in `models.py`. Each
+function that needs to communicate status takes an optional `output: Output | None = None`
+parameter.
 
 ```python
 # In models.py — ALL models use Pydantic BaseModel
@@ -226,13 +216,9 @@ Use `IssueStatus` instead of `dict[str, str]` for status results.
 Use `PullRequestRef` instead of `dict[str, Any]` for PR references.
 Use `ViewItemResult` instead of `dict[str, Any]` for view results.
 
-Replace `typer.echo(msg)` → `output.info(msg)`
-Replace `typer.echo(msg, err=True)` → `output.warn(msg)`
-Replace `typer.Exit(1)` → raise appropriate exception from models.py
-
 ## Error Handling Pattern
 
-Functions that previously raised `typer.Exit(1)` must instead raise one of:
+Functions raise one of these exceptions rather than terminating the process:
 
 - `BacklogError` — general errors
 - `ItemNotFoundError(selector)` — item not found
@@ -246,10 +232,10 @@ Functions that previously raised `typer.Exit(1)` must instead raise one of:
 
 **Responsibility**: Constants, regex patterns, type maps, exceptions, Output handler.
 
-**Functions/data extracted from backlog.py** (line references are approximate):
+**Public data**:
 
 - Constants: `BACKLOG_DIR`, `DEFAULT_REPO`, `SECTION_RE`, `SKIP_STATUS`, `GITHUB_ISSUE_URL_RE`, `GITHUB_ISSUE_TITLE_TRUNCATE`, `MIN_FRONTMATTER_PARTS`, `TYPE_TO_LABEL`, `_COMMIT_PREFIX_RE`, `_FIELD_TO_INDEX`
-- Add new: `PRIORITY_SECTIONS` dict mapping priority strings to section headings (from the `add` command)
+- `PRIORITY_SECTIONS`: priority strings mapped to section headings
 - Exception classes: `BacklogError`, `ItemNotFoundError`, `DuplicateItemError`, `AmbiguousSelectorError`, `GitHubUnavailableError`, `ValidationError`
 - Pydantic models: `Entry`, `Section`, `GroomedData`, `BacklogItem`, `Output`, `IssueStatus`, `PullRequestRef`, `ViewItemResult`, `IssueLocalFields`
 
@@ -264,20 +250,14 @@ All constants, all exception classes, all Pydantic models.
 
 **Responsibility**: The single canonical source of truth for backlog section and subsection names
 — one Python file holding one `StrEnum` (plus one alias map) per naming layer, so a name is
-registered once and every reader/writer resolves it the same way. This closed #2970: before this
-module existed, `SECTION_HEADING` (the section display-heading dict) lived in `rendering.py`,
-`SECTION_HEADING_ALIAS` lived in `models.py`, `backlog_groom`'s MCP `section=` parameter was an
-unvalidated plain `str`, and `GroomedData.subsections` had no registry at all — four independently
-evolving surfaces with no single place an agent could read to learn the valid section names, which
-is the direct root cause of the 126+ unregistered `unknown__` keys #2956/#2970 found accumulated in
-production backlog items.
+registered once and every reader/writer resolves it the same way.
 
 **Two independent naming layers, each with its own enum + alias map + resolver**:
 
 - **Sections** (`BacklogItem.sections` keys) — `SectionKey(StrEnum)` defines the canonical
   `snake_case` storage key (e.g. `fact_check`); `SECTION_HEADING: dict[str, str]` pairs each key
   with its display heading (e.g. `"Fact-Check"`); `SECTION_NAME_ALIASES: dict[str, str]` maps
-  deprecated/historic spellings (lowercased) to the canonical key, kept as a map distinct from
+  noncanonical spellings (lowercased) to the canonical key, kept as a map distinct from
   `SECTION_HEADING` — alias recovery, never a second registration surface.
 - **Subsections** (`GroomedData.subsections` keys) — `SubsectionKey(StrEnum)` defines the canonical
   key, where the enum *value itself* is the display text used verbatim as the storage key (there is
@@ -299,22 +279,20 @@ type carried through storage.
    `PROGRESS_NOTES = "progress_notes"`).
 2. Add a matching `(SectionKey.PROGRESS_NOTES, "Progress Notes")` entry to `_SECTION_DISPLAY` — the
    display heading rendered in GitHub markdown.
-3. If a deprecated or historic alternate spelling exists (an agent doc previously wrote it
-   differently), add it to `SECTION_NAME_ALIASES` (lowercased key -> canonical value).
+3. Add accepted alternate spellings to `SECTION_NAME_ALIASES` (lowercased key -> canonical value).
 
 **How to add a new canonical subsection** (`GroomedData.subsections`):
 
 1. Append a member to `SubsectionKey` — the value IS the display text used verbatim as the storage
    key (e.g. `RISKS = "Risks"`).
-2. If a deprecated or historic alternate spelling exists, add it to `SUBSECTION_NAME_ALIASES` the
-   same way as section aliases.
+2. Add accepted alternate spellings to `SUBSECTION_NAME_ALIASES` the same way as section aliases.
 
 **Write-boundary enforcement**: `operations._normalize_section_key` resolves every caller-supplied
 section name (from `backlog_groom`'s `section=`/`sections={}` MCP parameters) through
 `resolve_section_name` before persisting — a resolvable alias or legacy `unknown__` form always
 persists under its resolved canonical key, never under the alias spelling and never under
 `unknown__`. A name that resolves to neither the registry nor the alias map falls back to
-`heading_to_unknown_key` (`rendering.py`) as before. After the backend successfully persists that
+`heading_to_unknown_key` (`rendering.py`). After the backend successfully persists that
 fallback, the owning single- or batch-write path calls `operations._warn_unregistered_section`,
 which prints a diagnostic to stderr and records the same warning on the caller's `Output.warnings`
 when one is provided. The persisted content remains intact, and the warning names the reconstructed
@@ -328,18 +306,17 @@ round-trip, not only on the `### subsection` and legacy `.md` parse paths.
 
 **Read-time recovery**: `rendering.normalize_unknown_sections` (read boundary, called from
 `yaml_io.load_item`/`load_item_text`) folds a legacy `unknown__{key}` section into `{key}` once that
-name becomes canonical, and now also calls `rendering.normalize_groomed_subsections` on every
-`GroomedData` value to fold aliased/miscased subsection keys the same way. Both folds heal
-already-corrupted cache records on next load — no bulk migration script touches live GitHub issues.
+name becomes canonical and calls `rendering.normalize_groomed_subsections` on every `GroomedData`
+value to fold aliased or miscased subsection keys the same way. Recovery occurs at the read boundary
+and must not require a bulk migration of live GitHub issues.
 
-**Merge rule for a section that already has both `unknown__{key}` and `{key}` present** (possible
-once some items are re-groomed post-fix while others are not, or after a manually edited cache
-file): `normalize_unknown_sections` merges the two `Section.entries` lists through
+**Merge rule for a section that has both `unknown__{key}` and `{key}` present**:
+`normalize_unknown_sections` merges the two `Section.entries` lists through
 `rendering.merge_entries` — the same struck-wins-then-longer-content-wins-per-id rule
 `github_sync.merge_item` applies when reconciling local and remote entries. `merge_entries` is
-defined once in `rendering.py` (a leaf shared by both callers, since `rendering.py` may not import
-`github_sync`) and re-exported as `github_sync._merge_entries` for backward compatibility with
-existing callers. Two entries sharing an id are not always distinct — a struck entry and a stale
+defined once in `rendering.py`, a leaf shared by both callers because it may not import
+`github_sync`; `github_sync._merge_entries` must resolve to that same implementation. Two entries
+sharing an id are not always distinct — a struck entry and a stale
 active copy, or two edits of the same logical entry, can collide across the `unknown__{key}`/`{key}`
 split — so a naive union/first-seen-wins dedup would silently drop whichever copy carries the
 struck state or the longer content. `normalize_groomed_subsections` uses the adjacent rule from
@@ -357,8 +334,8 @@ collision genuinely is two versions of one string value under two spellings, the
 
 ## Module: timestamps.py
 
-**Responsibility**: The single shared `now_iso()` UTC timestamp helper. Extracted from `parsing.py`
-so `parsing.py` and `entry_blocks.py` can import from each other at module scope: `entry_blocks.py`
+**Responsibility**: The single shared `now_iso()` UTC timestamp helper. It is a leaf module so
+`parsing.py` and `entry_blocks.py` need not import each other at module scope: `entry_blocks.py`
 needs `now_iso()` to stamp new entries, and `parsing.py` needs `entry_blocks.find_entry_spans` (plus
 two private helpers) to compute entry extents — two modules importing each other at module scope is
 a cycle regardless of which pair of symbols crosses the boundary, so the one symbol both directions
@@ -380,15 +357,14 @@ operations).
 utilities, view helpers, and normalize helpers. Runtime backlog-directory traversal belongs to
 `FileCache`, not this provider-neutral module.
 
-**Current active functions** (post-YAML migration):
+**Public functions**:
 
 - Date helper: `today()` (see `timestamps.py` for the sibling `now_iso()`)
 - Slug/title: `title_to_slug()`, `normalize_issue_title()`, `infer_type()`
 - Selector: `parse_issue_selector()`
-- Item parsing: `parse_item_file()` (legacy `.md` path — deprecated and restricted to migration
-  tooling). Existing `parse_backlog_from_directory()` and `parse_backlog()` entry points are
-  migration debt; runtime callers must use the configured backend, and remote cache traversal moves
-  behind `FileCache`.
+- Item parsing: `parse_item_file()`, `parse_backlog_from_directory()`, and `parse_backlog()` are
+  available only to explicit migration tooling. Runtime callers must obtain work items from the
+  configured backend; only `FileCache` may traverse a remote provider's cache files.
 - Item search: `find_item()` (dedup rule: when multiple title-substring matches share exactly one distinct issue number, returns the first match instead of raising `AmbiguousSelectorError`; still raises when matches have different issue numbers, or when any matching item is unnumbered)
 - Item filtering: `items_needing_issues()`, `items_with_issues()`
 - Issue body: `build_issue_body()`, `build_issue_body_from_file()`
@@ -410,8 +386,8 @@ below), `from ruamel.yaml import YAML, YAMLError`.
 **Responsibility**: Full-text search engine over the `list[dict[str, str | bool]]` item shape
 produced by `operations._build_list_entry`, plus content-based duplicate detection built on top of
 it. Must never import `fastmcp` or `mcp` — that constraint is what makes it importable from
-`operations.py`, which cannot depend on the FastMCP server module. Extracted from `server.py`:
-search is a distinct concern from markdown parsing, so it is not folded into `parsing.py`.
+`operations.py`, which cannot depend on the FastMCP server module. Search is a distinct concern
+from markdown parsing, so it must not be folded into `parsing.py`.
 
 **Search engine**:
 
@@ -426,15 +402,13 @@ search is a distinct concern from markdown parsing, so it is not folded into `pa
 - Snippet helpers: `_make_snippet()`, `_make_snippet_parts()`, `_format_match_text()`,
   `_parse_body_sections()`.
 
-**Content-based duplicate detection** (replaces the deleted title-character-ratio matcher that
-previously lived in `parsing.py`):
+**Content-based duplicate detection**:
 
 - `DuplicateCheckStatus(StrEnum)` — `DUPLICATE_FOUND`, `NO_DUPLICATE`, `COULD_NOT_VERIFY`. The
   tri-state result `operations._classify_duplicate_check()` returns; `COULD_NOT_VERIFY` never blocks
   item creation.
 - `ContentDuplicateMatch` (frozen dataclass) — `title`, `item_ref`, `matched_field`, `snippet`,
-  `match_count`. The actionable reference a caller can act on, replacing the old file-path-only
-  result.
+  `match_count`. The actionable reference returned to callers.
 - `build_concept_query(title, description)` — extracts up to 4 significant words (stopword- and
   length-filtered) from title + description into a `term1 OR term2 ...` query.
 - `find_content_duplicates(title, description, candidates)` — runs the concept query through
@@ -512,7 +486,7 @@ only runtime component permitted to read or write backlog YAML and cached plan o
 **On-disk layout**, under the cache root (`<state_root>/github-cache/` for the GitHub backend):
 
 - `cache.json` — the durable state above, as JSON (`_CacheStateStore` in `file_cache_state.py`). A
-  legacy `cache.yaml` from before this file was renamed is migrated automatically on first write.
+  legacy `cache.yaml` must be migrated automatically on first write.
 - `cache.lock` — cross-process/cross-version mutual exclusion for the state file; never renamed.
 - `items/**/*.yaml` — per-item provider snapshots, written by `yaml_io.py`. These genuinely are
   YAML, unlike `cache.json` — don't confuse the two when reasoning about this cache's format.
@@ -527,7 +501,7 @@ only runtime component permitted to read or write backlog YAML and cached plan o
   `has_pending_writes` provenance on every response and, when a GitHub-backed cache's state cannot
   be confirmed complete (never synced, or a checkpoint over a snapshot set with unreadable files),
   withholds `items`/`count` (both `None`) by default rather than returning an ambiguous empty list —
-  see `docs/backend-providers.md`'s "Listing provenance" section (backlog #3546 task A4).
+  see `docs/backend-providers.md`'s "Listing provenance" section.
 
 ### Snapshot completeness and listing provenance
 
@@ -593,12 +567,12 @@ Operations layer never writes raw markdown body strings directly — they go thr
 - `merge_item(local, remote)` — merges remote into local; local metadata is authoritative; sections
   are merged per-entry via `rendering.merge_entries` (struck state wins over active; longer content
   wins on tie; unique entries from either side are preserved)
-- `SECTION_HEADING` — re-exported from `rendering` (originally `section_registry` — see "Module: section_registry.py"); dict mapping section storage keys to GitHub markdown heading text (e.g. `"fact_check"` → `"Fact-Check"`)
+- `SECTION_HEADING` — re-exported from `rendering`; dict mapping section storage keys to GitHub markdown heading text (e.g. `"fact_check"` → `"Fact-Check"`)
 - `heading_to_section_key(heading_text)` — maps a `## Heading` text to its section storage key via `resolve_section_name` (alias-aware); returns `None` for unknown headings
 - `heading_to_unknown_key(heading_text)` — converts an unknown heading to an `"unknown__"` prefixed storage key
 - `unknown_key_to_heading(key)` — reverses `heading_to_unknown_key`; strips prefix, title-cases result
 
-**Known section keys** (BacklogItem.sections): the full, current list lives in
+**Known section keys** (`BacklogItem.sections`): the canonical list lives in
 `section_registry.SectionKey` — do not duplicate it here, it will drift (see "Module:
 section_registry.py"). The one structurally special key is `"groomed"` → `## Groomed (date)`
 (`GroomedData` type, not `Section`) — it has no `SectionKey` member because it is rendered by a
@@ -615,17 +589,17 @@ do not import from `gh_client.py`, `operations.py`, or `server.py`)
 
 ## Module: rendering.py
 
-**Responsibility**: Backend-neutral shared rendering utilities for backlog sections. Extracts
-rendering logic from `github_sync` into a location `WorkItemBackend` implementations can import,
-ensuring identical logical section rendering where the provider representation requires it.
+**Responsibility**: Backend-neutral shared rendering utilities for backlog sections. The module is
+importable by `WorkItemBackend` implementations and provides identical logical section rendering
+where the provider representation requires it.
 
 **Dependency direction**: `section_registry ← models ← rendering` (must remain acyclic; do not import from `github_sync`, `operations`, `gh_client`, or `server`)
 
 **Public API** (`__all__`): `GROOMED_SUBSECTION_ORDER`, `SECTION_HEADING`, `heading_to_unknown_key`, `merge_entries`, `normalize_groomed_subsections`, `normalize_unknown_sections`, `render_groomed_section`, `resolve_subsection_name`, `section_display_title`, `unknown_key_to_heading`
 
 - `SECTION_HEADING` — re-exported from `section_registry` (the canonical registry — see "Module: section_registry.py"); dict mapping known section storage keys to display heading text (e.g. `"fact_check"` → `"Fact-Check"`); shared constant used by all backends
-- `GROOMED_SUBSECTION_ORDER` — re-exported from `section_registry.SUBSECTION_KEY_ORDER`; canonical render order for `GroomedData` subsections (heading text as stored), kept under its historic name so existing callers are unaffected
-- `merge_entries(local_entries, remote_entries)` — merges two `Entry` lists per id (struck state wins over active; longer content wins on tie; unique entries from either side are preserved); shared by `github_sync.merge_item` (re-exported there as `_merge_entries` for backward compatibility) and `normalize_unknown_sections` below, so there is one merge policy for "two entry lists that may share an id", not one per caller
+- `GROOMED_SUBSECTION_ORDER` — re-exported from `section_registry.SUBSECTION_KEY_ORDER`; canonical render order for `GroomedData` subsections (heading text as stored)
+- `merge_entries(local_entries, remote_entries)` — merges two `Entry` lists per id (struck state wins over active; longer content wins on tie; unique entries from either side are preserved); shared by `github_sync.merge_item` through its `_merge_entries` alias and by `normalize_unknown_sections` below, so there is one merge policy for "two entry lists that may share an id", not one per caller
 - `render_groomed_section(groomed)` — renders a `GroomedData` as `## Groomed ({date})` with `### subsection` children in canonical order; extras appended alphabetically
 - `section_display_title(key, groomed_date)` — returns the human-readable title for a section storage key; handles known keys via `SECTION_HEADING`, `"unknown__"` prefix via `unknown_key_to_heading`, and the special `"groomed"` key with optional date
 - `unknown_key_to_heading(key)` / `heading_to_unknown_key(heading_text)` — the local-write / GitHub-parse boundary normaliser pair (see "Module: section_registry.py" for why both sides must call the same function)
@@ -641,9 +615,8 @@ ensuring identical logical section rendering where the provider representation r
 
 **Responsibility**: The shared PyGithub construction and transport-security boundary. Every plugin
 caller that needs a `Github` instance uses `make_github_client()` rather than constructing one
-directly. Current consumers are the issue adapter in `gh_client.py`, the legacy artifact-provider
-adapter, and the SAM GitHub context backend. This keeps token precedence, API endpoint selection,
-timeouts, and TLS behavior identical across those independently loaded surfaces.
+directly. This keeps token precedence, API endpoint selection, timeouts, and TLS behavior identical
+across independently loaded surfaces.
 
 **Public API** (`__all__`): `CA_BUNDLE_ENV_VARS`, `DEFAULT_TIMEOUT`, `TOKEN_ENV_VARS`,
 `MissingGitHubTokenError`, `bundle_adds_new_anchor`, `bundle_requires_relaxed_verification`,
@@ -666,7 +639,7 @@ turning certificate verification off:
 - Custom trust sources are resolved in `GITHUB_CA_BUNDLE`, `REQUESTS_CA_BUNDLE`,
   `CURL_CA_BUNDLE`, `SSL_CERT_FILE` order. The middle two match `requests`' own precedence;
   `SSL_CERT_FILE` remains a final explicit source because `requests` does not read it itself.
-  Existing PEM files and OpenSSL-hashed CA directories are accepted; missing paths and ordinary
+  PEM files and OpenSSL-hashed CA directories are accepted; missing paths and ordinary
   directories are ignored.
 - Merely setting a CA environment variable is insufficient to alter transport behavior. A valid
   source must add at least one certificate, compared by SHA-256 identity, beyond certifi's public
@@ -690,12 +663,7 @@ turning certificate verification off:
   so installation is thread-safe, idempotent, and always occurs before client construction. The
   custom path uses PyGithub's public connection-class injection API; its loss of connection reuse is
   accepted rather than mutating PyGithub private state. A forced re-evaluation resets the native
-  classes when custom trust is no longer warranted.
-
-These constraints are exercised by `tests/test_github_client.py`, including direct and proxy
-adapter paths, trust-source precedence, bundle and hashed-directory parsing, strict/non-strict
-contexts, hostname and chain verification, pre-init shim ordering, client authentication, timeout,
-and API-root selection.
+  classes when custom trust is unnecessary.
 
 **Dependency direction**: callers → `github_client.py` → PyGithub/requests/urllib3 and trust-store
 libraries. The module has no `FileCache`, backend, artifact, issue-domain, or filesystem-state
@@ -709,18 +677,18 @@ ownership; filesystem reads are limited to configured trust stores and certifi's
 construction, authentication, timeout defaults, API-root selection, and TLS policy belong to
 `github_client.py`; this module obtains clients through that factory.
 
-**Functions extracted from backlog.py**:
+**Public API**:
 
-- Client access: `_get_github()` → `get_github()`, `_try_get_github()` → `try_get_github()`; both
+- Client access: `get_github()`, `try_get_github()`; both
   delegate construction to `github_client.make_github_client()`
-- Issue CRUD: `create_issue_for_item()`, `_close_github_issue()` → `close_github_issue()`, `_resolve_github_issue()` → `resolve_github_issue()`
-- PR check: `_check_open_prs_for_issue()` → `check_open_prs_for_issue()`
-- Status: `_batch_fetch_statuses()` → `batch_fetch_statuses()`, `_fetch_item_status()` → `fetch_item_status()`, `_apply_status_in_progress()` → `apply_status_in_progress()`
-- Issue queries: `_fetch_open_issues_by_title()` → `fetch_open_issues_by_title()`
-- View enrichment: `_view_enrich_from_github()` → `view_enrich_from_github()`
-- Issue data: `_issue_to_local_fields()` → `issue_to_local_fields()`
-- Groomed sync: `_sync_groomed_to_github_issue()` → `sync_groomed_to_github_issue()`
-- Fetch: `_fetch_github_issue_body()` → `fetch_github_issue_body()`
+- Issue CRUD: `create_issue_for_item()`, `close_github_issue()`, `resolve_github_issue()`
+- PR check: `check_open_prs_for_issue()`
+- Status: `batch_fetch_statuses()`, `fetch_item_status()`, `apply_status_in_progress()`
+- Issue queries: `fetch_open_issues_by_title()`
+- View enrichment: `view_enrich_from_github()`
+- Issue data: `issue_to_local_fields()`
+- Groomed sync: `sync_groomed_to_github_issue()`
+- Fetch: `fetch_github_issue_body()`
 
 **Exports**: All functions listed above.
 
@@ -828,7 +796,7 @@ implementation details.
   rejects references that violate these kind-specific invariants. This prevents equal artifact
   paths on different items or under different artifact types from colliding.
 
-  For `PLAN` and `DISPATCH_PLAN` records, `ContentWrite.owner_reference=None` preserves the current
+  For `PLAN` and `DISPATCH_PLAN` records, `ContentWrite.owner_reference=None` preserves the stored
   owner; any string, including `""`, atomically reassigns or unlinks it. For artifact kinds, ownership is fixed by
   `ContentRef.namespace`; validation rejects a non-`None` write owner that conflicts with that
   namespace.
@@ -836,7 +804,7 @@ implementation details.
   An empty plan owner means unlinked content in the backend instance's project namespace.
   For `ContentQuery`, `owner_reference=None` discovers all owners, while `owner_reference=""`
   selects only unowned/project-level plans. This query filter is distinct from
-  `ContentWrite.owner_reference=None`, which preserves the current plan owner.
+  `ContentWrite.owner_reference=None`, which preserves the stored plan owner.
   Providers must not share plan names across backend instances or project roots.
   `list_content()` provides bounded plan discovery
   without requiring a known name; artifact callers normally address content directly. `revision`
@@ -846,12 +814,12 @@ implementation details.
   the capability raises `UnsupportedCapabilityError`. No caller selects a second provider after any
   of these outcomes.
 
-  Plan create/update MCP inputs retain the existing optional numeric `issue` field and add
+  Plan create/update MCP inputs accept optional numeric `issue` and
   `owner_reference: str | None = None`. For update, `None` preserves ownership, a non-empty string
   reassigns it, and explicit `""` unlinks it. For create, `None` normalizes to unlinked `""`.
   The operation rejects `issue` together with any non-`None` owner reference, stringifies `issue`
-  for numeric providers, and otherwise passes the opaque value unchanged. This preserves existing
-  callers while allowing Beads and future provider IDs.
+  for numeric providers, and otherwise passes the opaque value unchanged, supporting both numeric
+  and opaque provider IDs.
 - `BacklogConfig` — dataclass wrapping only the active backend instance; passed by dependency
   injection to `operations.py` and `server.py`. It does not expose a cache object.
 - `create_backend(name)` — sole composition root for backend storage. It resolves the configured
@@ -917,11 +885,10 @@ mutation rules as work-item content. For Beads, SQLite, and Memory, those values
 backend storage only. Unsupported capabilities fail explicitly through the selected backend; they
 must not fall back to YAML or another provider.
 
-`operations.py` and `server.py` obtain artifact capabilities from the configured backend; they no
-longer call `create_artifact_provider()` or select `LocalFilesystemArtifactProvider`. The
-independent provider factory and local fallback remain reachable from `artifact_migration.py` only.
-#3158 tracks removing or explicitly retiring that superseded migration surface; #3086 tracks the
-migration helper's bypass of the current artifact identity computation.
+`operations.py` and `server.py` must obtain artifact capabilities from the configured backend and
+must not call `create_artifact_provider()` or select `LocalFilesystemArtifactProvider`. Any
+independent provider factory or local fallback retained for migration is permitted only within
+explicit migration tooling.
 
 ### GitHub writable records
 
@@ -957,10 +924,9 @@ concurrency guarantees:
   SHA is the opaque revision: updates send the observed SHA and creates omit SHA. On `409` or `422`,
   the provider re-reads the target. A path that appeared, disappeared, or changed SHA is
   `ContentConflictError`; an unchanged target permits only a bounded retry for an unrelated
-  branch-head race. `403` and protected-branch failures are unavailable, not conflicts — this no
-  longer describes content writes generally, since `dh-content` is deliberately unprotected; it now
-  applies only to the one-time read of the default branch's HEAD inside bootstrap (which may itself
-  carry branch protection, since it is only ever read, never written). Discovery
+  branch-head race. The one-time bootstrap read of the default branch's HEAD may encounter branch
+  protection; a `403` or protected-branch failure there is unavailable, not a conflict. The default
+  branch is never written, and `dh-content` must remain unprotected. Discovery
   resolves one branch tree, rejects truncated results, validates every envelope, sorts by logical
   identity, then applies `ContentQuery` filtering and bounds. Native records take precedence over
   read-only Gist/index migration records; a malformed native record never falls back.
@@ -992,20 +958,6 @@ returns a structured result and takes an optional `output: Output` parameter. Op
 business rules and pure transformations, but all persistence, provider communication, cache access,
 and artifact access go through `get_config().backend`.
 
-**Functions extracted/refactored from backlog.py**:
-
-- File metadata: `_update_item_metadata()` → `update_item_metadata()`
-- ADD: `_add_item_index_format()` → part of `add_item()`; duplicate check logic from `add` command
-- LIST: logic from `list_items` command → `list_items()`; `_refresh_local_cache_from_github()` → `refresh_local_cache_from_github()`
-- VIEW: logic from `view` command → `view_item()`
-- SYNC: `_sync_create_missing_issues()` → `sync_create_missing_issues()`, `_sync_push_groomed_content()` → `sync_push_groomed_content()`, combined `sync_items()`; `_find_or_create_issue()` → `find_or_create_issue()`
-- CLOSE: `_close_item_index()`, `_close_cleanup()` → part of `close_item()`
-- RESOLVE: `_resolve_item_index()` → part of `resolve_item()`
-- UPDATE: refactored `update` command → `update_item()`; `_apply_plan_to_item()`, `_create_issue_and_update_item()`, `_handle_update_groomed()`, `_ensure_github_issue()`, `_write_groomed_to_github()`, `_write_groomed_to_item_file()`, `_resolve_groomed_content()`
-- GROOM: `groom` command → `groom_item()`
-- NORMALIZE: `normalize` command → `normalize_items()`; `_build_normalized_content()`, `_normalize_item_file()`
-- PULL: `pull` command → `pull_items()`; `_pull_single_issue()` → `pull_single_issue()`, `_pull_item()`, `_pull_item_create_new()`, `_pull_item_update_existing()`, `_overwrite_body_from_github()`
-
 **Exports**: `add_item`, `list_items`, `view_item`, `sync_items`, `close_item`, `resolve_item`, `update_item`, `groom_item`, `normalize_items`, `pull_items`, `update_item_metadata`, `pull_single_issue`, `refresh_local_cache_from_github`, `sync_create_missing_issues`, `sync_push_groomed_content`
 
 **Imports from other modules**:
@@ -1013,10 +965,11 @@ and artifact access go through `get_config().backend`.
 - Pure, filesystem-free helpers from `parsing.py`
 - Protocols and `get_config()` from `backend_protocol.py`
 
-`operations.py` must not import `yaml_io.py`, `file_cache.py`, provider clients, provider-format
-adapters, or local backend implementations. It currently satisfies this boundary. Legacy parsing
-and independent artifact-provider access are confined to migration modules and do not describe a
-permitted runtime architecture.
+`operations.py` and `reconciliation.py` must not import `yaml_io.py`, `file_cache.py`, provider
+client implementations, provider-format adapters, local backend implementations, or independent
+artifact providers. All persistence, provider communication, cache access, and artifact access
+must cross the configured backend boundary. Migration-only access does not define a permitted
+runtime dependency.
 
 The same restriction applies to `reconciliation.py`: reconciliation classifies snapshots and asks
 the provider to persist outcomes; it does not own filesystem storage.
@@ -1038,15 +991,13 @@ Resolution is handled by `find_item` in `parsing.py`. The resolution order is:
 
 The string-ID path fires when the selector is not a URL, `#N`, or bare integer. No additional routing logic is needed in `server.py` — the selector string passes through to `find_item` unchanged. GitHub URL detection is a regex operation (`GITHUB_ISSUE_URL_RE`) — no GitHub token or API call is involved at any point in selector resolution.
 
-SOURCE: `parsing.py:find_item` (string-ID path at `# String-ID exact match` comment), `parsing.py:parse_issue_selector`, commit `f6438cac` (2026-06-19)
-
 ---
 
 ## Module: server.py
 
 **Responsibility**: FastMCP 3.x server exposing all operations as MCP tools.
 
-**Pattern**: Each CLI subcommand becomes a `@mcp.tool()` decorated function that calls the corresponding operation and returns a dict.
+**Pattern**: Each `@mcp.tool()` function calls the corresponding operation and returns a dict.
 
 **Tools** (14 total):
 
@@ -1110,7 +1061,7 @@ At server startup, `server.py` auto-bootstraps the [beads](https://github.com/be
 
 ### How It Wires In
 
-The FastMCP constructor receives a `lifespan=_beads_lifespan` parameter (see `server.py`, `FastMCP(...)` call). FastMCP invokes this hook once per server startup (or once per `Client(mcp)` context manager entry in tests). The hook runs `_bootstrap_beads()` in a thread executor before yielding to accept tool calls:
+The FastMCP constructor receives a `lifespan=_beads_lifespan` parameter (see `server.py`, `FastMCP(...)` call). FastMCP invokes this hook once per server startup. The hook runs `_bootstrap_beads()` in a thread executor before yielding to accept tool calls:
 
 ```text
 FastMCP startup → _beads_lifespan → asyncio.run_in_executor(_bootstrap_beads) → yield → tools available
@@ -1120,9 +1071,7 @@ The `@lifespan` decorator is imported from `fastmcp.server.lifespan`.
 
 ### Sentinel Pattern
 
-A module-level `_beads_bootstrapped: bool = False` sentinel prevents repeated execution. The sentinel is checked at the top of `_bootstrap_beads()` and set to `True` on every exit path (including degradation paths). This matters because tests open multiple `Client(mcp)` connections — without the sentinel, bootstrap would run on every connection.
-
-Tests reset the sentinel via `monkeypatch.setattr("backlog_core.server._beads_bootstrapped", False)`.
+A module-level `_beads_bootstrapped: bool = False` sentinel prevents repeated execution. The sentinel is checked at the top of `_bootstrap_beads()` and set to `True` on every exit path (including degradation paths), so repeated lifespan entry within one process cannot repeat bootstrap.
 
 ### Bootstrap Decision Tree
 
@@ -1173,7 +1122,7 @@ Bootstrap receives the project root from `models.get_repo_root()`, which returns
 
 ---
 
-## CLI wrapper: backlog.py (rewritten)
+## CLI wrapper: backlog.py
 
 **Responsibility**: Thin Typer CLI that imports from `operations` module.
 
@@ -1183,7 +1132,7 @@ Bootstrap receives the project root from `models.get_repo_root()`, which returns
 3. Prints `output.messages` and `output.warnings`
 4. Catches exceptions and converts to `typer.Exit(1)`
 
-**Keeps**: Rich table formatting for `list` command, text formatting for `view` command.
+**Display**: Rich table formatting for `list` and text formatting for `view`.
 These are CLI-specific display concerns that don't belong in core logic.
 
 **Imports**: `from .operations import ...`, `from .models import ...`
@@ -1206,33 +1155,17 @@ behaviour they implement. Add navigation capability to the engine, not this pack
 Contract reference: `docs/mcp-progressive-disclosure-contract.md` for ordinal addressing and
 response shapes.
 
-### Progressive-disclosure migration debt
-
-The moved mapper and token-window extractor consolidate primitive ownership only. They do not
-complete the agent markdown-consumption requirements. The table below is the persistent inventory
-of remaining ownership and consumer work; each row links that work to its issue-backed owner:
-
-| Source or boundary | Current state | Remaining owner |
-|---|---|---|
-| Default item/PASSTHROUGH reads and grooming gates | Legacy compact manifest, bracket index, and paged-body paths remain | #3057 |
-| Plan, task, and artifact reads | Do not use the engine's serving path; artifact delivery still returns provider content directly | #3058, #3078 |
-| MAP/NAVIGATE/EXTRACT serving | Backlog handler adapts moved primitives; general navigator and paginator have no consumers; MAP is complete but unpaginated | #3059, #2969 |
-| Section and artifact discovery | Separate inventories remain | #3061, blocked by #3055 |
-| Content identity and control set | No content-ID follow-up, global control set, or write invalidation is implemented | #3062, #3079, #3081 |
-| CLI navigation | CLI has no MAP/NAVIGATE/EXTRACT or content-identity parameters | #3063 |
-| Consumer guidance and contract identity | Transitional parameters and duplicate contract paths remain documented | #3054, #3060, #3064, #3071 |
-
-#1676's YAML sidecar and #3085's session key are superseded mechanisms, not implementation tasks
-for this architecture. Duplicate-heading semantics remain unsettled in #3190; an engine-boundary
-test preserves the current occurrence-based ordinal behavior until that issue chooses the final
-contract.
+Backlog-specific compact manifests, section indexes, paged-body renderers, content-identity
+schemes, or sidecars must not replace the engine's automatic compact form or impose a
+source-layer token budget. Every transport must expose the same engine-owned addressing,
+pagination, and content-identity contract.
 
 ### MarkdownIndexer Integration
 
 `OrdinalPathMapper.build_map()` calls `_index_entry_subtree()` for each level-2 entry to
 index sub-headings and code fences into the resolution index.
 
-**Construction sequence** (DN-1 — actual sequence differs from architecture spec §4.1):
+**Construction sequence**:
 
 ```text
 MarkdownItParser().parse("inline", entry_content)  →  MarkdownIndexer().build(result)
@@ -1241,10 +1174,10 @@ MarkdownItParser().parse("inline", entry_content)  →  MarkdownIndexer().build(
 `MarkdownIndexer.build()` takes a `ParserResult`, not a raw string.
 `MarkdownItParser` is imported from `progressive_markdown.parser`.
 
-**MarkdownDocument fields** (DN-2 — field names differ from architecture spec §4.1):
+**MarkdownDocument fields**:
 
-- `.sections: dict[str, SectionNode]` — sections by ID (the spec documented `.sections_by_id`)
-- `.code_blocks: dict[str, CodeBlock]` — code blocks by ID (the spec documented `.code_blocks_by_id`)
+- `.sections: dict[str, SectionNode]` — sections by ID
+- `.code_blocks: dict[str, CodeBlock]` — code blocks by ID
 - `.root_section_ids: list[str]` — IDs of top-level sections
 
 `SectionNode` fields used: `.child_ids`, `.code_block_ids`, `.body_span`, `.title`, `.level`.
@@ -1272,18 +1205,14 @@ Whether a node returns a child map or prose body differs by depth:
 - **Level-3+ sub-heading node**: `has_sub_heading_children` is `True` iff
   `bool(node.child_ids)` — any child section triggers parent behavior.
 
-Source: `ordinal_mapper.py`, `_MIN_ROOT_SECTIONS_FOR_PARENT` constant and
-`_collect_section_children()`.
-
 ### Resolution Index vs Map Text Split (§5.3)
 
 `_ResolutionIndex: dict[str, _SubtreeNode]` is built eagerly to all depths during
 `build_map()`. `resolve()` and `valid_ordinals()` operate on this complete index.
 
-`MapResponse.map_text` contains every formatted entry returned by `build_map()`. It is not bounded
-or paginated and does not omit entries. `MapResponse.over_budget` compares the represented
-level-1 content estimate with `TOKEN_BUDGET`; it is diagnostic only. #3059 tracks paginating MAP
-without dropping any address, and #3062 tracks content-identity follow-up requests.
+`MapResponse.map_text` must preserve every formatted entry: pagination may divide the map into
+bounded pages but must not omit an address. `MapResponse.over_budget` is diagnostic and never
+authorizes truncation.
 
 ### Token Counting
 
