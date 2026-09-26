@@ -83,7 +83,7 @@ LINT_CONFIG_NAMES = frozenset({
     ".gitignore",
     ".gitattributes",
 })
-LANGUAGE_SUFFIXES = {
+FAST_PLUGIN_MARKER = "not e2e and not cross_backend and not integration and not research_vault"\nLANGUAGE_SUFFIXES = {
     "lint-python": {".py", ".pyi"},
     "lint-js": {".js", ".jsx", ".cjs", ".mjs", ".ts", ".tsx", ".mts", ".cts", ".json", ".jsonc", ".css"},
     "lint-markdown": {".md", ".markdown", ".mdown", ".mkd"},
@@ -256,7 +256,7 @@ def build_plan(
     reasons.extend(f"Shared/configuration input: {path}" for path in shared)
     reasons.extend(f"Shared Python import/fixture input: {path}" for path in changed if shared_source(path, imports))
     unit: list[Shard] = [
-        {"name": owner, "paths": ([] if owner != "global" else targets), "marker": "", "runner": (targets[0] if owner != "global" else "")}
+        {"name": owner, "paths": ([] if owner != "global" else targets), "marker": (FAST_PLUGIN_MARKER if owner != "global" else ""), "runner": (targets[0] if owner != "global" else "")}
         for owner, targets in sorted(suites.items())
         if full_tests or owner == "global" or owner in owners
     ]
