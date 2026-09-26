@@ -124,7 +124,7 @@ def valid_path(value: str) -> str:
 
 
 def read_pytest_config(root: Path) -> tuple[dict[str, list[str]], list[str]]:
-    """Discover plugin runners and repository-owned test roots."""
+    """Discover plugin runners and repository-owned test roots.\n\n    Returns:\n        Suite roots grouped by owner, and shared plugin import roots.\n    """
     config = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
     options = config["tool"]["pytest"]["ini_options"]
     testpaths = options["testpaths"]
@@ -142,6 +142,7 @@ def read_pytest_config(root: Path) -> tuple[dict[str, list[str]], list[str]]:
         suites[runner.parent.name] = [runner.relative_to(root).as_posix()]
     imports = [valid_path(path) for path in options.get("pythonpath", []) if plugin_owner(path)]
     return suites, imports
+
 
 def git(root: Path, *args: str) -> bytes:
     """Run a bounded, read-only Git command without a shell.
