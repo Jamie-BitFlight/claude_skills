@@ -23,7 +23,7 @@ from backlog_core.backend_protocol import get_config, reset_config, set_config
 from backlog_core.backend_types import BacklogConfig
 from backlog_core.backends.github_backend import GitHubBackend
 from backlog_core.file_cache import FileCache
-from backlog_core.models import ReconcileRequest, ReconcileScope
+from backlog_core.models import BackendUnavailableError, ProviderSnapshot, ReconcileRequest, ReconcileScope
 from fastmcp.client import Client
 
 from close_test_issues import open_sandbox
@@ -122,7 +122,9 @@ def listed_references(items: list[dict[str, object]]) -> set[str]:
     return {str(item.get("issue", "")) for item in items}
 
 
-async def test_live_crud_persists_changes_and_preserves_other_sections(live_environment: LiveEnvironment) -> None:
+async def test_live_crud_persists_changes_and_preserves_other_sections(
+    live_environment: LiveEnvironment, monkeypatch: pytest.MonkeyPatch
+) -> None:
     env = live_environment
     # Warm CRUD has an explicit, real open-issue snapshot. Historical cold-cache
     # recovery belongs to the independent scenario below, not an accidental list side effect.
@@ -212,19 +214,14 @@ async def test_live_crud_persists_changes_and_preserves_other_sections(live_envi
                 # Live-first title selection would otherwise re-fetch GitHub and let a
                 # no-op pull satisfy this phase.
                 with env.fresh_reader() as reader:
-                    original_fetch = reader.fetch_snapshot
 
                     def unavailable_fetch(request: ReconcileRequest) -> ProviderSnapshot:
                         raise BackendUnavailableError("offline read-back after pull")
 
-                    reader.fetch_snapshot = unavailable_fetch
-                    try:
-                        pulled = await calls.call(
-                            "backlog_view",
-                            {"selector": changed_title, "summary": False, "allow_cached": True},
-                        )
-                    finally:
-                        reader.fetch_snapshot = original_fetch
+                    monkeypatch.setattr(reader, "fetch_snapshot", unavailable_fetch)
+                    pulled = await calls.call(
+                        "backlog_view", {"selector": changed_title, "summary": False, "allow_cached": True}
+                    )
                 assert pulled["status_source"] == "cache", pulled
                 assert pulled["title"] == changed_title, pulled
                 assert "Provider edit not present in the writer cache." in str(pulled["body"]), pulled
