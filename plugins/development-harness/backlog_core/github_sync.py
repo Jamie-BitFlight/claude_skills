@@ -300,7 +300,16 @@ def parse_issue_body(body: str, existing: BacklogItem | None = None) -> BacklogI
         # Strip leading "## " to get the plain heading name
         heading_name = heading.removeprefix("## ").strip()
 
-        if heading_name == "Description":
+        # Case-folded, not an exact-case compare: ``render_issue_body`` emits
+        # ``## Description``, but a human rewriting the issue body by hand types
+        # whatever casing they like, and ``## description`` names the same field.
+        # An exact-case compare routed that heading to ``heading_to_unknown_key``
+        # instead, so the provider's text landed in an ``unknown__description``
+        # section while ``description`` kept the stale carried-over value from
+        # ``base`` — one field in the provider body becoming two in the model, and
+        # (since ``render_sections_as_body`` emits both) two ``## Description``
+        # blocks with different content in every rendered view of that item.
+        if heading_name.casefold() == "description":
             description = content.strip()
             saw_description = True
             continue

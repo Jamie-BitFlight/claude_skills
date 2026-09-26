@@ -16,9 +16,10 @@ _PLUGIN_ROOT = Path(__file__).parent.parent
 if str(_PLUGIN_ROOT) not in sys.path:
     sys.path.insert(0, str(_PLUGIN_ROOT))
 
-from backlog_core.models import BacklogItem, Entry, GroomedData, Section
+from backlog_core.models import BacklogItem, Entry, GroomedData, Section, ViewItemResult
 from backlog_core.operations import (
     _filter_sections,
+    _populate_yaml_item_content,
     _render_section_index,
     _section_display_title,
     render_sections_as_body,
@@ -152,18 +153,33 @@ class TestRenderSectionsAsBodyIndex:
         # Index appears before the section content
         assert body.index("## Sections") < body.index("## Fact-Check")
 
-    def test_no_index_when_empty_sections(self) -> None:
-        """No sections → empty string (no index, no body)."""
+    def test_description_is_the_whole_body_when_there_are_no_sections(self) -> None:
+        """No sections → no index, and the description is still the body."""
         item = _item(sections={})
+        body = render_sections_as_body(item)
+        assert "## Sections" not in body
+        assert body == "## Description\n\ndesc\n\n"
+
+    def test_empty_string_when_neither_description_nor_sections(self) -> None:
+        """Nothing to render → empty string."""
+        item = _item(sections={})
+        item.description = ""
         assert render_sections_as_body(item) == ""
 
+    def test_description_renders_between_the_index_and_the_sections(self) -> None:
+        """The description reaches the body under the ``## Description`` heading the write path emits."""
+        item = _item(sections={"fact_check": Section(entries=[_entry("x")])})
+        body = render_sections_as_body(item)
+        assert body.index("## Sections") < body.index("## Description") < body.index("## Fact-Check")
+
     def test_no_index_when_section_filter_active(self) -> None:
-        """When section filter is active, no index block is prepended."""
+        """When section filter is active, no index block and no description is prepended."""
         item = _item(
             sections={"fact_check": Section(entries=[_entry("fc")]), "rt_ica": Section(entries=[_entry("rt")])}
         )
         body = render_sections_as_body(item, section="0")
         assert "## Sections" not in body
+        assert "## Description" not in body
         assert "## Fact-Check" in body
 
     def test_groomed_rendered_correctly(self) -> None:
@@ -331,3 +347,90 @@ class TestRenderSectionsAsBodyFiltered:
         assert "## Fact-Check" in body
         assert "## Notes" in body
         assert "## RT-ICA" not in body
+
+
+# ---------------------------------------------------------------------------
+# _populate_yaml_item_content section filter — every rendered heading is
+# addressable, and an unmatched expression reports a miss
+# ---------------------------------------------------------------------------
+
+
+class TestYamlSectionFilterAddressability:
+    """The singular ``section=`` filter reaches every ``## `` heading the body renders."""
+
+    @staticmethod
+    def _filtered(item: BacklogItem, section: str | None) -> ViewItemResult:
+        """Run the full-content YAML view arm for *section* and return its result."""
+        result = ViewItemResult(title=item.title)
+        _populate_yaml_item_content(result, item, section)
+        return result
+
+    @staticmethod
+    def _companion() -> BacklogItem:
+        """An item whose rendered body carries both a description and a section."""
+        return _item(sections={"fact_check": Section(entries=[_entry("fact content")])})
+
+    def test_unfiltered_body_advertises_the_description_heading(self) -> None:
+        """Premise for the rest of this class: the heading really is rendered."""
+        assert "## Description" in self._filtered(self._companion(), None).body
+
+    def test_description_heading_is_addressable_by_name(self) -> None:
+        """``section="Description"`` returns the description, not an empty body.
+
+        The plural ``sections=["Description"]`` form narrows the rendered body by
+        header name and so matches this heading. The singular form resolves
+        against ``item.sections``, which the description is not a member of — so
+        without the description arm the two filters disagree about whether a
+        heading the same call renders can be requested.
+        """
+        item = self._companion()
+        result = self._filtered(item, "Description")
+        assert item.description in result.body
+        assert "## Fact-Check" not in result.body
+        assert result.section_filter_miss is False
+
+    def test_description_heading_is_addressable_by_regex(self) -> None:
+        """The regex form reaches the description too, like any other heading name."""
+        item = self._companion()
+        assert item.description in self._filtered(item, "/desc.*/").body
+
+    def test_an_ordinal_does_not_resolve_to_the_description(self) -> None:
+        """Ordinals stay the ``## Sections`` index's numbering, which omits the description.
+
+        Index ``0`` is the first entry of that block; resolving it to the
+        description as well would renumber every section a caller has read.
+        """
+        item = self._companion()
+        result = self._filtered(item, "0")
+        assert "## Fact-Check" in result.body
+        assert "## Description" not in result.body
+
+    def test_an_unmatched_name_reports_a_filter_miss(self) -> None:
+        """An empty content response must carry the miss signal, not read as "no content".
+
+        ``rules/silent-failure-prevention.md``: a transform reports what it
+        changed. ``server.backlog_view`` gates on this flag to answer with the
+        valid-name error dict instead of an empty body.
+        """
+        result = self._filtered(self._companion(), "Nonexistent")
+        assert result.body == ""
+        assert result.sections == {}
+        assert result.section_filter_miss is True
+
+    def test_the_reported_valid_names_include_every_rendered_heading(self) -> None:
+        """The names offered on a miss are the names the filter actually matches."""
+        item = self._companion()
+        result = self._filtered(item, "Nonexistent")
+        rendered = self._filtered(item, None).body
+        for name in result.section_filter_valid_names:
+            assert f"## {name}" in rendered
+        assert "Description" in result.section_filter_valid_names
+        assert _section_display_title("fact_check") in result.section_filter_valid_names
+
+    def test_an_item_with_no_description_offers_no_description_name(self) -> None:
+        """A heading the body does not render is not offered as a valid name."""
+        item = self._companion()
+        item.description = ""
+        result = self._filtered(item, "Nonexistent")
+        assert "Description" not in result.section_filter_valid_names
+        assert self._filtered(item, "Description").section_filter_miss is True

@@ -13,7 +13,7 @@ if str(_PLUGIN_ROOT) not in sys.path:
 from backlog_core import rendering
 from backlog_core.github_sync import merge_item, parse_issue_body, render_issue_body
 from backlog_core.models import BacklogItem, Entry, GroomedData, Section
-from backlog_core.operations import _normalize_section_key
+from backlog_core.operations import _normalize_section_key, render_sections_as_body
 from backlog_core.parsing import extract_sections
 from hypothesis import HealthCheck, example, given, settings, strategies as st
 
@@ -518,6 +518,64 @@ class TestParseIssueBodyNoMetadata:
         # Assert — valid lines still parse; blank line is skipped
         assert result.priority == "P2"
         assert result.item_type == "Feature"
+
+
+# ---------------------------------------------------------------------------
+# parse_issue_body — the Description heading is matched case-insensitively
+# ---------------------------------------------------------------------------
+
+
+class TestParseIssueBodyDescriptionHeadingCase:
+    """parse_issue_body: any casing of ``## Description`` names the description field."""
+
+    _LOWERCASE_DESCRIPTION_BODY = (
+        "<!-- backlog-metadata:\n"
+        "priority: P1\n"
+        "type: Feature\n"
+        "status: open\n"
+        "added: 2026-01-01\n"
+        "-->\n\n"
+        "## description\n\nPROVIDER BODY DESC\n"
+    )
+
+    def test_lowercase_description_heading_fills_the_description_field(self) -> None:
+        """A hand-typed ``## description`` reaches ``description``, not an unknown section.
+
+        ``render_issue_body`` emits ``## Description``; a human rewriting the issue
+        body types whatever casing they like. Routing another casing to
+        ``heading_to_unknown_key`` split one provider field into two model fields:
+        the provider's text under ``unknown__description`` and the stale
+        carried-over value still under ``description``.
+        """
+        # Arrange — the provider body names the description in lower case, and the
+        # cached item carries a stale description that must not survive.
+        existing = _make_item(description="STALE CARRIED-OVER DESC")
+
+        # Act
+        result = parse_issue_body(self._LOWERCASE_DESCRIPTION_BODY, existing)
+
+        # Assert
+        assert result.description == "PROVIDER BODY DESC"
+        assert not [key for key in result.sections if "description" in key]
+
+    def test_lowercase_description_heading_renders_one_description_block(self) -> None:
+        """The rendered view body carries exactly one ``## Description`` block.
+
+        ``render_sections_as_body`` emits the ``description`` field and every
+        section; an item holding the same field twice rendered two identically
+        titled blocks with different content, only one of which any section filter
+        could address.
+        """
+        # Arrange
+        existing = _make_item(description="STALE CARRIED-OVER DESC")
+
+        # Act
+        rendered = render_sections_as_body(parse_issue_body(self._LOWERCASE_DESCRIPTION_BODY, existing))
+
+        # Assert
+        assert rendered.count("## Description") == 1
+        assert "PROVIDER BODY DESC" in rendered
+        assert "STALE CARRIED-OVER DESC" not in rendered
 
 
 # ---------------------------------------------------------------------------
