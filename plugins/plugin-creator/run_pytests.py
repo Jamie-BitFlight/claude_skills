@@ -40,11 +40,7 @@ import pytest
 
 PLUGIN_ROOT = Path(__file__).resolve().parent
 IMPORT_PATHS = ("scripts", "skills/skill-creator/scripts")
-TEST_PATHS = (
-    "tests",
-    "skills/ensemble-rule-review/scripts",
-    "skills/output-style-creator/scripts",
-)
+TEST_PATHS = ("tests", "skills/ensemble-rule-review/scripts", "skills/output-style-creator/scripts")
 
 
 def main() -> int:
