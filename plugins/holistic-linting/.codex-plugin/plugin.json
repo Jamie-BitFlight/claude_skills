@@ -1,6 +1,6 @@
 {
   "name": "holistic-linting",
-  "version": "2.4.44",
+  "version": "2.4.45",
   "description": "Discovers and runs repository-configured quality gates for requested or changed work, preserves diagnostics as evidence, routes non-trivial failures to available causal/domain capabilities, verifies correction integrity, and reports unresolved or out-of-scope findings without silently weakening gates.",
   "author": {
     "name": "Jamie Nelson",
