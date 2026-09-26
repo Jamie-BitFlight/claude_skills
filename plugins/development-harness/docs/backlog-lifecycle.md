@@ -7,15 +7,16 @@ related:
   - skills/work-backlog-item/references/workflows/work/start.md
   - skills/work-backlog-item/references/workflows/close/start.md
 created: 2026-03-30
-updated: 2026-09-15
-source: "Derived from the status writes in backlog_core/operations.py and the work-backlog-item workflow files. Keep provider wire formats, cache policy, and capability details in backend-providers.md."
+updated: 2026-09-26
+status: "desired architecture contract"
+source: "Defines the target lifecycle contract. Keep provider wire formats, cache policy, and capability details in backend-providers.md."
 ---
 
 # Backlog Item Lifecycle — Canonical Reference
 
-This document lists the item statuses that `backlog_core` writes, the route that writes each
-status, and the gates between the stages. The code is the authority. When this document and
-`backlog_core/operations.py` disagree, the code is correct and this document is stale.
+This document defines the desired item statuses, the route that writes each status, and the gates
+between stages. Implementation conformance is audited against this contract; an observed gap
+belongs in the backlog and does not weaken the contract.
 
 ## Consumer workflow
 
@@ -111,24 +112,25 @@ earlier stage whose output is missing.
 or backlog context. It is an offline, one-off workflow that follows `/dh:work-backlog-item` while
 bypassing the configured backend to create a local-only item. It supports feature, bug-fix, and
 documentation work in projects without a configured DH backend, and immediate work that should not
-first be filed remotely. The resulting Work Brief enters the same Groom → Work lifecycle.
+first be filed remotely. The resulting local item stores the Work Brief and follows the ordinary
+Create → Groom → Work lifecycle.
 
-Work Brief intake performs the normal Create and Groom lifecycle writes, verifies the persisted
-Groom result by reading it back, and only then enters Work. It does not bypass or add a stage to the
-ordinary `create` → `groom` → `work` order.
+Work Brief intake is a pre-lifecycle activity. It performs and verifies the normal Create and Groom
+lifecycle writes, then enters Work. It does not bypass or add a lifecycle stage to the ordinary
+`create` → `groom` → `work` order.
 
 Interactive intake opens a scratch state file, names its exact path at the start of every grilling
 response, and reads and updates it every turn. It establishes the observable current problem or
 desired outcome and current relevance, then gathers only the clarification, discovery, research,
-feasibility evidence, constraints, examples, and validation the request needs. The state records
-settled decisions, answered and intentionally unresolved questions, evidence references, concerns,
-and the remaining question frontier.
+grilling, brainstorming, feasibility evidence, constraints, examples, and validation the request
+needs. The state records settled decisions, answered and intentionally unresolved questions,
+evidence references, concerns, and the remaining question frontier.
 
 ### Stage Definitions
 
-| Stage | Route | Workflow file | Output | Status write |
+| Activity or stage | Route | Workflow file | Output | Status write |
 |---|---|---|---|---|
-| Work Brief intake | `/dh:work-brief` | Interactive intake | Verified local Work Brief ready for design, then entry to Work | `needs-grooming` from Create, then `groomed` from Groom |
+| Pre-lifecycle Work Brief intake | `/dh:work-brief` | Interactive intake | Verified local Work Brief ready for design, then entry to Work | `needs-grooming` from Create, then `groomed` from Groom |
 | Create | `create` | `create/scope.md`, `create/start.md` | `item_ref` from `backlog_add` | `needs-grooming` |
 | Groom | `groom` | `groom/start.md` | Groomed sections on the item | `groomed` |
 | Work | `work` | `work/start.md` | Plan address on the item, written by `backlog_update(plan=...)` | `in-progress`, before any gate runs |
@@ -142,9 +144,11 @@ flowchart TD
     BriefIntake --> BriefReady{"question frontier empty and<br>shared understanding confirmed?"}
     BriefReady -->|No, input required| BriefInput(["Stop — needs input; preserve grilling state"])
     BriefReady -->|Yes| BriefCreate["Run Create lifecycle write"]
-    BriefCreate --> BriefGroom["Run Groom lifecycle write"]
-    BriefGroom --> BriefPersisted{"Create and Groom succeeded,<br>and persisted copy verified?"}
-    BriefPersisted -->|No| BriefBlocked(["Stop — blocked; preserve grilling state"])
+    BriefCreate --> BriefCreated{"reference, route, and<br>needs-grooming state verified?"}
+    BriefCreated -->|No| BriefBlocked(["Stop — blocked; preserve grilling state"])
+    BriefCreated -->|Yes| BriefGroom["Run Groom lifecycle write"]
+    BriefGroom --> BriefPersisted{"Groom succeeded and<br>persisted copy verified?"}
+    BriefPersisted -->|No| BriefBlocked
     BriefPersisted -->|Yes| WorkGate
     Entry -->|/dh:work-backlog-item| Route
 
@@ -171,11 +175,11 @@ flowchart TD
     WorkGate -->|No| Work["work/start.md"]
 ```
 
-Ready for design is reached only after the question frontier needed by architecture and planning is
-empty, the user confirms shared understanding, Create and Groom complete in order, and persisted
-grooming provenance passes read-back. Missing input records the unanswered questions and ends
-`needs-input`; Create, Groom, persistence, or verification failure ends blocked. Both outcomes
-preserve grilling state and claim no readiness.
+Ready for design has the meaning defined in [CONTEXT.md](../CONTEXT.md). Operationally, intake
+reaches it only after Create returns and verifies the reference, route, and `needs-grooming` state,
+then Groom persists the normalized dataset and a read-back verifies it. Missing input records the
+unanswered questions and ends `needs-input`; Create, Groom, persistence, or verification failure
+ends blocked. Both outcomes preserve grilling state and claim no readiness.
 
 ### Checks inside the stages
 
