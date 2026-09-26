@@ -76,10 +76,8 @@ class WorkItemDecisionContext:
         )
         try:
             snapshot = self._github.fetch_snapshot(request)
-        except BacklogError as exc:
-            if not self.allow_cached or (
-                type(exc) is not BacklogError and not isinstance(exc, BackendUnavailableError)
-            ):
+        except BackendUnavailableError as exc:
+            if not self.allow_cached:
                 raise
             self._warn_cached_fallback(exc)
             self._bulk = self._cached_items()
@@ -108,10 +106,8 @@ class WorkItemDecisionContext:
             reference = f"#{exact}"
             try:
                 snapshot = self._targeted_snapshot(reference)
-            except BacklogError as exc:
-                if not self.allow_cached or (
-                    type(exc) is not BacklogError and not isinstance(exc, BackendUnavailableError)
-                ):
+            except BackendUnavailableError as exc:
+                if not self.allow_cached:
                     raise
                 self._warn_cached_fallback(exc)
                 read = self._cached_items()

@@ -38,21 +38,23 @@ def _github_exception(status: int, data: object) -> GithubException:
 
 
 class _FakeRequester:
-    """Stands in for PyGithub's requester, raising whatever the test supplies."""
+    """Stands in for PyGithub's requester, returning or raising what the test supplies."""
 
-    def __init__(self, error: Exception) -> None:
-        self._error = error
+    def __init__(self, result: Exception | dict[str, object]) -> None:
+        self._result = result
 
     def graphql_query(self, query: str, variables: dict[str, object]) -> tuple[dict, dict]:
-        """Raise the configured error instead of issuing a request."""
-        raise self._error
+        """Return or raise the configured result instead of issuing a request."""
+        if isinstance(self._result, Exception):
+            raise self._result
+        return {}, self._result
 
 
 class _FakeRepo:
     """Minimal stand-in satisfying the `.requester` surface `_graphql_request` needs."""
 
-    def __init__(self, error: Exception) -> None:
-        self.requester = _FakeRequester(error)
+    def __init__(self, result: Exception | dict[str, object]) -> None:
+        self.requester = _FakeRequester(result)
 
 
 class TestMessageExtraction:
@@ -145,32 +147,53 @@ class TestGraphqlRequestRaisesTheDistinctType:
 
         assert excinfo.value.__cause__ is original
 
-    def test_a_permissions_403_still_raises_the_generic_error(self):
-        repo = _FakeRepo(_github_exception(403, {"message": "Resource not accessible by integration"}))
+    def test_a_permissions_403_is_nonretryable_backend_unavailability(self):
+        original = _github_exception(403, {"message": "Resource not accessible by integration"})
+        repo = _FakeRepo(original)
 
-        with pytest.raises(BacklogError) as excinfo:
+        with pytest.raises(BackendUnavailableError) as excinfo:
             _graphql_request(repo, "query { viewer { login } }")
 
-        assert not isinstance(excinfo.value, GraphQLUnavailableError)
+        assert excinfo.value.retryable is False
+        assert excinfo.value.__cause__ is original
 
-    def test_a_non_403_still_raises_the_generic_error(self):
-        repo = _FakeRepo(_github_exception(500, {"message": "Server Error"}))
+    def test_a_503_is_retryable_backend_unavailability(self):
+        original = _github_exception(503, {"message": "Server Error"})
+        repo = _FakeRepo(original)
 
-        with pytest.raises(BacklogError) as excinfo:
+        with pytest.raises(BackendUnavailableError) as excinfo:
             _graphql_request(repo, "query { viewer { login } }")
 
-        assert not isinstance(excinfo.value, GraphQLUnavailableError)
+        assert excinfo.value.retryable is True
+        assert excinfo.value.__cause__ is original
 
     @pytest.mark.parametrize("transport_type", RETRYABLE_TRANSIENT_EXCEPTIONS)
-    def test_raw_transport_failures_raise_the_generic_error(self, transport_type: type[Exception]):
+    def test_raw_transport_failures_raise_retryable_backend_unavailability(
+        self, transport_type: type[Exception]
+    ) -> None:
         transport_error = transport_type("transport failed")
         repo = _FakeRepo(transport_error)
 
-        with pytest.raises(BacklogError) as excinfo:
+        with pytest.raises(BackendUnavailableError) as excinfo:
             _graphql_request(repo, "query { viewer { login } }")
 
         assert "GraphQL transport failed" in str(excinfo.value)
+        assert excinfo.value.retryable is True
         assert excinfo.value.__cause__ is transport_error
+
+    @pytest.mark.parametrize(
+        ("response", "message"),
+        [
+            pytest.param({"errors": [{"message": "field invalid"}]}, "GraphQL error", id="graphql-errors"),
+            pytest.param({"extensions": {}}, "missing 'data' key", id="missing-data"),
+        ],
+    )
+    def test_answered_response_failures_remain_semantic(self, response: dict[str, object], message: str) -> None:
+        with pytest.raises(BacklogError, match=message) as excinfo:
+            _graphql_request(_FakeRepo(response), "query { viewer { login } }")
+
+        assert type(excinfo.value) is BacklogError
+        assert excinfo.value.__cause__ is None
 
 
 class TestErrorTypeRelationships:

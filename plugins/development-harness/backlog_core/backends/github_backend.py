@@ -66,7 +66,12 @@ from backlog_core.models import (
     ViewEnrichmentResult,
     parse_issue_number,
 )
-from backlog_core.sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS, SyncErrorKind, classify_sync_error
+from backlog_core.sync_state import (
+    RETRYABLE_TRANSIENT_EXCEPTIONS,
+    SyncErrorKind,
+    classify_github_failure,
+    classify_sync_error,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -292,13 +297,19 @@ class GitHubBackend:
             raise
         except BacklogError:
             raise
-        except (GithubException, ContentUnavailableError, *RETRYABLE_TRANSIENT_EXCEPTIONS) as exc:
-            retryable = getattr(exc, "retryable", None)
+        except ContentUnavailableError as exc:
+            retryable = exc.retryable
+            kind = classify_github_failure(exc)
+            if retryable is False or (retryable is None and kind is SyncErrorKind.UNKNOWN):
+                raise
             if retryable is None:
-                kind = classify_sync_error(exc)
-                retryable = (
-                    True if kind is SyncErrorKind.RETRYABLE else False if kind is SyncErrorKind.NON_RETRYABLE else None
-                )
+                retryable = kind is SyncErrorKind.RETRYABLE
+            raise BackendUnavailableError(f"GitHub snapshot unavailable: {exc}", retryable=retryable) from exc
+        except (GithubException, *RETRYABLE_TRANSIENT_EXCEPTIONS) as exc:
+            kind = classify_sync_error(exc)
+            retryable = (
+                True if kind is SyncErrorKind.RETRYABLE else False if kind is SyncErrorKind.NON_RETRYABLE else None
+            )
             raise BackendUnavailableError(f"GitHub snapshot unavailable: {exc}", retryable=retryable) from exc
 
     def pending_work_items(self, repo: str = "") -> list[BacklogItem]:

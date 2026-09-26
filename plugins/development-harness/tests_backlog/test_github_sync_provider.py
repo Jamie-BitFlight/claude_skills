@@ -11,6 +11,7 @@ from backlog_core.backend_types import AddedCommentNode
 from backlog_core.backends._github_work_item_versions import render_work_item_comment, root_revision, work_item_head_ref
 from backlog_core.backends.github_backend import GitHubBackend, _GitHubDispatchPersistence
 from backlog_core.backends.github_content_stores import _content_revision
+from backlog_core.backends.github_contents import _GitHubContentIntegrityError
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.file_cache import FileCache
 from backlog_core.models import (
@@ -121,6 +122,8 @@ def test_fetch_snapshot_normalizes_provider_availability(error: Exception, retry
     [
         pytest.param(ContentNotFoundError("missing"), id="content-not-found"),
         pytest.param(ContentConflictError("conflict"), id="content-conflict"),
+        pytest.param(ContentUnavailableError("invalid work-item head"), id="content-no-availability-evidence"),
+        pytest.param(_GitHubContentIntegrityError("tree truncated"), id="content-integrity"),
         pytest.param(ValidationError("invalid"), id="validation"),
         pytest.param(RuntimeError("bug"), id="runtime"),
     ],

@@ -667,9 +667,9 @@ class GitHubUnavailableError(BackendUnavailableError):
     once the credentials or the network are there.
     """
 
-    def __init__(self, *args: object) -> None:
-        """Initialize with the usual exception args and a retryable verdict."""
-        super().__init__(*args, retryable=True)
+    def __init__(self, *args: object, retryable: bool = True) -> None:
+        """Initialize with the usual exception args and the raise site's retry verdict."""
+        super().__init__(*args, retryable=retryable)
 
 
 class GraphQLUnavailableError(BackendUnavailableError):

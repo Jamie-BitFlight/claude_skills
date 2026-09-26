@@ -13,6 +13,7 @@ from backlog_core.models import (
     ArtifactEntry,
     ArtifactManifest,
     ArtifactType,
+    BackendUnavailableError,
     ContentConflictError,
     ContentKind,
     ContentQuery,
@@ -63,10 +64,13 @@ class _FakeRequester:
     def __init__(self, repository: _Repository) -> None:
         self._repository = repository
         self.call_count = 0
+        self.error: Exception | None = None
         self.override: dict[str, object] | None = None
 
     def graphql_query(self, query: str, variables: dict[str, object]) -> tuple[dict[str, object], dict[str, object]]:
         self.call_count += 1
+        if self.error is not None:
+            raise self.error
         if self.override is not None:
             return {}, self.override
         sha_keys = sorted((key for key in variables if key.startswith("sha")), key=lambda key: int(key[3:]))
@@ -457,14 +461,26 @@ def test_missing_native_blob_fails_closed(store: _GitHubContentsStore, repositor
         store.list(ContentQuery(kind=ContentKind.PLAN))
 
 
-def test_blob_batch_graphql_transport_failure_fails_closed(
-    store: _GitHubContentsStore, repository: _Repository
-) -> None:
+def test_blob_batch_graphql_semantic_failure_fails_closed(store: _GitHubContentsStore, repository: _Repository) -> None:
     store.put(ContentWrite(reference=ContentRef(kind=ContentKind.PLAN, name="P1"), content="body"))
     repository.requester.override = {"errors": [{"message": "rate limited"}]}
 
     with pytest.raises(ContentUnavailableError, match="discovery failed"):
         store.list(ContentQuery(kind=ContentKind.PLAN))
+
+
+def test_blob_batch_graphql_transport_availability_is_preserved(
+    store: _GitHubContentsStore, repository: _Repository
+) -> None:
+    store.put(ContentWrite(reference=ContentRef(kind=ContentKind.PLAN, name="P1"), content="body"))
+    transport_error = TimeoutError("timed out")
+    repository.requester.error = transport_error
+
+    with pytest.raises(BackendUnavailableError) as unavailable:
+        store.list(ContentQuery(kind=ContentKind.PLAN))
+
+    assert unavailable.value.retryable is True
+    assert unavailable.value.__cause__ is transport_error
 
 
 def test_get_many_fetches_only_requested_blobs(store: _GitHubContentsStore, repository: _Repository) -> None:

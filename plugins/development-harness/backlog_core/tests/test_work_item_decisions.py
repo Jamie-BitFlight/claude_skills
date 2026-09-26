@@ -9,6 +9,7 @@ import pytest
 from github import GithubException
 
 from backlog_core.backends.github_backend import GitHubBackend
+from backlog_core.backends.github_contents import _GitHubContentIntegrityError
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.file_cache import FileCache
 from backlog_core.gh_client import _fetch_issues_graphql
@@ -200,9 +201,70 @@ def test_explicit_cached_fallback_handles_real_provider_failures(
     assert expected_message in output.warnings[0]
 
 
+@pytest.mark.parametrize("read_kind", ["bulk", "targeted"])
+def test_content_integrity_failure_never_reads_cache(tmp_path: Path, mocker: MockerFixture, read_kind: str) -> None:
+    repo = "owner/repository"
+    backend = GitHubBackend(repo=repo, cache=FileCache(tmp_path))
+    backend.reconcile(
+        ReconcileRequest(scope=ReconcileScope.INITIAL, repo=repo, apply_local_patches=False),
+        snapshot=ProviderSnapshot(
+            items=[provider_item("#7", "cached title")], sync_started_at="2026-09-24T00:00:00+00:00"
+        ),
+    )
+    issue = {"number": 7}
+    repository = mocker.Mock(full_name=repo)
+    repository.get_git_tree.return_value = mocker.Mock(truncated=True)
+    client = mocker.Mock()
+    client.get_repo.return_value = repository
+    mocker.patch("backlog_core.gh_client.make_github_client", return_value=client)
+    backend._fetch_issues_graphql = mocker.Mock(return_value=[issue])
+    backend._fetch_targeted_issues = mocker.Mock(return_value={"#7": issue})
+    cached_work_items = mocker.spy(backend, "cached_work_items")
+    output = Output()
+    context = WorkItemDecisionContext(backend, repo=repo, allow_cached=True, output=output)
+
+    integrity_error = None
+    try:
+        context.all() if read_kind == "bulk" else context.select("#7", purpose="read")
+    except _GitHubContentIntegrityError as exc:
+        integrity_error = exc
+
+    assert (type(integrity_error), cached_work_items.call_count, output.warnings) == (
+        _GitHubContentIntegrityError,
+        0,
+        [],
+    )
+
+
+def test_malformed_targeted_graphql_response_never_reads_cache(tmp_path: Path, mocker: MockerFixture) -> None:
+    repo = "owner/repository"
+    backend = GitHubBackend(repo=repo, cache=FileCache(tmp_path))
+    backend.reconcile(
+        ReconcileRequest(scope=ReconcileScope.INITIAL, repo=repo, apply_local_patches=False),
+        snapshot=ProviderSnapshot(
+            items=[provider_item("#7", "cached title")], sync_started_at="2026-09-24T00:00:00+00:00"
+        ),
+    )
+    backend.get_github = mocker.Mock(return_value=mocker.Mock(full_name=repo))
+    backend._graphql_request = mocker.Mock(return_value={})
+    cached_work_items = mocker.spy(backend, "cached_work_items")
+    output = Output()
+    context = WorkItemDecisionContext(backend, repo=repo, allow_cached=True, output=output)
+
+    malformed = None
+    try:
+        context.select("#7", purpose="read")
+    except BacklogError as exc:
+        malformed = exc
+
+    assert (type(malformed), cached_work_items.call_count, output.warnings) == (BacklogError, 0, [])
+    assert "omitted repository data" in str(malformed)
+
+
 @pytest.mark.parametrize(
     "error",
     [
+        pytest.param(BacklogError("semantic response failure"), id="backlog-semantic"),
         pytest.param(ValidationError("invalid"), id="validation"),
         pytest.param(BranchConflictError("head", "base"), id="branch-conflict"),
         pytest.param(ContentConflictError("conflict"), id="content-conflict"),

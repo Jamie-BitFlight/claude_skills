@@ -578,7 +578,8 @@ def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, obj
 
     Raises:
         GraphQLUnavailableError: When the environment refuses GraphQL outright.
-        BacklogError: On GraphQL errors, NOT_FOUND (404), or network/auth failures.
+        BackendUnavailableError: On GitHub API or transport failures.
+        BacklogError: On answered GraphQL errors or invalid response shapes.
     """
     try:
         _headers, response = repo.requester.graphql_query(query, variables or {})
@@ -587,10 +588,12 @@ def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, obj
             msg = f"GraphQL is unavailable in this environment: {_github_exception_message(exc)}"
             raise GraphQLUnavailableError(msg) from exc
         msg = f"GraphQL request failed: {exc}"
-        raise BacklogError(msg) from exc
+        kind = classify_sync_error(exc)
+        retryable = True if kind is SyncErrorKind.RETRYABLE else False if kind is SyncErrorKind.NON_RETRYABLE else None
+        raise BackendUnavailableError(msg, retryable=retryable) from exc
     except RETRYABLE_TRANSIENT_EXCEPTIONS as exc:
         msg = f"GraphQL transport failed: {exc}"
-        raise BacklogError(msg) from exc
+        raise BackendUnavailableError(msg, retryable=True) from exc
     if "errors" in response:
         first_error = response["errors"][0] if response["errors"] else {}
         msg = first_error.get("message", str(response["errors"]))
@@ -1323,7 +1326,7 @@ def get_github(repo: str = "", timeout: int = 15) -> Repository:
     try:
         gh = make_github_client(timeout=timeout)
     except MissingGitHubTokenError as exc:
-        raise GitHubUnavailableError(str(exc)) from exc
+        raise GitHubUnavailableError(str(exc), retryable=False) from exc
     return gh.get_repo(repo)
 
 

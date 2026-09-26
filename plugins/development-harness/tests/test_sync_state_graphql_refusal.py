@@ -57,4 +57,7 @@ def test_a_generic_graphql_failure_stays_retryable() -> None:
 
 def test_a_missing_token_stays_non_retryable() -> None:
     """The sibling BackendUnavailableError subclass keeps its existing verdict."""
-    assert classify_sync_error(GitHubUnavailableError("GITHUB_TOKEN not set")) is SyncErrorKind.NON_RETRYABLE
+    assert (
+        classify_sync_error(GitHubUnavailableError("GITHUB_TOKEN not set", retryable=False))
+        is SyncErrorKind.NON_RETRYABLE
+    )
