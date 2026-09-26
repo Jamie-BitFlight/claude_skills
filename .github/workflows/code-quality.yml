@@ -16,11 +16,61 @@ concurrency:
 permissions: {}
 
 jobs:
+  # Selection is itself blocking. Unknown/shared inputs and non-PR events run
+  # the complete matrix; see .github/ci/README.md for the boundary contract.
+  changes:
+    name: CI / Change plan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      plan: ${{ steps.select.outputs.plan }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.11"
+      - name: Select affected checks and test suites
+        id: select
+        env:
+          CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: uv run --script .github/ci/plan.py
+
   # =============================================================================
   # Python: Ruff linting and formatting (via prek — single config source)
   # =============================================================================
   lint-python:
+    needs: changes
+    if: ${{ fromJSON(needs.changes.outputs.plan).checks['lint-python'] }}
     name: Python / Ruff
+    runs-on: ubuntu-latest
+    env:
+      CI_PLAN: ${{ needs.changes.outputs.plan }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-python
+        with:
+          fetch-depth: 0
+
+      - name: Lint with Ruff
+        run: uv run --script .github/ci/run.py prek --hook ruff
+
+      - name: Check formatting with Ruff
+        run: uv run --script .github/ci/run.py prek --hook ruff-format
+
+
+  # Dependency-use evidence includes scripts, commands and documentation. Keep
+  # the audit global even when there are no Python changes.
+  audit-dependencies:
+    name: Python / Dependency audit
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -29,17 +79,6 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-python
-
-      - name: Lint with Ruff
-        run: uv run -q --locked prek run ruff --all-files --show-diff-on-failure
-
-      - name: Check formatting with Ruff
-        run: uv run -q --locked prek run ruff-format --all-files --show-diff-on-failure
-
-      # The hook's own `files:` pattern limits it to pyproject.toml changes, and the
-      # file-hygiene job runs changed-files-only on pull_request. A change that removes
-      # the last import of a dependency without touching pyproject.toml would otherwise
-      # skip the audit entirely. Run it here against the whole tree on every event.
       - name: Audit declared dependencies
         run: uv run -q --locked prek run audit-dependencies --all-files --show-diff-on-failure
 
@@ -48,6 +87,8 @@ jobs:
   # Blocking as of 2026-02-19 — CI run 22188303914 passed cleanly.
   # =============================================================================
   typecheck-ty:
+    needs: changes
+    if: ${{ fromJSON(needs.changes.outputs.plan).checks['typecheck-ty'] }}
     name: Python / ty
     runs-on: ubuntu-latest
     permissions:
@@ -65,8 +106,12 @@ jobs:
   # JavaScript/TypeScript/JSON: Biome linting and formatting (via prek)
   # =============================================================================
   lint-js:
+    needs: changes
+    if: ${{ fromJSON(needs.changes.outputs.plan).checks['lint-js'] }}
     name: JS/TS/JSON / Biome lint
     runs-on: ubuntu-latest
+    env:
+      CI_PLAN: ${{ needs.changes.outputs.plan }}
     permissions:
       contents: read
     steps:
@@ -74,16 +119,22 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-python
+        with:
+          fetch-depth: 0
 
       - name: Run Biome
-        run: uv run -q --locked prek run biome-check --all-files --show-diff-on-failure
+        run: uv run --script .github/ci/run.py prek --hook biome-check
 
   # =============================================================================
   # Markdown: markdownlint (via prek)
   # =============================================================================
   lint-markdown:
+    needs: changes
+    if: ${{ fromJSON(needs.changes.outputs.plan).checks['lint-markdown'] }}
     name: Markdown / markdownlint
     runs-on: ubuntu-latest
+    env:
+      CI_PLAN: ${{ needs.changes.outputs.plan }}
     permissions:
       contents: read
     steps:
@@ -91,16 +142,22 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-python
+        with:
+          fetch-depth: 0
 
       - name: Run markdownlint-cli2
-        run: uv run -q --locked prek run markdownlint-cli2 --all-files --show-diff-on-failure
+        run: uv run --script .github/ci/run.py prek --hook markdownlint-cli2
 
   # =============================================================================
   # Shell: shellcheck and shfmt (via prek)
   # =============================================================================
   lint-shell:
+    needs: changes
+    if: ${{ fromJSON(needs.changes.outputs.plan).checks['lint-shell'] }}
     name: Shell / shellcheck + shfmt
     runs-on: ubuntu-latest
+    env:
+      CI_PLAN: ${{ needs.changes.outputs.plan }}
     permissions:
       contents: read
     steps:
@@ -108,20 +165,26 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-python
+        with:
+          fetch-depth: 0
 
       - name: Run shellcheck
-        run: uv run -q --locked prek run shellcheck --all-files --show-diff-on-failure
+        run: uv run --script .github/ci/run.py prek --hook shellcheck
 
       - name: Run shfmt
-        run: uv run -q --locked prek run shell-fmt-go --all-files --show-diff-on-failure
+        run: uv run --script .github/ci/run.py prek --hook shell-fmt-go
 
   # =============================================================================
   # Local hooks: plugin validation (via prek)
   # Blocking since 2026-02-18 — all pre-existing errors resolved.
   # =============================================================================
   validate-plugins:
+    needs: changes
+    if: ${{ fromJSON(needs.changes.outputs.plan).checks['validate-plugins'] }}
     name: Local / Plugin validation
     runs-on: ubuntu-latest
+    env:
+      CI_PLAN: ${{ needs.changes.outputs.plan }}
     permissions:
       contents: read
     steps:
@@ -131,7 +194,7 @@ jobs:
       - uses: ./.github/actions/setup-python
 
       - name: Validate plugins
-        run: uvx skilllint@latest check plugins/ .claude/
+        run: uv run --script .github/ci/run.py skilllint
 
   # =============================================================================
   # Local hooks: manifest sync (via prek)
@@ -148,6 +211,8 @@ jobs:
   # diffing against bare "HEAD" would mix in base-only changes.
   # =============================================================================
   manifest-sync:
+    needs: changes
+    if: ${{ fromJSON(needs.changes.outputs.plan).checks['manifest-sync'] }}
     name: Local / Manifest sync
     runs-on: ubuntu-latest
     permissions:
@@ -156,8 +221,9 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-          fetch-depth: 0
       - uses: ./.github/actions/setup-python
+        with:
+          fetch-depth: 0
 
       - name: Check manifest sync
         run: uv run -q --locked prek run agent-marketplace-versioner --all-files --show-diff-on-failure
@@ -178,31 +244,30 @@ jobs:
   #   mixed-line-ending, check-added-large-files, check-case-conflict,
   #   check-executables-have-shebangs, check-shebang-scripts-are-executable,
   #   check-yaml, check-json, check-toml, check-symlinks, destroyed-symlinks
-  # validate-research-entries remains enabled here so modified entries are
-  # blocking, while the whole-corpus report below remains advisory.
+  # Workflow edits also run actionlint. Research entry validation retains its
+  # existing advisory lane rather than changing that policy in this split.
   # =============================================================================
   file-hygiene:
+    needs: changes
+    if: ${{ fromJSON(needs.changes.outputs.plan).checks['file-hygiene'] }}
     name: Files / Hygiene checks
     runs-on: ubuntu-latest
+    env:
+      CI_PLAN: ${{ needs.changes.outputs.plan }}
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-          fetch-depth: 0
       - uses: ./.github/actions/setup-python
+        with:
+          fetch-depth: 0
 
       - name: Run file hygiene hooks
         env:
-          SKIP: sync-pre-commit-deps,conventional-pre-commit,repair-symlinks,biome-check,ruff,ruff-format,pypfmt,markdownlint-cli2,actionlint,shell-fmt-go,shellcheck,agent-marketplace-versioner,skilllint,ty,enable-rerere,validate-research-entries,audit-dependencies
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE=$(git merge-base "origin/${GITHUB_HEAD_REF}" "origin/${GITHUB_BASE_REF}")
-            uv run --locked prek run --from-ref "${BASE}" --to-ref "origin/${GITHUB_HEAD_REF}" --show-diff-on-failure
-          else
-            uv run --locked prek run --all-files --show-diff-on-failure
-          fi
+          SKIP: sync-pre-commit-deps,conventional-pre-commit,repair-symlinks,biome-check,ruff,ruff-format,pypfmt,markdownlint-cli2,shell-fmt-go,shellcheck,agent-marketplace-versioner,skilllint,ty,enable-rerere,validate-research-entries,audit-dependencies
+        run: uv run --script .github/ci/run.py prek
 
   # =============================================================================
   # Research: validate research entry structure and completeness.
@@ -213,6 +278,8 @@ jobs:
   # into quality-gate until the corpus backlog is cleared.
   # =============================================================================
   research-validation:
+    needs: changes
+    if: ${{ fromJSON(needs.changes.outputs.plan).checks['research-validation'] }}
     name: Research / Entry validation
     runs-on: ubuntu-latest
     continue-on-error: true
@@ -235,8 +302,16 @@ jobs:
   # Python: pytest test suite
   # =============================================================================
   test-python:
-    name: Python / Tests
+    needs: changes
+    if: ${{ fromJSON(needs.changes.outputs.plan).checks['test-python'] }}
+    name: Python / Tests (${{ matrix.name }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.changes.outputs.plan).unit_matrix }}
+    env:
+      CI_PLAN: ${{ needs.changes.outputs.plan }}
+      CI_SHARD: ${{ toJSON(matrix) }}
     permissions:
       contents: read
     steps:
@@ -245,8 +320,8 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-python
 
-      - name: Run pytest
-        run: uv run -q --locked pytest
+      - name: Run selected pytest shard
+        run: uv run --script .github/ci/run.py pytest
 
   # =============================================================================
   # Python: Cross-backend protocol compliance tests
@@ -255,9 +330,12 @@ jobs:
   # and a live GITHUB_TOKEN — neither is set in this CI job).
   # =============================================================================
   test-cross-backend:
+    needs: changes
+    if: ${{ fromJSON(needs.changes.outputs.plan).checks['test-cross-backend'] }}
     name: Python / Cross-backend tests (${{ matrix.backend }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         backend: [memory, sqlite]
     env:
@@ -284,8 +362,16 @@ jobs:
   # quality-gate job rather than advisory.
   # =============================================================================
   test-integration:
-    name: Python / Integration tests
+    needs: changes
+    if: ${{ fromJSON(needs.changes.outputs.plan).checks['test-integration'] }}
+    name: Python / Integration tests (${{ matrix.name }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.changes.outputs.plan).integration_matrix }}
+    env:
+      CI_PLAN: ${{ needs.changes.outputs.plan }}
+      CI_SHARD: ${{ toJSON(matrix) }}
     permissions:
       contents: read
     steps:
@@ -294,11 +380,8 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-python
 
-      - name: Run integration tests
-        run: uv run -q --locked pytest -m "integration and not research_vault" -v plugins/development-harness/tests/ tests/research_backlinks/
-
-      - name: Verify rebase publication identity
-        run: uv run -q --locked pytest -m integration -v tests/test_rebase_publication_identity.py
+      - name: Run selected pytest shard
+        run: uv run --script .github/ci/run.py pytest
 
   # =============================================================================
   # Python: End-to-end live validation tests
@@ -388,14 +471,14 @@ jobs:
   # =============================================================================
   # Summary job that requires all checks to pass
   # =============================================================================
-  # The repository ruleset currently requires the historical
-  # "JS/TS/JSON / Biome" context. Keep that stable context as the aggregate
-  # merge gate so every blocking job below is actually merge-enforced.
-  # The underlying Biome job is named "JS/TS/JSON / Biome lint".
+  # The repository ruleset requires only the "Quality Gate" context, so every
+  # blocking job must be listed in needs to be merge-enforced.
   quality-gate:
-    name: JS/TS/JSON / Biome
+    name: Quality Gate
     if: always()
     needs:
+      - changes
+      - audit-dependencies
       - lint-python
       - typecheck-ty
       - lint-js
@@ -412,4 +495,6 @@ jobs:
       - name: Check all jobs passed
         uses: re-actors/alls-green@release/v1
         with:
+          # Planner failure remains blocking; an absent plan grants no skips.
+          allowed-skips: ${{ needs.changes.outputs.plan && fromJSON(needs.changes.outputs.plan).allowed_skips || '' }}
           jobs: ${{ toJSON(needs) }}
