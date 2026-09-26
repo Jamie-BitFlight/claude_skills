@@ -90,7 +90,7 @@ def _plugin_runner_testpaths() -> list[str]:
         )
         assert assignment is not None, f"{runner.relative_to(_REPO_ROOT)} has no literal test-path contract"
         values = ast.literal_eval(assignment.value)
-        assert isinstance(values, (list, tuple)) and values
+        assert isinstance(values, (list, tuple))\n        assert values
         plugin = runner.parent.relative_to(_REPO_ROOT)
         roots.extend((plugin / value).as_posix() for value in values)
     return roots
