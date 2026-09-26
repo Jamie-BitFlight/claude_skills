@@ -1,6 +1,6 @@
 # Architecture
 
-What this repository is, and how its parts fit together. This document states the current design.
+What this repository is, and how its parts fit together. This document states the desired design.
 It is not the intent — a `PURPOSE.md` states what a subsystem is for, and this says how that is
 achieved. It is not a deliberation: why a design was chosen, and what was rejected, belongs in an
 ADR, and nothing here links to one (see [rules/adr-lifecycle.md](./rules/adr-lifecycle.md)).

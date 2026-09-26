@@ -10,7 +10,7 @@ been added yet.
 
 | File | Purpose | Reaches an agent via |
 |---|---|---|
-| `adr-lifecycle.md` | `ARCHITECTURE.md` states what's true now; an ADR records a dismissible deliberation nothing links to | `manifest.json` |
+| `adr-lifecycle.md` | `ARCHITECTURE.md` defines desired state; backlog records gaps; an ADR records a dismissible deliberation that nothing links to | `manifest.json` |
 | `agent-output-contracts.md` | prohibited silent-output instructions and enforcement checklist | `manifest.json` |
 | `astral-tool-overrides.md` | this repo's uv/ty/ruff policy overrides | `manifest.json` |
 | `ci-workflows.md` | CI workflow modification protocol | `manifest.json` |

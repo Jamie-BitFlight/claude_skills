@@ -1,5 +1,8 @@
 # Backlog Item Groomed Schema
 
+> **Status: desired schema contract.** Implementation conformance is audited against this contract;
+> an observed gap belongs in the backlog and does not weaken the contract.
+
 **Purpose**: Define the structure of groomed content written into backlog item files. Grooming (backlog refinement) transforms items from vague ("this problem happens") to ready for planning — problem is clear, facts are verified, resources are mapped, effort is estimated, and blockers are surfaced. The agent does this autonomously: fact-checking claims, searching the codebase for related work, and identifying gaps. It does NOT produce architecture, task decomposition, or implementation plans — those happen in the SAM planning phase.
 
 **Scope**: This document defines the groomed *content* schema — frontmatter shape, body sections, and `## Groomed` subsections — passed through `backlog_groom(selector=..., section=..., content=...)` (`backlog_core/server.py:2550`). This content is identical regardless of which backend (github, sqlite, memory, beads) stores it; physical storage format and location are backend internals (see `plugins/development-harness/AGENTS.md` §Backend Providers) and are out of scope here. Frontmatter uses the research-style `metadata:` block (aligned with `./research/` entries). Body has no duplication of frontmatter — only extra fields when present, plus `## Groomed` when groomed.
@@ -43,6 +46,12 @@ Body is **empty** when un-groomed and no extra details. When present, body conta
 - **Files** — when applicable
 - **## Groomed (YYYY-MM-DD)** — when groomed (see below)
 
+An interactively normalized Work Brief persists its terminal grilling record inside the existing
+`sections["groomed"]` / `GroomedData` content represented by `## Groomed`; it does not create a
+top-level Entry-bearing section or a parallel provenance document. The orchestrator reads the
+persisted record back and verifies complete conversion before deleting the scratch source. After
+that gate, `GroomedData` is the sole durable copy.
+
 Do **not** duplicate `title`, `description`, `source`, `added`, `priority`, `type`, `issue` in the body — they live in frontmatter.
 
 ---
@@ -60,6 +69,11 @@ Do **not** duplicate `title`, `description`, `source`, `added`, `priority`, `typ
 ---
 
 ## Groomed Sections (Body, under ## Groomed)
+
+Work Brief grilling provenance carries the settled decisions, answered and intentionally
+unresolved questions, evidence references, and concerns needed by discovery, architecture, and
+planning. Place that content in the applicable existing groomed subsections below; “grilling
+provenance” is ownership of the record, not a new subsection name.
 
 | Section | Purpose | Required |
 |---------|---------|----------|

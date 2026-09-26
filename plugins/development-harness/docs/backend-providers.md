@@ -1,15 +1,18 @@
 # Development Harness Backend Providers
 
-This document is the backend contract for the development harness. Configure one
-backend for a process. That backend owns work items, grooming, plans, task state,
-artifact manifests, and artifact content.
+> **Status: desired architecture contract.** Implementation conformance is audited against this
+> contract; an observed gap belongs in the backlog and does not weaken the contract.
+
+This document is the backend contract for the development harness. Configure one primary backend
+for a process. The routing boundary adds only the reserved local Work Brief overlay and keeps every
+logical record on its selected route.
 
 Use provider-neutral MCP or CLI operations after resolving the active backend.
 Do not make a consumer choose a second backend for plans or artifacts.
 
 <storage_contract>
 
-## One configured backend
+## One configured primary backend
 
 Resolve the active backend in this order:
 
@@ -20,9 +23,16 @@ Resolve the active backend in this order:
    `.beads/dh-backend` marker.
 4. Otherwise use `github`.
 
-The selected backend is the source of truth for every logical record:
+Only a reference matching `brief~<mandatory-2-3-word-slug>-<4-lowercase-hex>` overrides this
+selection and routes to the existing project-local SQLite adapter. Its slug contains meaningful
+lowercase ASCII words, is immutable, and is truncated only at a word boundary; no fallback slug is
+generated. When SQLite is already the configured primary, ordinary local identifiers remain
+sufficient. Every other reference uses the configured primary backend; other identifier shapes
+remain opaque to routing.
 
-| Record | Owned by the configured backend |
+The routed backend is the source of truth for every logical record:
+
+| Record | Owned by the routed backend |
 |---|---|
 | Work item | Title, description, status, dependencies, labels, comments, and grooming sections |
 | Plan | Goal, context, owner reference, task rows, status, and task sections |
@@ -33,12 +43,17 @@ Use an opaque owner reference when associating a plan or artifact with a work
 item. A GitHub issue number is one provider's reference shape, not a universal
 plan identity.
 
+One composition boundary selects coordinated adapters for work items, content, Plans and Tasks,
+concerns, gates, and completion. Consumers never branch on the prefix or choose an adapter. A
+`brief~` route never falls back to the primary provider, never creates a second local store, and
+reports a routing or storage failure as an error.
+
 </storage_contract>
 
 ## SAM Storage Model
 
 Keep coordination and handoff content logically distinct while keeping their
-ownership unified:
+ownership unified on the selected route:
 
 | Logical object | What it contains | Backend operation family |
 |---|---|---|
@@ -46,13 +61,13 @@ ownership unified:
 | Task | Claimable execution state, dependencies, and evidence | `sam_task` |
 | Document | Plan, context, design, validation, or report content | `sam_plan` and `artifact_*` |
 
-This is a domain model, not a permission to select separate stores. The active
-backend owns all three object types and resolves their owner references — but
+This is a domain model, not a permission to select separate stores. The routed
+adapter set owns all three object types and resolves their owner references — but
 "owns" refers to storage selection, not one shared access protocol. Work
 items go through `WorkItemBackend`; plans and tasks go through a separate
 `TaskBackend` protocol, concretely implemented by `ContentTaskProvider` as an
 adapter over the same `ContentProvider` that `artifact_*` calls use — the
-same underlying configured backend, reached through a different interface.
+same underlying routed backend, reached through a different interface.
 `sam_active_task` primarily routes through a third protocol, `ContextBackend`,
 for its session-scoped state. The concrete protocol names and file paths are below.
 
@@ -75,10 +90,13 @@ established in-memory behavior. `sam_active_task` is not a `TaskBackend` consume
 (`get_context_config().backend`), for session-scoped active-task state, and only incidentally
 resolves a `TaskBackend` on its `update` action (to cross-validate/append task-section content
 against the plan the active-task address points at). There is no local filesystem fallback or
-per-plan backend selection — each protocol still resolves to exactly one configured backend
-instance per its own selection rules. Remote providers may use a private `FileCache` for stale
-reads and queued writes. Beads, SQLite, and Memory remain native-only and never use YAML or cache
-storage.
+caller-selected per-Plan backend. The distinct `WorkItemBackend`, `TaskBackend`, `ContentProvider`,
+and `ContextBackend` protocols remain separate; composite routing selects their coordinated
+adapter set rather than collapsing them into one interface. Plan creation atomically records
+`plan_id → backend + brief_reference`, and operations holding only the Plan address resolve every
+related state family through that binding. Remote providers may use a private `FileCache` for
+stale reads and queued writes. Beads, SQLite, and Memory remain native-only and never use YAML or
+cache storage.
 
 ### Plan drafting and the single-writer append
 
@@ -102,7 +120,7 @@ CLI equivalent: `plan create --slug ... --goal ... --owner-reference <work_item_
 
 **`append_task` is single-writer only.**
 
-`append_task` is single-writer for a given plan. Serialize appends through the configured backend;
+`append_task` is single-writer for a given Plan. Serialize appends through the routed backend;
 concurrent writes are outside the contract. Do NOT call `append_task` for
 the same plan from multiple agents or sessions simultaneously. The content-store `TaskBackend`
 (`ContentTaskProvider`) mutates its in-memory plan copy before writing it through
@@ -116,7 +134,7 @@ and the caller must retry rather than assume the append succeeded. See
 
 ## CLI vs MCP Capability Surface
 
-The CLI and MCP are two transports over the same configured backend. Use the
+The CLI and MCP are two transports over the same routing boundary. Use the
 surface available to the caller; do not infer a different source of truth from
 the transport.
 
@@ -138,16 +156,11 @@ dependent step. Do not emulate it with a cache or direct file access.
 
 ## Backlog Persistence Boundary
 
-The configured backend is the sole source of truth for backlog records. Remote
+The routed backend is the sole source of truth for each backlog record. Remote
 provider snapshots and local item files are private `FileCache` records; they
 support reconciliation and recovery but do not create a second backlog. Beads,
 SQLite, and memory backends read and write their own native state directly and
 do not use YAML or a provider cache.
-
-Known gap: `add_item` on `sqlite`/`memory` does not insert a normally-created
-item into that backend's native issue table — it is stored only through
-`put_work_item`, so a backend-native operation keyed on `issue_number`
-(milestone assignment included) cannot find it yet. Tracked as #3365.
 
 <provider_contract>
 
@@ -182,7 +195,37 @@ The same rule applies to remote work-item reconciliation: provider snapshots
 and local item files are private cache records, while the remote provider owns
 the accepted state.
 
+Creation and update are separate operations. Generic `backlog add` accepts an optional
+`--reference`. A provider that supports caller-assigned references accepts it. A provider that
+cannot honor it creates normally, returns its canonical reference, and emits a warning. SQLite
+supports caller-assigned references. The creation response is:
+
+```json
+{
+  "reference": "canonical-reference",
+  "warnings": []
+}
+```
+
+Creation is create-only. A collision never overwrites, retries automatically, falls through to
+update, or becomes bypassable with `force`. The error identifies the colliding reference and
+existing title, reports `retryable: false`, directs the caller to update or groom that reference
+for the same work, and directs the caller to invoke creation again for distinct work.
+Existing update and groom operations continue to modify the exact reference the caller supplies.
+
+For caller-assigned references, the provider boundary performs creation as one atomic
+insert-if-absent operation. A frontend existence check followed by an ordinary write does not
+satisfy this contract because another creator can win between those operations. On collision, the
+existing record remains unchanged.
+
+A local Work Brief otherwise follows ordinary provider behavior, including labels and tags.
+Completed local briefs remain until explicit cleanup.
+
 ### Listing provenance
+
+The provider-neutral list operation queries the configured primary and the local overlay; when
+SQLite is already primary, it queries that adapter only once. Every record carries route provenance
+so it remains attributable and subsequent operations use the same owner.
 
 On a never-synced remote cache, `operations.list_items()` performs one
 unlabeled, fetch-only reconciliation before serving the listing. The unlabeled
@@ -310,7 +353,7 @@ explicitly stale private-cache record under the remote-provider rules above.
 
 Agents MUST complete these steps for every backend-backed workflow:
 
-1. Resolve the active backend through the server configuration. Verify the
+1. Resolve the routed backend through the composition boundary. Verify the
    response identifies the expected provider before writing.
 2. Read and groom work items through `backlog_view`, `backlog_list`, and
    `backlog_groom`. Verify the returned record contains the required sections
@@ -327,8 +370,8 @@ Agents MUST complete these steps for every backend-backed workflow:
 6. Close or resolve the work item only after the plan status, artifact reads,
    and required acceptance evidence are complete on the selected backend.
 
-The workflow is complete when one backend owns every work-item, plan, manifest,
-and artifact operation and no step depends on a direct cache or filesystem read.
+The workflow is complete when one route owns every work-item, Plan, manifest, and artifact
+operation and no step depends on a direct cache or filesystem read.
 
 </consumer_workflow>
 
@@ -336,7 +379,7 @@ and artifact operation and no step depends on a direct cache or filesystem read.
 
 ## Configuration and troubleshooting
 
-Set one backend before starting the MCP server:
+Set one primary backend before starting the MCP server:
 
 ```bash
 BACKLOG_BACKEND=github uv run --script plugins/development-harness/scripts/run_backlog_server.py
@@ -363,9 +406,26 @@ Handle provider status as follows:
 | Pending | Report that the write is durably queued; wait for replay acknowledgement before claiming completion. |
 | Unavailable | Preserve the error and stop the dependent write or verification step. |
 
+`backend status [optional-reference]` always emits JSON. Without a reference it reports the
+configured primary provider; with a reference it reports the routed provider. The frontend owns
+routing and configuration context, then calls the selected adapter's `status()`. Each adapter
+returns `availability` plus an extensible `details` object. SQLite details may include the database
+path and record counts; GitHub details may include authentication state, username, and offline-cache
+state.
+
+This adapter-owned `status()` evolves or replaces the existing `probe_backend_status()` seam; no
+parallel provider-status mechanism is added.
+
+Online adapters check availability and authentication under one 30-second overall timeout.
+Reachable status exits zero. Timeout, authentication, rate-limit, and provider errors exit nonzero
+and preserve the adapter's structured connection-status error type. Responses expose no secrets,
+raw environment values, or unsafe exception text.
+
 Beads failures identify the missing or unavailable `bd` dependency; they do not
-select another backend. Memory state is intentionally ephemeral. SQLite state is
-durable only when the caller supplies a persistent database path.
+select another backend. Memory state is intentionally ephemeral. Direct SQLite construction is
+durable only when the caller supplies a persistent database path. The factory-created SQLite
+backend uses `dh_paths.state_root() / "backlog.sqlite3"`, which the local overlay reuses.
+Direct-construction semantics remain as described in Listing provenance's configuration caveat.
 
 </configuration_and_troubleshooting>
 

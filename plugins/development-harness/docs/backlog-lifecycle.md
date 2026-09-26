@@ -7,15 +7,16 @@ related:
   - skills/work-backlog-item/references/workflows/work/start.md
   - skills/work-backlog-item/references/workflows/close/start.md
 created: 2026-03-30
-updated: 2026-09-15
-source: "Derived from the status writes in backlog_core/operations.py and the work-backlog-item workflow files. Keep provider wire formats, cache policy, and capability details in backend-providers.md."
+updated: 2026-09-26
+status: "desired architecture contract"
+source: "Defines the target lifecycle contract. Keep provider wire formats, cache policy, and capability details in backend-providers.md."
 ---
 
 # Backlog Item Lifecycle — Canonical Reference
 
-This document lists the item statuses that `backlog_core` writes, the route that writes each
-status, and the gates between the stages. The code is the authority. When this document and
-`backlog_core/operations.py` disagree, the code is correct and this document is stale.
+This document defines the desired item statuses, the route that writes each status, and the gates
+between stages. Implementation conformance is audited against this contract; an observed gap
+belongs in the backlog and does not weaken the contract.
 
 ## Consumer workflow
 
@@ -34,7 +35,7 @@ with a guessed local value.
 
 ## Contributor boundary
 
-Route every lifecycle read and write through `backlog_core.operations` and the configured backend
+Route every lifecycle read and write through `backlog_core.operations` and the routed backend
 capability. Keep provider-specific identifiers, wire field names, timestamps, cache paths, and
 reconciliation mechanics inside adapters.
 
@@ -98,7 +99,7 @@ milestone, closes the GitHub milestone, and sets Project V2 Status to `Done` for
 
 ## 2. Pipeline Stages
 
-`dh:work-backlog-item` is the entry point for the backlog routes. The skill coerces its own
+`dh:work-backlog-item` is the entry point for provider-backed backlog routes. The skill coerces its own
 arguments to `scripts/parser/parse.schema.json`. `scripts/parser/command-routes.json` maps each
 route to its workflow file: `create`, `groom`, `work`, `close`, `resolve`, `setup-github`,
 `progress`, and `resume`. `close` and `resolve` share `close/start.md`. An argument with an issue
@@ -107,10 +108,29 @@ reference or a title and no route word runs the `work` pipeline.
 Pipeline order: `create` → `groom` → `work`. Before a target stage runs, the skill runs each
 earlier stage whose output is missing.
 
+`/dh:work-brief` is the entrypoint for an arbitrary conversation, interview, brainstorming session,
+or backlog context. It is an offline, one-off workflow that follows `/dh:work-backlog-item` while
+bypassing the configured backend to create a local-only item. It supports feature, bug-fix, and
+documentation work in projects without a configured DH backend, and immediate work that should not
+first be filed remotely. The resulting local item stores the Work Brief and follows the ordinary
+Create → Groom → Work lifecycle.
+
+Work Brief intake is a pre-lifecycle activity. It performs and verifies the normal Create and Groom
+lifecycle writes, then enters Work. It does not bypass or add a lifecycle stage to the ordinary
+`create` → `groom` → `work` order.
+
+Interactive intake opens a scratch state file, names its exact path at the start of every grilling
+response, and reads and updates it every turn. It establishes the observable current problem or
+desired outcome and current relevance, then gathers only the clarification, discovery, research,
+grilling, brainstorming, feasibility evidence, constraints, examples, and validation the request
+needs. The state records settled decisions, answered and intentionally unresolved questions,
+evidence references, concerns, and the remaining question frontier.
+
 ### Stage Definitions
 
-| Stage | Route | Workflow file | Output | Status write |
+| Activity or stage | Route | Workflow file | Output | Status write |
 |---|---|---|---|---|
+| Pre-lifecycle Work Brief intake | `/dh:work-brief` | Interactive intake | Verified local Work Brief ready for design, then entry to Work | `needs-grooming` from Create, then `groomed` from Groom |
 | Create | `create` | `create/scope.md`, `create/start.md` | `item_ref` from `backlog_add` | `needs-grooming` |
 | Groom | `groom` | `groom/start.md` | Groomed sections on the item | `groomed` |
 | Work | `work` | `work/start.md` | Plan address on the item, written by `backlog_update(plan=...)` | `in-progress`, before any gate runs |
@@ -119,6 +139,19 @@ earlier stage whose output is missing.
 
 ```mermaid
 flowchart TD
+    Entry{"entrypoint?"}
+    Entry -->|/dh:work-brief| BriefIntake["Interactive Work Brief intake"]
+    BriefIntake --> BriefReady{"question frontier empty and<br>user confirmed shared understanding?"}
+    BriefReady -->|No, input required| BriefInput(["Stop — needs input; preserve grilling state"])
+    BriefReady -->|Yes| BriefCreate["Run Create lifecycle write"]
+    BriefCreate --> BriefCreated{"reference, route, and<br>needs-grooming state verified?"}
+    BriefCreated -->|No| BriefBlocked(["Stop — blocked; preserve grilling state"])
+    BriefCreated -->|Yes| BriefGroom["Run Groom lifecycle write"]
+    BriefGroom --> BriefPersisted{"Groom succeeded and<br>persisted copy verified?"}
+    BriefPersisted -->|No| BriefBlocked
+    BriefPersisted -->|Yes| WorkGate
+    Entry -->|/dh:work-backlog-item| Route
+
     Route{"route value?"}
     Route -->|create| CreateRef{"item_ref available?"}
     CreateRef -->|Yes| CreateSkip(["Stop — item exists"])
@@ -141,6 +174,12 @@ flowchart TD
     WorkGate -->|Yes| WorkStop(["Stop — report the blocking reason"])
     WorkGate -->|No| Work["work/start.md"]
 ```
+
+Ready for design has the meaning defined in [CONTEXT.md](../CONTEXT.md). Operationally, intake
+reaches it only after Create returns and verifies the reference, route, and `needs-grooming` state,
+then Groom persists the normalized dataset and a read-back verifies it. Missing input records the
+unanswered questions and ends `needs-input`; Create, Groom, persistence, or verification failure
+ends blocked. Both outcomes preserve grilling state and claim no readiness.
 
 ### Checks inside the stages
 
@@ -182,6 +221,9 @@ The groom stage writes one of the three tokens that `dh:planner-rt-ica` owns:
 `BLOCKED-FOR-PLANNING`, continues on the other two, and routes any other token to `groom/error.md`.
 The work stage's RT-ICA gate reads the groom tokens and the two `dh:rt-ica` tokens. Its token table
 is in `work/rt-ica-gate.md`.
+
+Ready for design is a Work Brief handoff gate. It does not rename or replace `status: groomed`,
+`APPROVED-FOR-PLANNING`, `APPROVED-WITH-GAPS`, or `BLOCKED-FOR-PLANNING`.
 
 ### Quality gates before `status:verified`
 
@@ -239,6 +281,9 @@ The supported identifiers are `github`, `memory`, `sqlite`, and `beads`. See
 [Backend Providers](./backend-providers.md) for the Protocol reference, method groups, and
 configuration.
 
+Reference-level routing is owned by [Backend Providers](./backend-providers.md). Lifecycle callers
+pass references unchanged and do not infer a provider from any identifier shape.
+
 ### Fields Stored Per Item
 
 | Field | Set by | Description |
@@ -264,6 +309,10 @@ Find plans with `sam_plan(config={"action": "list", "search": "{search_term}"})`
 
 Write the returned plan address to the backlog item with
 `backlog_update(selector='{item_ref}', plan='{plan_address}')`.
+
+Plan creation atomically records the Plan address's selected backend and Work Brief reference. A
+later operation with only a Plan address uses that binding and fails closed when it cannot resolve
+it.
 
 Completion criterion: every consumer-facing response preserves the selected provider's `stale`,
 `pending`, warning, or error signal, and no route claims synchronization that the provider did not
@@ -308,6 +357,14 @@ In `auto` mode, `work-backlog-item create` derives the priority:
 ---
 
 ## 6. Groomed Item Content
+
+For an interactively normalized Work Brief, the existing `sections["groomed"]` / `GroomedData`
+content layer owns the terminal grilling provenance: settled decisions, answered and intentionally
+unresolved questions, evidence references, and concerns consumed by discovery, architecture, and
+planning. The orchestrator reads the persisted content back and verifies complete conversion
+without omission, duplication, or speculation. Only then is it the sole durable copy and the
+scratch grilling file is deleted. No new top-level Entry-bearing section or parallel provenance
+document is introduced.
 
 ### Required groomed sections
 
