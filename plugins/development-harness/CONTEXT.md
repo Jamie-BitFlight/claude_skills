@@ -120,9 +120,8 @@ between the methodology and one literal stateless agent instance).
 
 **Resolve**:
 Mark a work item DONE with an evidence trail (summary, method, notes, follow-ups, findings) —
-`resolve_item()`. The evidence trail is meant
-as contractual, not a GitHub-only artifact — persisting it on every backend, not only rendering it
-into a GitHub comment, is tracked by [#3220](https://github.com/Jamie-BitFlight/claude_skills/issues/3220).
+`resolve_item()`. The evidence trail is a backend-neutral part of the resolution contract, not a
+GitHub-only artifact.
 _Avoid_: "close" for completed work — that is Close below, a different, incompatible contract.
 
 **Close**:
@@ -139,17 +138,15 @@ _Avoid_: "resolve" for a dismissal — these were once conflated and callers use
 for already-completed work; close and resolve are now a deliberate, distinct pair.
 
 **Evidence trail**:
-The structured resolution record Resolve above requires. Only `summary` is enforced today;
-persisting the rest beyond the GitHub-rendered comment is [#3220](https://github.com/Jamie-BitFlight/claude_skills/issues/3220).
+The structured, backend-neutral resolution record Resolve above requires.
 
 **Failure type**:
-A label a Worker attaches to a failure it reports, drawn from the extensible vocabulary in
-`dh_core/known_failure_types.py` (readable as JSON via `sam known-failure-types` or the
-`sam_known_failure_types` MCP tool). It assists the router's pattern match the way a label on a
-GitHub issue does: it says where the work should go at a glance without dictating what happens to
-it. Biased by construction to what the reporting agent could see and understand — that is a
-property of the report, not a defect in it. An unknown name is accepted, recorded and routed
-rather than refused, because refusing pushes a novel failure into a mislabelled known one.
+A label a Worker attaches to a failure it reports, chosen from an extensible vocabulary. It assists
+the router's pattern match the way a label on a GitHub issue does: it says where the work should go
+at a glance without dictating what happens to it. Biased by construction to what the reporting
+agent could see and understand — that is a property of the report, not a defect in it. The
+vocabulary is open: a novel failure label is a valid routing input and must be accepted, recorded,
+and routed rather than rejected or forced into a known label.
 Distinct from a `REASONS` code (why a CLI command refused about a ledger row — the ledger's own
 observation, which no agent chooses) and from `reclaim --reason` (what the Orchestrator did about
 it). Two mappings exist because they sit at different layers: the ledger's vocabulary maps status
@@ -162,21 +159,10 @@ reporter's reading of it. Also avoid "error code" or "error type": these name wh
 proceed, not an exception that was raised.
 
 **Backend**:
-The data provider Collection reaches. Confirmed by the repo owner: "backend" always means the
-data-providing system, never a call to the MCP tool or CLI — those are Frontend below. Not one
-universal instance: backlog items route through `WorkItemBackend` (GitHub, SQLite, Beads, or
-Memory; see `docs/backend-providers.md`), accessed through `MarkdownContentProvider` (a thinner,
-markdown-specific adapter in front of it). SAM plans and tasks currently do **not** share that
-`WorkItemBackend` — they route through a separate `TaskBackend` protocol
-(`dh_core/protocols.py`), confirmed by the repo owner and verified against `dh_core/operations.py`
-(`create_plan(backend: TaskBackend, ...)` etc.). `AGENTS.md`'s "Plan and artifact capability
-boundary" section now describes this same `TaskBackend`/`WorkItemBackend` split; the earlier
-contradiction tracked as [#3088](https://github.com/Jamie-BitFlight/claude_skills/issues/3088) is resolved.
-_Avoid_: "backend call" for an MCP tool invocation or CLI request — that ambiguity caused real
-confusion in this session's design discussion. A backend call is specifically Collection
-reaching a data provider. Also avoid assuming "the backend" means one shared instance across
-backlog items and SAM — verify which protocol (`WorkItemBackend` vs `TaskBackend`) a given
-subsystem actually uses before making that claim.
+The data-providing system Collection reaches. Backend names a provider role, not one universal
+instance and not a call to an MCP tool or CLI — those are Frontend below.
+_Avoid_: "backend call" for an MCP tool invocation or CLI request. A backend call is specifically
+Collection reaching a data provider.
 
 **Frontend**:
 MCP, CLI, and the local navigator together — everything on the agent-facing side of a backend
