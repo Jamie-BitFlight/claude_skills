@@ -436,8 +436,14 @@ def test_view_after_targeted_pull_renders_the_provider_body_for_a_title_selector
     )
     pull_by_selector("#42")
 
-    # Then: a non-refresh title lookup serves that text as the item's body
-    viewed = view_item("companion changed remotely")
+    # Then: with the provider unavailable, an explicitly cache-allowed title lookup
+    # serves the pulled text as the item's body. Commands read live first, so the
+    # writer cache is reached only through this opt-in fallback.
+    def _unavailable(request: ReconcileRequest) -> ProviderSnapshot:
+        raise BackendUnavailableError
+
+    monkeypatch.setattr(backend, "fetch_snapshot", _unavailable)
+    viewed = view_item("companion changed remotely", allow_cached=True)
     assert viewed.title == "companion changed remotely"
     assert viewed.status_source == "cache", viewed
     assert "Provider edit not present in the writer cache." in viewed.body, viewed
