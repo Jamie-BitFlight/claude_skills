@@ -249,6 +249,19 @@ The provider-neutral list operation queries the configured primary and the local
 SQLite is already primary, it queries that adapter only once. Every record carries route provenance
 so it remains attributable and subsequent operations use the same owner.
 
+The composition boundary tags rows with their route before combining them. Primary rows precede
+overlay rows, and each route preserves its adapter's order. Row identity is `(route, reference)`, so
+an equal reference on different routes is not collapsed. Filters and search run once over the
+combined rows, followed by one pagination pass. `pagination.total` and count-only responses report
+the combined post-filter total; response `count` reports the rows on the current page.
+
+Aggregate `from_cache` and `has_pending_writes` are the logical OR of the queried routes. Warnings
+retain their route, while page-scoped status provenance is derived from the rows on that page. If
+either route cannot produce a result under its own fallback rules, the whole list fails rather than
+returning a partial backlog. Likewise, a route that withholds `items` and `count` because its
+fallback is unconfirmed causes the aggregate response to withhold both; rows from the other route
+do not turn an unknown total into a partial success.
+
 Pending mutations remain a separate local-intent journal. Mutation commands
 may use that intent as their mutation base after selecting the live provider
 fact, but journal rows do not become provider observations. A provider failure
