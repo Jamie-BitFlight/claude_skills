@@ -144,16 +144,6 @@ _PLAN_LOAD_ERRORS: tuple[type[Exception], ...] = (
 _YAML_FRONTMATTER_PARTS = 3
 _ACCEPTANCE_CRITERIA_ADAPTER = TypeAdapter(list[AcceptanceCriterion])
 
-_SYNC_ERRORS: tuple[type[Exception], ...]
-try:
-    from backlog_core.operations import sync_items as sync_backlog
-
-    _BACKLOG_CORE_AVAILABLE = True
-    _SYNC_ERRORS = (BacklogError, OSError, ValueError)
-except ImportError:
-    _BACKLOG_CORE_AVAILABLE = False
-    _SYNC_ERRORS = (OSError, ValueError)
-
 MILESTONE_ERRORS: tuple[type[Exception], ...] = (
     UnsupportedBackendCapabilityError,
     GitHubUnavailableError,
@@ -1890,36 +1880,7 @@ def _update_backlog_refs(old_path: Path, new_path: Path, backlog_dir: Path) -> i
     return updated
 
 
-def _attempt_backlog_sync() -> None:
-    """Best-effort backlog sync before bulk migration."""
-    if _BACKLOG_CORE_AVAILABLE:
-        try:
-            sync_backlog()
-        except _SYNC_ERRORS as exc:
-            typer.echo(f"Warning: backlog sync failed; continuing. ({exc})", err=True)
-        else:
-            typer.echo("Backlog synced to GitHub.", err=True)
-            return
-    uv_exe = shutil.which("uv")
-    if not uv_exe:
-        typer.echo("Warning: backlog sync unavailable (uv not found).", err=True)
-        return
-    try:
-        process = subprocess.run(
-            [uv_exe, "run", "backlog", "sync"], capture_output=True, text=True, timeout=30, check=False
-        )
-    except (OSError, subprocess.SubprocessError) as exc:
-        typer.echo(f"Warning: backlog sync unavailable: {exc}", err=True)
-    else:
-        if process.returncode:
-            typer.echo(f"Warning: backlog sync failed (exit {process.returncode}): {process.stderr.strip()}", err=True)
-        else:
-            typer.echo("Backlog synced to GitHub.", err=True)
-
-
-def _migrate_all(
-    plan_dir: Path, dry_run: bool, skip_sync: bool, backlog_dir: Path
-) -> dict[str, str | int | bool | list[str]]:
+def _migrate_all(plan_dir: Path, dry_run: bool, backlog_dir: Path) -> dict[str, str | int | bool | list[str]]:
     """Migrate every legacy plan in a directory and return a JSON summary.
 
     Returns:
@@ -1930,8 +1891,6 @@ def _migrate_all(
     candidates = sorted(p for p in plan_dir.iterdir() if p.suffix == ".md" and re.match(r"^tasks-\d+-", p.name))
     if not candidates:
         return {"migrated": 0, "candidates": 0, "backlog_refs_updated": 0, "dry_run": dry_run}
-    if not skip_sync and not dry_run:
-        _attempt_backlog_sync()
     migrated: list[tuple[Path, Path]] = []
     errors: list[str] = []
     for path in candidates:
@@ -1959,15 +1918,12 @@ def migrate(
     plan_dir: Annotated[Path | None, typer.Option("--plan-dir")] = None,
     dry_run: Annotated[bool, typer.Option("--dry-run")] = False,
     all_plans: Annotated[bool, typer.Option("--all")] = False,
-    skip_sync: Annotated[bool, typer.Option("--skip-sync")] = False,
     backlog_dir: Annotated[Path | None, typer.Option("--backlog-dir")] = None,
 ) -> None:
     """Migrate one legacy plan or all legacy plans to canonical YAML."""
     directory = _plan_dir(plan_dir)
     if all_plans:
-        _emit(
-            _migrate_all(directory, dry_run, skip_sync, dh_paths.backlog_dir() if backlog_dir is None else backlog_dir)
-        )
+        _emit(_migrate_all(directory, dry_run, dh_paths.backlog_dir() if backlog_dir is None else backlog_dir))
         return
     if plan_address is None:
         _error("Provide --plan-address or use --all to migrate every plan")

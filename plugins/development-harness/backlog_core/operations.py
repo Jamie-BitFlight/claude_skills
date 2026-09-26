@@ -159,11 +159,6 @@ def _decision_context(
     return WorkItemDecisionContext(get_config().backend, repo=repo, allow_cached=allow_cached, output=output)
 
 
-def _pending_decision_items(context: WorkItemDecisionContext) -> list[BacklogItem]:
-    """Return the context's memoized pending intent for safety checks."""
-    return context._pending()
-
-
 def _has_live_provider_target(target: DecisionTarget) -> bool:
     """Whether direct provider side effects are valid for a selected mutation.
 
@@ -1630,7 +1625,7 @@ def _duplicate_candidates(context: WorkItemDecisionContext) -> list[dict[str, st
     Returns:
         List entry dicts for every non-skipped, non-terminal-status item.
     """
-    items = context.all().provider_items + _pending_decision_items(context)
+    items = context.all().provider_items + context.pending()
     items = [it for it in items if not it.skip and it.status.casefold() not in _DUPLICATE_TERMINAL_STATUSES]
     return [_build_list_entry(it, {}) for it in items]
 
@@ -1689,7 +1684,7 @@ def _check_for_duplicates(
 def _resolve_reference(context: WorkItemDecisionContext, priority: str, slug: str) -> str:
     base = f"{priority.lower()}-{slug}"
     reference = base
-    existing_references = {item.reference for item in context.all().provider_items + _pending_decision_items(context)}
+    existing_references = {item.reference for item in context.all().provider_items + context.pending()}
     idx = 0
     while reference in existing_references:
         idx += 1
@@ -4991,7 +4986,7 @@ def normalize_items(
     context = _decision_context(repo=repo, allow_cached=allow_cached, output=out)
     read = context.all()
     by_reference = {item.reference: item for item in read.provider_items}
-    by_reference.update({item.reference: item for item in _pending_decision_items(context)})
+    by_reference.update({item.reference: item for item in context.pending()})
     items = list(by_reference.values())
     if not items:
         out.info("No backlog items found")

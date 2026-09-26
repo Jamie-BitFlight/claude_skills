@@ -53,8 +53,19 @@ from github import GithubException
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from typing import Protocol
 
     from pytest_mock import MockerFixture
+
+    class _ProviderMemoryBackend(Protocol):
+        provider_items: list[BacklogItem]
+        reconcile_requests: list[ReconcileRequest]
+        reconcile_result: ReconcileResult
+
+        def fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot: ...
+        def pending_work_items(self, repo: str = "") -> list[BacklogItem]: ...
+        def list_work_items(self) -> list[BacklogItem]: ...
+        def put_work_item(self, item: BacklogItem, repo: str = "") -> None: ...
 
 
 # ---------------------------------------------------------------------------
@@ -87,7 +98,7 @@ def _seed_items(items: list[BacklogItem]) -> None:
 def _seed_provider_items(items: list[BacklogItem]) -> None:
     from backlog_core.backend_protocol import get_config
 
-    backend = cast("Any", get_config().backend)
+    backend = cast("_ProviderMemoryBackend", get_config().backend)
     backend.provider_items.extend(item.model_copy(deep=True) for item in items)
 
 
@@ -119,12 +130,12 @@ class TestProviderMemoryBackendSeparation:
         """An unlinked local row is pending intent, never a live provider fact."""
         from backlog_core.backend_protocol import get_config
 
-        backend = get_config().backend
+        backend = cast("_ProviderMemoryBackend", get_config().backend)
         pending = BacklogItem(title="Pending only", reference="p2-pending-only", priority="P2")
         backend.put_work_item(pending)
 
-        snapshot = cast("Any", backend).fetch_snapshot(ReconcileRequest(scope=ReconcileScope.INCREMENTAL))
-        pending_items = cast("Any", backend).pending_work_items()
+        snapshot = backend.fetch_snapshot(ReconcileRequest(scope=ReconcileScope.INCREMENTAL))
+        pending_items = backend.pending_work_items()
 
         assert snapshot.items == []
         assert [(item.reference, item.issue) for item in pending_items] == [("p2-pending-only", "")]
@@ -3453,7 +3464,7 @@ class TestPullItemsEntryAwareMerge:
     def test_pull_with_empty_journal_reconciles_live_repository(self, mocker: MockerFixture) -> None:
         from backlog_core.backend_protocol import get_config
 
-        backend = cast("Any", get_config().backend)
+        backend = cast("_ProviderMemoryBackend", get_config().backend)
         mocker.patch.object(backend, "pending_work_items", return_value=[])
         mocker.patch.object(backend, "list_work_items", side_effect=AssertionError("cache queried during live pull"))
         backend.reconcile_result = ReconcileResult(local_updates=1)

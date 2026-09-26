@@ -10,7 +10,7 @@ No ``@pytest.mark.asyncio`` decorators — global ``asyncio_mode = "auto"``.
 
 from __future__ import annotations
 
-from typing import Any, ClassVar, cast
+from typing import TYPE_CHECKING, ClassVar, cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -19,6 +19,15 @@ from backlog_core.models import IssueStatus, ReconcileRequest, ReconcileResult, 
 from backlog_core.server import mcp
 
 from tests.helpers import call_mcp_tool
+
+if TYPE_CHECKING:
+    from typing import Protocol
+
+    from backlog_core.models import BacklogItem
+
+    class _ProviderItemsBackend(Protocol):
+        provider_items: list[BacklogItem]
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -38,7 +47,7 @@ def _stored_item(title: str):
 
 
 def _seed_provider_items(*titles: str) -> None:
-    backend = cast("Any", get_config().backend)
+    backend = cast("_ProviderItemsBackend", get_config().backend)
     backend.provider_items.extend(_stored_item(title).model_copy(deep=True) for title in titles)
 
 
@@ -515,7 +524,7 @@ class TestSyncAndPull:
         result = await _call("backlog_pull")
 
         provider_state.assert_called_once_with(
-            ReconcileRequest(scope=ReconcileScope.LINKED, references=["#50"], force=False, include_diff=False)
+            ReconcileRequest(scope=ReconcileScope.INCREMENTAL, references=["#50"], force=False, include_diff=False)
         )
         assert result["pulled"] == 1
         assert isinstance(result["messages"], list)

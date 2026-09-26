@@ -73,7 +73,8 @@ gh_client.py          ← GitHub work-item operations; imports from models, pars
 rendering.py          ← shared rendering utilities (section_display_title, render_groomed_section); imports section_registry; imported by backend implementations
 backend_protocol.py   ← re-exports backend_types contracts plus config/composition root; imports backend constructors
 backends/             ← provider implementations; remote providers privately compose FileCache
-operations.py         ← imports from models, pure helpers, search, and backend_protocol only
+work_item_decisions.py ← command-scoped live decision context; imports provider protocols, models, parsing, reconciliation, and status registry
+operations.py         ← imports from models, pure helpers, search, backend_protocol, and work_item_decisions
 dispatch_state.py     ← imports from models (DispatchItemRecord, DispatchWaveRecord); no MCP awareness
 server.py             ← imports from models, operations, dispatch_state, backend_protocol, search
 backlog.py            ← imports from operations (thin CLI wrapper)
@@ -978,6 +979,7 @@ and artifact access go through `get_config().backend`.
 - `from .models import ...`
 - Pure, filesystem-free helpers from `parsing.py`
 - Protocols and `get_config()` from `backend_protocol.py`
+- Command-scoped work-item decision types from `work_item_decisions.py`
 
 `operations.py` and `reconciliation.py` must not import `yaml_io.py`, `file_cache.py`, provider
 client implementations, provider-format adapters, local backend implementations, or independent

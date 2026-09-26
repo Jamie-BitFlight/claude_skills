@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 from ruamel.yaml import YAML
+from sam_schema import sam_plan
 from sam_schema.cli import app
 from sam_schema.sam_plan import _migrate_one, _migrate_one_fallback
 from typer.testing import CliRunner
@@ -304,17 +305,32 @@ def test_migrate_one_falls_back_for_pure_markdown_no_frontmatter(tmp_path: Path)
 # ---------------------------------------------------------------------------
 
 
+def test_migrate_all_never_synchronizes_implicitly(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    plan_dir = _make_nonstandard_plan_dir(tmp_path)
+
+    monkeypatch.setattr(sam_plan, "sync_backlog", lambda: pytest.fail("sync_backlog called"), raising=False)
+    monkeypatch.setattr(
+        sam_plan.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail(f"fallback sync called with {args!r} {kwargs!r}"),
+    )
+    result = runner.invoke(app, ["plan", "migrate", "--all", "--plan-dir", str(plan_dir)])
+
+    assert result.exit_code == 0, result.exception
+    assert json.loads(result.stdout)["migrated"] == 1
+
+
 def test_migrate_all_migrates_nonstandard_frontmatter_files(tmp_path: Path) -> None:
     """--all successfully migrates Category A files (non-standard frontmatter task lists).
 
     Tests: Zero errors when migrating files with task_exports or other non-canonical schemas.
-    How: Place nonstandard_frontmatter fixture, run sam migrate --all --skip-sync,
+    How: Place nonstandard_frontmatter fixture, run sam migrate --all,
          assert output yaml exists and exit code is 0.
     Why: The 10 error files in the original run were Category A/B — after this fix, zero errors.
     """
     plan_dir = _make_nonstandard_plan_dir(tmp_path)
 
-    result = runner.invoke(app, ["plan", "migrate", "--all", "--skip-sync", "--plan-dir", str(plan_dir)])
+    result = runner.invoke(app, ["plan", "migrate", "--all", "--plan-dir", str(plan_dir)])
 
     assert result.exit_code == 0, result.stderr
     payload = json.loads(result.stdout)
@@ -330,13 +346,13 @@ def test_migrate_all_migrates_pure_markdown_files(tmp_path: Path) -> None:
     """--all successfully migrates Category B files (pure markdown, no frontmatter).
 
     Tests: Zero errors when migrating pure markdown files with checklist tasks.
-    How: Place pure_markdown_checklist fixture, run sam migrate --all --skip-sync,
+    How: Place pure_markdown_checklist fixture, run sam migrate --all,
          assert output yaml exists.
     Why: Pure markdown files are the second common category that load_plan previously rejected.
     """
     plan_dir = _make_pure_markdown_plan_dir(tmp_path)
 
-    result = runner.invoke(app, ["plan", "migrate", "--all", "--skip-sync", "--plan-dir", str(plan_dir)])
+    result = runner.invoke(app, ["plan", "migrate", "--all", "--plan-dir", str(plan_dir)])
 
     assert result.exit_code == 0, result.stderr
     payload = json.loads(result.stdout)
@@ -360,7 +376,7 @@ def test_migrate_all_preserves_content_for_fallback_migrated_files(tmp_path: Pat
     src = plan_dir / "tasks-7-data-check.md"
     src.write_text(f"# Data Check\n\n**Issue**: #7\n\n{unique_marker}\n", encoding="utf-8")
 
-    result = runner.invoke(app, ["plan", "migrate", "--all", "--skip-sync", "--plan-dir", str(plan_dir)])
+    result = runner.invoke(app, ["plan", "migrate", "--all", "--plan-dir", str(plan_dir)])
 
     assert result.exit_code == 0, result.stderr
     payload = json.loads(result.stdout)
@@ -411,7 +427,7 @@ def test_migrate_all_mixed_standard_and_fallback_files(tmp_path: Path) -> None:
     nonstandard_content = _NONSTANDARD_FM.read_text(encoding="utf-8")
     (plan_dir / "tasks-6-nonstandard.md").write_text(nonstandard_content, encoding="utf-8")
 
-    result = runner.invoke(app, ["plan", "migrate", "--all", "--skip-sync", "--plan-dir", str(plan_dir)])
+    result = runner.invoke(app, ["plan", "migrate", "--all", "--plan-dir", str(plan_dir)])
 
     assert result.exit_code == 0, result.stderr
     payload = json.loads(result.stdout)

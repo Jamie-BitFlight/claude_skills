@@ -228,6 +228,20 @@ def test_select_purpose_controls_pending_journal_access_and_mutation_base(mocker
     assert len(backend.snapshot_requests) == 1
 
 
+def test_pending_is_repository_scoped_and_memoized(mocker: MockerFixture) -> None:
+    pending = BacklogItem(title="queued title", issue="#7")
+    backend = DecisionBackend(live_items=[], pending_items=[pending])
+    pending_work_items = mocker.spy(backend, "pending_work_items")
+    context = WorkItemDecisionContext(backend, repo="owner/repository")
+
+    first = context.pending()
+    second = context.pending()
+
+    assert second is first
+    assert first == [pending]
+    pending_work_items.assert_called_once_with("owner/repository")
+
+
 def test_targeted_then_global_reads_each_live_scope_once() -> None:
     backend = DecisionBackend(live_items=[provider_item("#7", "live title")])
     context = WorkItemDecisionContext(backend)

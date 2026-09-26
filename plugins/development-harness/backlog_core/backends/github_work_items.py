@@ -55,6 +55,7 @@ from backlog_core.models import (
     ReconcileRequest,
     ReconcileResult,
     ReconcileScope,
+    ValidationError,
 )
 from backlog_core.reconciliation import (
     ActionResult,
@@ -591,7 +592,7 @@ class _GitHubReconciliation:
         elif effective_request.scope in {ReconcileScope.LINKED, ReconcileScope.TARGETED}:
             observed = {item.reference for item in snapshot.items}
             if missing := set(effective_request.references) - observed:
-                raise ValueError(f"Supplied snapshot is missing requested references: {sorted(missing)}")
+                raise ValidationError(f"Supplied snapshot is missing requested references: {sorted(missing)}")
         pending_work_items = self._cache._pending_work_item_mutations(
             effective_request.repo or self._default_repo, default_repo=self._default_repo
         )

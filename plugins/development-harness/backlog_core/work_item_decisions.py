@@ -127,7 +127,7 @@ class WorkItemDecisionContext:
             pending_selector = (
                 provider.reference if provider is not None else f"#{exact}" if exact is not None else selector
             )
-            pending = find_item(self._pending(), pending_selector)
+            pending = find_item(self.pending(), pending_selector)
             mutation_base = pending or provider
         return DecisionTarget(
             provider=provider, pending=pending, mutation_base=mutation_base, provider_snapshot=snapshot
@@ -172,7 +172,8 @@ class WorkItemDecisionContext:
             self._targeted[reference] = self._slice_snapshot(snapshot, [reference])
         return self._targeted[reference]
 
-    def _pending(self) -> list[BacklogItem]:
+    def pending(self) -> list[BacklogItem]:
+        """Return memoized pending intent scoped to this context's repository."""
         if self._pending_items is None:
             if not self._is_github:
                 self._pending_items = []
@@ -185,7 +186,7 @@ class WorkItemDecisionContext:
     def _cached_items(self) -> CommandWorkItems:
         if self._cached is None:
             pending_identities = {
-                identity for item in self._pending() for identity in (item.reference, item.issue) if identity
+                identity for item in self.pending() for identity in (item.reference, item.issue) if identity
             }
             cached_items = (
                 self.backend.cached_work_items(self.repo)

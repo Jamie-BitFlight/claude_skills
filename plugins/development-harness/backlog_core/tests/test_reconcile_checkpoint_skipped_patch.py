@@ -37,6 +37,7 @@ from backlog_core.models import (
     ProviderSnapshot,
     ReconcileRequest,
     ReconcileScope,
+    ValidationError,
 )
 
 if TYPE_CHECKING:
@@ -178,7 +179,7 @@ class TestFetchOnlyReconcileAdvancesTheCheckpoint:
         reconciliation = _GitHubReconciliation(FileCache(tmp_path), _FakeReconcileProvider(_provider_snapshot()))
         request = ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#1", "#2"])
 
-        with pytest.raises(ValueError, match="#2"):
+        with pytest.raises(ValidationError, match="missing requested references"):
             reconciliation.reconcile(request, snapshot=_provider_snapshot())
 
     def test_a_second_fetch_only_call_does_not_repeat_the_full_fetch(self, tmp_path: Path) -> None:
