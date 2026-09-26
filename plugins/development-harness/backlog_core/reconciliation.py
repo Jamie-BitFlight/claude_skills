@@ -122,6 +122,15 @@ def _normalized_body(body: str) -> str:
     return body.replace("\r\n", "\n").replace("\r", "\n")
 
 
+def _label_priority(labels: Sequence[str]) -> str:
+    """Return the priority a ``priority:`` label names, or ``""`` when none does.
+
+    Issues created by ``create_issue_for_item`` carry priority only in this label;
+    their body has no ``backlog-metadata`` block for ``parse_issue_body`` to read.
+    """
+    return next((label.split(":", 1)[1].upper() for label in labels if label.startswith("priority:")), "")
+
+
 def _compose(
     local: BacklogItem, provider: ProviderItem, body_item: BacklogItem, *, title: str | None = None
 ) -> BacklogItem:
@@ -131,7 +140,7 @@ def _compose(
             "issue": provider.reference,
             "item_type": body_item.metadata.item_type,
             "labels": provider.labels,
-            "priority": body_item.metadata.priority,
+            "priority": body_item.metadata.priority or _label_priority(provider.labels),
             "status": provider.state.lower(),
             "updated_at": provider.revision,
         }
