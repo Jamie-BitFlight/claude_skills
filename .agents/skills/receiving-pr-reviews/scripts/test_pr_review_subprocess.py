@@ -72,6 +72,24 @@ def test_terminate_windows_process_tree_uses_taskkill_for_descendants(mocker: Mo
     )
 
 
+@pytest.mark.parametrize("error", [ProcessLookupError, PermissionError])
+def test_process_group_is_gone_when_the_probe_finds_no_signallable_member(
+    mocker: MockerFixture, error: type[OSError]
+) -> None:
+    """Darwin answers EPERM, not ESRCH, for a group whose only members are unreaped zombies."""
+    mocker.patch.object(pr_review_subprocess.os, "killpg", side_effect=error, create=True)
+
+    assert pr_review_subprocess.process_group_is_alive(4312) is False
+
+
+def _pid_exists(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+
 @pytest.mark.skipif(os.name != "posix", reason="POSIX process groups are unavailable")
 def test_timeout_removes_a_live_descendant_process_group(tmp_path: Path) -> None:
     ready_file = tmp_path / "descendant-ready"
@@ -87,8 +105,10 @@ def test_timeout_removes_a_live_descendant_process_group(tmp_path: Path) -> None
         pr_review_subprocess.run_capture([sys.executable, "-c", parent], timeout=1)
 
     descendant_pid, process_group_id = map(int, ready_file.read_text().split())
+    # The killed descendant is an orphan zombie until init reaps it. Linux counts that zombie as a
+    # live group member and Darwin does not, so wait for the reap itself.
     deadline = time.monotonic() + 3
-    while pr_review_subprocess.process_group_is_alive(process_group_id) and time.monotonic() < deadline:
+    while _pid_exists(descendant_pid) and time.monotonic() < deadline:
         time.sleep(0.01)
 
     assert not pr_review_subprocess.process_group_is_alive(process_group_id)

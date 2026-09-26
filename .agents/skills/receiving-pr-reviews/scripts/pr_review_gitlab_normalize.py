@@ -77,8 +77,11 @@ def note_input(state: GitLabState, note: GitLabNote, *, discussion: GitLabDiscus
     if note.system:
         return None
     position = note.position
-    current_user = note.author.id == state.current_user.id
     threaded = discussion is not None and not discussion.individual_note
+    # A discussion opener is review input whoever wrote it; only the current user's reply or
+    # individual note is a response.
+    opens_discussion = threaded and discussion is not None and note == discussion.notes[0]
+    response = note.author.id == state.current_user.id and not opens_discussion
     resolved = note.resolved is True
     can_resolve = threaded and note.resolvable and not resolved
     relation = "unknown"
@@ -98,7 +101,7 @@ def note_input(state: GitLabState, note: GitLabNote, *, discussion: GitLabDiscus
         source_kind="discussion_note" if threaded else "individual_note",
         kinds={"comment"},
         location="inline" if position is not None else "top_level",
-        direction="outbound" if current_user else "inbound",
+        direction="outbound" if response else "inbound",
         actor=actor(note.author, state),
         body=note.body,
         stable_reference=note_reference(state, note),
@@ -161,7 +164,7 @@ def approval_inputs(state: GitLabState) -> list[ReviewInput]:
                 source_kind="merge_request_approval",
                 kinds={"approval"},
                 location="top_level",
-                direction="outbound" if user.id == state.current_user.id else "inbound",
+                direction="inbound",
                 actor=actor(user, state, reviewer=True),
                 body="",
                 stable_reference=f"{state.merge_request.web_url}#approval_{user.id}",

@@ -278,7 +278,7 @@ def test_fetch_persists_history_without_rendering_it(tmp_path: Path, mocker: Moc
 @pytest.mark.parametrize(
     ("update", "communicated"),
     [({"direction": "outbound"}, False), ({"provider_state": "resolved"}, False), ({}, True)],
-    ids=["outbound", "resolved", "addressed"],
+    ids=["own reply", "resolved", "addressed"],
 )
 def test_action_view_excludes_non_immediate_inputs(update: dict[str, str], communicated: bool) -> None:
     snapshot = canonical_snapshot()
