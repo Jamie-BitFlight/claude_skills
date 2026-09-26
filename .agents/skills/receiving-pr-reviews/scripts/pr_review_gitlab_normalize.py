@@ -220,7 +220,7 @@ def award_inputs(state: GitLabState) -> list[ReviewInput]:
             source_kind="award_emoji",
             kinds=award_kind(award),
             location="top_level",
-            direction="inbound",
+            direction="outbound" if award.user.id == state.current_user.id else "inbound",
             actor=actor(award.user, state, reviewer=award.name in {"thumbsup", "+1", "thumbsdown", "-1"}),
             body=award.name,
             stable_reference=f"{state.merge_request.web_url}#award_{award.id}",

@@ -28,10 +28,11 @@ used, and a canonical fingerprint exists.
 The inbound census contains every normalized inline or top-level comment, semantic question,
 approval, rejection/change request, bot summary, and human, reviewer, or stakeholder input. Canonical
 IDs are unique, and snapshot inbound IDs equal `input_census` exactly. Direction is set by an input's
-role, not by who wrote it. A submitted review, an approval, an award, and the first comment of a review
+role, not by who wrote it. A submitted review, an approval, and the first comment of a review
 thread or discussion are inbound even when the authenticated account wrote them, so a self-review is
 assessed like any other. Only the authenticated account's replies inside a thread and its top-level
-comments are outbound; they are the responses that communication evidence counts. Resolved history remains part
+comments and award emoji are outbound; the replies and comments are the responses that communication
+evidence counts. Resolved history remains part
 of pattern analysis. Provider metadata remains observable without becoming actor-backed input.
 
 Any pagination, required-surface, nested-conversation, schema, or transport gap yields

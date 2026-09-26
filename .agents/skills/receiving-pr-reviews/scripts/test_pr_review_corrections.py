@@ -39,7 +39,7 @@ from pr_review_gh_wire import (
 )
 from pr_review_github_normalize import communicated_inputs, inline_inputs, review_inputs
 from pr_review_gitlab_normalize import normalize_state
-from pr_review_gitlab_wire import GitLabApprovedBy, GitLabDiscussion
+from pr_review_gitlab_wire import GitLabApprovedBy, GitLabAwardEmoji, GitLabDiscussion
 from pr_review_output import action_view
 from pr_review_state import authorize_action
 from pr_review_threads import app
@@ -51,7 +51,7 @@ from review_test_fixtures import (
     state_for_input,
     write_ready_files,
 )
-from review_test_gitlab_fixtures import note as gitlab_note, state as gitlab_state, target as gitlab_target
+from review_test_gitlab_fixtures import NOW, note as gitlab_note, state as gitlab_state, target as gitlab_target
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -362,8 +362,8 @@ def test_github_own_submitted_review_is_inbound() -> None:
     assert [item.direction for item in normalized] == ["inbound"]
 
 
-def test_gitlab_own_discussion_opener_and_approval_are_inbound_and_own_reply_is_outbound() -> None:
-    """GitLab applies the same role rule to the current user's discussions and approvals."""
+def test_gitlab_own_discussion_opener_and_approval_are_inbound_and_own_reply_and_award_are_outbound() -> None:
+    """GitLab applies the role rule to discussions and approvals; only another user's award is inbound."""
     state = gitlab_state()
     current = state.current_user
     discussion = GitLabDiscussion(
@@ -380,7 +380,10 @@ def test_gitlab_own_discussion_opener_and_approval_are_inbound_and_own_reply_is_
             "discussions": [*state.discussions, discussion],
             "notes": [*state.notes, *discussion.notes],
             "approvals": approvals,
-            "awards": [],
+            "awards": [
+                GitLabAwardEmoji(id=40, name="thumbsup", user=current, created_at=NOW, updated_at=NOW),
+                *state.awards[:1],
+            ],
         }
     )
 
@@ -389,6 +392,8 @@ def test_gitlab_own_discussion_opener_and_approval_are_inbound_and_own_reply_is_
     assert directions["gitlab:note:30"] == "inbound"
     assert directions["gitlab:note:31"] == "outbound"
     assert directions[f"gitlab:approval:{current.id}"] == "inbound"
+    assert directions["gitlab:award:40"] == "outbound"
+    assert directions["gitlab:award:20"] == "inbound"
 
 
 def test_self_authored_review_thread_passes_validate_cycle_and_authorizes_a_reply(tmp_path: Path) -> None:
