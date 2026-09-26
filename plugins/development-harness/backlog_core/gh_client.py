@@ -62,7 +62,7 @@ from .parsing import (
     parse_sam_task_metadata,
     today,
 )
-from .status_registry import STATUS_LABEL_PREFIX, StatusLabel
+from .status_registry import STATUS_LABEL_PREFIX, StatusLabel, pick_primary_status_label
 from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS, SyncErrorKind, classify_sync_error
 
 if TYPE_CHECKING:
@@ -562,9 +562,9 @@ def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, obj
     """Execute a raw GraphQL query using PyGithub's requester.
 
     Follows the same pattern as ``_resolve_labels_graphql``.  Raises
-    ``BacklogError`` when the GraphQL response contains an ``errors`` key
-    or when the requester raises ``GithubException`` (including
-    ``UnknownObjectException`` for NOT_FOUND / 404 responses).
+    ``BackendUnavailableError`` when the requester raises a provider or transport
+    failure (including ``UnknownObjectException`` for NOT_FOUND / 404 responses),
+    and ``BacklogError`` when the GraphQL response contains errors or invalid data.
 
     Args:
         repo: Any object exposing ``.requester.graphql_query(...)`` -- a real
@@ -578,7 +578,8 @@ def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, obj
 
     Raises:
         GraphQLUnavailableError: When the environment refuses GraphQL outright.
-        BacklogError: On GraphQL errors, NOT_FOUND (404), or network/auth failures.
+        BackendUnavailableError: On GitHub API or transport failures.
+        BacklogError: On answered GraphQL errors or invalid response shapes.
     """
     try:
         _headers, response = repo.requester.graphql_query(query, variables or {})
@@ -587,10 +588,12 @@ def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, obj
             msg = f"GraphQL is unavailable in this environment: {_github_exception_message(exc)}"
             raise GraphQLUnavailableError(msg) from exc
         msg = f"GraphQL request failed: {exc}"
-        raise BacklogError(msg) from exc
+        kind = classify_sync_error(exc)
+        retryable = True if kind is SyncErrorKind.RETRYABLE else False if kind is SyncErrorKind.NON_RETRYABLE else None
+        raise BackendUnavailableError(msg, retryable=retryable) from exc
     except RETRYABLE_TRANSIENT_EXCEPTIONS as exc:
         msg = f"GraphQL transport failed: {exc}"
-        raise BacklogError(msg) from exc
+        raise BackendUnavailableError(msg, retryable=True) from exc
     if "errors" in response:
         first_error = response["errors"][0] if response["errors"] else {}
         msg = first_error.get("message", str(response["errors"]))
@@ -1323,7 +1326,7 @@ def get_github(repo: str = "", timeout: int = 15) -> Repository:
     try:
         gh = make_github_client(timeout=timeout)
     except MissingGitHubTokenError as exc:
-        raise GitHubUnavailableError(str(exc)) from exc
+        raise GitHubUnavailableError(str(exc), retryable=False) from exc
     return gh.get_repo(repo)
 
 
@@ -1659,28 +1662,11 @@ def batch_fetch_statuses(items: list[BacklogItem], repo: str = "") -> dict[int, 
             status_labels = [lbl["name"] for lbl in gh_issue["labels"] if lbl["name"].startswith(STATUS_LABEL_PREFIX)]
             ms = gh_issue["milestone"]
             result[num] = IssueStatus(
-                status=_pick_primary_status_label(status_labels),
+                status=pick_primary_status_label(status_labels),
                 milestone=ms["title"] if ms else "",
                 state=str(gh_issue.get("state", "")),
             )
     return result
-
-
-def _pick_primary_status_label(status_labels: list[str]) -> str:
-    """Pick the status label to display when an issue carries multiple ``status:*`` labels.
-
-    ``status:blocked`` is an overlay (an item can be both in-progress and
-    blocked), not a lifecycle replacement — but it must win display priority
-    over the underlying lifecycle label so a blocked item doesn't silently
-    keep showing as its prior status.
-
-    Returns:
-        ``"status:blocked"`` if present, else the first label in ``status_labels``,
-        else ``""``.
-    """
-    if StatusLabel.BLOCKED.value in status_labels:
-        return StatusLabel.BLOCKED.value
-    return status_labels[0] if status_labels else ""
 
 
 def fetch_item_status(item: BacklogItem, repo: str = "", output: Output | None = None) -> str:
@@ -1706,7 +1692,7 @@ def fetch_item_status(item: BacklogItem, repo: str = "", output: Output | None =
         owner, repo_name = repository.full_name.split("/", 1)
         gh_issue = _fetch_issue_graphql(repository, owner, repo_name, num)
         labels = [lb["name"] for lb in gh_issue["labels"] if lb["name"].startswith(STATUS_LABEL_PREFIX)]
-        return _pick_primary_status_label(labels)
+        return pick_primary_status_label(labels)
     except GraphQLUnavailableError:
         # A refusal ("GitHub GraphQL is not available ...") is not "no status set" --
         # it is the environment declining the query outright. GraphQLUnavailableError
@@ -2049,7 +2035,7 @@ def view_enrich_from_github(
             result.priority = lb.split(":", 1)[1].upper()
             break
     status_labels = [lb for lb in result.labels if lb.startswith(STATUS_LABEL_PREFIX)]
-    if primary_status := _pick_primary_status_label(status_labels):
+    if primary_status := pick_primary_status_label(status_labels):
         result.status = primary_status.split(":", 1)[1]
     return True
 

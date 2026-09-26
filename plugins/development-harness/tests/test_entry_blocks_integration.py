@@ -8,10 +8,12 @@ from __future__ import annotations
 
 from typing import cast
 
+import pytest
 from backlog_core import operations
 from backlog_core.models import Output, SectionEntryMetadata
 
 
+@pytest.mark.usefixtures("plain_memory_backend")
 def test_full_entry_lifecycle(backlog_dir, mock_github):
     """Create item -> groom with entries -> strike one -> view -> verify."""
     out = Output()
@@ -69,6 +71,7 @@ def test_full_entry_lifecycle(backlog_dir, mock_github):
     assert "Updated second decision." in active[0]["content"]
 
 
+@pytest.mark.usefixtures("plain_memory_backend")
 def test_full_entry_lifecycle_with_nested_html_survives_resubmission(backlog_dir, mock_github):
     """Real write -> render -> parse cycle through operations, not entry_blocks directly.
 

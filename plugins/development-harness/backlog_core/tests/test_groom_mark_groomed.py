@@ -19,6 +19,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from backlog_core import operations
+from backlog_core.backend_types import BacklogConfig
+from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.models import BacklogItem, Entry, Section, ValidationError
 from backlog_core.operations import _apply_groomed_entries, _resolve_groomed_content, groom_item
 
@@ -111,23 +114,15 @@ def test_groom_item_mark_groomed_with_content_calls_update_item(mocker: MockerFi
 
 
 # ---------------------------------------------------------------------------
-# Fix 3 — mark_groomed emits warning and sets skip signal when re-lookup returns None
+# Live-first — mark_groomed reuses its command-scoped selection
 # ---------------------------------------------------------------------------
 
 
-def test_groom_item_mark_groomed_skipped_when_item_not_found_after_reparse(mocker: MockerFixture) -> None:
-    """mark_groomed=True emits warning and sets mark_groomed_skipped when re-lookup returns None.
-
-    Before this fix, groom_item silently dropped the mark_groomed operation when
-    find_item returned None after the post-write re-parse. No warning was emitted
-    and no result key indicated the skip — a violation of the silent-failure-prevention rule.
-
-    Fix 3: when fresh_item is None, emit out.warn() and set result["mark_groomed_skipped"]=True.
-    """
-    # Arrange — first find_item call (initial lookup) returns item, second (re-lookup) returns None
+def test_groom_item_mark_groomed_reuses_one_selection(mocker: MockerFixture) -> None:
+    """mark_groomed uses the item selected once at command start."""
     fake_item = BacklogItem(title="vanishing-item")
     backend = _configure_memory_view(mocker, item=fake_item)
-    mocker.patch.object(backend, "list_work_items", side_effect=[[fake_item], []])
+    mock_list = mocker.patch.object(backend, "list_work_items", side_effect=[[fake_item], []])
     mocker.patch("backlog_core.operations.update_item", return_value={"updated": True})
     mock_update_metadata = mocker.patch("backlog_core.operations.update_item_metadata")
     mock_apply = mocker.patch("backlog_core.operations.apply_status_groomed")
@@ -139,17 +134,28 @@ def test_groom_item_mark_groomed_skipped_when_item_not_found_after_reparse(mocke
         selector="vanishing-item", section="Description", content="Groomed content.", output=out, mark_groomed=True
     )
 
-    # Assert — skip is explicit, not silent
-    assert result.get("mark_groomed_skipped") is True
-    skip_reason = result.get("mark_groomed_skip_reason")
-    assert isinstance(skip_reason, str)
-    assert "vanishing-item" in skip_reason
-    assert result.get("mark_groomed_applied") is not True
-    # Warning must be emitted — not silent
-    out.warn.assert_called()
-    warn_msg = out.warn.call_args_list[0][0][0]
-    assert "mark_groomed" in warn_msg
-    assert "not found" in warn_msg
-    # Metadata and GitHub label paths must NOT be reached
-    mock_update_metadata.assert_not_called()
+    assert result.get("mark_groomed_applied") is True
+    mock_update_metadata.assert_called_once()
     mock_apply.assert_not_called()
+    assert mock_list.call_count == 1
+
+
+def test_groom_item_mark_groomed_preserves_content_in_final_storage(mocker: MockerFixture) -> None:
+    """The status write accumulates on the item containing the new section."""
+    backend = InMemoryBackend()
+    original = BacklogItem(title="cumulative groom", reference="cumulative-groom", priority="P1")
+    backend.put_work_item(original)
+    mocker.patch.object(operations, "get_config", return_value=BacklogConfig(backend=backend))
+
+    groom_item(
+        "cumulative groom",
+        section="Acceptance Criteria",
+        content="- [ ] Final item keeps this criterion",
+        mark_groomed=True,
+    )
+
+    stored = backend.get_work_item("cumulative-groom")
+    section = stored.sections["acceptance_criteria"]
+    assert isinstance(section, Section)
+    assert section.entries[-1].content == "- [ ] Final item keeps this criterion"
+    assert stored.status == "groomed"

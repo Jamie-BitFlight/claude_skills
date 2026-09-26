@@ -418,8 +418,8 @@ def classify_sync_error(exc: BaseException) -> SyncErrorKind:
 
     Classification table (from design doc section 5.1):
 
-    - ``BackendUnavailableError`` (includes ``GitHubUnavailableError`` and
-      ``GraphQLUnavailableError``) — NON_RETRYABLE.
+    - ``BackendUnavailableError`` — its explicit ``retryable`` verdict wins; an unspecified
+      verdict remains conservatively NON_RETRYABLE.
     - ``UnsupportedBackendCapabilityError`` (backend lacks an optional capability;
       retrying will not change what the backend supports) — NON_RETRYABLE.
     - ``ContentProviderError`` (unrelated exception tree from ``BacklogError``, so
@@ -458,10 +458,11 @@ def classify_sync_error(exc: BaseException) -> SyncErrorKind:
         ``SyncErrorKind`` indicating whether the sync should retry.
     """
     if isinstance(exc, (BackendUnavailableError, UnsupportedBackendCapabilityError)):
-        # Structural, not transient: a capability gap won't resolve by retrying, and an
-        # environment that refuses GraphQL outright (GraphQLUnavailableError) refuses the
-        # next attempt on the same grounds.
-        return SyncErrorKind.NON_RETRYABLE
+        return (
+            SyncErrorKind.RETRYABLE
+            if isinstance(exc, BackendUnavailableError) and exc.retryable is True
+            else SyncErrorKind.NON_RETRYABLE
+        )
     if isinstance(exc, ContentProviderError):
         # Unrelated exception tree from BacklogError (see models.py) — needs its own
         # branch or it falls through to UNKNOWN. Not always structural: see

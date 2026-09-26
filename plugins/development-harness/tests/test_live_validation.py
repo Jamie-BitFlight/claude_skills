@@ -23,7 +23,7 @@ from backlog_core.backend_protocol import get_config, reset_config, set_config
 from backlog_core.backend_types import BacklogConfig
 from backlog_core.backends.github_backend import GitHubBackend
 from backlog_core.file_cache import FileCache
-from backlog_core.models import ReconcileRequest, ReconcileScope
+from backlog_core.models import BackendUnavailableError, ProviderSnapshot, ReconcileRequest, ReconcileScope
 from fastmcp.client import Client
 
 from close_test_issues import open_sandbox
@@ -122,7 +122,9 @@ def listed_references(items: list[dict[str, object]]) -> set[str]:
     return {str(item.get("issue", "")) for item in items}
 
 
-async def test_live_crud_persists_changes_and_preserves_other_sections(live_environment: LiveEnvironment) -> None:
+async def test_live_crud_persists_changes_and_preserves_other_sections(
+    live_environment: LiveEnvironment, monkeypatch: pytest.MonkeyPatch
+) -> None:
     env = live_environment
     # Warm CRUD has an explicit, real open-issue snapshot. Historical cold-cache
     # recovery belongs to the independent scenario below, not an accidental list side effect.
@@ -208,9 +210,19 @@ async def test_live_crud_persists_changes_and_preserves_other_sections(live_envi
                 changed_body = f"{env.scope.body_marker}\n\nProvider edit not present in the writer cache."
                 await asyncio.to_thread(remote.edit, title=changed_title, body=changed_body)
                 await calls.call("backlog_pull", {"selector": f"#{companion}"})
-                # A title lookup without refresh reads the cache populated by pull. A
-                # numeric lookup here would mask a no-op pull by fetching GitHub again.
-                pulled = await calls.call("backlog_view", {"selector": changed_title, "summary": False})
+                # Force the read-back through the writer cache populated by pull.
+                # Live-first title selection would otherwise re-fetch GitHub and let a
+                # no-op pull satisfy this phase.
+                with env.fresh_reader() as reader:
+
+                    def unavailable_fetch(request: ReconcileRequest) -> ProviderSnapshot:
+                        raise BackendUnavailableError("offline read-back after pull")
+
+                    monkeypatch.setattr(reader, "fetch_snapshot", unavailable_fetch)
+                    pulled = await calls.call(
+                        "backlog_view", {"selector": changed_title, "summary": False, "allow_cached": True}
+                    )
+                assert pulled["status_source"] == "cache", pulled
                 assert pulled["title"] == changed_title, pulled
                 assert "Provider edit not present in the writer cache." in str(pulled["body"]), pulled
 

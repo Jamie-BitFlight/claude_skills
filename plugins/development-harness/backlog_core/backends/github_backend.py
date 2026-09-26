@@ -29,7 +29,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Literal
 
 import dh_paths
-from github import GithubObject
+from github import GithubException, GithubObject
 
 from backlog_core import gh_client, github_branches, github_sync, rendering
 from backlog_core.artifact_provider import ArtifactBackend, GitHubGistArtifactProvider
@@ -48,11 +48,14 @@ from backlog_core.backends.github_contents import _GitHubContentsStore
 from backlog_core.backends.github_work_items import _TARGET_BATCH_SIZE, _GitHubReconciliation, _GitHubWorkItemSync
 from backlog_core.file_cache import FileCache
 from backlog_core.models import (
+    BackendUnavailableError,
     BacklogError,
     BacklogItem,
+    ContentNotFoundError,
     ContentQuery,
     ContentRecord,
     ContentRef,
+    ContentUnavailableError,
     ContentWrite,
     PatchResult,
     ProviderPatch,
@@ -62,6 +65,12 @@ from backlog_core.models import (
     StatusFetchResult,
     ViewEnrichmentResult,
     parse_issue_number,
+)
+from backlog_core.sync_state import (
+    RETRYABLE_TRANSIENT_EXCEPTIONS,
+    SyncErrorKind,
+    classify_github_failure,
+    classify_sync_error,
 )
 
 if TYPE_CHECKING:
@@ -141,6 +150,7 @@ class GitHubBackend:
         """
         self._repo = repo
         self._cache = cache or FileCache(dh_paths.state_root() / "github-cache")
+        self._cache._set_default_repo(repo)
         self._artifact_provider = artifact_provider or GitHubGistArtifactProvider(repo=repo)
         self._plan_persistence = plan_persistence or _GitHubPlanPersistence(self._artifact_provider)
         self._dispatch_persistence = _GitHubDispatchPersistence(self._artifact_provider)
@@ -153,7 +163,7 @@ class GitHubBackend:
         )
         self._content_cache = _GitHubContentCache(self._cache, self)
         self._work_items = _GitHubWorkItemSync(self, lambda: self._contents)
-        self._reconciliation = _GitHubReconciliation(self._cache, self)
+        self._reconciliation = _GitHubReconciliation(self._cache, self, default_repo=repo)
 
     # ------------------------------------------------------------------
     # Repository access
@@ -212,6 +222,14 @@ class GitHubBackend:
         """
         return self._reconciliation.list_work_items()
 
+    def cached_work_items(self, repo: str = "") -> list[BacklogItem]:
+        """List cached provider rows for one repository.
+
+        Returns:
+            Persisted work items scoped to the selected repository.
+        """
+        return self._reconciliation.list_work_items(repo)
+
     def get_work_item(self, reference: str) -> BacklogItem:
         """Get a cached work item by stable reference.
 
@@ -245,17 +263,17 @@ class GitHubBackend:
         """
         return self._reconciliation.has_pending_writes()
 
-    def put_work_item(self, item: BacklogItem) -> None:
+    def put_work_item(self, item: BacklogItem, repo: str = "") -> None:
         """Persist a work-item intent for provider reconciliation."""
-        self._reconciliation.put_work_item(item)
+        self._reconciliation.put_work_item(item, repo)
 
-    def reconcile(self, request: ReconcileRequest) -> ReconcileResult:
+    def reconcile(self, request: ReconcileRequest, *, snapshot: ProviderSnapshot | None = None) -> ReconcileResult:
         """Reconcile provider state through the pure engine and private cache.
 
         Returns:
             Completed reconciliation counts with changed logical references.
         """
-        return self._reconciliation.reconcile(request)
+        return self._reconciliation.reconcile(request, snapshot=snapshot)
 
     def _load_reconcile_records(
         self, pending_work_items: Sequence[_PendingWorkItemMutation] | None = None
@@ -267,21 +285,48 @@ class GitHubBackend:
         """
         return self._reconciliation.load_records(pending_work_items)
 
-    def _fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot:
+    def fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot:
         """Fetch one normalized bounded GitHub snapshot for reconciliation.
 
         Returns:
             Provider snapshot whose pagination remains private to this adapter.
         """
-        return self._work_items.fetch_snapshot(request)
+        try:
+            return self._work_items.fetch_snapshot(request)
+        except ContentNotFoundError:
+            raise
+        except BacklogError:
+            raise
+        except ContentUnavailableError as exc:
+            retryable = exc.retryable
+            kind = classify_github_failure(exc)
+            if retryable is False or (retryable is None and kind is SyncErrorKind.UNKNOWN):
+                raise
+            if retryable is None:
+                retryable = kind is SyncErrorKind.RETRYABLE
+            raise BackendUnavailableError(f"GitHub snapshot unavailable: {exc}", retryable=retryable) from exc
+        except (GithubException, *RETRYABLE_TRANSIENT_EXCEPTIONS) as exc:
+            kind = classify_sync_error(exc)
+            retryable = (
+                True if kind is SyncErrorKind.RETRYABLE else False if kind is SyncErrorKind.NON_RETRYABLE else None
+            )
+            raise BackendUnavailableError(f"GitHub snapshot unavailable: {exc}", retryable=retryable) from exc
 
-    def _apply_patches(self, patches: list[ProviderPatch]) -> list[PatchResult]:
+    def pending_work_items(self, repo: str = "") -> list[BacklogItem]:
+        """Return configured-repository intent only when that repository is selected."""
+        return self._reconciliation.pending_work_items(repo)
+
+    def _apply_patches(self, patches: list[ProviderPatch], repo: str = "") -> list[PatchResult]:
         """Apply optimistic GitHub body patches and return one outcome per patch.
+
+        Args:
+            patches: Provider patches derived from the reconciliation snapshot.
+            repo: Repository slug used to fetch that snapshot.
 
         Returns:
             Patch results indexed by the stable provider reference.
         """
-        return self._work_items.apply_patches(patches)
+        return self._work_items.apply_patches(patches, repo)
 
     # ------------------------------------------------------------------
     # GraphQL utilities

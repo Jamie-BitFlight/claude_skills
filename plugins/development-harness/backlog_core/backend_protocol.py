@@ -49,6 +49,7 @@ from .models import (
     ContentUnavailableError,
     UnsupportedCapabilityError,
     ValidationError,
+    get_default_repo,
 )
 
 if TYPE_CHECKING:
@@ -211,7 +212,7 @@ def create_backend(name: str | None = None) -> WorkItemBackend:
     resolved = name or DHConfig().get_backend(subsystem="backlog")
 
     if resolved == "github":
-        return GitHubBackend()
+        return GitHubBackend(repo=get_default_repo())
 
     if resolved == "memory":
         return InMemoryBackend()

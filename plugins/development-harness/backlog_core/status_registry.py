@@ -2,7 +2,7 @@
 
 ``gh_client.py`` previously scattered ~19 raw ``"status:X"`` string literals across its
 label-management functions (``apply_status_in_progress``, ``apply_status_verified``,
-``apply_status_groomed``, ``apply_status_blocked``, ``_pick_primary_status_label``, ...)
+``apply_status_groomed``, ``apply_status_blocked``, primary-status selection, ...)
 with no shared source of truth, and a second independent copy of ``status:verified`` was
 hardcoded in ``.github/workflows/quality-gate-audit.yml``'s inline JS. This module exists
 to prevent a renamed or added status label from drifting silently across any of them (#3004).
@@ -31,7 +31,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Final
 
-__all__ = ["STATUS_LABEL_PREFIX", "StatusLabel"]
+__all__ = ["STATUS_LABEL_PREFIX", "StatusLabel", "pick_primary_status_label"]
 
 # Shared namespace prefix for every status label — used by callers that filter an
 # issue's labels down to "any status label" rather than checking a specific one.
@@ -50,3 +50,17 @@ class StatusLabel(StrEnum):
     GROOMED = "status:groomed"
     VERIFIED = "status:verified"
     BLOCKED = "status:blocked"
+
+
+def pick_primary_status_label(status_labels: list[str]) -> str:
+    """Pick the status label displayed when an issue carries multiple labels.
+
+    Blocked is an overlay rather than a lifecycle replacement, so it takes
+    display priority over the underlying lifecycle label.
+
+    Returns:
+        The blocked label, first supplied label, or an empty string.
+    """
+    if StatusLabel.BLOCKED.value in status_labels:
+        return StatusLabel.BLOCKED.value
+    return status_labels[0] if status_labels else ""

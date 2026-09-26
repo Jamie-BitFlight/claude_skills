@@ -44,7 +44,8 @@ class _SyncProviderStub(InMemoryBackend):
         self.requests = []
         self.result = ReconcileResult()
 
-    def reconcile(self, request: ReconcileRequest) -> ReconcileResult:
+    def reconcile(self, request: ReconcileRequest, *, snapshot: ProviderSnapshot | None = None) -> ReconcileResult:
+        del snapshot
         self.requests.append(request)
         return self.result
 
@@ -102,7 +103,7 @@ def test_refresh_wrapper_surfaces_a_dead_lettered_entry(tmp_path: Path, monkeypa
     backend = GitHubBackend(cache=cache)
     monkeypatch.setattr(
         backend,
-        "_fetch_snapshot",
+        "fetch_snapshot",
         lambda request: ProviderSnapshot(items=[], sync_started_at="2026-08-12T01:00:00Z", pages_fetched=1),
     )
     monkeypatch.setattr(
@@ -149,15 +150,15 @@ def test_label_refresh_does_not_forward_unfiltered_cached_references(sync_provid
     assert sync_provider.requests == [ReconcileRequest(scope=scope, label="review")]
 
 
-def test_unscoped_refresh_forwards_cached_references(sync_provider) -> None:
+def test_unscoped_refresh_does_not_turn_cached_references_into_provider_scope(sync_provider) -> None:
     # Given: a cached issue available for an unscoped refresh
     sync_provider.put_work_item(_linked_item("#11"))
 
     # When: an unscoped refresh is requested
     refresh_local_cache_from_github()
 
-    # Then: existing targeted fallback behavior remains intact
-    assert sync_provider.requests == [ReconcileRequest(scope=ReconcileScope.INCREMENTAL, references=["#11"])]
+    # Then: cached provider rows do not define the live request scope.
+    assert sync_provider.requests == [ReconcileRequest(scope=ReconcileScope.INCREMENTAL)]
 
 
 def test_list_wrapper_forwards_label_to_reconciliation(sync_provider) -> None:
@@ -189,8 +190,8 @@ def test_sync_wrapper_reconciles_linked_items(sync_provider, monkeypatch: pytest
 
     # Then: its stable output maps provider patches and forwards dry-run scope
     request = sync_provider.requests[0]
-    assert request.scope == ReconcileScope.LINKED
-    assert request.references == ["#7"]
+    assert request.scope == ReconcileScope.INCREMENTAL
+    assert request.references == []
     assert request.dry_run is True
     assert result["created"] == 3
     assert result["pushed"] == 2
@@ -245,7 +246,8 @@ def test_grooming_persists_before_targeted_reconciliation(sync_provider) -> None
         events.append("put")
         original_put(updated)
 
-    def record_reconcile(request: ReconcileRequest) -> ReconcileResult:
+    def record_reconcile(request: ReconcileRequest, *, snapshot: ProviderSnapshot | None = None) -> ReconcileResult:
+        del snapshot
         events.append("reconcile")
         sync_provider.requests.append(request)
         return ReconcileResult()
@@ -258,7 +260,9 @@ def test_grooming_persists_before_targeted_reconciliation(sync_provider) -> None
 
     # Then: the provider-owned record is durable before one targeted reconcile
     assert events == ["put", "reconcile"]
-    assert sync_provider.requests[-1] == ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#7"])
+    assert sync_provider.requests[-1] == ReconcileRequest(
+        scope=ReconcileScope.TARGETED, repo="unused", references=["#7"]
+    )
 
 
 def test_batch_grooming_reconciles_once(sync_provider) -> None:
@@ -273,7 +277,7 @@ def test_batch_grooming_reconciles_once(sync_provider) -> None:
     # "Plan" is not a canonical section name, so it normalises to an unknown__ key.
     # "Research" IS canonical (see rendering.SECTION_HEADING).
     assert written == ["unknown__plan", "research"]
-    assert sync_provider.requests == [ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#7"])]
+    assert sync_provider.requests == [ReconcileRequest(scope=ReconcileScope.TARGETED, repo="unused", references=["#7"])]
 
 
 def test_local_grooming_uses_native_storage_without_sync(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -338,7 +342,7 @@ def test_targeted_pull_writes_an_unstructured_provider_body_into_the_writer_cach
     # Given: one cached item reconciled from a provider body in the rendered shape
     cache = FileCache(tmp_path / "writer")
     backend = GitHubBackend(cache=cache)
-    monkeypatch.setattr(backend, "_apply_patches", lambda patches: [])
+    monkeypatch.setattr(backend, "_apply_patches", lambda patches, repo="": [])
     monkeypatch.setattr(
         models, "_config", models.BacklogConfig(repo_root=tmp_path, backlog_dir=tmp_path / "backlog", default_repo="")
     )
@@ -365,13 +369,13 @@ def test_targeted_pull_writes_an_unstructured_provider_body_into_the_writer_cach
         "<!-- backlog-metadata:\npriority: P1\ntype: Feature\nstatus: open\nadded: 2026-01-01\n-->\n\n"
         "## Description\n\n<!-- dh-e2e-run:1-1 -->\n\nLive validation fixture: companion\n"
     )
-    monkeypatch.setattr(backend, "_fetch_snapshot", lambda request: _snapshot_of("companion", rendered, "rev-1"))
+    monkeypatch.setattr(backend, "fetch_snapshot", lambda request: _snapshot_of("companion", rendered, "rev-1"))
     pull_by_selector("#42")
 
     # When: the provider edits the issue natively, replacing title and whole body
     edited = "<!-- dh-e2e-run:1-1 -->\n\nProvider edit not present in the writer cache."
     monkeypatch.setattr(
-        backend, "_fetch_snapshot", lambda request: _snapshot_of("companion changed remotely", edited, "rev-2")
+        backend, "fetch_snapshot", lambda request: _snapshot_of("companion changed remotely", edited, "rev-2")
     )
     pull_by_selector("#42")
 
@@ -395,7 +399,7 @@ def test_view_after_targeted_pull_renders_the_provider_body_for_a_title_selector
     # Given: one cached item reconciled from a provider body in the rendered shape
     cache = FileCache(tmp_path / "writer")
     backend = GitHubBackend(cache=cache)
-    monkeypatch.setattr(backend, "_apply_patches", lambda patches: [])
+    monkeypatch.setattr(backend, "_apply_patches", lambda patches, repo="": [])
     monkeypatch.setattr(
         models, "_config", models.BacklogConfig(repo_root=tmp_path, backlog_dir=tmp_path / "backlog", default_repo="")
     )
@@ -422,18 +426,24 @@ def test_view_after_targeted_pull_renders_the_provider_body_for_a_title_selector
         "<!-- backlog-metadata:\npriority: P1\ntype: Feature\nstatus: open\nadded: 2026-01-01\n-->\n\n"
         "## Description\n\n<!-- dh-e2e-run:1-1 -->\n\nLive validation fixture: companion\n"
     )
-    monkeypatch.setattr(backend, "_fetch_snapshot", lambda request: _snapshot_of("companion", rendered, "rev-1"))
+    monkeypatch.setattr(backend, "fetch_snapshot", lambda request: _snapshot_of("companion", rendered, "rev-1"))
     pull_by_selector("#42")
 
     # When: the provider rewrites the whole body by hand, dropping every heading
     edited = "<!-- dh-e2e-run:1-1 -->\n\nProvider edit not present in the writer cache."
     monkeypatch.setattr(
-        backend, "_fetch_snapshot", lambda request: _snapshot_of("companion changed remotely", edited, "rev-2")
+        backend, "fetch_snapshot", lambda request: _snapshot_of("companion changed remotely", edited, "rev-2")
     )
     pull_by_selector("#42")
 
-    # Then: a non-refresh title lookup serves that text as the item's body
-    viewed = view_item("companion changed remotely")
+    # Then: with the provider unavailable, an explicitly cache-allowed title lookup
+    # serves the pulled text as the item's body. Commands read live first, so the
+    # writer cache is reached only through this opt-in fallback.
+    def _unavailable(request: ReconcileRequest) -> ProviderSnapshot:
+        raise BackendUnavailableError
+
+    monkeypatch.setattr(backend, "fetch_snapshot", _unavailable)
+    viewed = view_item("companion changed remotely", allow_cached=True)
     assert viewed.title == "companion changed remotely"
     assert viewed.status_source == "cache", viewed
     assert "Provider edit not present in the writer cache." in viewed.body, viewed

@@ -53,8 +53,19 @@ from github import GithubException
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from typing import Protocol
 
     from pytest_mock import MockerFixture
+
+    class _ProviderMemoryBackend(Protocol):
+        provider_items: list[BacklogItem]
+        reconcile_requests: list[ReconcileRequest]
+        reconcile_result: ReconcileResult
+
+        def fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot: ...
+        def pending_work_items(self, repo: str = "") -> list[BacklogItem]: ...
+        def list_work_items(self) -> list[BacklogItem]: ...
+        def put_work_item(self, item: BacklogItem, repo: str = "") -> None: ...
 
 
 # ---------------------------------------------------------------------------
@@ -84,6 +95,13 @@ def _seed_items(items: list[BacklogItem]) -> None:
         get_config().backend.put_work_item(item)
 
 
+def _seed_provider_items(items: list[BacklogItem]) -> None:
+    from backlog_core.backend_protocol import get_config
+
+    backend = cast("_ProviderMemoryBackend", get_config().backend)
+    backend.provider_items.extend(item.model_copy(deep=True) for item in items)
+
+
 def _stored_item(reference: Path | str) -> BacklogItem:
     from backlog_core.backend_protocol import get_config
 
@@ -105,6 +123,22 @@ def _provider_plan(local: BacklogItem, provider: ProviderItem) -> ReconcilePlan:
         ProviderSnapshot(items=[provider], sync_started_at="2026-08-13T00:00:00Z", pages_fetched=1),
         ReconcileRequest(scope=ReconcileScope.LINKED, references=[provider.reference]),
     )
+
+
+class TestProviderMemoryBackendSeparation:
+    def test_unlinked_local_intent_is_pending_not_live(self) -> None:
+        """An unlinked local row is pending intent, never a live provider fact."""
+        from backlog_core.backend_protocol import get_config
+
+        backend = cast("_ProviderMemoryBackend", get_config().backend)
+        pending = BacklogItem(title="Pending only", reference="p2-pending-only", priority="P2")
+        backend.put_work_item(pending)
+
+        snapshot = backend.fetch_snapshot(ReconcileRequest(scope=ReconcileScope.INCREMENTAL))
+        pending_items = backend.pending_work_items()
+
+        assert snapshot.items == []
+        assert [(item.reference, item.issue) for item in pending_items] == [("p2-pending-only", "")]
 
 
 def _write_item(
@@ -386,8 +420,11 @@ class TestAddItemCreatesLocalFile:
             "  WARNING: Could not post plan to issue #42 because GitHub is unavailable: server error"
         ]
 
-    def test_view_forwards_enrichment_fallback_warning_to_output(self, mocker: MockerFixture) -> None:
+    def test_view_forwards_enrichment_fallback_warning_to_output(
+        self, mocker: MockerFixture, plain_memory_backend: InMemoryBackend
+    ) -> None:
         """An authoritative-body fallback warning reaches progressive-disclosure callers."""
+        assert plain_memory_backend.supports_github_extras is False
         _seed_items([BacklogItem(title="Item", section="P1", issue="#42")])
         output = Output()
 
@@ -562,7 +599,9 @@ class TestAddItemCreatesLocalFile:
 
         mock_create.assert_not_called()
 
-    def test_add_item_local_only_pending_state_visible_via_list_and_view(self, mocker: MockerFixture) -> None:
+    def test_add_item_local_only_pending_state_visible_via_list_and_view(
+        self, mocker: MockerFixture, plain_memory_backend: InMemoryBackend
+    ) -> None:
         """Verify a local-only create's pending state is visible on later reads, not just at creation.
 
         Tests: item 2 of #2999's fix — a caller reading the item later (grooming,
@@ -576,6 +615,7 @@ class TestAddItemCreatesLocalFile:
              that the read paths already carry the signal add_item now also returns —
              no separate mechanism was needed for requirement 2.
         """
+        assert plain_memory_backend.supports_github_extras is False
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
         mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
         add_item(title="Pending Local Only Item", description="desc", priority="P2")
@@ -861,51 +901,36 @@ class TestAddItemDuplicateDetection:
 
 
 class TestCheckForDuplicatesFreshness:
-    """_classify_duplicate_check's tri-state freshness behaviour (AC2).
-
-    Absence of a local match is not proof of "no duplicate" for a
-    SyncProvider-backed backend fed by an external provider: one bounded
-    refresh is attempted before declaring NO_DUPLICATE, and a refresh
-    failure downgrades to COULD_NOT_VERIFY rather than blocking creation.
-    """
+    """Duplicate checks use one command-scoped live provider observation."""
 
     def test_sync_provider_refresh_surfaces_new_match_raises_duplicate(self, mocker: MockerFixture) -> None:
-        """A SyncProvider backend with no local match that gains one after refresh raises.
-
-        Tests: The concurrent-session case from the #3169 incident -- a
-        duplicate created by another session between this session's stale
-        local cache and the write attempt.
-        How: The default test backend (see conftest's ``_isolated_backend``)
-        is already a SyncProvider. Mock ``refresh_local_cache_from_github``
-        to simulate an external session's write landing during the refresh,
-        by inserting a content-overlapping item into the live backend.
-        Why: If refresh-on-empty-result is deleted, this duplicate is missed
-        entirely -- exactly the incident being fixed.
-        """
+        """A duplicate present in the live snapshot blocks creation despite an empty cache."""
         from backlog_core.backend_protocol import get_config
 
         backend = get_config().backend
         assert isinstance(backend, SyncProvider)
-
-        def _refresh_surfaces_duplicate(*_args: object, **_kwargs: object) -> dict[str, int]:
-            backend.put_work_item(
-                BacklogItem(
-                    title="Sync engine mishandles retryable network errors",
-                    description=_DUPLICATE_DESCRIPTION,
-                    reference="p1-sync-retryable",
-                    metadata=BacklogItemMetadata(
-                        source="test",
-                        added="2026-01-01",
-                        priority="P1",
-                        status="open",
-                        issue="",
-                        topic="sync-retryable",
-                    ),
+        duplicate = BacklogItem(
+            title="Sync engine mishandles retryable network errors",
+            description=_DUPLICATE_DESCRIPTION,
+            reference="#17",
+            issue="#17",
+            priority="P1",
+        )
+        snapshot = ProviderSnapshot(
+            items=[
+                ProviderItem(
+                    provider_id="node-17",
+                    reference="#17",
+                    title=duplicate.title,
+                    body=render_issue_body(duplicate),
+                    state="OPEN",
+                    labels=[],
+                    revision="revision-17",
                 )
-            )
-            return {"refreshed": 1, "reconciled": 0}
-
-        mocker.patch("backlog_core.operations.refresh_local_cache_from_github", side_effect=_refresh_surfaces_duplicate)
+            ],
+            sync_started_at="2026-09-24T00:00:00+00:00",
+        )
+        fetch = mocker.patch.object(backend, "fetch_snapshot", return_value=snapshot)
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
 
         with pytest.raises(DuplicateItemError):
@@ -913,44 +938,31 @@ class TestCheckForDuplicatesFreshness:
                 title="Retryable network error handling in sync", description=_DUPLICATE_DESCRIPTION, priority="P1"
             )
 
+        fetch.assert_called_once_with(
+            ReconcileRequest(scope=ReconcileScope.INCREMENTAL, since="", apply_local_patches=False)
+        )
+
     def test_sync_provider_refresh_failure_reports_could_not_verify_but_still_creates(
         self, mocker: MockerFixture
     ) -> None:
-        """A refresh failure never blocks creation -- it downgrades to a warning.
-
-        Tests: AC5/DO-2 together -- an unverifiable duplicate status must not
-        become a rejection, and must not become a silent, warning-less success
-        either.
-        How: Mock ``refresh_local_cache_from_github`` to raise ``GithubException``.
-        Mock the GitHub issue-creation path to succeed (not merely "unavailable"),
-        isolating the warning under assertion to the COULD_NOT_VERIFY path only.
-        Why: Deleting the ``except (GithubException, BacklogError)`` handler in
-        ``_classify_duplicate_check`` would let this exception propagate and
-        abort item creation entirely -- this test fails loudly if that happens.
-        """
+        """A failed live read propagates instead of creating from stale cache."""
         from backlog_core.backend_protocol import get_config
 
         backend = get_config().backend
         assert isinstance(backend, SyncProvider)
-        mocker.patch(
-            "backlog_core.operations.refresh_local_cache_from_github", side_effect=GithubException(503, "boom", None)
-        )
-        mocker.patch("backlog_core.operations.try_get_github", return_value=mocker.MagicMock())
-        mocker.patch("backlog_core.operations.create_issue_for_item", return_value=42)
+        mocker.patch.object(backend, "fetch_snapshot", side_effect=BackendUnavailableError("offline"))
         out = Output()
 
-        result = add_item(
-            title="Completely Unrelated New Feature Proposal",
-            description="Adds a brand-new capability unrelated to anything else in the backlog.",
-            priority="P2",
-            output=out,
-        )
+        with pytest.raises(BackendUnavailableError, match="offline"):
+            add_item(
+                title="Completely Unrelated New Feature Proposal",
+                description="Adds a brand-new capability unrelated to anything else in the backlog.",
+                priority="P2",
+                output=out,
+            )
 
-        assert result["file_path"]
-        assert len(out.warnings) == 1
-        assert "Could not verify duplicate status" in out.warnings[0]
-        stored_titles = [item.title for item in backend.list_work_items()]
-        assert "Completely Unrelated New Feature Proposal" in stored_titles
+        assert out.warnings == []
+        assert backend.list_work_items() == []
 
     def test_non_sync_provider_backend_never_attempts_refresh(self, mocker: MockerFixture) -> None:
         """A non-SyncProvider backend (e.g. plain in-memory) never triggers a refresh.
@@ -1057,28 +1069,37 @@ class TestCheckForDuplicatesFreshness:
 
         assert "file_path" in result
 
-    def test_transient_network_error_downgrades_to_could_not_verify(self, mocker: MockerFixture) -> None:
-        """A transient network exception from refresh downgrades to a warning, not a crash.
-
-        Tests: ``requests.exceptions.ConnectionError`` (not a ``GithubException``
-        or ``BacklogError`` subclass) is caught via ``RETRYABLE_TRANSIENT_EXCEPTIONS``
-        (Fix 2).
-        How: Mock ``refresh_local_cache_from_github`` to raise
-        ``requests.exceptions.ConnectionError``, mirroring the existing
-        GithubException-refresh-failure test.
-        Why: Before Fix 2, this exception type propagated uncaught out of
-        ``add_item``, aborting item creation entirely instead of downgrading
-        to COULD_NOT_VERIFY.
-        """
-        import requests
+    def test_live_read_failure_uses_explicit_warned_cached_fallback(self, mocker: MockerFixture) -> None:
+        """allow_cached=True permits creation only after warning about the live-read failure."""
         from backlog_core.backend_protocol import get_config
 
         backend = get_config().backend
         assert isinstance(backend, SyncProvider)
-        mocker.patch(
-            "backlog_core.operations.refresh_local_cache_from_github",
-            side_effect=requests.exceptions.ConnectionError("boom"),
+        mocker.patch.object(backend, "fetch_snapshot", side_effect=BackendUnavailableError("offline"))
+        mocker.patch("backlog_core.operations.try_get_github", return_value=mocker.MagicMock())
+        mocker.patch("backlog_core.operations.create_issue_for_item", return_value=42)
+        out = Output()
+
+        result = add_item(
+            title="Completely Unrelated New Feature Proposal",
+            description="Adds a brand-new capability unrelated to anything else in the backlog.",
+            priority="P2",
+            output=out,
+            allow_cached=True,
         )
+
+        assert result["file_path"]
+        assert out.warnings == ["Live provider read failed; using cached work items: offline"]
+        stored_titles = [item.title for item in backend.list_work_items()]
+        assert "Completely Unrelated New Feature Proposal" in stored_titles
+
+    def test_duplicate_check_does_not_reconcile_before_creation(self, mocker: MockerFixture) -> None:
+        """Duplicate truth comes from the live read, not a reconciliation result."""
+        from backlog_core.backend_protocol import get_config
+
+        backend = get_config().backend
+        assert isinstance(backend, SyncProvider)
+        reconcile = mocker.spy(backend, "reconcile")
         mocker.patch("backlog_core.operations.try_get_github", return_value=mocker.MagicMock())
         mocker.patch("backlog_core.operations.create_issue_for_item", return_value=42)
         out = Output()
@@ -1091,51 +1112,12 @@ class TestCheckForDuplicatesFreshness:
         )
 
         assert result["file_path"]
-        assert len(out.warnings) == 1
-        assert "Could not verify duplicate status" in out.warnings[0]
-        stored_titles = [item.title for item in backend.list_work_items()]
-        assert "Completely Unrelated New Feature Proposal" in stored_titles
-
-    def test_partial_reconcile_failures_downgrade_to_could_not_verify(self, mocker: MockerFixture) -> None:
-        """A refresh that reports partial reconciliation failures is not treated as clean.
-
-        Tests: The duplicate-check call site inspects the ``"failures"`` count
-        returned by ``refresh_local_cache_from_github`` and downgrades to
-        COULD_NOT_VERIFY rather than trusting a partially-reconciled cache
-        (Fix 3).
-        How: Mock ``refresh_local_cache_from_github`` to return a dict with
-        ``"failures": 3`` instead of raising.
-        Why: Before Fix 3, the return value was discarded entirely, so a
-        partial failure looked identical to a clean refresh and could return
-        NO_DUPLICATE on incomplete data.
-        """
-        from backlog_core.backend_protocol import get_config
-
-        backend = get_config().backend
-        assert isinstance(backend, SyncProvider)
-        mocker.patch(
-            "backlog_core.operations.refresh_local_cache_from_github",
-            return_value={"refreshed": 0, "reconciled": 0, "failures": 3},
-        )
-        mocker.patch("backlog_core.operations.try_get_github", return_value=mocker.MagicMock())
-        mocker.patch("backlog_core.operations.create_issue_for_item", return_value=42)
-        out = Output()
-
-        result = add_item(
-            title="Completely Unrelated New Feature Proposal",
-            description="Adds a brand-new capability unrelated to anything else in the backlog.",
-            priority="P2",
-            output=out,
-        )
-
-        assert result["file_path"]
-        assert len(out.warnings) == 1
-        assert "Could not verify duplicate status" in out.warnings[0]
-        assert "3 item(s) failed to reconcile" in out.warnings[0]
+        reconcile.assert_not_called()
         stored_titles = [item.title for item in backend.list_work_items()]
         assert "Completely Unrelated New Feature Proposal" in stored_titles
 
 
+@pytest.mark.usefixtures("plain_memory_backend")
 class TestListItemsSearch:
     """list_items(search=...) filters via backlog_core.search; None skips filtering (AC4/AC7)."""
 
@@ -1187,9 +1169,9 @@ class TestListItemsEmpty:
 
 
 class TestListItemsFiltering:
-    """list_items excludes skip=True items and uses batch_fetch_statuses for status."""
+    """list_items filters native rows and derives provider status from one snapshot."""
 
-    def test_list_items_excludes_skip_items(self, mocker: MockerFixture) -> None:
+    def test_list_items_excludes_skip_items(self, mocker: MockerFixture, plain_memory_backend: InMemoryBackend) -> None:
         """Verify list_items omits items with skip=True (done/resolved status).
 
         Tests: Skip filtering in list_items.
@@ -1200,6 +1182,7 @@ class TestListItemsFiltering:
         """
         active = BacklogItem(title="Active Item", section="P1", skip=False)
         done = BacklogItem(title="Done Item", section="P1", skip=True)
+        assert plain_memory_backend.supports_github_extras is False
         _seed_items([active, done])
         mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
 
@@ -1210,70 +1193,60 @@ class TestListItemsFiltering:
         assert "Active Item" in titles
         assert "Done Item" not in titles
 
-    def test_list_items_enriches_status_from_batch_fetch(self, mocker: MockerFixture) -> None:
-        """Verify list_items always enriches items with status from batch_fetch_statuses.
+    def test_list_items_derives_status_from_provider_snapshot(self, mocker: MockerFixture) -> None:
+        """Verify list_items derives status and milestone from its provider snapshot."""
+        from backlog_core.backend_protocol import get_config
 
-        Tests: batch_fetch_statuses integration in list_items.
-        How: Mock parse_backlog to return an item with issue="#7"; mock batch_fetch_statuses.
-        Why: status must use batch fetch — not N+1 individual calls.  parse_backlog
-             is mocked to inject a BacklogItem with a specific issue value directly,
-             isolating this test from parsing logic.
-        """
         item_with_issue = BacklogItem(title="Tracked Item", section="P1", skip=False, issue="#7")
+        item_with_issue.metadata.labels = ["status:in-progress"]
+        item_with_issue.metadata.milestone = "v2"
         _seed_items([item_with_issue])
-        mock_batch = mocker.patch(
-            "backlog_core.operations.batch_fetch_statuses",
-            return_value={7: IssueStatus(status="status:in-progress", milestone="v2")},
-        )
+        _seed_provider_items([item_with_issue])
+        backend = get_config().backend
+        fetch = mocker.spy(backend, "fetch_snapshot")
 
         result = list_items(refresh=False, status="status:in-progress")
 
-        mock_batch.assert_called_once()
+        fetch.assert_called_once_with(
+            ReconcileRequest(scope=ReconcileScope.INCREMENTAL, since="", apply_local_patches=False)
+        )
         items = cast("list[dict[str, str | bool]]", result["items"])
         assert len(items) == 1
         assert items[0]["status"] == "status:in-progress"
         assert items[0]["milestone"] == "v2"
 
-    def test_list_items_always_calls_batch_fetch(self, mocker: MockerFixture) -> None:
-        """Verify list_items calls batch_fetch_statuses to populate status fields.
-
-        Tests: batch_fetch_statuses is called regardless of filter parameters, for a
-            page that has at least one numeric-issue item to look up.
-        How: Call list_items with no status filter; assert batch fetch was called.
-        Why: Status fields (status, milestone) are always included in every response —
-             batch fetch must run to populate them for numeric-issue items. A page with
-             no numeric issue reference at all is deliberately skipped instead (#3546,
-             Codex review on PR #3577) -- see
-             ``test_status_source_field.py::test_no_numeric_issue_references_reports_cache_not_live``
-             for that distinct case -- so this item is given an issue reference to keep
-             exercising the "must run" path this test names.
-        """
+    def test_list_items_always_reads_provider_snapshot(self, mocker: MockerFixture) -> None:
+        """Verify list_items reads one provider snapshot even without filters."""
         import backlog_core.models as models
+        from backlog_core.backend_protocol import get_config
 
         fake_dir: Path = models.get_backlog_dir()
         _write_item(fake_dir, title="No Status Item", priority="P2", topic="no-status-item", issue="#1")
-        mock_batch = mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
+        backend = get_config().backend
+        fetch = mocker.spy(backend, "fetch_snapshot")
 
         list_items(refresh=False)
 
-        mock_batch.assert_called_once()
-
-    def test_list_items_refresh_calls_refresh_local_cache(self, mocker: MockerFixture) -> None:
-        """Verify list_items with refresh=True triggers a cache refresh.
-
-        Tests: refresh refresh path.
-        How: Patch refresh_local_cache_from_github; call list_items(refresh=True).
-        Why: refresh must invoke the refresh before returning local data.
-        """
-        mock_refresh = mocker.patch(
-            "backlog_core.operations.refresh_local_cache_from_github",
-            return_value={"refreshed": 0, "messages": [], "warnings": [], "errors": []},
+        fetch.assert_called_once_with(
+            ReconcileRequest(scope=ReconcileScope.INCREMENTAL, since="", apply_local_patches=False)
         )
-        mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
+
+    def test_list_items_refresh_reconciles_command_snapshot(self, mocker: MockerFixture) -> None:
+        """Verify refresh reconciles the same snapshot already read for the command."""
+        from backlog_core.backend_protocol import get_config
+
+        backend = get_config().backend
+        fetch = mocker.spy(backend, "fetch_snapshot")
+        reconcile = mocker.spy(backend, "reconcile")
 
         list_items(refresh=True)
 
-        mock_refresh.assert_called_once()
+        fetch.assert_called_once_with(
+            ReconcileRequest(scope=ReconcileScope.INCREMENTAL, since="", apply_local_patches=False)
+        )
+        reconcile.assert_called_once_with(
+            ReconcileRequest(scope=ReconcileScope.INCREMENTAL, apply_local_patches=True), snapshot=fetch.spy_return
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1416,7 +1389,9 @@ class TestApplyIssueStatusLabelsBeads:
         _apply_issue_status_labels(item, "in-progress", False, "", result, out)
 
         assert result.get("status") == "in-progress"
-        mock_update.assert_called_once_with("bd-native-task", {"metadata": {"status": "in-progress"}}, output=out)
+        mock_update.assert_called_once_with(
+            "bd-native-task", {"metadata": {"status": "in-progress"}}, output=out, base_item=item, repo=""
+        )
 
     def test_status_in_progress_calls_bd_update_claim_for_beads_item_without_issue(self, mocker: MockerFixture) -> None:
         """status="in-progress" issues bd update --claim via apply_status_in_progress.
@@ -1560,7 +1535,9 @@ class TestApplyIssueStatusLabelsBeads:
 
         _apply_issue_status_labels(item, "blocked", False, "", result, out)
 
-        mock_update.assert_called_once_with("bd-blocked-task", {"metadata": {"status": "blocked"}}, output=out)
+        mock_update.assert_called_once_with(
+            "bd-blocked-task", {"metadata": {"status": "blocked"}}, output=out, base_item=item, repo=""
+        )
         mock_blocked.assert_not_called()
         assert result.get("status") == "blocked"
 
@@ -1734,6 +1711,7 @@ class TestApplyIssueStatusLabelsBeads:
 class TestViewItem:
     """view_item returns ViewItemResult for local items and raises for unknowns."""
 
+    @pytest.mark.usefixtures("plain_memory_backend")
     def test_view_item_returns_view_item_result_type(self, mocker: MockerFixture) -> None:
         """Verify view_item returns a ViewItemResult instance, not a raw dict.
 
@@ -1755,6 +1733,7 @@ class TestViewItem:
         assert isinstance(result.messages, list)
         assert isinstance(result.warnings, list)
 
+    @pytest.mark.usefixtures("plain_memory_backend")
     def test_view_item_known_title_returns_result(self, mocker: MockerFixture) -> None:
         """Verify view_item returns ViewItemResult with title field for a known item.
 
@@ -1784,6 +1763,7 @@ class TestViewItem:
         with pytest.raises(ItemNotFoundError):
             view_item("Nonexistent Item That Does Not Exist")
 
+    @pytest.mark.usefixtures("plain_memory_backend")
     def test_view_item_offset_limit_paginates_body(self, mocker: MockerFixture) -> None:
         """Verify view_item applies offset and limit to body text.
 
@@ -1804,6 +1784,7 @@ class TestViewItem:
         # Only 2 lines returned starting from line 1
         assert len(body_lines) <= 2
 
+    @pytest.mark.usefixtures("plain_memory_backend")
     def test_view_item_no_pagination_returns_full_body(self, mocker: MockerFixture) -> None:
         """Verify view_item returns full body when offset and limit are both 0.
 
@@ -1822,6 +1803,7 @@ class TestViewItem:
 
         assert result.body_truncated is False
 
+    @pytest.mark.usefixtures("plain_memory_backend")
     def test_view_item_returns_section_entries(self, mocker: MockerFixture) -> None:
         """view_item response includes sections dict with entry metadata.
 
@@ -1851,6 +1833,7 @@ class TestViewItem:
         assert decision["num_entries"] == 2
         assert len(decision["entries"]) == 2
 
+    @pytest.mark.usefixtures("plain_memory_backend")
     def test_view_item_yaml_fallback_shows_display_title_for_canonical_section(self, mocker: MockerFixture) -> None:
         """view_item's YAML-only fallback shows the display title, not the raw storage key (#2962).
 
@@ -1893,105 +1876,101 @@ class TestViewItem:
     # it, so this class covers only the remaining five refresh scenarios.
     # -----------------------------------------------------------------
 
-    def test_view_item_title_selector_refresh_true_uses_item_identifier(self, mocker: MockerFixture) -> None:
-        """Cached item + title-substring selector + refresh=True calls enrich with the item's id.
-
-        Tests: view_item's opt-in live check for Case H (title selector, refresh=True).
-        How: Write a local item with a known issue number; call view_item with a title
-             substring and refresh=True; assert view_enrich_from_github was called with
-             the item's issue-derived identifier, never the raw title text.
-        Why: A naive implementation could forward the title substring straight into
-             view_enrich_from_github(), which crashes downstream (int(issue_num) in
-             gh_client.py). _live_lookup_id() must resolve the cached item's own id.
-        """
+    def test_view_item_title_selector_refresh_true_uses_bulk_snapshot(self, mocker: MockerFixture) -> None:
+        """A title selector resolves from one bulk snapshot without legacy enrichment."""
         import backlog_core.models as models
+        from backlog_core.backend_protocol import get_config
 
         fake_dir: Path = models.get_backlog_dir()
-        _write_item(fake_dir, title="Refreshable Title Item", priority="P1", topic="refreshable-title", issue="77")
+        path = _write_item(
+            fake_dir, title="Refreshable Title Item", priority="P1", topic="refreshable-title", issue="#77"
+        )
+        _seed_provider_items([_stored_item(path)])
+        backend = get_config().backend
+        fetch = mocker.spy(backend, "fetch_snapshot")
         mock_enrich = mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=True)
 
-        view_item("Refreshable Title", refresh=True)
+        result = view_item("Refreshable Title", refresh=True)
 
-        mock_enrich.assert_called_once()
-        selector_arg = mock_enrich.call_args.args[1]
-        assert selector_arg == "77"
-        assert selector_arg != "Refreshable Title Item"
+        assert result.title == "Refreshable Title Item"
+        fetch.assert_called_once_with(
+            ReconcileRequest(scope=ReconcileScope.INCREMENTAL, since="", apply_local_patches=False)
+        )
+        mock_enrich.assert_not_called()
 
     def test_view_item_title_selector_refresh_false_skips_live_check(self, mocker: MockerFixture) -> None:
-        """Cached item + title-substring selector + refresh=False (default) does not call enrich.
-
-        Tests: view_item's new default for Case H — the live check is opt-in only.
-             REGRESSION GUARD: locks in that a title-selector hit on a cached item
-             makes no network call unless refresh=True is passed explicitly.
-        How: Write a local item; call view_item with a title substring and no
-             refresh kwarg; assert view_enrich_from_github was never called.
-        Why: Before this plan, no live-check path existed at all for title
-             selectors. The new opt-in capability must not become an unconditional
-             call — that would silently add a network call to every title-based
-             view for an item that already has a local, cached copy.
-        """
+        """The default title-selector path also uses one bulk snapshot."""
         import backlog_core.models as models
+        from backlog_core.backend_protocol import get_config
 
         fake_dir: Path = models.get_backlog_dir()
-        _write_item(fake_dir, title="Cached Title Item", priority="P1", topic="cached-title-item", issue="88")
+        path = _write_item(fake_dir, title="Cached Title Item", priority="P1", topic="cached-title-item", issue="#88")
+        _seed_provider_items([_stored_item(path)])
+        backend = get_config().backend
+        fetch = mocker.spy(backend, "fetch_snapshot")
         mock_enrich = mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=True)
 
         view_item("Cached Title Item")
 
+        fetch.assert_called_once_with(
+            ReconcileRequest(scope=ReconcileScope.INCREMENTAL, since="", apply_local_patches=False)
+        )
         mock_enrich.assert_not_called()
 
-    def test_view_item_numeric_selector_refresh_false_still_calls_enrich(self, mocker: MockerFixture) -> None:
-        """Cached item + numeric selector + refresh=False still calls enrich (Case A/B).
-
-        Tests: view_item's unconditional live check for an already-cached item
-             matched by numeric selector. REGRESSION GUARD: confirms Case A/B
-             stayed unconditional (today's pre-existing behavior) and was not
-             accidentally gated behind refresh alongside the new Case H opt-in.
-        How: Write a local item with issue="55"; call view_item("55") with no
-             refresh kwarg; assert view_enrich_from_github was called with "55".
-        Why: 52 pre-existing tests elsewhere in the suite (via
-             backlog_core/tests/_view_test_helpers.py::_configure_memory_view)
-             depend on this unconditional call for numeric selectors. `refresh`
-             is additive-only — it must never remove this
-             existing behavior.
-        """
+    def test_view_item_numeric_selector_uses_targeted_snapshot(self, mocker: MockerFixture) -> None:
+        """An exact numeric selector resolves from one targeted snapshot."""
         import backlog_core.models as models
+        from backlog_core.backend_protocol import get_config
 
         fake_dir: Path = models.get_backlog_dir()
-        _write_item(fake_dir, title="Numeric Selector Item", priority="P1", topic="numeric-selector-item", issue="55")
+        path = _write_item(
+            fake_dir, title="Numeric Selector Item", priority="P1", topic="numeric-selector-item", issue="#55"
+        )
+        _seed_provider_items([_stored_item(path)])
+        backend = get_config().backend
+        fetch = mocker.spy(backend, "fetch_snapshot")
         mock_enrich = mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=True)
 
-        # show="1" (MCP clients send numeric `show` values as strings) also exercises
-        # view_item's str->int show conversion alongside the refresh control flow.
-        view_item("55", show="1")
+        result = view_item("55", show="1")
 
-        mock_enrich.assert_called_once()
-        assert mock_enrich.call_args.args[1] == "55"
+        assert result.title == "Numeric Selector Item"
+        fetch.assert_called_once_with(
+            ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#55"], apply_local_patches=False)
+        )
+        mock_enrich.assert_not_called()
 
-    def test_view_item_no_cached_item_numeric_selector_refresh_false_still_resolves(
-        self, mocker: MockerFixture
-    ) -> None:
-        """No cached item + numeric selector + refresh=False still performs a live lookup.
+    def test_view_item_no_cached_item_numeric_selector_resolves_live_snapshot(self, mocker: MockerFixture) -> None:
+        """An exact selector resolves a live-only item from its targeted snapshot."""
+        from backlog_core.backend_protocol import get_config
 
-        Tests: view_item's unconditional identity-resolution live call (Case C/D).
-             REGRESSION GUARD: a not-yet-synced item must still resolve via
-             a live lookup regardless of refresh, or it would raise a false
-             ItemNotFoundError.
-        How: Write NO local item; call view_item("999") with no refresh kwarg and
-             enrich mocked to succeed; assert enrich was called with "999" and no
-             exception was raised.
-        Why: Gating the identity-resolution call behind refresh would break every
-             not-yet-synced item lookup — the exact bug this guards against.
-        """
+        live = BacklogItem(title="Live Only Item", issue="#999", priority="P1")
+        snapshot = ProviderSnapshot(
+            items=[
+                ProviderItem(
+                    provider_id="node-999",
+                    reference="#999",
+                    title=live.title,
+                    body=render_issue_body(live),
+                    state="OPEN",
+                    labels=[],
+                    revision="revision-999",
+                )
+            ],
+            sync_started_at="2026-09-24T00:00:00+00:00",
+        )
+        backend = get_config().backend
+        fetch = mocker.patch.object(backend, "fetch_snapshot", return_value=snapshot)
         mock_enrich = mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=True)
 
-        # show="not-a-number" exercises the ValueError fallback branch of view_item's
-        # str->int show conversion alongside the identity-resolution control flow.
-        view_item("999", show="not-a-number")
+        result = view_item("999", show="not-a-number")
 
-        mock_enrich.assert_called_once()
-        assert mock_enrich.call_args.args[1] == "999"
+        assert result.title == "Live Only Item"
+        fetch.assert_called_once_with(
+            ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#999"], apply_local_patches=False)
+        )
+        mock_enrich.assert_not_called()
 
+    @pytest.mark.usefixtures("plain_memory_backend")
     def test_view_item_refresh_true_no_identifier_appends_no_warning_without_call(self, mocker: MockerFixture) -> None:
         """Cached item with no resolvable id + refresh=True: no call, no warning, no raise.
 
@@ -2092,6 +2071,7 @@ class TestCloseItem:
             ),
         )
         get_config().backend.put_work_item(item)
+        _seed_provider_items([item])
         mock_close_github_issue = mocker.patch("backlog_core.operations.close_github_issue")
         mocker.patch("backlog_core.operations.check_open_prs_for_issue", return_value=[])
 
@@ -2099,7 +2079,7 @@ class TestCloseItem:
             selector="Close Context Item", reason="superseded", reference=related_reference, comment=close_comment
         )
 
-        stored = get_config().backend.get_work_item(storage_reference)
+        stored = get_config().backend.get_work_item("#3230")
         assert stored.metadata.close_reason == "superseded"
         assert stored.metadata.close_reference == related_reference
         assert stored.metadata.close_comment == close_comment
@@ -2121,11 +2101,8 @@ class TestCloseItem:
         from backlog_core.models import BacklogError
 
         fake_dir: Path = models.get_backlog_dir()
-        filepath = _write_item(fake_dir, title="PR Blocked Close", priority="P1", topic="pr-blocked-close")
-        item_with_issue = BacklogItem(
-            title="PR Blocked Close", section="P1", issue="#5", file_path=str(filepath), reference=str(filepath)
-        )
-        mocker.patch("backlog_core.operations.find_item", return_value=item_with_issue)
+        path = _write_item(fake_dir, title="PR Blocked Close", priority="P1", topic="pr-blocked-close", issue="#5")
+        _seed_provider_items([_stored_item(path)])
         mocker.patch(
             "backlog_core.operations.check_open_prs_for_issue",
             return_value=[PullRequestRef(number=10, title="WIP: feature", url="https://github.com/t/10")],
@@ -2149,11 +2126,10 @@ class TestCloseItem:
         from backlog_core.models import BacklogError
 
         fake_dir: Path = models.get_backlog_dir()
-        filepath = _write_item(fake_dir, title="PR Warning Text Close", priority="P1", topic="pr-warning-text-close")
-        item_with_issue = BacklogItem(
-            title="PR Warning Text Close", section="P1", issue="#5", file_path=str(filepath), reference=str(filepath)
+        path = _write_item(
+            fake_dir, title="PR Warning Text Close", priority="P1", topic="pr-warning-text-close", issue="#5"
         )
-        mocker.patch("backlog_core.operations.find_item", return_value=item_with_issue)
+        _seed_provider_items([_stored_item(path)])
         mocker.patch(
             "backlog_core.operations.check_open_prs_for_issue",
             return_value=[PullRequestRef(number=10, title="WIP: feature", url="https://github.com/t/10")],
@@ -2178,11 +2154,8 @@ class TestCloseItem:
         import backlog_core.models as models
 
         fake_dir: Path = models.get_backlog_dir()
-        filepath = _write_item(fake_dir, title="Force Close Item", priority="P1", topic="force-close-item")
-        item_with_issue = BacklogItem(
-            title="Force Close Item", section="P1", issue="#6", file_path=str(filepath), reference=str(filepath)
-        )
-        mocker.patch("backlog_core.operations.find_item", return_value=item_with_issue)
+        path = _write_item(fake_dir, title="Force Close Item", priority="P1", topic="force-close-item", issue="#6")
+        _seed_provider_items([_stored_item(path)])
         mocker.patch(
             "backlog_core.operations.check_open_prs_for_issue",
             return_value=[PullRequestRef(number=11, title="WIP", url="https://github.com/t/11")],
@@ -2265,11 +2238,8 @@ class TestResolveItem:
         from backlog_core.models import BacklogError
 
         fake_dir: Path = models.get_backlog_dir()
-        filepath = _write_item(fake_dir, title="PR Blocked Resolve", priority="P1", topic="pr-blocked-resolve")
-        item_with_issue = BacklogItem(
-            title="PR Blocked Resolve", section="P1", issue="#8", file_path=str(filepath), reference=str(filepath)
-        )
-        mocker.patch("backlog_core.operations.find_item", return_value=item_with_issue)
+        path = _write_item(fake_dir, title="PR Blocked Resolve", priority="P1", topic="pr-blocked-resolve", issue="#8")
+        _seed_provider_items([_stored_item(path)])
         mocker.patch(
             "backlog_core.operations.check_open_prs_for_issue",
             return_value=[PullRequestRef(number=20, title="Fix: something", url="https://github.com/t/20")],
@@ -2288,11 +2258,8 @@ class TestResolveItem:
         import backlog_core.models as models
 
         fake_dir: Path = models.get_backlog_dir()
-        filepath = _write_item(fake_dir, title="Force Resolve Item", priority="P1", topic="force-resolve-item")
-        item_with_issue = BacklogItem(
-            title="Force Resolve Item", section="P1", issue="#9", file_path=str(filepath), reference=str(filepath)
-        )
-        mocker.patch("backlog_core.operations.find_item", return_value=item_with_issue)
+        path = _write_item(fake_dir, title="Force Resolve Item", priority="P1", topic="force-resolve-item", issue="#9")
+        _seed_provider_items([_stored_item(path)])
         mocker.patch(
             "backlog_core.operations.check_open_prs_for_issue",
             return_value=[PullRequestRef(number=21, title="WIP", url="https://github.com/t/21")],
@@ -2332,7 +2299,7 @@ class TestResolveItem:
         ),
     ],
 )
-def test_github_only_falls_back_to_pull(
+def test_github_only_exact_selector_uses_targeted_snapshot(
     op: Callable[..., Any],
     op_kwargs: dict,
     gh_mock: str,
@@ -2342,22 +2309,27 @@ def test_github_only_falls_back_to_pull(
     topic: str,
     mocker: MockerFixture,
 ) -> None:
-    """Verify close_item and resolve_item fall back to GitHub pull when no local cache file exists.
+    """A GitHub-only exact selector resolves live without populating a local cache first."""
+    from backlog_core.backend_protocol import get_config
 
-    Tests: _pull_if_issue_selector fallback path in close/resolve operations.
-    How: Empty backlog; mock _pull_if_issue_selector to write a local cache file
-         as a side effect; call the operation with a #N selector.
-    Why: GitHub-only issues (never synced or deleted from cache) must be closeable/resolvable
-         without a prior pull. Covers acceptance criteria from issue #323.
-    """
-    import backlog_core.models as models
-
-    fake_dir: Path = models.get_backlog_dir()
-
-    def _write_cache_file(selector: str, repo: str, output: object = None) -> None:
-        _write_item(fake_dir, title=title, priority=priority, topic=topic, issue="#999")
-
-    mocker.patch("backlog_core.operations._pull_if_issue_selector", side_effect=_write_cache_file)
+    live = BacklogItem(title=title, issue="#999", priority=priority, topic=topic)
+    snapshot = ProviderSnapshot(
+        items=[
+            ProviderItem(
+                provider_id="node-999",
+                reference="#999",
+                title=title,
+                body=render_issue_body(live),
+                state="OPEN",
+                labels=[],
+                revision="revision-999",
+            )
+        ],
+        sync_started_at="2026-09-24T00:00:00+00:00",
+    )
+    backend = get_config().backend
+    fetch = mocker.patch.object(backend, "fetch_snapshot", return_value=snapshot)
+    pull = mocker.patch("backlog_core.operations._pull_if_issue_selector")
     mocker.patch("backlog_core.operations.check_open_prs_for_issue", return_value=[])
     mocker.patch(gh_mock)
 
@@ -2365,6 +2337,10 @@ def test_github_only_falls_back_to_pull(
 
     assert result[result_key] is True
     assert result["title"] == title
+    fetch.assert_called_once_with(
+        ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#999"], apply_local_patches=False)
+    )
+    pull.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -2392,6 +2368,7 @@ def test_github_only_raises_when_issue_absent(op: Callable[..., Any], kwargs: di
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("plain_memory_backend")
 @pytest.mark.parametrize(
     ("priority", "topic", "expected_section"),
     [("P0", "critical-feature", "P0"), ("P1", "important-feature", "P1"), ("P2", "nice-to-have", "P2")],
@@ -2460,7 +2437,8 @@ class TestUpdateItemTitleAndDescription:
         from backlog_core.operations import update_item
 
         fake_dir: Path = models.get_backlog_dir()
-        _write_item(fake_dir, title="Linked Item", topic="linked-item", issue="42")
+        path = _write_item(fake_dir, title="Linked Item", topic="linked-item", issue="42")
+        _seed_provider_items([_stored_item(path)])
 
         mock_repo = mocker.Mock()
         mock_repo.full_name = "owner/repo"
@@ -2478,7 +2456,9 @@ class TestUpdateItemTitleAndDescription:
         mock_fetch_issue.assert_called_once_with(mock_repo, "owner", "repo", 42)
         mock_update_issue.assert_called_once_with(mock_repo, fake_node_id, title="Renamed Item")
 
-    def test_update_item_title_no_github_when_no_issue(self, mocker: MockerFixture) -> None:
+    def test_update_item_title_no_github_when_no_issue(
+        self, mocker: MockerFixture, plain_memory_backend: InMemoryBackend
+    ) -> None:
         """update_item with title= does NOT call GitHub when item has no issue.
 
         Tests: update_item title rename local-only code path.
@@ -2488,6 +2468,7 @@ class TestUpdateItemTitleAndDescription:
         import backlog_core.models as models
         from backlog_core.operations import update_item
 
+        assert plain_memory_backend.supports_github_extras is False
         fake_dir: Path = models.get_backlog_dir()
         _write_item(fake_dir, title="No Issue Item", topic="no-issue-item", issue="")
         mock_try_gh = mocker.patch("backlog_core.operations.try_get_github")
@@ -2530,7 +2511,8 @@ class TestUpdateItemTitleAndDescription:
         from backlog_core.operations import update_item
 
         fake_dir: Path = models.get_backlog_dir()
-        _write_item(fake_dir, title="Desc GitHub Item", topic="desc-gh-item", issue="99")
+        path = _write_item(fake_dir, title="Desc GitHub Item", topic="desc-gh-item", issue="99")
+        _seed_provider_items([_stored_item(path)])
         mock_try_gh = mocker.patch("backlog_core.operations.try_get_github")
 
         update_item(selector="Desc GitHub Item", description="Local only description.")
@@ -2557,7 +2539,8 @@ class TestUpdateItemTitleAndDescription:
         from backlog_core.operations import update_item
 
         fake_dir: Path = models.get_backlog_dir()
-        _write_item(fake_dir, title="Reconcile Desc Item", topic="reconcile-desc-item", issue="#123")
+        path = _write_item(fake_dir, title="Reconcile Desc Item", topic="reconcile-desc-item", issue="#123")
+        _seed_provider_items([_stored_item(path)])
 
         result = update_item(selector="Reconcile Desc Item", description="Amended description.")
 
@@ -2565,7 +2548,7 @@ class TestUpdateItemTitleAndDescription:
         backend = cast("Any", get_config().backend)
         assert backend.reconcile_requests[-1] == ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#123"])
 
-    def test_update_item_description_without_issue_skips_reconcile(self) -> None:
+    def test_update_item_description_without_issue_skips_reconcile(self, mocker: MockerFixture) -> None:
         """update_item with description= on an item with no linked issue never reconciles.
 
         Tests: _update_item_description -> _reconcile_item's early return when
@@ -2581,11 +2564,15 @@ class TestUpdateItemTitleAndDescription:
 
         fake_dir: Path = models.get_backlog_dir()
         _write_item(fake_dir, title="No Issue Desc Item", topic="no-issue-desc-item", issue="")
+        backend = get_config().backend
+        assert isinstance(backend, SyncProvider)
+        reconcile = mocker.spy(backend, "reconcile")
 
-        update_item(selector="No Issue Desc Item", description="Still local only.")
+        result = update_item(selector="No Issue Desc Item", description="Still local only.")
 
-        backend = cast("Any", get_config().backend)
-        assert backend.reconcile_requests == []
+        assert result.get("description_updated") is True
+        assert _stored_item(fake_dir / "p1-no-issue-desc-item.md").description == "Still local only."
+        reconcile.assert_not_called()
 
     def test_update_item_description_refreshes_callers_item_object(self) -> None:
         """_update_item_description refreshes the item object it was handed.
@@ -2615,6 +2602,7 @@ class TestUpdateItemTitleAndDescription:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("plain_memory_backend")
 class TestListItemsFilterSection:
     """list_items(section=...) filters items by priority section (case-insensitive)."""
 
@@ -2687,6 +2675,7 @@ class TestListItemsFilterSection:
         assert len(items) == 2
 
 
+@pytest.mark.usefixtures("plain_memory_backend")
 class TestListItemsFilterTitle:
     """list_items(title=...) filters items by case-insensitive substring match."""
 
@@ -2741,6 +2730,7 @@ class TestListItemsFilterTitle:
         assert items == []
 
 
+@pytest.mark.usefixtures("plain_memory_backend")
 class TestListItemsFilterStatus:
     """list_items(status=...) filters items by derived GitHub status."""
 
@@ -2808,6 +2798,7 @@ class TestListItemsFilterStatus:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("plain_memory_backend")
 class TestListItemsFilterType:
     """list_items(type_=...) filters items by case-insensitive exact match on metadata.type."""
 
@@ -2904,6 +2895,7 @@ class TestListItemsFilterType:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("plain_memory_backend")
 class TestListItemsFilterTopic:
     """list_items(topic=...) filters items by case-insensitive substring match on metadata.topic."""
 
@@ -2980,6 +2972,7 @@ class TestListItemsFilterTopic:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("plain_memory_backend")
 class TestListItemsFilterTypeTopicComposed:
     """list_items(type_=..., topic=...) composes filters with AND logic."""
 
@@ -3029,6 +3022,7 @@ class TestListItemsFilterTypeTopicComposed:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("plain_memory_backend")
 class TestBuildListEntryTypeTopicFields:
     """_build_list_entry includes 'type' and 'topic' fields in the returned dict."""
 
@@ -3095,6 +3089,7 @@ class TestBuildListEntryTypeTopicFields:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("plain_memory_backend")
 class TestBuildItemBody:
     """_build_item_body returns searchable text from description and section entries."""
 
@@ -3316,6 +3311,7 @@ class TestGroomItemAppend:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("plain_memory_backend")
 class TestStrikeEntryOperation:
     """Tests for the strike_entry public API function."""
 
@@ -3465,16 +3461,32 @@ class TestStrikeEntryOperation:
 
 
 class TestPullItemsEntryAwareMerge:
-    def test_pull_dry_run_returns_entry_diff(self) -> None:
+    def test_pull_with_empty_journal_reconciles_live_repository(self, mocker: MockerFixture) -> None:
+        from backlog_core.backend_protocol import get_config
+
+        backend = cast("_ProviderMemoryBackend", get_config().backend)
+        mocker.patch.object(backend, "pending_work_items", return_value=[])
+        mocker.patch.object(backend, "list_work_items", side_effect=AssertionError("cache queried during live pull"))
+        backend.reconcile_result = ReconcileResult(local_updates=1)
+
+        result = ops.pull_items(repo="owner/repository")
+
+        assert (result["pulled"], backend.reconcile_requests) == (
+            1,
+            [ReconcileRequest(scope=ReconcileScope.INCREMENTAL, repo="owner/repository")],
+        )
+
+    def test_pull_dry_run_returns_entry_diff(self, mocker: MockerFixture) -> None:
         from backlog_core.backend_protocol import get_config
 
         backend = cast("Any", get_config().backend)
-        _seed_items([BacklogItem(title="Diff Item", section="P1", issue="#42", reference="#42")])
+        item = BacklogItem(title="Diff Item", section="P1", issue="#42", reference="#42")
+        mocker.patch.object(backend, "pending_work_items", return_value=[item])
         backend.reconcile_result = ReconcileResult(local_updates=1, diffs={"#42": "entry diff"})
         result = ops.pull_items(dry_run=True, diff=True)
         assert result["diff"] == "entry diff"
         assert backend.reconcile_requests[-1] == ReconcileRequest(
-            scope=ReconcileScope.LINKED, references=["#42"], dry_run=True, include_diff=True
+            scope=ReconcileScope.INCREMENTAL, references=["#42"], dry_run=True, include_diff=True
         )
 
     def test_pull_entry_aware_merge_keeps_struck(self) -> None:
@@ -3518,23 +3530,25 @@ class TestPullItemsEntryAwareMerge:
 
 
 class TestPullItemsResilienceToFetchErrors:
-    def test_pull_continues_past_404_and_reports_skipped(self) -> None:
+    def test_pull_continues_past_404_and_reports_skipped(self, mocker: MockerFixture) -> None:
         from backlog_core.backend_protocol import get_config
 
         backend = cast("Any", get_config().backend)
-        _seed_items([
+        items = [
             BacklogItem(title="Good", section="P1", issue="#10", reference="#10"),
             BacklogItem(title="Missing", section="P1", issue="#11", reference="#11"),
-        ])
+        ]
+        mocker.patch.object(backend, "pending_work_items", return_value=items)
         backend.reconcile_result = ReconcileResult(local_updates=1, failures=1)
         result = ops.pull_items()
         assert (result["pulled"], result["skipped"], result["total"]) == (1, 1, 2)
 
-    def test_pull_all_failed_reports_zero_pulled(self) -> None:
+    def test_pull_all_failed_reports_zero_pulled(self, mocker: MockerFixture) -> None:
         from backlog_core.backend_protocol import get_config
 
         backend = cast("Any", get_config().backend)
-        _seed_items([BacklogItem(title="Missing", section="P1", issue="#11", reference="#11")])
+        item = BacklogItem(title="Missing", section="P1", issue="#11", reference="#11")
+        mocker.patch.object(backend, "pending_work_items", return_value=[item])
         backend.reconcile_result = ReconcileResult(failures=1)
         result = ops.pull_items()
         assert (result["pulled"], result["skipped"]) == (0, 1)
@@ -3590,13 +3604,13 @@ class TestRefreshClosedIssueReconciliation:
         assert reconciled.metadata.status == "closed"
         assert reconciled.description == "preserve local evidence"
 
-    def test_refresh_skips_already_terminal(self) -> None:
+    def test_refresh_reconciles_provider_scope_without_cached_reference_filter(self) -> None:
         from backlog_core.backend_protocol import get_config
 
         backend = cast("Any", get_config().backend)
         _seed_items([BacklogItem(title="Done", section="P1", issue="#60", status="done", reference="#60")])
         refresh_local_cache_from_github()
-        assert backend.reconcile_requests[-1].references == ["#60"]
+        assert backend.reconcile_requests[-1] == ReconcileRequest(scope=ReconcileScope.INCREMENTAL)
 
     def test_refresh_open_takes_precedence(self) -> None:
         from backlog_core.backend_protocol import get_config
@@ -3655,7 +3669,7 @@ class TestRefreshLocalCacheIncrementalSync:
 
 
 class TestSyncIncrementalParseBacklogCallCount:
-    def test_parse_backlog_called_once_for_multiple_closed_issues(self) -> None:
+    def test_incremental_sync_does_not_build_reference_list_from_cache(self) -> None:
         from backlog_core.backend_protocol import get_config
 
         backend = cast("Any", get_config().backend)
@@ -3665,9 +3679,7 @@ class TestSyncIncrementalParseBacklogCallCount:
             BacklogItem(title="Three", section="P1", issue="#3", reference="#3"),
         ])
         refresh_local_cache_from_github()
-        assert backend.reconcile_requests == [
-            ReconcileRequest(scope=ReconcileScope.INCREMENTAL, references=["#1", "#2", "#3"])
-        ]
+        assert backend.reconcile_requests == [ReconcileRequest(scope=ReconcileScope.INCREMENTAL)]
 
 
 class TestGroomItemMarkGroomed:
@@ -3714,9 +3726,10 @@ class TestGroomItemMarkGroomed:
 
         backlog_dir = m.get_backlog_dir()
         # Use .yaml file so parse_backlog() re-finds the item after save_item converts it
-        _write_item_yaml(
+        filepath = _write_item_yaml(
             backlog_dir, title="Mark Groomed Github", priority="P1", topic="mark-groomed-github", issue="#123"
         )
+        _seed_provider_items([_stored_item(filepath)])
 
         out = Output()
         result = ops.groom_item(
@@ -3749,6 +3762,7 @@ class TestGroomItemMarkGroomed:
         filepath = _write_item(
             backlog_dir, title="Mark Groomed False", priority="P1", topic="mark-groomed-false", issue="#456"
         )
+        _seed_provider_items([_stored_item(filepath)])
 
         out = Output()
         result = ops.groom_item(
@@ -3781,9 +3795,10 @@ class TestGroomItemMarkGroomed:
 
         backlog_dir = m.get_backlog_dir()
         # Use .yaml file so parse_backlog() re-finds the item after save_item converts it
-        _write_item_yaml(
+        filepath = _write_item_yaml(
             backlog_dir, title="Mark Groomed Batch", priority="P1", topic="mark-groomed-batch", issue="#789"
         )
+        _seed_provider_items([_stored_item(filepath)])
 
         out = Output()
         result = ops.groom_item(
@@ -3815,6 +3830,7 @@ class TestGroomItemMarkGroomed:
         filepath = _write_item(
             backlog_dir, title="Mark Groomed Error", priority="P1", topic="mark-groomed-error", issue="#999"
         )
+        _seed_provider_items([_stored_item(filepath)])
 
         out = Output()
         result = ops.groom_item(
@@ -3837,6 +3853,7 @@ class TestGroomItemMarkGroomed:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("plain_memory_backend")
 class TestViewItemUnknownSections:
     """Unknown-section content survives through view_item into ViewItemResult.sections,
     keyed by display title rather than by its raw internal storage key.
@@ -4248,6 +4265,7 @@ class TestEntryIdReadWriteInvariant:
 
         assert body_parsed_ids == structured_ids == [f"{shared_id}-0", f"{shared_id}-1"]
 
+    @pytest.mark.usefixtures("plain_memory_backend")
     def test_view_item_duplicate_stored_ids_are_addressable_by_groom_item(self, mocker: MockerFixture) -> None:
         """An id view_item returns for a duplicate-id structured section must update via groom_item.
 

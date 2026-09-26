@@ -56,6 +56,7 @@ def _mock_no_github(mocker: MockerFixture) -> None:
 
 
 @pytest.mark.parametrize("name", _ALL_NAMES)
+@pytest.mark.usefixtures("plain_memory_backend")
 def test_round_trip_fresh_write_no_loss_no_duplication(name: str, mocker: MockerFixture) -> None:
     """write -> read -> write -> read preserves all content under one stable key.
 
@@ -91,6 +92,7 @@ def test_round_trip_fresh_write_no_loss_no_duplication(name: str, mocker: Mocker
 
 
 @pytest.mark.parametrize("name", _ALL_NAMES)
+@pytest.mark.usefixtures("plain_memory_backend")
 def test_round_trip_existing_prior_content_no_loss_no_duplication(name: str, mocker: MockerFixture) -> None:
     """Writing into a section that already has content preserves the existing entry.
 
@@ -127,6 +129,7 @@ def test_round_trip_existing_prior_content_no_loss_no_duplication(name: str, moc
     assert contents == {"Pre-existing entry.", "New entry."}, f"Expected both entries present, got {contents}"
 
 
+@pytest.mark.usefixtures("plain_memory_backend")
 def test_title_case_collision_writes_merge_into_one_section(mocker: MockerFixture) -> None:
     """Case-variant section names collide onto one storage key (#2971 regression guard).
 

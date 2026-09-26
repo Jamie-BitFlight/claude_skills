@@ -11,6 +11,7 @@ from github import GithubException
 
 from backlog_core import gh_client
 from backlog_core.models import (
+    BackendUnavailableError,
     BacklogError,
     ContentConflictError,
     ContentNotFoundError,
@@ -383,6 +384,8 @@ class _GitHubContentsStore:
             variables.update({f"sha{index}": sha for index, sha in enumerate(chunk)})
             try:
                 data = gh_client._graphql_request(repository, query, variables)
+            except BackendUnavailableError:
+                raise
             except BacklogError as exc:
                 raise ContentUnavailableError(f"GitHub content discovery failed: {exc}") from exc
             repository_data = data.get("repository")

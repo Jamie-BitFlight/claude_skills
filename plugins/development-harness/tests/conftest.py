@@ -41,7 +41,15 @@ import pytest
 from backlog_core.backend_protocol import reset_config, set_config
 from backlog_core.backend_types import BacklogConfig
 from backlog_core.backends.memory_backend import InMemoryBackend
-from backlog_core.models import ReconcileRequest, ReconcileResult
+from backlog_core.github_sync import render_issue_body
+from backlog_core.models import (
+    BacklogItem,
+    ProviderItem,
+    ProviderSnapshot,
+    ReconcileRequest,
+    ReconcileResult,
+    ReconcileScope,
+)
 
 if TYPE_CHECKING:
     from backlog_core.models import GroomedData, Section
@@ -68,10 +76,59 @@ class ProviderMemoryBackend(InMemoryBackend):
 
     def __init__(self) -> None:
         super().__init__()
+        self.provider_items: list[BacklogItem] = []
         self.reconcile_requests: list[ReconcileRequest] = []
+        self.snapshot_requests: list[ReconcileRequest] = []
         self.reconcile_result = ReconcileResult()
 
-    def reconcile(self, request: ReconcileRequest) -> ReconcileResult:
+    def fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot:
+        """Return explicitly seeded provider rows without consulting local intent."""
+        self.snapshot_requests.append(request)
+        items = [
+            ProviderItem(
+                provider_id=item.issue or item.reference,
+                reference=item.issue or item.reference,
+                title=item.title,
+                body=render_issue_body(item),
+                state=("CLOSED" if item.status.casefold() in {"closed", "completed", "done", "resolved"} else "OPEN"),
+                labels=list(item.metadata.labels),
+                revision=item.metadata.updated_at or f"test-{item.issue}",
+                milestone=item.metadata.milestone,
+            )
+            for item in self.provider_items
+        ]
+        if request.scope in {ReconcileScope.LINKED, ReconcileScope.TARGETED}:
+            by_reference = {item.reference: item for item in items}
+            items = [
+                by_reference.get(
+                    reference,
+                    ProviderItem(
+                        provider_id="",
+                        reference=reference,
+                        title="",
+                        body="",
+                        state="",
+                        labels=[],
+                        revision="",
+                        exists=False,
+                    ),
+                )
+                for reference in request.references
+            ]
+        return ProviderSnapshot(items=items, sync_started_at="2026-09-24T00:00:00+00:00", pages_fetched=1)
+
+    def pending_work_items(self, repo: str = "") -> list[BacklogItem]:
+        """Return unlinked local intent separately from live provider rows."""
+        del repo
+        return [item.model_copy(deep=True) for item in self.list_work_items() if not item.issue]
+
+    def put_work_item(self, item: BacklogItem, repo: str = "") -> None:
+        """Accept the repository parameter required by GitHub-shaped tests."""
+        del repo
+        super().put_work_item(item)
+
+    def reconcile(self, request: ReconcileRequest, *, snapshot: ProviderSnapshot | None = None) -> ReconcileResult:
+        del snapshot
         self.reconcile_requests.append(request)
         return self.reconcile_result
 
@@ -101,6 +158,14 @@ def _isolated_backend(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRe
     set_config(BacklogConfig(backend=backend))
     yield backend
     reset_config()
+
+
+@pytest.fixture
+def plain_memory_backend() -> InMemoryBackend:
+    """Install the native backend for tests that exercise provider-neutral behavior."""
+    backend = InMemoryBackend()
+    set_config(BacklogConfig(backend=backend))
+    return backend
 
 
 @pytest.fixture

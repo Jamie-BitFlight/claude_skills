@@ -24,8 +24,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+import pytest
+
 from backlog_core.backends.github_work_items import _GitHubReconciliation
 from backlog_core.file_cache import FileCache
+from backlog_core.file_cache_state import _ProviderSnapshotCheckpoint
 from backlog_core.github_sync import render_issue_body
 from backlog_core.models import (
     BacklogItem,
@@ -34,6 +37,7 @@ from backlog_core.models import (
     ProviderSnapshot,
     ReconcileRequest,
     ReconcileScope,
+    ValidationError,
 )
 
 if TYPE_CHECKING:
@@ -51,14 +55,16 @@ class _FakeReconcileProvider:
     def __init__(self, snapshot: ProviderSnapshot, *, patch_status: _PatchStatus = "applied") -> None:
         self._snapshot = snapshot
         self._patch_status = patch_status
+        self.fetch_snapshot_calls: list[ReconcileRequest] = []
         self.apply_patches_calls: list[list[ProviderPatch]] = []
 
-    def _fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot:
+    def fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot:
         """Return the fixed snapshot regardless of the request (test double)."""
-        del request
+        self.fetch_snapshot_calls.append(request)
         return self._snapshot
 
-    def _apply_patches(self, patches: list[ProviderPatch]) -> list[PatchResult]:
+    def _apply_patches(self, patches: list[ProviderPatch], repo: str = "") -> list[PatchResult]:
+        del repo
         self.apply_patches_calls.append(patches)
         return [
             PatchResult(
@@ -66,6 +72,22 @@ class _FakeReconcileProvider:
             )
             for patch in patches
         ]
+
+
+class _RepositoryProvider:
+    """Return distinct issue #1 snapshots and watermarks for two repositories."""
+
+    def __init__(self, snapshots: dict[str, ProviderSnapshot]) -> None:
+        self.snapshots = snapshots
+        self.fetch_snapshot_calls: list[ReconcileRequest] = []
+
+    def fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot:
+        self.fetch_snapshot_calls.append(request)
+        return self.snapshots[request.repo]
+
+    def _apply_patches(self, patches: list[ProviderPatch], repo: str = "") -> list[PatchResult]:
+        del patches, repo
+        return []
 
 
 def _provider_snapshot() -> ProviderSnapshot:
@@ -84,6 +106,25 @@ def _provider_snapshot() -> ProviderSnapshot:
         revision="rev-1",
     )
     return ProviderSnapshot(items=[item], sync_started_at="2026-01-01T00:00:00+00:00", pages_fetched=1)
+
+
+def _repository_snapshot(title: str, watermark: str) -> ProviderSnapshot:
+    item = BacklogItem(title=title, description=f"{title} body", issue=_ISSUE_REFERENCE, section="P1")
+    return ProviderSnapshot(
+        items=[
+            ProviderItem(
+                provider_id=f"node-{title}",
+                reference=_ISSUE_REFERENCE,
+                title=title,
+                body=render_issue_body(item),
+                state="OPEN",
+                labels=[],
+                revision=f"revision-{title}",
+            )
+        ],
+        sync_started_at=watermark,
+        pages_fetched=1,
+    )
 
 
 def _queue_divergent_local_mutation(cache: FileCache) -> None:
@@ -123,6 +164,23 @@ class TestFetchOnlyReconcileAdvancesTheCheckpoint:
         pending = cache._pending_work_item_mutations()
         assert len(pending) == 1
         assert pending[0].item.reference == _ISSUE_REFERENCE
+
+    def test_supplied_snapshot_skips_a_second_provider_fetch(self, tmp_path: Path) -> None:
+        cache = FileCache(tmp_path)
+        provider = _FakeReconcileProvider(_provider_snapshot())
+        reconciliation = _GitHubReconciliation(cache, provider)
+        request = ReconcileRequest(scope=ReconcileScope.TARGETED, references=[_ISSUE_REFERENCE])
+
+        reconciliation.reconcile(request, snapshot=_provider_snapshot())
+
+        assert provider.fetch_snapshot_calls == []
+
+    def test_supplied_targeted_snapshot_must_cover_every_requested_reference(self, tmp_path: Path) -> None:
+        reconciliation = _GitHubReconciliation(FileCache(tmp_path), _FakeReconcileProvider(_provider_snapshot()))
+        request = ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#1", "#2"])
+
+        with pytest.raises(ValidationError, match="missing requested references"):
+            reconciliation.reconcile(request, snapshot=_provider_snapshot())
 
     def test_a_second_fetch_only_call_does_not_repeat_the_full_fetch(self, tmp_path: Path) -> None:
         """Regression guard for the reported symptom: once the checkpoint has
@@ -173,3 +231,75 @@ class TestFinalizeReconciliationStillDistinguishesFailureFromSkip:
         assert result.skipped_patches == 0
         assert result.failures == 1
         assert reconciliation.has_synced_snapshot() is False
+
+
+class TestRepositoryScopedSnapshotsAndCheckpoints:
+    """Equal issue numbers in different repositories retain independent state."""
+
+    _REPO_A = "owner/repository-a"
+    _REPO_B = "owner/repository-b"
+    _WATERMARK_A = "2026-01-01T00:00:00+00:00"
+    _WATERMARK_B = "2026-02-01T00:00:00+00:00"
+
+    def _reconciliation(self, tmp_path: Path) -> tuple[_GitHubReconciliation, _RepositoryProvider]:
+        provider = _RepositoryProvider({
+            self._REPO_A: _repository_snapshot("repository A item", self._WATERMARK_A),
+            self._REPO_B: _repository_snapshot("repository B item", self._WATERMARK_B),
+        })
+        return _GitHubReconciliation(FileCache(tmp_path), provider, default_repo=self._REPO_A), provider
+
+    def test_equal_issue_numbers_keep_repository_specific_snapshot_baselines(self, tmp_path: Path) -> None:
+        reconciliation, _provider = self._reconciliation(tmp_path)
+        reconciliation.reconcile(ReconcileRequest(scope=ReconcileScope.INITIAL, repo=self._REPO_A))
+        reconciliation.reconcile(ReconcileRequest(scope=ReconcileScope.INITIAL, repo=self._REPO_B))
+
+        records_a = reconciliation.load_records(repo=self._REPO_A)
+        records_b = reconciliation.load_records(repo=self._REPO_B)
+
+        assert [record.item.title for record in records_a] == ["repository A item"]
+        assert [record.item.title for record in records_b] == ["repository B item"]
+
+    def test_incremental_reconcile_reuses_only_its_repository_watermark(self, tmp_path: Path) -> None:
+        cache = FileCache(tmp_path)
+        for repo, watermark in ((self._REPO_A, self._WATERMARK_A), (self._REPO_B, self._WATERMARK_B)):
+            cache._set_snapshot_checkpoint(
+                _ProviderSnapshotCheckpoint(
+                    watermark=watermark, scope=ReconcileScope.INITIAL.value, label="", items_observed=1
+                ),
+                repo=repo,
+            )
+        reconciliation, _provider = self._reconciliation(tmp_path)
+
+        request = reconciliation._with_snapshot_checkpoint(
+            ReconcileRequest(scope=ReconcileScope.INCREMENTAL, repo=self._REPO_A)
+        )
+
+        assert request.since == self._WATERMARK_A
+
+    def test_legacy_unscoped_state_belongs_only_to_default_repository(self, tmp_path: Path) -> None:
+        cache = FileCache(tmp_path)
+        legacy = BacklogItem(title="legacy default item", issue=_ISSUE_REFERENCE, section="P1")
+        cache._save_work_item_snapshot(_ISSUE_REFERENCE, legacy)
+        cache._set_snapshot_checkpoint(
+            _ProviderSnapshotCheckpoint(
+                watermark=self._WATERMARK_A, scope=ReconcileScope.INITIAL.value, label="", items_observed=1
+            )
+        )
+        provider = _RepositoryProvider({
+            self._REPO_A: _repository_snapshot("repository A item", self._WATERMARK_A),
+            self._REPO_B: _repository_snapshot("repository B item", self._WATERMARK_B),
+        })
+        reconciliation = _GitHubReconciliation(cache, provider, default_repo=self._REPO_A)
+
+        assert [record.item.title for record in reconciliation.load_records(repo=self._REPO_A)] == [
+            "legacy default item"
+        ]
+        assert reconciliation.load_records(repo=self._REPO_B) == []
+        request_a = reconciliation._with_snapshot_checkpoint(
+            ReconcileRequest(scope=ReconcileScope.INCREMENTAL, repo=self._REPO_A)
+        )
+        request_b = reconciliation._with_snapshot_checkpoint(
+            ReconcileRequest(scope=ReconcileScope.INCREMENTAL, repo=self._REPO_B)
+        )
+        assert request_a.since == self._WATERMARK_A
+        assert request_b.scope is ReconcileScope.INITIAL

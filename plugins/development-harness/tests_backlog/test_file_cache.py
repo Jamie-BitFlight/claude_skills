@@ -13,7 +13,10 @@ from threading import Barrier, Thread
 from unittest.mock import MagicMock
 
 import pytest
-from backlog_core import file_cache
+from backlog_core import file_cache, models
+from backlog_core.backend_protocol import create_backend
+from backlog_core.backends import github_backend
+from backlog_core.backends.github_backend import GitHubBackend
 from backlog_core.file_cache import CacheCheckpoint, FileCache, ReplayAcknowledgement, _ProviderSnapshotCheckpoint
 from backlog_core.file_cache_state import (
     PendingMutation,
@@ -130,6 +133,37 @@ def test_file_cache_coalesces_work_item_intent_and_reopens_it(tmp_path: Path) ->
 
     # Then: only the latest durable intent remains for idempotent replay
     assert pending == [latest]
+
+
+def test_configured_repository_write_replaces_legacy_unscoped_intent(tmp_path: Path) -> None:
+    cache = FileCache(tmp_path)
+    cache._queue_work_item("#1", BacklogItem(title="Issue 1", description="legacy pending"))
+    backend = GitHubBackend(repo="default/repository", cache=cache)
+
+    backend.put_work_item(BacklogItem(title="Issue 1", description="new pending", issue="#1"))
+
+    assert [(entry.repo, entry.item.description) for entry in cache._pending_work_item_mutations()] == [
+        ("default/repository", "new pending")
+    ]
+
+
+def test_factory_configured_repository_write_replaces_legacy_unscoped_intent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    configured_repo = "owner/repository"
+    monkeypatch.setattr(models, "_config", None)
+    models.init_paths(project_dir=str(tmp_path), repo=configured_repo)
+    monkeypatch.setattr(github_backend.dh_paths, "state_root", lambda: tmp_path)
+    cache = FileCache(tmp_path / "github-cache")
+    cache._queue_work_item("#1", BacklogItem(title="Issue 1", description="legacy pending"))
+
+    backend = create_backend("github")
+    assert isinstance(backend, GitHubBackend)
+    backend.put_work_item(BacklogItem(title="Issue 1", description="new pending", issue="#1"), repo=configured_repo)
+
+    assert [(entry.repo, entry.item.description) for entry in cache._pending_work_item_mutations()] == [
+        (configured_repo, "new pending")
+    ]
 
 
 def test_file_cache_acknowledges_work_item_by_idempotency_key(tmp_path: Path) -> None:
@@ -869,6 +903,28 @@ def test_transaction_merge_keeps_one_pending_work_item_per_key_on_collision(tmp_
     matching = [entry for entry in loaded.pending_work_items if entry.key == colliding_key]
     assert matching == [current_state.pending_work_items[0]]
     assert any(entry.idempotency_key == legacy_work_item.idempotency_key for entry in loaded.rejected_work_items)
+
+
+def test_legacy_file_merge_canonicalizes_configured_repository_and_keeps_current_intent(tmp_path: Path) -> None:
+    store = _CacheStateStore(tmp_path)
+    current_item = BacklogItem(title="Issue 1", description="new pending", issue="#1")
+    current_mutation = _PendingWorkItemMutation(
+        idempotency_key=_work_item_mutation_key("#1", current_item, "default/repository"),
+        key="#1",
+        item=current_item,
+        repo="default/repository",
+    )
+    _write_new_json(store._state_path, _CacheState(pending_work_items=[current_mutation]))
+    legacy_item = BacklogItem(title="Issue 1", description="legacy pending", issue="#1")
+    legacy_mutation = _PendingWorkItemMutation(
+        idempotency_key=_work_item_mutation_key("#1", legacy_item), key="#1", item=legacy_item
+    )
+    _write_legacy_yaml(store._legacy_state_path, _CacheState(pending_work_items=[legacy_mutation]))
+    cache = FileCache(tmp_path)
+    backend = GitHubBackend(repo="default/repository", cache=cache)
+
+    assert [item.description for item in backend.pending_work_items()] == ["new pending"]
+    assert cache._pending_work_item_mutations() == [current_mutation]
 
 
 def test_transaction_merge_lets_a_terminal_entry_win_over_a_still_pending_copy(tmp_path: Path) -> None:

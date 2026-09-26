@@ -11,10 +11,12 @@ from backlog_core.backend_types import AddedCommentNode
 from backlog_core.backends._github_work_item_versions import render_work_item_comment, root_revision, work_item_head_ref
 from backlog_core.backends.github_backend import GitHubBackend, _GitHubDispatchPersistence
 from backlog_core.backends.github_content_stores import _content_revision
+from backlog_core.backends.github_contents import _GitHubContentIntegrityError
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.file_cache import FileCache
 from backlog_core.models import (
     ArtifactManifest,
+    BackendUnavailableError,
     BacklogError,
     BacklogItem,
     ContentConflictError,
@@ -28,7 +30,10 @@ from backlog_core.models import (
     ProviderPatch,
     ReconcileRequest,
     ReconcileScope,
+    ValidationError,
 )
+from backlog_core.reconciliation import synchronized_fingerprint
+from github import GithubException
 from sam_schema.core.artifact_registry_client import ArtifactRegistryClient, PlanIndexUnavailableError
 from sam_schema.core.plan_id_index import PlanIndexEntry, _serialize_index_yaml
 
@@ -84,13 +89,53 @@ def test_github_sync_provider_normalizes_bounded_snapshot() -> None:
     backend._fetch_issue_comments_graphql = MagicMock(return_value=[])
 
     # When: reconciliation fetches an initial snapshot
-    snapshot = backend._fetch_snapshot(ReconcileRequest(scope=ReconcileScope.INITIAL))
+    snapshot = backend.fetch_snapshot(ReconcileRequest(scope=ReconcileScope.INITIAL))
 
     # Then: the normalized provider item retains body, labels, and revision
     assert snapshot.items[0].reference == "#1"
     assert snapshot.items[0].labels == ["feature"]
     assert snapshot.items[0].revision == root_revision("#1", "node-1", "body")
     assert backend._fetch_issues_graphql.call_args.kwargs["first"] == 100
+
+
+@pytest.mark.parametrize(
+    ("error", "retryable"),
+    [
+        pytest.param(GithubException(503, {"message": "provider offline"}), True, id="github-503"),
+        pytest.param(TimeoutError("transport timed out"), True, id="transport-timeout"),
+        pytest.param(ContentUnavailableError("content offline", retryable=True), True, id="content-unavailable"),
+    ],
+)
+def test_fetch_snapshot_normalizes_provider_availability(error: Exception, retryable: bool) -> None:
+    backend = GitHubBackend()
+    backend._work_items.fetch_snapshot = MagicMock(side_effect=error)
+
+    with pytest.raises(BackendUnavailableError) as unavailable:
+        backend.fetch_snapshot(ReconcileRequest(scope=ReconcileScope.INITIAL))
+
+    assert unavailable.value.__cause__ is error
+    assert unavailable.value.retryable is retryable
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        pytest.param(ContentNotFoundError("missing"), id="content-not-found"),
+        pytest.param(ContentConflictError("conflict"), id="content-conflict"),
+        pytest.param(ContentUnavailableError("invalid work-item head"), id="content-no-availability-evidence"),
+        pytest.param(_GitHubContentIntegrityError("tree truncated"), id="content-integrity"),
+        pytest.param(ValidationError("invalid"), id="validation"),
+        pytest.param(RuntimeError("bug"), id="runtime"),
+    ],
+)
+def test_fetch_snapshot_does_not_normalize_semantic_or_programming_errors(error: Exception) -> None:
+    backend = GitHubBackend()
+    backend._work_items.fetch_snapshot = MagicMock(side_effect=error)
+
+    with pytest.raises(type(error)) as raised:
+        backend.fetch_snapshot(ReconcileRequest(scope=ReconcileScope.INITIAL))
+
+    assert raised.value is error
 
 
 def test_github_sync_provider_forwards_label_scope_to_snapshot_query() -> None:
@@ -102,7 +147,7 @@ def test_github_sync_provider_forwards_label_scope_to_snapshot_query() -> None:
     backend._fetch_issue_comments_graphql = MagicMock(return_value=[])
 
     # When: the adapter fetches the provider snapshot
-    backend._fetch_snapshot(ReconcileRequest(scope=ReconcileScope.INITIAL, label="review"))
+    backend.fetch_snapshot(ReconcileRequest(scope=ReconcileScope.INITIAL, label="review"))
 
     # Then: the existing GraphQL query receives only the requested label
     assert backend._fetch_issues_graphql.call_args.kwargs["labels"] == ["review"]
@@ -137,7 +182,7 @@ def test_github_sync_provider_targeted_fetch_uses_alias_batch_and_emits_tombston
     backend._graphql_request = MagicMock(return_value={"repository": {"i0": _issue(1), "i1": None}})
 
     # When: reconciliation asks only for those linked references
-    snapshot = backend._fetch_snapshot(ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#1", "#2"]))
+    snapshot = backend.fetch_snapshot(ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#1", "#2"]))
 
     # Then: one bounded alias query replaces per-issue reads and preserves the deletion explicitly
     assert [item.exists for item in snapshot.items] == [True, False]
@@ -210,6 +255,31 @@ def test_github_sync_provider_publishes_body_change_as_audit_comment() -> None:
     backend._update_issues_graphql_batch.assert_not_called()
     backend._fetch_issue_graphql.assert_not_called()
     backend._fetch_issues_graphql.assert_not_called()
+
+
+def test_reconcile_fetches_and_applies_patches_to_supplied_repository(tmp_path: Path) -> None:
+    contents = _InMemoryContents()
+    backend = GitHubBackend(repo="default/repository", cache=FileCache(tmp_path), contents=contents)
+    repository = MagicMock(full_name="supplied/repository")
+    provider_item = BacklogItem(title="Issue 1", description="provider body", issue="#1")
+    pending_item = provider_item.model_copy(deep=True)
+    pending_item.metadata.sync_fingerprint = synchronized_fingerprint(provider_item)
+    pending_item.description = "pending body"
+    backend.put_work_item(pending_item, repo="supplied/repository")
+    issue = _issue(1)
+    issue["body"] = backend.render_issue_body(provider_item)
+    backend.get_github = MagicMock(return_value=repository)
+    backend._fetch_issues_graphql = MagicMock(return_value=[issue])
+    backend._fetch_targeted_issues = MagicMock(return_value={"#1": issue})
+    backend._add_comment_graphql = MagicMock(return_value=AddedCommentNode(id="comment-1", database_id=None))
+
+    result = backend.reconcile(ReconcileRequest(scope=ReconcileScope.INITIAL, repo="supplied/repository"))
+
+    assert result.provider_patches == 1
+    assert [entry.args for entry in backend.get_github.call_args_list] == [
+        ("supplied/repository",),
+        ("supplied/repository",),
+    ]
 
 
 def test_github_sync_provider_continues_after_audit_comment_failure() -> None:
@@ -287,7 +357,7 @@ def test_github_backend_reconcile_owns_snapshot_cache_and_engine(tmp_path: Path)
     assert result.fetched_items == 1
     assert result.local_updates == 1
     assert result.changed_references == ["#1"]
-    assert not hasattr(backend, "fetch_snapshot")
+    assert callable(backend.fetch_snapshot)
     assert not hasattr(backend, "apply_patches")
     assert cache._work_item_snapshots().snapshots[0][1].metadata.sync_fingerprint
 

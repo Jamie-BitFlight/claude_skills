@@ -1233,7 +1233,10 @@ def _view_item_side_effect(view_result: ViewItemResult, warning_text: str):
     cached/local-record ``ViewItemResult`` while recording a warning.
     """
 
-    def _fake(selector: str, refresh: bool = False, output: Output | None = None) -> ViewItemResult:
+    def _fake(
+        selector: str, refresh: bool = False, allow_cached: bool = False, output: Output | None = None
+    ) -> ViewItemResult:
+        del selector, refresh, allow_cached
         if output is not None:
             output.warn(warning_text)
         return view_result

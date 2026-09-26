@@ -12,6 +12,8 @@ from sam_schema import cli_output
 
 app = typer.Typer(name="backlog", help="Backlog item operations.", no_args_is_help=True, rich_markup_mode=None)
 
+_ALLOW_CACHED_HELP = "After a live provider read fails, permit a warned fallback to cached provider records"
+
 
 def _emit(result: object, output: Output) -> None:
     cli_output.output_json(result)
@@ -57,6 +59,7 @@ def add(
         bool, typer.Option("--force", help="Force creation even if a content-based duplicate is suspected")
     ] = False,
     repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    allow_cached: Annotated[bool, typer.Option("--allow-cached", help=_ALLOW_CACHED_HELP)] = False,
 ) -> None:
     """Add a new item to the backlog."""
     output = Output()
@@ -69,6 +72,7 @@ def add(
             type_=type_,
             force=force,
             repo=repo,
+            allow_cached=allow_cached,
             output=output,
         )
     except BacklogError as exc:
@@ -81,17 +85,18 @@ def add(
 @app.command("list")
 def list_items(
     refresh: Annotated[
-        bool, typer.Option("--refresh", help="Refresh from the selected backend provider before listing")
+        bool,
+        typer.Option(
+            "--refresh", help="Reconcile the command's live provider snapshot in the foreground before returning"
+        ),
     ] = False,
     allow_cached: Annotated[
         bool,
         typer.Option(
             "--allow-cached",
             help=(
-                "Opt into serving items/count from a provider-private cache even when its state "
-                "cannot be confirmed complete (never synced, or a checkpoint over a partial/corrupted "
-                "snapshot set). Default declines and reports from_cache/has_pending_writes instead "
-                "(backlog #3546 task A4)."
+                "After a live provider read fails, permit a warned fallback to cached provider records. "
+                "Live data is always attempted first."
             ),
         ),
     ] = False,
@@ -110,21 +115,24 @@ def list_items(
 ) -> None:
     """List backlog items, optionally filtered."""
     output = Output()
-    result = operations.list_items(
-        refresh=refresh,
-        allow_cached=allow_cached,
-        label=label,
-        section=section,
-        status=status,
-        title=title,
-        type_=type_,
-        topic=topic,
-        include_closed=include_closed,
-        filter_by_key=_filter_pairs(filters),
-        search=search,
-        repo=repo,
-        output=output,
-    )
+    try:
+        result = operations.list_items(
+            refresh=refresh,
+            allow_cached=allow_cached,
+            label=label,
+            section=section,
+            status=status,
+            title=title,
+            type_=type_,
+            topic=topic,
+            include_closed=include_closed,
+            filter_by_key=_filter_pairs(filters),
+            search=search,
+            repo=repo,
+            output=output,
+        )
+    except BacklogError as exc:
+        cli_output.exit_with_json_error({"error": str(exc), **output.to_dict()})
     _emit(result, output)
 
 
@@ -132,7 +140,11 @@ def list_items(
 def view(
     selector: Annotated[str, typer.Option("--selector", help="Item selector")],
     refresh: Annotated[
-        bool, typer.Option("--refresh", help="Bypass the local cache and validate against the live backend")
+        bool,
+        typer.Option(
+            "--refresh",
+            help="Request live enrichment for native-backend title selectors; GitHub selectors are always live-first",
+        ),
     ] = False,
     repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
     offset: Annotated[int, typer.Option("--offset", min=0, help="Pagination offset")] = 0,
@@ -140,20 +152,25 @@ def view(
     show: Annotated[str | None, typer.Option("--show", help="Show a section or field")] = None,
     since: Annotated[str | None, typer.Option("--since", help="Filter entries since date/commit")] = None,
     section: Annotated[str | None, typer.Option("--section", help="Show only a named section")] = None,
+    allow_cached: Annotated[bool, typer.Option("--allow-cached", help=_ALLOW_CACHED_HELP)] = False,
 ) -> None:
     """View a single backlog item by selector."""
     output = Output()
-    result = operations.view_item(
-        selector=selector,
-        repo=repo,
-        offset=offset,
-        limit=limit,
-        show=show,
-        since=since,
-        output=output,
-        section=section,
-        refresh=refresh,
-    )
+    try:
+        result = operations.view_item(
+            selector=selector,
+            repo=repo,
+            offset=offset,
+            limit=limit,
+            show=show,
+            since=since,
+            output=output,
+            section=section,
+            refresh=refresh,
+            allow_cached=allow_cached,
+        )
+    except BacklogError as exc:
+        cli_output.exit_with_json_error({"error": str(exc), **output.to_dict()})
     _emit(result, output)
 
 
@@ -167,20 +184,25 @@ def update(
     title: Annotated[str | None, typer.Option("--title", help="New title")] = None,
     description: Annotated[str | None, typer.Option("--description", help="New description")] = None,
     repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    allow_cached: Annotated[bool, typer.Option("--allow-cached", help=_ALLOW_CACHED_HELP)] = False,
 ) -> None:
     """Update a backlog item's fields."""
     output = Output()
-    result = operations.update_item(
-        selector=selector,
-        plan=plan,
-        status=status,
-        section=section,
-        content=content,
-        title=title,
-        description=description,
-        repo=repo,
-        output=output,
-    )
+    try:
+        result = operations.update_item(
+            selector=selector,
+            plan=plan,
+            status=status,
+            section=section,
+            content=content,
+            title=title,
+            description=description,
+            repo=repo,
+            allow_cached=allow_cached,
+            output=output,
+        )
+    except BacklogError as exc:
+        cli_output.exit_with_json_error({"error": str(exc), **output.to_dict()})
     _emit(result, output)
 
 
@@ -193,6 +215,7 @@ def close(
     cleanup: Annotated[bool, typer.Option("--cleanup", help="Clean up local files after closing")] = False,
     force: Annotated[bool, typer.Option("--force", help="Force close even if checks fail")] = False,
     repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    allow_cached: Annotated[bool, typer.Option("--allow-cached", help=_ALLOW_CACHED_HELP)] = False,
 ) -> None:
     """Dismiss a backlog item without completion."""
     output = Output()
@@ -205,6 +228,7 @@ def close(
             cleanup=cleanup,
             force=force,
             repo=repo,
+            allow_cached=allow_cached,
             output=output,
         )
     except BacklogError as exc:
@@ -224,6 +248,7 @@ def resolve(
     cleanup: Annotated[bool, typer.Option("--cleanup", help="Clean up local files after resolving")] = False,
     force: Annotated[bool, typer.Option("--force", help="Force resolve even if checks fail")] = False,
     repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    allow_cached: Annotated[bool, typer.Option("--allow-cached", help=_ALLOW_CACHED_HELP)] = False,
 ) -> None:
     """Mark a backlog item as done and close the issue with evidence."""
     output = Output()
@@ -239,6 +264,7 @@ def resolve(
             cleanup=cleanup,
             force=force,
             repo=repo,
+            allow_cached=allow_cached,
             output=output,
         )
     except BacklogError as exc:
@@ -250,20 +276,30 @@ def resolve(
 def link_followup(
     selector: Annotated[str, typer.Option("--selector", help="Item selector")],
     followup_to: Annotated[str, typer.Option("--to", help="Originating plan or task ID")],
+    allow_cached: Annotated[bool, typer.Option("--allow-cached", help=_ALLOW_CACHED_HELP)] = False,
 ) -> None:
     """Link a backlog item to its originating plan or task."""
     output = Output()
-    result = operations.link_followup(selector=selector, followup_to=followup_to, output=output)
+    try:
+        result = operations.link_followup(
+            selector=selector, followup_to=followup_to, allow_cached=allow_cached, output=output
+        )
+    except BacklogError as exc:
+        cli_output.exit_with_json_error({"error": str(exc), **output.to_dict()})
     _emit(result, output)
 
 
 @app.command("list-followups")
 def list_followups(
     followup_to: Annotated[str, typer.Option("--followup-to", help="Originating plan or task ID")],
+    allow_cached: Annotated[bool, typer.Option("--allow-cached", help=_ALLOW_CACHED_HELP)] = False,
 ) -> None:
     """List backlog items linked to an originating plan or task."""
     output = Output()
-    result = operations.list_followups(followup_to=followup_to, output=output)
+    try:
+        result = operations.list_followups(followup_to=followup_to, allow_cached=allow_cached, output=output)
+    except BacklogError as exc:
+        cli_output.exit_with_json_error({"error": str(exc), **output.to_dict()})
     _emit(result, output)
 
 
@@ -273,10 +309,16 @@ def groom(
     section: Annotated[str | None, typer.Option("--section", help="Section name for content")] = None,
     content: Annotated[str | None, typer.Option("--content", help="Content to write into section")] = None,
     repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+    allow_cached: Annotated[bool, typer.Option("--allow-cached", help=_ALLOW_CACHED_HELP)] = False,
 ) -> None:
     """Write groomed content into a backlog item file."""
     output = Output()
-    result = operations.groom_item(selector=selector, section=section, content=content, repo=repo, output=output)
+    try:
+        result = operations.groom_item(
+            selector=selector, section=section, content=content, repo=repo, allow_cached=allow_cached, output=output
+        )
+    except BacklogError as exc:
+        cli_output.exit_with_json_error({"error": str(exc), **output.to_dict()})
     _emit(result, output)
 
 
@@ -309,7 +351,10 @@ def pull(
 ) -> None:
     """Pull a single backlog item using the selected backend provider."""
     output = Output()
-    result = operations.pull_by_selector(selector=selector, repo=repo, diff=diff, output=output)
+    try:
+        result = operations.pull_by_selector(selector=selector, repo=repo, diff=diff, output=output)
+    except BacklogError as exc:
+        cli_output.exit_with_json_error({"error": str(exc), **output.to_dict()})
     _emit(result, output)
 
 
@@ -322,17 +367,24 @@ def pull_all(
 ) -> None:
     """Pull all backlog items using the selected backend provider."""
     output = Output()
-    result = operations.pull_items(repo=repo, dry_run=dry_run, force=force, diff=diff, output=output)
+    try:
+        result = operations.pull_items(repo=repo, dry_run=dry_run, force=force, diff=diff, output=output)
+    except BacklogError as exc:
+        cli_output.exit_with_json_error({"error": str(exc), **output.to_dict()})
     _emit(result, output)
 
 
 @app.command("normalize")
 def normalize(
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview changes without writing")] = False,
+    allow_cached: Annotated[bool, typer.Option("--allow-cached", help=_ALLOW_CACHED_HELP)] = False,
 ) -> None:
     """Normalize backlog item files to canonical structure."""
     output = Output()
-    result = operations.normalize_items(dry_run=dry_run, output=output)
+    try:
+        result = operations.normalize_items(dry_run=dry_run, allow_cached=allow_cached, output=output)
+    except BacklogError as exc:
+        cli_output.exit_with_json_error({"error": str(exc), **output.to_dict()})
     _emit(result, output)
 
 
@@ -342,12 +394,21 @@ def strike(
     entry_id: Annotated[str, typer.Option("--entry-id", help="Log entry ID to strike")],
     reason: Annotated[str, typer.Option("--reason", help="Reason for striking the entry")],
     section: Annotated[str | None, typer.Option("--section", help="Section containing the entry")] = None,
+    allow_cached: Annotated[bool, typer.Option("--allow-cached", help=_ALLOW_CACHED_HELP)] = False,
 ) -> None:
     """Strike a log entry from a backlog item."""
     output = Output()
-    result = operations.strike_entry(
-        selector=selector, entry_id=entry_id, reason=reason, section=section, output=output
-    )
+    try:
+        result = operations.strike_entry(
+            selector=selector,
+            entry_id=entry_id,
+            reason=reason,
+            section=section,
+            allow_cached=allow_cached,
+            output=output,
+        )
+    except BacklogError as exc:
+        cli_output.exit_with_json_error({"error": str(exc), **output.to_dict()})
     _emit(result, output)
 
 
@@ -359,9 +420,12 @@ def refresh(
 ) -> None:
     """Refresh the local backlog cache from the selected backend provider."""
     output = Output()
-    result = operations.refresh_local_cache_from_github(
-        repo=repo, label=label, full_refresh=full_refresh, output=output
-    )
+    try:
+        result = operations.refresh_local_cache_from_github(
+            repo=repo, label=label, full_refresh=full_refresh, output=output
+        )
+    except BacklogError as exc:
+        cli_output.exit_with_json_error({"error": str(exc), **output.to_dict()})
     _emit(result, output)
 
 
@@ -372,7 +436,10 @@ def labels(
 ) -> None:
     """List labels for a repository."""
     output = Output()
-    result = operations.list_labels(repo=repo, limit=limit, output=output)
+    try:
+        result = operations.list_labels(repo=repo, limit=limit, output=output)
+    except BacklogError as exc:
+        cli_output.exit_with_json_error({"error": str(exc), **output.to_dict()})
     _emit(result, output)
 
 
@@ -384,7 +451,10 @@ def merged_prs(
 ) -> None:
     """List merged pull requests for a repository."""
     output = Output()
-    result = operations.list_merged_prs(repo=repo, search=search, limit=limit, output=output)
+    try:
+        result = operations.list_merged_prs(repo=repo, search=search, limit=limit, output=output)
+    except BacklogError as exc:
+        cli_output.exit_with_json_error({"error": str(exc), **output.to_dict()})
     _emit(result, output)
 
 

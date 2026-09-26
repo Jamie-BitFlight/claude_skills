@@ -667,9 +667,9 @@ class GitHubUnavailableError(BackendUnavailableError):
     once the credentials or the network are there.
     """
 
-    def __init__(self, *args: object) -> None:
-        """Initialize with the usual exception args and a retryable verdict."""
-        super().__init__(*args, retryable=True)
+    def __init__(self, *args: object, retryable: bool = True) -> None:
+        """Initialize with the usual exception args and the raise site's retry verdict."""
+        super().__init__(*args, retryable=retryable)
 
 
 class GraphQLUnavailableError(BackendUnavailableError):
@@ -1309,6 +1309,7 @@ class ProviderItem(BaseModel):
     state: str
     labels: list[str]
     revision: str
+    milestone: str = ""
     exists: bool = True
 
 
@@ -1352,6 +1353,7 @@ class ReconcileRequest(BaseModel):
     """Typed request for a provider-neutral backlog reconciliation pass."""
 
     scope: ReconcileScope
+    repo: str = ""
     label: str = ""
     references: list[str] = Field(default_factory=list)
     since: str = ""

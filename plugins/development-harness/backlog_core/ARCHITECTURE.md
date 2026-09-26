@@ -25,9 +25,9 @@ legacy local representations through the explicit exceptions described below.
 Backends fall into two storage categories:
 
 - **Remote-capable providers** — GitHub, GitLab, Linear, Jira, and equivalent network providers are
-  authoritative when reachable. Each provider privately owns a durable `FileCache` that supplies
-  offline reads and queues offline mutations. Successful provider reads and writes refresh the
-  corresponding cache records.
+  authoritative. GitHub work-item commands read the provider before making a decision; its private
+  durable `FileCache` records reconciliation checkpoints and pending mutations, and is read for a
+  command result only as an explicit warned fallback after a live failure.
 - **Local providers** — Beads, SQLite, and Memory use their native storage directly. They do not
   instantiate `FileCache`, do not read or write backlog YAML, and do not pay file-cache overhead.
 
@@ -35,7 +35,7 @@ Backends fall into two storage categories:
 It is private to the selected provider: it is not exposed through `BacklogConfig`, and callers must
 not obtain or manipulate it independently.
 
-The cache owns all local persistence needed for remote-provider continuity:
+The cache owns the local journal and checkpoints needed for remote-provider continuity:
 
 - `yaml_io.py` — private YAML serialisation used only by `FileCache` for backlog snapshots,
   grooming, synchronization checkpoints, and pending mutations.
@@ -73,7 +73,8 @@ gh_client.py          ← GitHub work-item operations; imports from models, pars
 rendering.py          ← shared rendering utilities (section_display_title, render_groomed_section); imports section_registry; imported by backend implementations
 backend_protocol.py   ← re-exports backend_types contracts plus config/composition root; imports backend constructors
 backends/             ← provider implementations; remote providers privately compose FileCache
-operations.py         ← imports from models, pure helpers, search, and backend_protocol only
+work_item_decisions.py ← command-scoped live decision context; imports provider protocols, models, parsing, reconciliation, and status registry
+operations.py         ← imports from models, pure helpers, search, backend_protocol, and work_item_decisions
 dispatch_state.py     ← imports from models (DispatchItemRecord, DispatchWaveRecord); no MCP awareness
 server.py             ← imports from models, operations, dispatch_state, backend_protocol, search
 backlog.py            ← imports from operations (thin CLI wrapper)
@@ -486,14 +487,22 @@ only runtime component permitted to read or write backlog YAML and cached plan o
 **On-disk layout**, under the cache root (`<state_root>/github-cache/` for the GitHub backend):
 
 - `cache.json` — the durable state above, as JSON (`_CacheStateStore` in `file_cache_state.py`). A
-  legacy `cache.yaml` must be migrated automatically on first write.
+  legacy `cache.yaml` from before this file was renamed must be migrated automatically on first write.
+  Provider snapshot checkpoints are keyed by canonical repository. A legacy unscoped checkpoint is
+  read only for the backend's configured/default repository.
 - `cache.lock` — cross-process/cross-version mutual exclusion for the state file; never renamed.
-- `items/**/*.yaml` — per-item provider snapshots, written by `yaml_io.py`. These genuinely are
-  YAML, unlike `cache.json` — don't confuse the two when reasoning about this cache's format.
+- `items/repositories/<encoded-owner%2Frepo>/**/*.yaml` — repository-scoped per-item provider
+  snapshots, written by `yaml_io.py`. Legacy unscoped `items/**/*.yaml` snapshots remain readable
+  only for the configured/default repository; new reconciliations require no migration. These
+  genuinely are YAML, unlike `cache.json` — don't confuse the two when reasoning about this cache's
+  format.
 
 **Offline behavior**:
 
-- Reads return the latest cached value with explicit stale-state metadata.
+- GitHub work-item commands fail when their live read fails unless the caller explicitly sets
+  `allow_cached=True`. Only that opt-in path may return the latest cached provider value, with a
+  warning and cache provenance. A successful live read returning no rows is authoritative and
+  never falls through to cached rows.
 - Creates, updates, grooming changes, plans, and artifact mutations update the cache atomically and
   append a durable pending mutation.
 - A missing cache record is reported as unavailable data, never as an authoritative empty result.
@@ -512,11 +521,11 @@ continuing to return readable siblings. Any non-empty `skipped` value makes the 
 incomplete, regardless of checkpoint age; listing provenance must withhold an authoritative item
 count unless the caller explicitly accepts cached, low-confidence data.
 
-Cold-cache read-through shares one process-wide sync slot with startup and explicit synchronization.
-Taking that slot atomically captures both the prior lifecycle status and `started_at` under the
-same thread lock that marks the slot running. A failed transient claimant restores only that captured
-snapshot. It must not restore state read before claiming because an intervening synchronization may
-have completed and established a newer start timestamp.
+MCP cold-checkpoint maintenance shares one process-wide sync slot with startup and explicit
+synchronization. Taking that slot atomically captures both the prior lifecycle status and
+`started_at` under the same thread lock that marks the slot running. A failed transient claimant
+restores only that captured snapshot. It must not restore state read before claiming because an
+intervening synchronization may have completed and established a newer start timestamp.
 
 **Reconnect behavior**:
 
@@ -524,6 +533,10 @@ have completed and established a newer start timestamp.
 - Applied mutations update the provider revision and fingerprint before leaving the queue.
 - Concurrent provider changes produce an explicit conflict and retain the pending mutation.
 - Failed synchronization never discards cached content or queued work.
+
+The cache is not a normal work-item read path or a performance tier; its runtime work-item roles are
+the pending-mutation journal, the reconciliation checkpoint, and the explicit fallback above.
+Content records retain their separate offline contract through `ContentProvider`.
 
 The cache-record update and queue append are one durable transaction owned by the remote provider.
 Every queued mutation has a stable idempotency key derived from its logical object, base revision, and intended content. Replay
@@ -627,7 +640,9 @@ across independently loaded surfaces.
   `MissingGitHubTokenError`; unauthenticated client construction is not a fallback.
 - `make_github_client()` installs the transport policy before constructing the client, applies the
   caller's timeout (30 seconds by default), and resolves the API root from an explicit `base_url`,
-  then `GITHUB_API_URL`, then the public GitHub API.
+  then `GITHUB_API_URL`, then the public GitHub API. That timeout bounds each provider request, not
+  the whole logical command. A command that needs multiple requests has no default aggregate
+  deadline; every constituent provider request remains bounded to no more than 30 seconds.
 
 ### TLS and trust-store invariants
 
@@ -964,12 +979,24 @@ and artifact access go through `get_config().backend`.
 - `from .models import ...`
 - Pure, filesystem-free helpers from `parsing.py`
 - Protocols and `get_config()` from `backend_protocol.py`
+- Command-scoped work-item decision types from `work_item_decisions.py`
 
 `operations.py` and `reconciliation.py` must not import `yaml_io.py`, `file_cache.py`, provider
 client implementations, provider-format adapters, local backend implementations, or independent
 artifact providers. All persistence, provider communication, cache access, and artifact access
 must cross the configured backend boundary. Migration-only access does not define a permitted
 runtime dependency.
+
+GitHub work-item decisions run through one `WorkItemDecisionContext` per command. An exact numeric,
+`#N`, or GitHub-URL selector uses a targeted provider snapshot unless that command already obtained
+a bulk snapshot. Title selectors and global operations obtain one complete command-scoped bulk
+snapshot and reuse it for selection, status facts, duplicate checks, and compatible reconciliation.
+Pending mutations are joined separately as local intent; they do not replace the provider
+observation. Provider failure propagates by default, while `allow_cached=True` permits a warned
+cache fallback after that failure. That fallback calls the GitHub-specific
+`cached_work_items(repo)` seam with the command's repository, so equal issue numbers in different
+repositories cannot select the configured/default repository's baseline. A successful empty
+provider observation is final.
 
 The same restriction applies to `reconciliation.py`: reconciliation classifies snapshots and asks
 the provider to persist outcomes; it does not own filesystem storage.
@@ -1027,6 +1054,13 @@ The string-ID path fires when the selector is not a URL, `#N`, or bare integer. 
 - Return dicts with result data + output messages
 - Dispatch tools wrap `dispatch_state.DispatchStateManager` via `asyncio.to_thread()`
 - Use `if __name__ == "__main__": mcp.run()` for STDIO transport
+
+The CLI does not start synchronization implicitly; only an explicit sync/refresh operation performs
+maintenance there. After an MCP tool has assembled successful response data, it may schedule the
+existing single-flight maintenance worker when the remote checkpoint is absent. The tool never
+awaits that maintenance, and maintenance does not supply or alter the response's decision data.
+Both transports leave ordinary multi-request commands without a default whole-command deadline;
+the provider client bounds each individual request as described above.
 
 **Imports**: `from fastmcp import FastMCP`, `from .models import ...`, `from .operations import ...`, `from .dispatch_state import DispatchStateManager`
 

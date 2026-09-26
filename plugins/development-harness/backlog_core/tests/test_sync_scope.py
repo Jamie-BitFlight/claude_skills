@@ -11,7 +11,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
-from backlog_core.models import BacklogItem, ReconcileRequest, ReconcileResult, ReconcileScope
+from backlog_core.models import BacklogItem, ProviderSnapshot, ReconcileRequest, ReconcileResult, ReconcileScope
 from backlog_core.operations import pull_by_selector, sync_items
 from backlog_core.server import backlog_sync
 
@@ -33,7 +33,8 @@ class _SyncBackend:
     def list_work_items(self) -> list[BacklogItem]:
         return self.items
 
-    def reconcile(self, request: ReconcileRequest) -> ReconcileResult:
+    def reconcile(self, request: ReconcileRequest, *, snapshot: ProviderSnapshot | None = None) -> ReconcileResult:
+        del snapshot
         self.requests.append(request)
         return self.result
 
@@ -80,7 +81,7 @@ class TestFinallyWorkflowFinalization:
         result = sync_items(dry_run=True)
 
         mock_create.assert_called_once_with(items, "", True, output=mocker.ANY)
-        assert backend.requests == [ReconcileRequest(scope=ReconcileScope.LINKED, references=["12"], dry_run=True)]
+        assert backend.requests == [ReconcileRequest(scope=ReconcileScope.INCREMENTAL, dry_run=True)]
         assert result["created"] == 1
         assert result["pushed"] == 2
 

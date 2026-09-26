@@ -151,6 +151,7 @@ class _PendingWorkItemMutation(BaseModel):
     idempotency_key: str
     key: str
     item: BacklogItem
+    repo: str = ""
 
 
 class _RejectedMutation(BaseModel):
@@ -181,6 +182,7 @@ class _RejectedWorkItemMutation(BaseModel):
     key: str
     item: BacklogItem
     reason: str
+    repo: str = ""
 
 
 class _CorruptQueueEntry(BaseModel):
@@ -223,6 +225,7 @@ class _CacheState(BaseModel):
     rejected_work_items: list[_RejectedWorkItemMutation] = Field(default_factory=list)
     corrupt_queue_entries: list[_CorruptQueueEntry] = Field(default_factory=list)
     snapshot_checkpoint: _ProviderSnapshotCheckpoint | None = None
+    snapshot_checkpoints: dict[str, _ProviderSnapshotCheckpoint] = Field(default_factory=dict)
 
 
 def _content_mutation_key(write: ContentWrite) -> str:
@@ -239,7 +242,7 @@ def _content_mutation_key(write: ContentWrite) -> str:
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
-def _work_item_mutation_key(key: str, item: BacklogItem) -> str:
+def _work_item_mutation_key(key: str, item: BacklogItem, repo: str = "") -> str:
     """Reproducible idempotency key for a queued work-item mutation.
 
     Shared by :meth:`FileCache._queue_work_item` (derivation) and
@@ -249,14 +252,20 @@ def _work_item_mutation_key(key: str, item: BacklogItem) -> str:
         The hex-encoded sha256 digest of the key and the item's canonical JSON.
     """
     payload = json.dumps(item.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(f"{key}:{payload}".encode()).hexdigest()
+    identity = f"{repo}:{key}" if repo else key
+    return hashlib.sha256(f"{identity}:{payload}".encode()).hexdigest()
+
+
+def _work_item_identity(repo: str, key: str, default_repo: str) -> tuple[str, str]:
+    return repo or default_repo, key
 
 
 class _CacheStateStore:
     """Serialize state transactions across threads and processes."""
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, default_repo: str = "") -> None:
         self._root = root
+        self.default_repo = default_repo
         self._state_path = root / _STATE_FILE
         self._legacy_state_path = root / _LEGACY_STATE_FILE
 
@@ -457,8 +466,7 @@ class _CacheStateStore:
         superseded = self._legacy_state_path.with_name(self._legacy_state_path.name + ".superseded")
         self._legacy_state_path.replace(superseded)
 
-    @staticmethod
-    def _merge_queue_state(current: _CacheState, legacy: _CacheState) -> _CacheState:
+    def _merge_queue_state(self, current: _CacheState, legacy: _CacheState) -> _CacheState:
         """Union all five queue/dead-letter fields from ``legacy`` into ``current``.
 
         ``rejected``/``rejected_work_items``/``corrupt_queue_entries`` are
@@ -495,8 +503,8 @@ class _CacheStateStore:
             ]
 
         pending, superseded_pending = _CacheStateStore._merge_pending_by_reference(current.pending, legacy.pending)
-        pending_work_items, superseded_work_items = _CacheStateStore._merge_pending_work_items_by_key(
-            current.pending_work_items, legacy.pending_work_items
+        pending_work_items, superseded_work_items = self._merge_pending_work_items_by_key(
+            current.pending_work_items, legacy.pending_work_items, self.default_repo
         )
         rejected = [*merged_by_key(current.rejected, legacy.rejected), *superseded_pending]
         rejected_work_items = [
@@ -564,30 +572,31 @@ class _CacheStateStore:
 
     @staticmethod
     def _merge_pending_work_items_by_key(
-        current: list[_PendingWorkItemMutation], legacy: list[_PendingWorkItemMutation]
+        current: list[_PendingWorkItemMutation], legacy: list[_PendingWorkItemMutation], default_repo: str = ""
     ) -> tuple[list[_PendingWorkItemMutation], list[_RejectedWorkItemMutation]]:
-        """Union two pending-work-item queues, keeping at most one entry per ``key``.
+        """Union queues, keeping at most one entry per repository and work-item key.
 
         Returns:
             The merged queue, and a dead-lettered _RejectedWorkItemMutation
-            for each legacy entry superseded by a same-key entry current
-            already has -- see :meth:`_merge_pending_by_reference` for why
-            idempotency_key alone isn't enough here.
+            for each legacy entry superseded by a same-repository, same-key
+            entry current already has -- see :meth:`_merge_pending_by_reference`
+            for why idempotency_key alone isn't enough here.
         """
         existing_keys = {entry.idempotency_key for entry in current}
-        existing_work_keys = {entry.key for entry in current}
+        existing_work_keys = {_work_item_identity(entry.repo, entry.key, default_repo) for entry in current}
         survivors = list(current)
         superseded: list[_RejectedWorkItemMutation] = []
         for entry in legacy:
             if entry.idempotency_key in existing_keys:
                 continue
-            if entry.key in existing_work_keys:
+            if _work_item_identity(entry.repo, entry.key, default_repo) in existing_work_keys:
                 superseded.append(
                     _RejectedWorkItemMutation(
                         idempotency_key=entry.idempotency_key,
                         key=entry.key,
                         item=entry.item,
                         reason="superseded by cache.json's entry for the same key during legacy-file merge",
+                        repo=entry.repo,
                     )
                 )
                 continue
@@ -731,6 +740,14 @@ class _CacheStateStore:
         # _verify_queue_keys -- not here, so it also runs on states that took
         # the model_validate_json fast path (see _read).
         checkpoint = self._salvage_checkpoint(raw, path)
+        repository_checkpoints: dict[str, _ProviderSnapshotCheckpoint] = {}
+        raw_repository_checkpoints = raw.get("snapshot_checkpoints", {})
+        if isinstance(raw_repository_checkpoints, dict):
+            for repo, value in raw_repository_checkpoints.items():
+                try:
+                    repository_checkpoints[str(repo)] = _ProviderSnapshotCheckpoint.model_validate(value)
+                except pydantic.ValidationError as exc:
+                    _log.warning("Cache state %s: dropping malformed checkpoint for %s: %s", path, repo, exc)
         return _CacheState(
             records=records,
             checkpoints=checkpoints,
@@ -740,6 +757,7 @@ class _CacheStateStore:
             rejected_work_items=cast("list[_RejectedWorkItemMutation]", survivors["rejected_work_items"]),
             corrupt_queue_entries=corrupt,
             snapshot_checkpoint=checkpoint,
+            snapshot_checkpoints=repository_checkpoints,
         )
 
     @staticmethod
@@ -883,7 +901,7 @@ class _CacheStateStore:
         pending_work_items: list[_PendingWorkItemMutation] = []
         rejected_work_items = list(state.rejected_work_items)
         for wi_entry in state.pending_work_items:
-            expected = _work_item_mutation_key(wi_entry.key, wi_entry.item)
+            expected = _work_item_mutation_key(wi_entry.key, wi_entry.item, wi_entry.repo)
             if _CacheStateStore._key_is_consistent(path, "pending_work_items", wi_entry.idempotency_key, expected):
                 pending_work_items.append(wi_entry)
             else:
@@ -893,6 +911,7 @@ class _CacheStateStore:
                         key=wi_entry.key,
                         item=wi_entry.item,
                         reason="idempotency_key does not match its content",
+                        repo=wi_entry.repo,
                     )
                 )
         if (

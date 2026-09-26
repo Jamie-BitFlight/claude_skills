@@ -71,7 +71,7 @@ class TestDerivedStatusWithoutALiveAnswer:
     def test_a_live_labeled_needs_grooming_status_is_normalized_to_bare(self) -> None:
         """Reproduction: a live status map entry carrying the literal
         ``"status:needs-grooming"`` label (the labeled form
-        ``gh_client._pick_primary_status_label`` returns when an issue genuinely
+        ``status_registry.pick_primary_status_label`` returns when an issue genuinely
         carries the label) must derive to the same bare ``"needs-grooming"``
         value a fetched issue with an empty status derives to — both mean "needs grooming"
         under the documented bare ``--status needs-grooming`` filter token.

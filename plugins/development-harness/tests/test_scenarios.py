@@ -10,7 +10,7 @@ No ``@pytest.mark.asyncio`` decorators — global ``asyncio_mode = "auto"``.
 
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar, cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -19,6 +19,15 @@ from backlog_core.models import IssueStatus, ReconcileRequest, ReconcileResult, 
 from backlog_core.server import mcp
 
 from tests.helpers import call_mcp_tool
+
+if TYPE_CHECKING:
+    from typing import Protocol
+
+    from backlog_core.models import BacklogItem
+
+    class _ProviderItemsBackend(Protocol):
+        provider_items: list[BacklogItem]
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -35,6 +44,11 @@ async def _call(tool_name: str, params: dict | None = None) -> dict:
 
 def _stored_item(title: str):
     return next(item for item in get_config().backend.list_work_items() if item.title == title)
+
+
+def _seed_provider_items(*titles: str) -> None:
+    backend = cast("_ProviderItemsBackend", get_config().backend)
+    backend.provider_items.extend(_stored_item(title).model_copy(deep=True) for title in titles)
 
 
 @pytest.fixture(autouse=True)
@@ -93,6 +107,7 @@ class TestWorkBacklogItem:
     # Scenario 2: list always includes GitHub status fields
     async def test_list_includes_status_fields(self, backlog_dir, mock_github, write_test_item):
         write_test_item("Status Test Item", issue="#10")
+        _seed_provider_items("Status Test Item")
         mock_github["batch_fetch_statuses"].return_value = {10: IssueStatus(status="open", milestone="v1.0")}
 
         result = await _call("backlog_list", {})
@@ -117,7 +132,9 @@ class TestWorkBacklogItem:
 
         assert isinstance(result["items"], list)
         assert result["count"] >= 0
-        provider_state.assert_called_once_with(ReconcileRequest(scope=ReconcileScope.INCREMENTAL))
+        provider_state.assert_called_once()
+        assert provider_state.call_args.args == (ReconcileRequest(scope=ReconcileScope.INCREMENTAL),)
+        assert provider_state.call_args.kwargs["snapshot"].items == []
 
     # Scenario 4: list with label filter (does not error without GitHub)
     async def test_list_with_label_filter(self, backlog_dir, mock_github, write_test_item):
@@ -133,6 +150,7 @@ class TestWorkBacklogItem:
     # Scenario 5: view item by GitHub issue number selector
     async def test_view_by_issue_number(self, backlog_dir, mock_github, write_test_item):
         write_test_item("View Issue Test", issue="#42")
+        _seed_provider_items("View Issue Test")
         mock_github["view_enrich_from_github"].return_value = False
 
         result = await _call("backlog_view", {"selector": "#42", "summary": False})
@@ -146,7 +164,7 @@ class TestWorkBacklogItem:
         assert isinstance(result["milestone"], str)
 
     # Scenario 6: view item by partial title substring
-    async def test_view_by_title_substring(self, backlog_dir, mock_github, write_test_item):
+    async def test_view_by_title_substring(self, backlog_dir, mock_github, write_test_item, plain_memory_backend):
         write_test_item("My Unique Title Item")
 
         result = await _call("backlog_view", {"selector": "Unique Title", "summary": False})
@@ -171,6 +189,7 @@ class TestWorkBacklogItem:
     async def test_close_with_reason(self, backlog_dir, mock_github, write_test_item):
         """Scenario 11: backlog_close closes an item with a reason and no blocking PRs."""
         write_test_item("Close Test Item", issue="#42")
+        _seed_provider_items("Close Test Item")
         mock_github["check_open_prs_for_issue"].return_value = []
         mock_github["close_github_issue"].return_value = None
 
@@ -198,6 +217,7 @@ class TestWorkBacklogItem:
     async def test_update_status_in_progress(self, backlog_dir, mock_github, write_test_item):
         """Scenario 9: backlog_update with status=in-progress calls apply_status_in_progress."""
         write_test_item("Status Update Test", issue="#55")
+        _seed_provider_items("Status Update Test")
         mock_github["try_get_github"].return_value = MagicMock()
 
         result = await _call("backlog_update", {"selector": "Status Update Test", "status": "in-progress"})
@@ -209,7 +229,9 @@ class TestWorkBacklogItem:
         assert isinstance(result["warnings"], list)
         assert isinstance(result["errors"], list)
 
-    async def test_update_creates_github_issue_when_missing(self, backlog_dir, mock_github, write_test_item):
+    async def test_update_creates_github_issue_when_missing(
+        self, backlog_dir, mock_github, write_test_item, plain_memory_backend
+    ):
         """Scenario 10: backlog_update creates a GitHub issue when the item lacks one."""
         write_test_item("Issue Create Test", priority="P1")
         mock_github["try_get_github"].return_value = MagicMock()
@@ -227,6 +249,7 @@ class TestWorkBacklogItem:
     async def test_resolve_with_summary(self, backlog_dir, mock_github, write_test_item):
         """Scenario 12: backlog_resolve marks item resolved and calls resolve_github_issue."""
         write_test_item("Resolve Test Item", issue="#55")
+        _seed_provider_items("Resolve Test Item")
         mock_github["check_open_prs_for_issue"].return_value = []
         mock_github["resolve_github_issue"].return_value = None
 
@@ -241,6 +264,7 @@ class TestWorkBacklogItem:
 
     async def test_resolve_with_cleanup(self, backlog_dir, mock_github, write_test_item):
         write_test_item("Cleanup Resolve Item", issue="#66")
+        _seed_provider_items("Cleanup Resolve Item")
         mock_github["check_open_prs_for_issue"].return_value = []
         mock_github["resolve_github_issue"].return_value = None
         mock_github["get_github"].return_value = MagicMock()
@@ -270,6 +294,7 @@ class TestGroomBacklogItem:
 
     async def test_groom_full_content(self, backlog_dir, mock_github, write_test_item, provider_state):
         write_test_item("Groom Full Test", issue="#80")
+        _seed_provider_items("Groom Full Test")
         mock_repo = MagicMock()
         mock_repo.full_name = "owner/repo"
         mock_repo.requester.graphql_query.return_value = (
@@ -304,13 +329,16 @@ class TestGroomBacklogItem:
         assert any(
             "groomed content" in entry.content for section in stored.sections.values() for entry in section.entries
         )
-        provider_state.assert_called_once_with(ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#80"]))
+        provider_state.assert_called_once()
+        assert provider_state.call_args.args == (ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#80"]),)
+        assert provider_state.call_args.kwargs["snapshot"].items[0].reference == "#80"
         assert isinstance(result["messages"], list)
         assert isinstance(result["warnings"], list)
         assert isinstance(result["errors"], list)
 
     async def test_groom_incremental_section(self, backlog_dir, mock_github, write_test_item):
         write_test_item("Groom Section Test", issue="#81")
+        _seed_provider_items("Groom Section Test")
         mock_repo = MagicMock()
         mock_repo.full_name = "owner/repo"
         mock_repo.requester.graphql_query.return_value = (
@@ -354,7 +382,9 @@ class TestGroomBacklogItem:
         assert isinstance(result["warnings"], list)
         assert isinstance(result["errors"], list)
 
-    async def test_groom_local_only(self, backlog_dir, mock_github, write_test_item, provider_state):
+    async def test_groom_local_only(
+        self, backlog_dir, mock_github, write_test_item, provider_state, plain_memory_backend
+    ):
         write_test_item("Groom Local Only Test")
         mock_github["try_get_github"].return_value = None
 
@@ -372,6 +402,7 @@ class TestGroomBacklogItem:
     async def test_groom_via_update(self, backlog_dir, mock_github, write_test_item):
         """Scenario 17: backlog_update with section/content param sets groomed content."""
         write_test_item("Groom Via Update Test", issue="#82")
+        _seed_provider_items("Groom Via Update Test")
         mock_repo = MagicMock()
         mock_repo.full_name = "owner/repo"
         mock_repo.requester.graphql_query.return_value = (
@@ -416,7 +447,7 @@ class TestGroomBacklogItem:
 class TestGroupItemsToMilestone:
     """Scenarios consumed by /group-items-to-milestone skill."""
 
-    async def test_list_for_milestone_selection(self, backlog_dir, mock_github, write_test_item):
+    async def test_list_for_milestone_selection(self, backlog_dir, mock_github, write_test_item, plain_memory_backend):
         """Scenario 18: list returns items with status/milestone keys for milestone assignment."""
         write_test_item("Milestone Item A", priority="P0", issue="#10")
         write_test_item("Milestone Item B", priority="P1", issue="#11")
@@ -442,7 +473,7 @@ class TestGroupItemsToMilestone:
 class TestBacklogItemGroomer:
     """Scenarios consumed by @backlog-item-groomer agent."""
 
-    async def test_groomer_list_then_view(self, backlog_dir, mock_github, write_test_item):
+    async def test_groomer_list_then_view(self, backlog_dir, mock_github, write_test_item, plain_memory_backend):
         """Scenario 19: groomer lists items then views a specific item by title."""
         write_test_item("Groomer View Target", priority="P1")
 
@@ -466,13 +497,15 @@ class TestBacklogItemGroomer:
 class TestSyncAndPull:
     """Scenarios for backlog_sync and backlog_pull tools."""
 
-    async def test_sync_creates_missing_issues(self, backlog_dir, mock_github, write_test_item):
+    async def test_sync_creates_missing_issues(self, backlog_dir, mock_github, write_test_item, mocker):
         """Scenario 20: backlog_sync creates GitHub issues for items that lack them."""
         write_test_item("Sync Test Item", priority="P1")
         mock_repo = MagicMock()
         mock_github["get_github"].return_value = mock_repo
         mock_github["fetch_open_issues_by_title"].return_value = {}
         mock_github["create_issue_for_item"].return_value = 99
+        backend = get_config().backend
+        mocker.patch.object(backend, "pending_work_items", side_effect=lambda repo="": backend.list_work_items())
 
         result = await _call("backlog_sync")
 
@@ -482,14 +515,16 @@ class TestSyncAndPull:
         assert isinstance(result["warnings"], list)
         assert isinstance(result["errors"], list)
 
-    async def test_pull_updates_local(self, backlog_dir, mock_github, write_test_item, provider_state):
+    async def test_pull_updates_local(self, backlog_dir, mock_github, write_test_item, provider_state, mocker):
         write_test_item("Pull Test Item", priority="P1", issue="#50")
         provider_state.return_value = ReconcileResult(local_updates=1)
+        backend = get_config().backend
+        mocker.patch.object(backend, "pending_work_items", side_effect=lambda repo="": backend.list_work_items())
 
         result = await _call("backlog_pull")
 
         provider_state.assert_called_once_with(
-            ReconcileRequest(scope=ReconcileScope.LINKED, references=["#50"], force=False, include_diff=False)
+            ReconcileRequest(scope=ReconcileScope.INCREMENTAL, references=["#50"], force=False, include_diff=False)
         )
         assert result["pulled"] == 1
         assert isinstance(result["messages"], list)
@@ -732,6 +767,7 @@ class TestLifecycles:
         )
         assert create_result["title"] == "Lifecycle Close Item"
         assert create_result["item_ref"] == "#70"
+        _seed_provider_items("Lifecycle Close Item")
 
         # Step 2: Groom item
         groom_result = await _call(
@@ -772,6 +808,7 @@ class TestLifecycles:
         assert create_result["item_ref"] == "#71"
         assert create_result["file_path"]  # non-empty path string
         assert _stored_item("Lifecycle Resolve Item").reference == "#71"
+        _seed_provider_items("Lifecycle Resolve Item")
 
         # Step 2: Resolve with cleanup
         mock_github["check_open_prs_for_issue"].return_value = []
@@ -797,6 +834,7 @@ class TestLifecycles:
         with empty status signaling staleness.
         """
         write_test_item("Stale Discovery Item", issue="#100")
+        _seed_provider_items("Stale Discovery Item")
         mock_github["batch_fetch_statuses"].return_value = {}
 
         result = await _call("backlog_list", {})
@@ -813,6 +851,7 @@ class TestLifecycles:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("plain_memory_backend")
 class TestSemanticMatchingInfrastructure:
     """Integration tests for the semantic matching strategy chain infrastructure.
 
@@ -928,6 +967,7 @@ class TestSemanticMatchingInfrastructure:
         assert result["count"] == 3
 
 
+@pytest.mark.usefixtures("plain_memory_backend")
 class TestSemanticQueryCorpus:
     """Corpus-based integration tests verifying the filter infrastructure
     supports semantic matching for a diverse set of queries.
@@ -1038,6 +1078,7 @@ class TestSemanticQueryCorpus:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("plain_memory_backend")
 class TestEndToEndQueryToResult:
     """End-to-end tests exercising the full path: user query -> backlog_list
     call -> matching -> result returned.
@@ -1196,6 +1237,7 @@ class TestEndToEndQueryToResult:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("plain_memory_backend")
 class TestCompactBacklogView:
     """Scenarios for backlog_view with include_content=False (compact mode).
 
@@ -1369,6 +1411,7 @@ class TestResolveVerifiedGate:
         and the item has a plan attached, but no verified label.
         """
         write_test_item("Verified Gate Test", issue="#200")
+        _seed_provider_items("Verified Gate Test")
         mock_github["view_enrich_from_github"].return_value = False
 
         # Attach a plan to the item via backlog_update
@@ -1390,6 +1433,7 @@ class TestResolveVerifiedGate:
         returns it in labels, and the resolve call succeeds.
         """
         write_test_item("Verified Pass Test", issue="#201")
+        _seed_provider_items("Verified Pass Test")
         mock_github["view_enrich_from_github"].return_value = False
         mock_github["check_open_prs_for_issue"].return_value = []
         mock_github["resolve_github_issue"].return_value = None
@@ -1413,6 +1457,7 @@ class TestResolveVerifiedGate:
         Non-SAM items (no plan attached) resolve without needing status:verified.
         """
         write_test_item("No Plan Item", issue="#202")
+        _seed_provider_items("No Plan Item")
         mock_github["view_enrich_from_github"].return_value = False
         mock_github["check_open_prs_for_issue"].return_value = []
         mock_github["resolve_github_issue"].return_value = None
@@ -1431,6 +1476,7 @@ class TestResolveVerifiedGate:
     async def test_resolve_force_bypasses_verified_gate(self, backlog_dir, mock_github, write_test_item):
         """force=True bypasses the verification gate even with a plan and no verified label."""
         write_test_item("Force Bypass Test", issue="#203")
+        _seed_provider_items("Force Bypass Test")
         mock_github["check_open_prs_for_issue"].return_value = []
         mock_github["resolve_github_issue"].return_value = None
 
@@ -1448,6 +1494,7 @@ class TestResolveVerifiedGate:
     async def test_resolve_force_bypasses_both_gates(self, backlog_dir, mock_github, write_test_item):
         """force=True bypasses both the verified gate and the open-PR gate."""
         write_test_item("Force Both Gates Test", issue="#204")
+        _seed_provider_items("Force Both Gates Test")
         # Simulate open PRs that would normally block resolve
         pr_mock = MagicMock()
         pr_mock.number = 500
@@ -1473,6 +1520,7 @@ class TestResolveVerifiedGate:
         happy-path pipeline from completion to closure.
         """
         write_test_item("Pipeline Flow Test", issue="#205")
+        _seed_provider_items("Pipeline Flow Test")
         mock_github["check_open_prs_for_issue"].return_value = []
         mock_github["resolve_github_issue"].return_value = None
 
@@ -1497,8 +1545,10 @@ class TestResolveVerifiedGate:
         self, backlog_dir, mock_github, write_test_item, provider_state
     ):
         write_test_item("Premature Close Test", issue="#206")
+        _seed_provider_items("Premature Close Test")
 
-        def reconcile_closed(_request: ReconcileRequest) -> ReconcileResult:
+        def reconcile_closed(_request: ReconcileRequest, *, snapshot=None) -> ReconcileResult:
+            assert snapshot is not None
             item = _stored_item("Premature Close Test")
             item.status = "closed"
             item.metadata.status = "closed"
@@ -1511,7 +1561,9 @@ class TestResolveVerifiedGate:
         result = await _call("backlog_list", {"refresh": True, "include_closed": True})
 
         assert isinstance(result["items"], list)
-        provider_state.assert_called_once_with(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, references=["#206"]))
+        provider_state.assert_called_once()
+        assert provider_state.call_args.args == (ReconcileRequest(scope=ReconcileScope.INCREMENTAL),)
+        assert provider_state.call_args.kwargs["snapshot"].items[0].reference == "#206"
         stored = _stored_item("Premature Close Test")
         assert stored.reference == "#206"
         assert stored.status == "closed"

@@ -60,7 +60,7 @@ async def test_a_bad_added_date_in_a_pulled_body_is_reported_as_an_error_respons
     """
     backend = GitHubBackend(cache=FileCache(tmp_path))
     backend.put_work_item(BacklogItem(title="An item", issue="#1", section="P1"))
-    backend._fetch_snapshot = MagicMock(
+    backend.fetch_snapshot = MagicMock(
         return_value=ProviderSnapshot(
             items=[
                 ProviderItem(

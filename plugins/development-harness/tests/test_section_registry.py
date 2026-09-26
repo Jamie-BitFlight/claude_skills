@@ -231,6 +231,7 @@ def message_readback_name(message: str) -> str:
 
 
 @pytest.mark.parametrize("name", UNREGISTERED_NAMES)
+@pytest.mark.usefixtures("plain_memory_backend")
 def test_unregistered_section_round_trips_under_the_name_the_message_gives(name: str, mocker: MockerFixture) -> None:
     """Reading back with the name the diagnostic gives returns the content written.
 

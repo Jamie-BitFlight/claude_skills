@@ -25,6 +25,7 @@ if TYPE_CHECKING:
         IssueLocalFields,
         MergeResult,
         Output,
+        ProviderSnapshot,
         PullRequestRef,
         ReconcileRequest,
         ReconcileResult,
@@ -310,7 +311,7 @@ class WorkItemBackend(Protocol):
 class SyncProvider(Protocol):
     """Optional one-method reconciliation capability for remote backends."""
 
-    def reconcile(self, request: ReconcileRequest) -> ReconcileResult: ...
+    def reconcile(self, request: ReconcileRequest, *, snapshot: ProviderSnapshot | None = None) -> ReconcileResult: ...
 
 
 @runtime_checkable
@@ -370,6 +371,13 @@ class ContentProvider(Protocol):
 
 
 @runtime_checkable
+class RepositoryScopedCachedListing(Protocol):
+    """Optional repository-aware listing over a provider-private cache."""
+
+    def cached_work_items(self, repo: str = "") -> list[BacklogItem]: ...
+
+
+@runtime_checkable
 class GitHubExtras(Protocol):
     """GitHub-specific surface only ``GitHubBackend`` implements.
 
@@ -391,6 +399,9 @@ class GitHubExtras(Protocol):
 
     # Repository access (GitHub-only)
     def get_github(self, repo: str = "", timeout: int = 15) -> Repository: ...
+    def fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot: ...
+    def pending_work_items(self, repo: str = "") -> list[BacklogItem]: ...
+    def put_work_item(self, item: BacklogItem, repo: str = "") -> None: ...
 
     # GraphQL utilities
     def _graphql_request(

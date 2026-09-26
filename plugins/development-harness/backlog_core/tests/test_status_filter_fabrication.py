@@ -59,7 +59,7 @@ class _Backend:
     """Minimal provider-backed backend stand-in exposing only what list_items reads."""
 
     supports_batch_status_fetch = True
-    supports_github_extras = True
+    supports_github_extras = False
 
     def __init__(self, items: list[BacklogItem], *, has_credentials: bool = True) -> None:
         self._items = items

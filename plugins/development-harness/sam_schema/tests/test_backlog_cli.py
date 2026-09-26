@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, cast
 
+import pytest
 from backlog_core import operations
 from backlog_core.backend_protocol import reset_config, set_config
 from backlog_core.backend_types import BacklogConfig
@@ -185,6 +186,94 @@ class TestBacklogListRefreshForwarding:
 
         assert result.exit_code == 0, result.stderr
         assert mock_list.call_args.kwargs["refresh"] is True
+
+
+class TestLiveFirstCliContract:
+    """Live-first commands expose explicit fallback and structured failures."""
+
+    @pytest.mark.parametrize(
+        ("args", "operation"),
+        [
+            (["backlog", "list"], "list_items"),
+            (["backlog", "view", "--selector", "#42"], "view_item"),
+            (["backlog", "link-followup", "--selector", "#42", "--to", "P1"], "link_followup"),
+            (["backlog", "list-followups", "--followup-to", "P1"], "list_followups"),
+            (["backlog", "update", "--selector", "#42", "--title", "new"], "update_item"),
+            (["backlog", "groom", "--selector", "#42"], "groom_item"),
+            (["backlog", "normalize"], "normalize_items"),
+            (["backlog", "strike", "--selector", "#42", "--entry-id", "e1", "--reason", "bad"], "strike_entry"),
+        ],
+    )
+    def test_backlog_error_is_json_without_traceback(
+        self, mocker: MockerFixture, args: list[str], operation: str
+    ) -> None:
+        mocker.patch(f"sam_schema.backlog.operations.{operation}", side_effect=BacklogError("provider unavailable"))
+
+        result = runner.invoke(app, args, env=_CLI_ENV)
+
+        assert result.exit_code == 1
+        assert json.loads(result.stdout)["error"] == "provider unavailable"
+        assert "Traceback" not in result.stderr
+
+    @pytest.mark.parametrize("flag", [[], ["--allow-cached"]])
+    def test_view_forwards_explicit_cached_fallback(self, mocker: MockerFixture, flag: list[str]) -> None:
+        mock_view = mocker.patch(
+            "sam_schema.backlog.operations.view_item", return_value={"title": "Item", "issue": "#42"}
+        )
+
+        result = runner.invoke(app, ["backlog", "view", "--selector", "#42", *flag], env=_CLI_ENV)
+
+        assert result.exit_code == 0, result.stderr
+        assert mock_view.call_args.kwargs["allow_cached"] is bool(flag)
+
+    def test_cli_read_starts_no_background_maintenance(self, mocker: MockerFixture) -> None:
+        mocker.patch("sam_schema.backlog.operations.list_items", return_value={"items": []})
+        launcher = mocker.patch("backlog_core.server._launch_background_sync")
+
+        result = runner.invoke(app, ["backlog", "list"], env=_CLI_ENV)
+
+        assert result.exit_code == 0, result.stderr
+        launcher.assert_not_called()
+
+    def test_sam_tasks_forwards_cached_fallback(self, mocker: MockerFixture) -> None:
+        get_tasks = mocker.patch("sam_schema.sam_plan.operations.get_sam_tasks", return_value={"tasks": [], "count": 0})
+
+        result = runner.invoke(
+            app, ["plan", "sam-tasks", "--parent-issue-number", "42", "--allow-cached"], env=_CLI_ENV
+        )
+
+        assert result.exit_code == 0, result.stderr
+        assert get_tasks.call_args.kwargs["allow_cached"] is True
+
+    def test_sam_tasks_backlog_error_is_json_without_traceback(self, mocker: MockerFixture) -> None:
+        mocker.patch("sam_schema.sam_plan.operations.get_sam_tasks", side_effect=BacklogError("provider unavailable"))
+
+        result = runner.invoke(app, ["plan", "sam-tasks", "--parent-issue-number", "42"], env=_CLI_ENV)
+
+        assert result.exit_code == 1
+        assert json.loads(result.stdout)["error"] == "provider unavailable"
+        assert "Traceback" not in result.stderr
+
+    @pytest.mark.parametrize(
+        ("args", "operation"),
+        [
+            (["backlog", "pull", "--selector", "#42"], "pull_by_selector"),
+            (["backlog", "pull-all"], "pull_items"),
+            (["backlog", "refresh"], "refresh_local_cache_from_github"),
+            (["backlog", "labels"], "list_labels"),
+            (["backlog", "merged-prs"], "list_merged_prs"),
+        ],
+    )
+    def test_provider_command_backlog_error_is_json_without_traceback(
+        self, mocker: MockerFixture, args: list[str], operation: str
+    ) -> None:
+        mocker.patch(f"sam_schema.backlog.operations.{operation}", side_effect=BacklogError("provider unavailable"))
+
+        result = runner.invoke(app, args, env=_CLI_ENV)
+
+        assert result.exit_code == 1
+        assert json.loads(result.stdout)["error"] == "provider unavailable"
+        assert "Traceback" not in result.stderr
 
 
 class TestBacklogSyncFallback:
