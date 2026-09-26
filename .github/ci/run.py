@@ -43,13 +43,19 @@ def command(operation: str, plan: dict[str, object], shard: dict[str, object], h
         The child executable and arguments, without shell quoting/interpolation.
     """
     if operation == "pytest":
-        args = ["uv", "run", "--locked", "pytest"]
+        runner = shard.get("runner", "")
+        if not isinstance(runner, str):
+            raise ValueError("The pytest runner must be a string")
+        args = ["uv", "run", "--script", runner] if runner else ["uv", "run", "--locked", "pytest"]
         marker = shard.get("marker", "")
         if not isinstance(marker, str):
             raise ValueError("The pytest marker must be a string")
         if marker:
             args.extend(["-m", marker, "-v"])
-        return [*args, *paths_from(shard.get("paths"))]
+        paths = shard.get("paths", [])
+        if runner and paths == []:
+            return args
+        return [*args, *paths_from(paths)]
     if operation == "skilllint":
         return ["uvx", "skilllint@latest", "check", *paths_from(plan.get("validation_paths"))]
     if operation != "prek" or (hook is not None and hook not in HOOKS):

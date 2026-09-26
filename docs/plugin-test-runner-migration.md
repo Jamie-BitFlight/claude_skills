@@ -4,4 +4,4 @@ This migration intentionally starts from the repository's known-good development
 
 The dependency list in each plugin runner is runtime/test execution metadata, not a plugin-local Python project. Root `pyproject.toml` remains the monorepo lint/type/development-policy authority.
 
-During this compatibility stage root pytest `testpaths` remain present so existing CI continues to work. The next stage makes runners authoritative and removes plugin test topology from root discovery.
+Root pytest `testpaths` kept the plugin entries only while the runners were introduced. Runners are now authoritative: root `testpaths` lists repository-owned tests only, and CI runs each plugin through its `run_pytests.py`.
