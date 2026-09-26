@@ -11,7 +11,7 @@ Run configured quality gates and treat diagnostics as evidence to diagnose, not 
 
 Start from explicitly requested files/directories, or task-changed files when no scope was supplied. Do not broaden into repository-wide cleanup unless requested or required by an authoritative configured gate.
 
-Inspect repository configuration read-only. Prefer an aggregate hook/task command when repository configuration makes it authoritative; preserve unknown/custom configured hooks rather than silently reducing them to a known-tool allowlist. Do not use `discover_linters.py` for runtime discovery: it is a setup/documentation writer.
+Inspect repository configuration read-only. Prefer an aggregate hook/task command when repository configuration makes it authoritative; preserve unknown/custom configured hooks rather than silently reducing them to a known-tool allowlist.
 
 When `.pre-commit-config.yaml` is authoritative, [detect_hook_tool.py](./scripts/detect_hook_tool.py) may assist runner selection. Resolve the script from this installed skill directory, not the caller's working directory. Its answer is evidence about runner selection, not proof that all configured gates were discovered.
 
@@ -99,6 +99,5 @@ Use `DONE` only when required gates/integrity checks are terminal for the claime
 ## Bundled mechanics
 
 - [detect_hook_tool.py](./scripts/detect_hook_tool.py) assists pre-commit-compatible runner selection.
-- `discover_linters.py` is a separately authorized setup/documentation utility; it is not the runtime discovery API.
 
 Script output is evidence, not semantic diagnosis.
