@@ -223,17 +223,10 @@ def test_content_integrity_failure_never_reads_cache(tmp_path: Path, mocker: Moc
     output = Output()
     context = WorkItemDecisionContext(backend, repo=repo, allow_cached=True, output=output)
 
-    integrity_error = None
-    try:
+    with pytest.raises(_GitHubContentIntegrityError) as raised:
         context.all() if read_kind == "bulk" else context.select("#7", purpose="read")
-    except _GitHubContentIntegrityError as exc:
-        integrity_error = exc
 
-    assert (type(integrity_error), cached_work_items.call_count, output.warnings) == (
-        _GitHubContentIntegrityError,
-        0,
-        [],
-    )
+    assert (type(raised.value), cached_work_items.call_count, output.warnings) == (_GitHubContentIntegrityError, 0, [])
 
 
 def test_malformed_targeted_graphql_response_never_reads_cache(tmp_path: Path, mocker: MockerFixture) -> None:
@@ -251,14 +244,11 @@ def test_malformed_targeted_graphql_response_never_reads_cache(tmp_path: Path, m
     output = Output()
     context = WorkItemDecisionContext(backend, repo=repo, allow_cached=True, output=output)
 
-    malformed = None
-    try:
+    with pytest.raises(BacklogError) as raised:
         context.select("#7", purpose="read")
-    except BacklogError as exc:
-        malformed = exc
 
-    assert (type(malformed), cached_work_items.call_count, output.warnings) == (BacklogError, 0, [])
-    assert "omitted repository data" in str(malformed)
+    assert (type(raised.value), cached_work_items.call_count, output.warnings) == (BacklogError, 0, [])
+    assert "omitted repository data" in str(raised.value)
 
 
 @pytest.mark.parametrize(

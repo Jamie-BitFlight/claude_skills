@@ -562,9 +562,9 @@ def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, obj
     """Execute a raw GraphQL query using PyGithub's requester.
 
     Follows the same pattern as ``_resolve_labels_graphql``.  Raises
-    ``BacklogError`` when the GraphQL response contains an ``errors`` key
-    or when the requester raises ``GithubException`` (including
-    ``UnknownObjectException`` for NOT_FOUND / 404 responses).
+    ``BackendUnavailableError`` when the requester raises a provider or transport
+    failure (including ``UnknownObjectException`` for NOT_FOUND / 404 responses),
+    and ``BacklogError`` when the GraphQL response contains errors or invalid data.
 
     Args:
         repo: Any object exposing ``.requester.graphql_query(...)`` -- a real
