@@ -209,6 +209,11 @@ update, or becomes bypassable with `force`. The error identifies the colliding r
 existing title, reports `retryable: false`, directs the caller to update or groom that reference
 for the same work, and directs the caller to invoke creation again for distinct work.
 
+For caller-assigned references, the provider boundary performs creation as one atomic
+insert-if-absent operation. A frontend existence check followed by an ordinary write does not
+satisfy this contract because another creator can win between those operations. On collision, the
+existing record remains unchanged.
+
 A local Work Brief otherwise follows ordinary provider behavior, including labels and tags.
 Completed local briefs remain until explicit cleanup.
 
