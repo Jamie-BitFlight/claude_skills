@@ -2679,6 +2679,13 @@ def list_followups(followup_to: str, output: Output | None = None) -> dict[str, 
 
 _ENTRY_FILTER_KEYWORDS: frozenset[str] = frozenset({"all", "struck", "last", "first"})
 
+# The heading ``render_sections_as_body`` emits ``BacklogItem.description`` under —
+# the same one ``github_sync.render_issue_body`` writes and ``parse_issue_body``
+# reads back.  Named once so the renderer, the section-filter addressability check
+# (:func:`_description_matches_section_filter`) and the advertised valid-name list
+# cannot drift apart on the spelling a caller has to supply.
+_DESCRIPTION_HEADING = "Description"
+
 
 def _merge_section_entries(existing: _SectionMetadata, new_entries: list[SectionEntryDict]) -> _SectionMetadata:
     """Merge *new_entries* into *existing* section metadata dict.
@@ -2771,6 +2778,29 @@ def _render_section_index(item: BacklogItem) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _numeric_index_parts(stripped: str) -> list[str]:
+    """Return *stripped* split into numeric index parts, or ``[]`` when it is not one.
+
+    Shared by :func:`_resolve_section_indices`, which resolves the ordinal form
+    against a candidate list, and :func:`_description_matches_section_filter`,
+    which must recognise an ordinal expression in order to decline it (the
+    description holds no ordinal).  A single definition keeps the two from
+    disagreeing about what counts as an ordinal expression.
+
+    Args:
+        stripped: A whitespace-stripped section filter expression.
+
+    Returns:
+        The non-empty comma-separated parts when every one of them is an
+        optionally-signed integer, else ``[]``.
+    """
+    parts = [p.strip() for p in stripped.split(",")]
+    numeric_parts = [p for p in parts if p]
+    if numeric_parts and all(p.lstrip("-").isdigit() for p in numeric_parts):
+        return numeric_parts
+    return []
+
+
 def _resolve_section_indices(candidates: list[str], section: str) -> list[int]:
     """Resolve a *section* filter expression to ordered candidate indices.
 
@@ -2820,9 +2850,8 @@ def _resolve_section_indices(candidates: list[str], section: str) -> list[int]:
         return [i for i, name in enumerate(candidates) if lower_filter in name.lower()]
 
     # --- comma-separated or single numeric index ---
-    index_parts = [p.strip() for p in stripped.split(",")]
-    numeric_parts = [p for p in index_parts if p]
-    if numeric_parts and all(p.lstrip("-").isdigit() for p in numeric_parts):
+    numeric_parts = _numeric_index_parts(stripped)
+    if numeric_parts:
         n = len(candidates)
         # Normalise negative indices (Python-style: -1 = last); drop out-of-range.
         resolved = {(int(p) % n) for p in numeric_parts if -n <= int(p) < n}
@@ -2874,8 +2903,82 @@ def _filter_sections(item: BacklogItem, section: str) -> dict[str, Section | Gro
         return {}
 
     items = list(item.sections.items())
-    candidates = [_section_display_title(k, sec.date if isinstance(sec, GroomedData) else "") for k, sec in items]
+    candidates = _section_filter_candidates(item)
     return {items[i][0]: items[i][1] for i in _resolve_section_indices(candidates, section)}
+
+
+def _section_filter_candidates(item: BacklogItem) -> list[str]:
+    """Return the display titles :func:`_filter_sections` resolves a filter against.
+
+    Positionally aligned with ``item.sections``, so an index into this list is an
+    index into that dict — the ordinal space the ``## Sections`` index block
+    advertises.
+
+    Args:
+        item: BacklogItem whose section display titles to list.
+
+    Returns:
+        One display title per entry in ``item.sections``, in insertion order.
+    """
+    return [
+        _section_display_title(key, sec.date if isinstance(sec, GroomedData) else "")
+        for key, sec in item.sections.items()
+    ]
+
+
+def _advertised_section_names(item: BacklogItem) -> list[str]:
+    """Return every ``## `` heading name a full render of *item* addresses by name.
+
+    The section display titles plus ``Description`` when the item carries one, in
+    render order.  Reported as ``section_filter_valid_names`` on a filter miss, so
+    the name list a caller is told to choose from is the list the filter actually
+    matches against -- not a subset that omits a heading the body renders.
+
+    Args:
+        item: BacklogItem whose advertised heading names to list.
+
+    Returns:
+        Ordered list of heading names.
+    """
+    names = _section_filter_candidates(item)
+    if (item.description or "").strip():
+        names.insert(0, _DESCRIPTION_HEADING)
+    return names
+
+
+def _description_matches_section_filter(item: BacklogItem, section: str) -> bool:
+    """Return whether *section* addresses the body's ``## Description`` block.
+
+    ``render_sections_as_body`` emits the description under ``## Description``,
+    but the description is not a member of ``item.sections``, so it holds no
+    ordinal in the ``## Sections`` index and :func:`_filter_sections` cannot
+    reach it.  Left at that, an unfiltered view advertises a ``## Description``
+    heading that ``section="Description"`` then returns nothing for, while the
+    plural ``sections=["Description"]`` form — which narrows the *rendered* body
+    by header name — matches it.  The two filters disagreeing about whether a
+    rendered heading is addressable is the addressability loss
+    ``AGENTS.md``'s "No Invented Limits" forbids, so the name and regex forms
+    resolve against the description here.
+
+    The ordinal forms are declined rather than resolved: renumbering the sections
+    so the description could take an index would move every section's advertised
+    ordinal, and ``## Description`` carries no index in the rendered index block
+    for a caller to have read.
+
+    Args:
+        item: BacklogItem whose description the filter may address.
+        section: Filter expression (index, comma list, regex, or name).
+
+    Returns:
+        ``True`` when *item* has a non-empty description and *section* is a
+        non-ordinal expression that matches the ``Description`` heading name.
+    """
+    if not (item.description or "").strip():
+        return False
+    stripped = section.strip()
+    if not stripped or _numeric_index_parts(stripped):
+        return False
+    return bool(_resolve_section_indices([_DESCRIPTION_HEADING], stripped))
 
 
 def render_sections_as_body(item: BacklogItem, section: str | None = None) -> str:
@@ -2892,8 +2995,11 @@ def render_sections_as_body(item: BacklogItem, section: str | None = None) -> st
     rendered without it is not the provider body's round-trip.  It stays out of
     ``item.sections`` (and so out of the index and the ordinal space
     :func:`_filter_sections` addresses), which is why it is emitted here rather
-    than as a section, and why a *section* filter -- a request for numbered or
-    named sections -- excludes it.
+    than as a section, and why a *section* filter -- resolved against
+    ``item.sections`` alone -- excludes it.  A caller naming the rendered
+    ``## Description`` heading still reaches it: the view path pairs
+    :func:`_description_matches_section_filter` with the filtered render, and
+    carries the description onto the filtered item it passes here.
 
     Args:
         item: The BacklogItem whose description and sections to render.
@@ -2918,7 +3024,7 @@ def render_sections_as_body(item: BacklogItem, section: str | None = None) -> st
             parts.append(index_block.rstrip("\n"))
 
     if description:
-        parts.append(f"## Description\n\n{description}")
+        parts.append(f"## {_DESCRIPTION_HEADING}\n\n{description}")
 
     for key, sec_data in sections_to_render.items():
         if isinstance(sec_data, GroomedData):
@@ -3235,6 +3341,17 @@ def _populate_yaml_item_content(result: ViewItemResult, item: BacklogItem, secti
     renders the body from the structured sections and populates ``result.body``
     and ``result.sections``.  When *section* is provided the output is filtered.
 
+    The filtered arm resolves *section* against the description as well as the
+    sections (:func:`_description_matches_section_filter`), so every ``## ``
+    heading the unfiltered body renders is addressable; and it reports a filter
+    miss the way the raw-body arm (:func:`_apply_body_section_filter`) and the
+    compact arm (:func:`_assemble_view_compact`) do.  Without that flag an
+    unmatched name returned an empty ``body`` and an empty ``sections`` with no
+    signal separating "that name matched nothing" from "this item has no
+    content" -- the silent failure ``rules/silent-failure-prevention.md``
+    forbids, and the shape ``server.backlog_view`` needs in order to answer with
+    the valid-name error dict instead of an empty content response.
+
     Args:
         result: Mutable ViewItemResult to update in-place.
         item: YAML BacklogItem with structured sections.
@@ -3242,10 +3359,16 @@ def _populate_yaml_item_content(result: ViewItemResult, item: BacklogItem, secti
     """
     if section is not None:
         filtered = _filter_sections(item, section)
-        # Build a temporary item with only the filtered sections for rendering
-        filtered_item = BacklogItem(title=item.title, sections=filtered)
+        description = item.description if _description_matches_section_filter(item, section) else ""
+        # Build a temporary item with only the filtered content for rendering.  It
+        # is passed unfiltered (``section=None``) so the matched description is
+        # rendered; the narrowing has already happened here.
+        filtered_item = BacklogItem(title=item.title, description=description, sections=filtered)
         result.body = render_sections_as_body(filtered_item)
         result.sections = _build_sections_from_yaml_item(filtered_item)
+        if not filtered and not description:
+            result.section_filter_miss = True
+            result.section_filter_valid_names = _advertised_section_names(item)
     else:
         result.body = render_sections_as_body(item)
         result.sections = _build_sections_from_yaml_item(item)
