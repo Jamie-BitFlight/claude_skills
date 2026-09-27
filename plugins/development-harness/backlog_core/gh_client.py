@@ -150,11 +150,12 @@ _labels_ensured_for_repo: set[str] = set()
 def ensure_dh_labels(repo: Repository, output: Output | None = None) -> None:
     """Create any missing dh labels on the repository.
 
-    Costs at most one REST request (``repo.get_labels()``) when every dh label already exists,
-    plus one ``create_label()`` per label actually missing — replacing a previous per-label
-    ``get_label()`` probe (one REST request per entry in ``DH_LABELS``, every call, even when
-    nothing was missing). Skips the check entirely on a repeat call for the same repo within this
-    process (see ``_labels_ensured_for_repo``). Idempotent — existing labels are left unchanged.
+    Costs ceil(n/30) REST requests on the first call per process, none after, where n is the
+    repository's label count: ``repo.get_labels()`` pages 30 labels per request, and a repeat call
+    for the same repo is skipped (see ``_labels_ensured_for_repo``). Add one ``create_label()`` per
+    label actually missing. This replaced a per-label ``get_label()`` probe that cost one REST
+    request per entry in ``DH_LABELS`` on every call. Idempotent — existing labels are left
+    unchanged.
     Label creation uses REST — there is no GraphQL createLabel mutation.
 
     Args:
