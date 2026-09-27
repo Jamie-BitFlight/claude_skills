@@ -17,7 +17,7 @@ import pytest
 from backlog_core.backend_protocol import get_config
 from backlog_core.backend_types import IssueNode
 from backlog_core.backends.memory_backend import InMemoryBackend
-from backlog_core.models import BacklogError, Output, ValidationError
+from backlog_core.models import BackendUnavailableError, BacklogError, Output, ValidationError
 from backlog_core.server import mcp
 
 from tests.helpers import call_mcp_tool
@@ -542,3 +542,74 @@ async def test_backlog_comment_issue_backlog_error_returns_error_key() -> None:
     # Assert
     assert "error" in result
     assert "Issue not found" in result["error"]
+
+
+async def test_backlog_comment_issue_reports_a_refused_comment_as_retryable(
+    configured_github_backend: tuple[InMemoryBackend, MagicMock], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A null ``addComment`` payload reaches the caller as ``retryable: true``.
+
+    GitHub answers a content-creating mutation it refuses, such as under a secondary rate limit,
+    with a null payload and no ``errors``; nothing was created, so the same call can succeed later.
+    Only the GraphQL transport is faked; ``gh_client``, ``operations`` and the server are real.
+    """
+    from backlog_core import gh_client
+
+    backend, repository = configured_github_backend
+    _seed_issue(backend, 42)
+    repository.requester.graphql_query.return_value = ({}, {"data": {"addComment": {"commentEdge": {"node": None}}}})
+    monkeypatch.setattr(backend, "_add_comment_graphql", gh_client._add_comment_graphql)
+
+    result = await _call("backlog_comment_issue", {"issue_number": 42, "body": "text"})
+
+    assert "addComment" in result["error"]
+    assert result["retryable"] is True
+
+
+@pytest.mark.parametrize("verdict", [True, False])
+@pytest.mark.parametrize(
+    ("operation", "kwargs"),
+    [
+        ("list_issues", {}),
+        ("comment_issue", {"issue_number": 1, "body": "x"}),
+        ("list_comments", {"issue_number": 1}),
+        ("read_comment", {"issue_number": 1, "comment_id": 1}),
+    ],
+)
+def test_wrapped_backlog_errors_keep_the_retry_verdict(
+    operation: str, kwargs: dict[str, object], verdict: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An operation that adds context to a ``BacklogError`` keeps the verdict its raise site stated."""
+    from backlog_core import operations
+
+    def refuse(repo: str = "", timeout: int = 15) -> MagicMock:
+        msg = "refused"
+        raise BackendUnavailableError(msg, retryable=verdict)
+
+    monkeypatch.setattr(operations, "get_github", refuse)
+
+    with pytest.raises(BacklogError) as excinfo:
+        getattr(operations, operation)(**kwargs)
+
+    assert excinfo.value.retryable is verdict
+
+
+@pytest.mark.parametrize("verdict", [True, False])
+def test_open_pr_search_failures_keep_the_retry_verdict(verdict: bool, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Both open-PR search wrappers keep the verdict of the failure they wrap."""
+    from backlog_core import operations
+
+    backend = get_config().backend
+
+    def refuse(issue_num: int, repo: str = "") -> list[object]:
+        msg = "refused"
+        raise BackendUnavailableError(msg, retryable=verdict)
+
+    monkeypatch.setattr(backend, "check_open_prs_for_issue", refuse)
+
+    with pytest.raises(BacklogError) as excinfo:
+        operations._search_open_prs(1, "owner/repo")
+
+    assert excinfo.value.retryable is verdict
+    assert isinstance(excinfo.value.__cause__, BacklogError)
+    assert excinfo.value.__cause__.retryable is verdict
