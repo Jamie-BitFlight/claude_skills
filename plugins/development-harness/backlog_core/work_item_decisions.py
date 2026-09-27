@@ -181,7 +181,7 @@ class WorkItemDecisionContext:
                     None,
                 )
         else:
-            provider, snapshot = self._select_by_title(selector)
+            provider, snapshot = self._select_by_title(selector, purpose=purpose)
         pending = None
         mutation_base = None
         if purpose == "mutation":
@@ -194,7 +194,9 @@ class WorkItemDecisionContext:
             provider=provider, pending=pending, mutation_base=mutation_base, provider_snapshot=snapshot
         )
 
-    def _select_by_title(self, selector: str) -> tuple[BacklogItem | None, ProviderSnapshot | None]:
+    def _select_by_title(
+        self, selector: str, *, purpose: Literal["read", "mutation"]
+    ) -> tuple[BacklogItem | None, ProviderSnapshot | None]:
         """Resolve a non-exact selector against pending intent, then GitHub search (D5).
 
         Pending (not-yet-created) items are checked first -- a slug or
@@ -203,7 +205,11 @@ class WorkItemDecisionContext:
         selector -- it was skipped as unsafe (too long, or carrying a quote --
         risk R-B), returned nothing, or returned only tokenized near-misses
         (risk R-A: it can also lag a just-created or just-edited issue) -- a
-        titles-only scan of open and closed issues decides. With
+        titles-only scan of open and closed issues decides. A mutation also
+        scans open titles alongside search, merged by issue number: search
+        lag hits recently created or edited issues, almost all open, and a
+        second open match must raise ``AmbiguousSelectorError`` rather than
+        let search's one indexed match become the target. With
         ``allow_cached``, a provider failure anywhere in the lookup, including
         the targeted read of the matched issue, falls back to the cache.
 
@@ -221,9 +227,13 @@ class WorkItemDecisionContext:
             candidates = (
                 self._pages.search_issues_by_title(self.repo, selector) if selector_fits_search(selector) else []
             )
-            match = _find_by_title_substring(
-                [provider_item_to_backlog_item(_issue_node_to_provider_item(node)) for node in candidates], selector
-            )
+            found = [provider_item_to_backlog_item(_issue_node_to_provider_item(node)) for node in candidates]
+            if purpose == "mutation":
+                found += [
+                    BacklogItem(title=title, issue=f"#{number}")
+                    for number, title in self._pages.fetch_issue_titles(self.repo, open_only=True)
+                ]
+            match = _find_by_title_substring(list({item.issue: item for item in found}.values()), selector)
             if match is None:
                 titles = self._pages.fetch_issue_titles(self.repo)
                 match = _find_by_title_substring(

@@ -198,10 +198,14 @@ class ProviderMemoryBackend(InMemoryBackend):
             if item.issue and selector.lower() in item.title.lower()
         ]
 
-    def fetch_issue_titles(self, repo: str) -> list[tuple[int, str]]:
-        """Return every provider item's ``(number, title)``, open and closed."""
+    def fetch_issue_titles(self, repo: str, *, open_only: bool = False) -> list[tuple[int, str]]:
+        """Return every provider item's ``(number, title)``, open only when *open_only*."""
         del repo
-        return [(int(item.issue.lstrip("#")), item.title) for item in self.provider_items if item.issue]
+        return [
+            (int(item.issue.lstrip("#")), item.title)
+            for item in self.provider_items
+            if item.issue and not (open_only and item.status.casefold() in {"closed", "completed", "done", "resolved"})
+        ]
 
     def pending_work_items(self, repo: str = "") -> list[BacklogItem]:
         """Return unlinked local intent separately from live provider rows."""

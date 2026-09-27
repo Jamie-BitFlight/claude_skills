@@ -301,10 +301,11 @@ query IssueTitleSearch($searchQuery: String!, $first: Int!, $after: String) {
 """
 
 _ISSUE_TITLES_QUERY = """
-query IssueTitles($owner: String!, $repo: String!, $first: Int!, $after: String) {
+query IssueTitles($owner: String!, $repo: String!, $states: [IssueState!]!, $first: Int!, $after: String) {
   repository(owner: $owner, name: $repo) {
     issues(
       first: $first, after: $after,
+      filterBy: {states: $states},
       orderBy: {field: UPDATED_AT, direction: DESC}
     ) {
       nodes { number title }
@@ -960,15 +961,18 @@ def _search_issues_by_title_graphql(repo: Repository, owner: str, repo_name: str
     return all_issues
 
 
-def _fetch_issue_titles_graphql(repo: Repository, owner: str, repo_name: str) -> list[tuple[int, str]]:
-    """Fetch every open and closed issue's ``(number, title)`` with no body or hydration.
+def _fetch_issue_titles_graphql(
+    repo: Repository, owner: str, repo_name: str, *, open_only: bool = False
+) -> list[tuple[int, str]]:
+    """Fetch every issue's ``(number, title)`` with no body or hydration.
 
     The D5 fallback for a title selector the search index missed (risk R-A)
-    or could not accept (risk R-B). Search lag and unsafe selectors affect
-    closed issues as much as open ones, so the scan covers both.
+    or could not accept (risk R-B) scans open and closed issues. A
+    title-selected mutation also scans open issues only (*open_only*), since
+    search lag affects recently created or edited issues, almost all open.
 
     Returns:
-        Every issue's number and title, cursors followed to the end.
+        Every requested-state issue's number and title, cursors followed to the end.
 
     Raises:
         BacklogError: On GraphQL errors.
@@ -977,7 +981,15 @@ def _fetch_issue_titles_graphql(repo: Repository, owner: str, repo_name: str) ->
     cursor: str | None = None
     while True:
         data = _graphql_request(
-            repo, _ISSUE_TITLES_QUERY, {"owner": owner, "repo": repo_name, "first": 100, "after": cursor}
+            repo,
+            _ISSUE_TITLES_QUERY,
+            {
+                "owner": owner,
+                "repo": repo_name,
+                "states": ["OPEN"] if open_only else ["OPEN", "CLOSED"],
+                "first": 100,
+                "after": cursor,
+            },
         )
         repo_data = data.get("repository") or {}
         issues_conn = repo_data.get("issues") if isinstance(repo_data, dict) else None

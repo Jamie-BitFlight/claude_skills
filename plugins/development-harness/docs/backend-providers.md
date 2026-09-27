@@ -218,10 +218,13 @@ the accepted state.
 Each GitHub work-item command owns live provider observations shaped by what it
 actually needs, not a whole-history read (the request-shaped-reads design,
 2026-09). Exact numeric, `#N`, and GitHub-URL selectors use a targeted read.
-A title selector resolves through GitHub's search index. When search finds no
-title containing the selector, a titles-only scan of open and closed issues
-decides. A targeted read of the one match follows. Neither step reads issue
-bodies or a full listing. `backlog_list` walks a forward cursor page
+A title selector resolves through GitHub's search index. A title-selected
+mutation also scans open issue titles and merges them with the search results
+by issue number, so a second open match that search has not indexed yet raises
+`AmbiguousSelectorError` instead of letting the one indexed match become the
+target. When nothing matches, a titles-only scan of open and closed issues
+decides. A targeted read of the one match follows. None of these steps reads
+issue bodies or a full listing. `backlog_list` walks a forward cursor page
 shaped by the requested offset/limit/filters, stopping as soon as it has
 enough matches; it never pages the whole repository history for a bounded
 request. Whole-set consumers that still need every candidate — the duplicate

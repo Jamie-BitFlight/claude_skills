@@ -255,8 +255,12 @@ class FakeRequester:
         return {"addComment": {"commentEdge": {"node": {"id": new_id, "fullDatabaseId": database_id}}}}
 
     def _issue_titles(self, variables: dict[str, object]) -> dict[str, object]:
-        del variables
-        issues = sorted(self._fixture.issues.values(), key=lambda issue: issue.updated_at, reverse=True)
+        states = cast("list[str]", variables["states"])
+        issues = sorted(
+            (issue for issue in self._fixture.issues.values() if issue.state in states),
+            key=lambda issue: issue.updated_at,
+            reverse=True,
+        )
         return {
             "repository": {
                 "issues": {
@@ -1107,3 +1111,65 @@ def test_section_filter_matches_the_tracked_head_priority(fixture: FakeGitHubFix
 
     assert [item["issue"] for item in _items(result)] == ["#1"], result
     assert result["has_more"] is False, result
+
+
+def _search_returns(fixture: FakeGitHubFixture, issues: list[FakeIssue]) -> None:
+    nodes = [issue.as_node() for issue in issues]
+    fixture.requester._title_search = lambda variables: {  # ty: ignore[invalid-assignment]
+        "search": {"nodes": nodes, "pageInfo": {"hasNextPage": False, "endCursor": None}}
+    }
+
+
+def _title_scan_states(fixture: FakeGitHubFixture) -> list[list[str]]:
+    return [entry["variables"]["states"] for entry in fixture.requester.log if entry["operation"] == "IssueTitles"]
+
+
+def test_title_mutation_is_ambiguous_when_search_indexed_only_one_match(fixture: FakeGitHubFixture) -> None:
+    indexed = fixture.add_tracked_issue(1, "flaky parser test", state="OPEN")
+    fixture.add_tracked_issue(2, "flaky parser test again", state="OPEN")
+    _search_returns(fixture, [indexed])
+
+    context = WorkItemDecisionContext(fixture.backend, repo=f"{fixture.owner}/{fixture.name}")
+    with pytest.raises(AmbiguousSelectorError):
+        context.select("flaky parser", purpose="mutation")
+
+
+@pytest.mark.parametrize("search_finds_it", [True, False])
+def test_title_mutation_scans_open_titles_only_when_it_finds_the_target(
+    fixture: FakeGitHubFixture, *, search_finds_it: bool
+) -> None:
+    target = fixture.add_tracked_issue(1, "unique open target", state="OPEN")
+    fixture.add_tracked_issue(2, "something closed", state="CLOSED")
+    _search_returns(fixture, [target] if search_finds_it else [])
+
+    context = WorkItemDecisionContext(fixture.backend, repo=f"{fixture.owner}/{fixture.name}")
+    selected = context.select("unique open target", purpose="mutation")
+
+    assert selected.provider is not None
+    assert selected.provider.issue == "#1", selected.provider
+    assert _title_scan_states(fixture) == [["OPEN"]], fixture.requester.log
+
+
+def test_title_mutation_falls_back_to_closed_titles_when_nothing_open_matches(fixture: FakeGitHubFixture) -> None:
+    fixture.add_tracked_issue(1, "closed and not yet indexed", state="CLOSED")
+    _search_returns(fixture, [])
+
+    context = WorkItemDecisionContext(fixture.backend, repo=f"{fixture.owner}/{fixture.name}")
+    selected = context.select("not yet indexed", purpose="mutation")
+
+    assert selected.provider is not None
+    assert selected.provider.issue == "#1", selected.provider
+    assert _title_scan_states(fixture) == [["OPEN"], ["OPEN", "CLOSED"]], fixture.requester.log
+
+
+def test_title_read_stays_search_first(fixture: FakeGitHubFixture) -> None:
+    indexed = fixture.add_tracked_issue(1, "flaky parser test", state="OPEN")
+    fixture.add_tracked_issue(2, "flaky parser test again", state="OPEN")
+    _search_returns(fixture, [indexed])
+
+    context = WorkItemDecisionContext(fixture.backend, repo=f"{fixture.owner}/{fixture.name}")
+    selected = context.select("flaky parser", purpose="read")
+
+    assert selected.provider is not None
+    assert selected.provider.issue == "#1", selected.provider
+    assert _title_scan_states(fixture) == [], fixture.requester.log
