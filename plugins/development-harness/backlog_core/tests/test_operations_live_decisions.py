@@ -5,12 +5,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
 from backlog_core import operations
-from backlog_core.backend_types import BacklogConfig
+from backlog_core.backend_types import BacklogConfig, ListPageResult
 from backlog_core.backends.github_backend import GitHubBackend
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.file_cache import FileCache
@@ -28,11 +28,15 @@ from backlog_core.models import (
     ReconcileScope,
     Section,
 )
+from backlog_core.reconciliation import provider_item_to_backlog_item
 
 if TYPE_CHECKING:
     from unittest.mock import MagicMock
 
+    from github.Repository import Repository
     from pytest_mock import MockerFixture
+
+    from backlog_core.backend_types import ListPageRequest
 
 
 def _provider_item(item: BacklogItem) -> ProviderItem:
@@ -65,6 +69,7 @@ class _LiveBackend(InMemoryBackend):
         self.cached_items = cached_items or []
         self.pending_items = pending_items or []
         self.snapshot_requests: list[ReconcileRequest] = []
+        self.page_requests: list[object] = []
         self.reconciliations: list[tuple[ReconcileRequest, ProviderSnapshot | None]] = []
         self.writes: list[BacklogItem] = []
         self.write_repos: list[str] = []
@@ -110,6 +115,56 @@ class _LiveBackend(InMemoryBackend):
         del repo
         return self.list_work_items()
 
+    def get_github(self, repo: str = "", timeout: int = 15) -> Repository:
+        """Return a structural repository stand-in carrying only ``full_name``."""
+        del timeout
+        return cast("Repository", SimpleNamespace(full_name=repo or "owner/repository"))
+
+    def fetch_page(
+        self, request: ListPageRequest, *, match: Callable[[BacklogItem, ProviderItem], bool], force_hydration: bool
+    ) -> ListPageResult:
+        """Apply *match* directly over ``live_items`` (see ``RequestShapedListing``)."""
+        del force_hydration
+        self.page_requests.append(request)
+        if self.live_error is not None:
+            raise self.live_error
+        provider_items = [_provider_item(item) for item in self.live_items]
+        matched = [pi for pi in provider_items if match(provider_item_to_backlog_item(pi), pi)]
+        after_offset = matched[request.offset :]
+        if request.limit > 0:
+            has_more = len(after_offset) > request.limit
+            page_items = after_offset[: request.limit]
+        else:
+            has_more = False
+            page_items = after_offset
+        return ListPageResult(
+            items=page_items, has_more=has_more, total=len(matched), sync_started_at="2026-09-24T00:00:00+00:00"
+        )
+
+    def _fetch_issues_page_graphql(self, repo: object, owner: str, repo_name: str, **kwargs: object) -> object:
+        """Unused by this double's own ``fetch_page`` -- present only to satisfy ``RequestShapedListing``."""
+        raise NotImplementedError
+
+    def search_issues_by_title(self, repo: str, selector: str) -> list[tuple[int, str]]:
+        """Return ``(number, title)`` for every live item whose title contains *selector*."""
+        del repo
+        return [
+            (int(item.issue.lstrip("#")), item.title)
+            for item in self.live_items
+            if selector.lower() in item.title.lower()
+        ]
+
+    def confirm_issues_reachable(self, repo: str) -> None:
+        """Fail exactly when a live page read would."""
+        del repo
+        if self.live_error is not None:
+            raise self.live_error
+
+    def fetch_issue_titles(self, repo: str, *, open_only: bool = False) -> list[tuple[int, str]]:
+        """Return every live item's ``(number, title)``."""
+        del repo, open_only
+        return [(int(item.issue.lstrip("#")), item.title) for item in self.live_items]
+
     def get_work_item(self, reference: str) -> BacklogItem:
         self.cached_get_calls += 1
         for item in self.cached_items:
@@ -152,7 +207,10 @@ def test_read_operations_ignore_disagreeing_cached_provider_rows(
     else:
         assert result["items"][0]["title"] == expected_title
     assert backend.cached_list_calls == 0
-    assert [request.scope for request in backend.snapshot_requests] == [ReconcileScope.INCREMENTAL]
+    # Both operations now read through the request-shaped page fetch, not a
+    # bulk fetch_snapshot -- see WorkItemDecisionContext.page().
+    assert backend.snapshot_requests == []
+    assert len(backend.page_requests) == 1
 
 
 @pytest.mark.parametrize("selector", ["#7", "live title"])
@@ -168,8 +226,10 @@ def test_close_selection_uses_live_exact_and_title_truth(mocker: MockerFixture, 
 
     assert result["title"] == "live title"
     assert backend.cached_list_calls == 0
-    expected_scope = ReconcileScope.TARGETED if selector == "#7" else ReconcileScope.INCREMENTAL
-    assert [request.scope for request in backend.snapshot_requests] == [expected_scope]
+    # An exact "#7" selector resolves through one TARGETED fetch_snapshot;
+    # a title selector resolves through search then a TARGETED fetch_snapshot
+    # of the one match -- either way, never a bulk/INCREMENTAL read.
+    assert [request.scope for request in backend.snapshot_requests] == [ReconcileScope.TARGETED]
 
 
 def test_pending_intent_blocks_duplicate_creation_and_reference_collision(mocker: MockerFixture) -> None:
@@ -447,6 +507,7 @@ def test_add_item_reports_refused_github_creation_and_keeps_the_item(tmp_path: P
 
     repository.requester.graphql_query.side_effect = graphql_query
     mocker.patch.object(backend, "try_get_github", return_value=repository)
+    mocker.patch.object(backend, "get_github", return_value=repository)
     mocker.patch.object(operations, "get_config", return_value=BacklogConfig(backend=backend))
 
     result = operations.add_item("new item", "new description", "P1", type_="Bug", force=True)

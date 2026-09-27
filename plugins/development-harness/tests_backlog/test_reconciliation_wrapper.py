@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import backlog_core.models as models
 import pytest
 from backlog_core.backend_protocol import set_config
-from backlog_core.backend_types import BacklogConfig
+from backlog_core.backend_types import BacklogConfig, ListPageResult
 from backlog_core.backends.github_backend import GitHubBackend
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.file_cache import FileCache
@@ -34,6 +35,7 @@ from backlog_core.operations import (
     view_item,
 )
 from backlog_core.parsing import build_issue_body
+from backlog_core.reconciliation import provider_item_to_backlog_item
 
 
 class _SyncProviderStub(InMemoryBackend):
@@ -439,11 +441,13 @@ def test_view_after_targeted_pull_renders_the_provider_body_for_a_title_selector
 
     # Then: with the provider unavailable, an explicitly cache-allowed title lookup
     # serves the pulled text as the item's body. Commands read live first, so the
-    # writer cache is reached only through this opt-in fallback.
-    def _unavailable(request: ReconcileRequest) -> ProviderSnapshot:
+    # writer cache is reached only through this opt-in fallback. A title selector
+    # now resolves through search (D5), not fetch_snapshot, so that must fail too.
+    def _unavailable(*args: object, **kwargs: object) -> ProviderSnapshot:
         raise BackendUnavailableError
 
     monkeypatch.setattr(backend, "fetch_snapshot", _unavailable)
+    monkeypatch.setattr(backend, "search_issues_by_title", _unavailable)
     viewed = view_item("companion changed remotely", allow_cached=True)
     assert viewed.title == "companion changed remotely"
     assert viewed.status_source == "cache", viewed
@@ -480,6 +484,22 @@ def test_list_includes_issues_whose_priority_is_only_in_the_priority_label(
     backend = GitHubBackend(cache=FileCache(tmp_path / "github-cache"))
     monkeypatch.setattr(backend, "fetch_snapshot", lambda request: snapshot)
     monkeypatch.setattr(backend, "_apply_patches", lambda patches, repo="": [])
+
+    def fake_fetch_page(
+        request: object, *, match: Callable[[BacklogItem, ProviderItem], bool], force_hydration: bool
+    ) -> ListPageResult:
+        # list_items now walks a request-shaped page (D3), not the bulk
+        # fetch_snapshot -- apply the same match predicate the real walk
+        # would, over this fixture's one provider row.
+        del request, force_hydration
+        provider = snapshot.items[0]
+        item = provider_item_to_backlog_item(provider)
+        matched = [provider] if match(item, provider) else []
+        return ListPageResult(
+            items=matched, has_more=False, total=len(matched), sync_started_at=snapshot.sync_started_at
+        )
+
+    monkeypatch.setattr(backend, "fetch_page", fake_fetch_page)
     monkeypatch.setattr(
         models, "_config", models.BacklogConfig(repo_root=tmp_path, backlog_dir=tmp_path / "backlog", default_repo="")
     )

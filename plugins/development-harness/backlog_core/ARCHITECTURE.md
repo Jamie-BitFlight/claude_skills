@@ -28,7 +28,13 @@ Backends fall into two storage categories:
 - **Remote-capable providers** — GitHub, GitLab, Linear, Jira, and equivalent network providers are
   authoritative. GitHub work-item commands read the provider before making a decision; its private
   durable `FileCache` records reconciliation checkpoints and pending mutations, and is read for a
-  command result only as an explicit warned fallback after a live failure.
+  command result only as an explicit warned fallback after a live failure. A successful live read
+  — a list page, a selected target, a duplicate/follow-up/normalize scan — writes the rows it
+  fetched and hydrated through a TARGETED reconcile as it returns, so the cache holds the union of
+  every row any earlier request observed. TARGETED never advances the checkpoint; only an explicit
+  whole-backlog `INITIAL`/`INCREMENTAL` reconcile (`backlog_sync`/`backlog_pull`) does. The cache is
+  therefore never a complete mirror of the provider on its own — see "Snapshot completeness and
+  listing provenance" below for what a listing may and may not conclude from that.
 - **Local providers** — Beads, SQLite, and Memory use their native storage directly. They do not
   instantiate `FileCache`, do not read or write backlog YAML, and do not pay file-cache overhead.
 
@@ -522,11 +528,18 @@ continuing to return readable siblings. Any non-empty `skipped` value makes the 
 incomplete, regardless of checkpoint age; listing provenance must withhold an authoritative item
 count unless the caller explicitly accepts cached, low-confidence data.
 
-MCP cold-checkpoint maintenance shares one process-wide sync slot with startup and explicit
-synchronization. Taking that slot atomically captures both the prior lifecycle status and
-`started_at` under the same thread lock that marks the slot running. A failed transient claimant
-restores only that captured snapshot. It must not restore state read before claiming because an
-intervening synchronization may have completed and established a newer start timestamp.
+Startup sync and explicit synchronization (`backlog_sync`) share one process-wide sync slot.
+Taking that slot atomically captures both the prior lifecycle status and `started_at` under the
+same thread lock that marks the slot running. A failed transient claimant restores only that
+captured snapshot. It must not restore state read before claiming because an intervening
+synchronization may have completed and established a newer start timestamp.
+
+No MCP tool schedules maintenance implicitly on a cold checkpoint anymore: a request-shaped read
+(`backlog_list`, `backlog_view`, a duplicate/follow-up/normalize scan) writes through only the
+rows it fetched, never the whole backlog, so scheduling a whole-history background fetch after
+one would contradict "the cache holds only what was requested" (request-shaped-reads design,
+2026-09). A cold checkpoint stays absent until a configured startup sync or an explicit
+`backlog_sync` runs.
 
 **Reconnect behavior**:
 
@@ -1084,12 +1097,13 @@ SOURCE: `parsing.py:find_item` (string-ID path at `# String-ID exact match` comm
 - Dispatch tools wrap `dispatch_state.DispatchStateManager` via `asyncio.to_thread()`
 - Use `if __name__ == "__main__": mcp.run()` for STDIO transport
 
-The CLI does not start synchronization implicitly; only an explicit sync/refresh operation performs
-maintenance there. After an MCP tool has assembled successful response data, it may schedule the
-existing single-flight maintenance worker when the remote checkpoint is absent. The tool never
-awaits that maintenance, and maintenance does not supply or alter the response's decision data.
-Both transports leave ordinary multi-request commands without a default whole-command deadline;
-the provider client bounds each individual request as described above.
+Neither transport starts synchronization implicitly; only an explicit sync/refresh operation, or a
+configured startup sync, performs maintenance. An MCP tool no longer schedules background
+maintenance after assembling successful response data (removed with the request-shaped-reads
+design, 2026-09) — a request-shaped read already writes through the rows it fetched, and scheduling
+a whole-history fetch behind it would contradict that contract. Both transports leave ordinary
+multi-request commands without a default whole-command deadline; the provider client bounds each
+individual request as described above.
 
 **Imports**: `from fastmcp import FastMCP`, `from .models import ...`, `from .operations import ...`, `from .dispatch_state import DispatchStateManager`
 

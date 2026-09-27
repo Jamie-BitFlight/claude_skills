@@ -564,7 +564,12 @@ class BacklogListResponse(FallibleToolResponse):
     """Field names selectable via ``fields=``."""
 
     pagination: dict[str, object] | None = None
-    """offset/limit/total/has_more for the current page."""
+    """offset/limit/total/has_more for the current page. ``total`` is
+    ``int | None``: exact once a GitHub-backed request-shaped walk reaches
+    the end of the matching state set or every fetched row matched, and
+    ``None`` when a local predicate removed a row before the walk exhausted
+    (an honestly unknown count, not a guess). ``has_more`` is always exact
+    regardless of whether ``total`` is known."""
 
     backend: dict[str, object] | None = None
     """Configured backend's reachability and item-count status."""
