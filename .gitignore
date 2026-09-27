@@ -5,6 +5,8 @@ raw/
 # git-history-recon / linear-walkthrough generated output (regenerate on demand)
 walkthrough/
 .omo/
+.gsd/
+.bg-shell/
 .cache*/
 .*_cache/
 .DS_Store
