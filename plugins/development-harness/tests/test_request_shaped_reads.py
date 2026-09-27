@@ -1239,13 +1239,20 @@ def test_count_only_refresh_still_reconciles_the_page(fixture: FakeGitHubFixture
 
 
 @pytest.mark.parametrize("selector", ["#1", "selected target"])
-def test_live_read_selection_writes_its_target_through_to_the_cache(fixture: FakeGitHubFixture, selector: str) -> None:
+def test_live_view_writes_its_target_through_to_the_cache(fixture: FakeGitHubFixture, selector: str) -> None:
+    from backlog_core import operations
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+
     fixture.add_tracked_issue(1, "selected target", state="OPEN")
     fixture.add_tracked_issue(2, "unrelated", state="OPEN")
 
-    context = WorkItemDecisionContext(fixture.backend, repo=f"{fixture.owner}/{fixture.name}")
-    target = context.select(selector, purpose="read")
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        viewed = operations.view_item(selector, repo=f"{fixture.owner}/{fixture.name}")
+    finally:
+        reset_config()
 
-    assert target.provider is not None
+    assert viewed.title == "selected target", viewed
     assert [item.issue for item in fixture.backend.list_work_items()] == ["#1"]
     assert fixture.backend.has_synced_snapshot() is False

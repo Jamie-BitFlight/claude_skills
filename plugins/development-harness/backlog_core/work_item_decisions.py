@@ -206,9 +206,6 @@ class WorkItemDecisionContext:
     def select(self, selector: str, *, purpose: Literal["read", "mutation"]) -> DecisionTarget:
         """Select live provider fact and separately indexed queued local intent.
 
-        A live read selection writes its targeted snapshot through to the
-        cache (D7); a mutation's caller reconciles the snapshot itself.
-
         Returns:
             Read selections return provider fact and snapshot without pending intent or a mutation base.
             Mutation selections may also return pending intent and use pending intent or the provider fact as
@@ -243,8 +240,6 @@ class WorkItemDecisionContext:
             provider, snapshot = self._select_by_title(selector, purpose=purpose)
         pending = None
         mutation_base = None
-        if purpose == "read" and snapshot is not None:
-            self.write_through(snapshot)
         if purpose == "mutation":
             pending_selector = (
                 provider.reference if provider is not None else f"#{exact}" if exact is not None else selector

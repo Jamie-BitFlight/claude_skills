@@ -4208,7 +4208,11 @@ def _resolve_view_source(
         Selected item, initial result, status provenance, and unavailable capabilities.
     """
     backend = get_config().backend
-    decision = _decision_context(repo=repo, allow_cached=allow_cached, output=output).select(selector, purpose="read")
+    context = _decision_context(repo=repo, allow_cached=allow_cached, output=output)
+    decision = context.select(selector, purpose="read")
+    if decision.provider_snapshot is not None:
+        # Read-only: nothing else reconciles this observation (D7).
+        context.write_through(decision.provider_snapshot)
     item = decision.provider
     result = view_result_from_local_item(item) if item else ViewItemResult()
     if getattr(backend, "supports_github_extras", False):
@@ -5627,7 +5631,11 @@ def get_sam_tasks(
     parent = str(parent_issue_number)
     owner_references = {parent, f"#{parent}"} if isinstance(parent_issue_number, int) else {parent}
     selector = f"#{parent}" if isinstance(parent_issue_number, int) else parent
-    target = _decision_context(repo=repo, allow_cached=allow_cached, output=out).select(selector, purpose="read")
+    context = _decision_context(repo=repo, allow_cached=allow_cached, output=out)
+    target = context.select(selector, purpose="read")
+    if target.provider_snapshot is not None:
+        # Read-only: nothing else reconciles this observation (D7).
+        context.write_through(target.provider_snapshot)
     if target.provider is not None:
         owner_references.update(
             reference for reference in (target.provider.reference, target.provider.issue) if reference
