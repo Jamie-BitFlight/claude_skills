@@ -6,8 +6,10 @@ its manifests. A PR may still set a deliberate version, such as a minor or major
 
 The repository uses the stock hook and GitHub Action from
 [agent-marketplace-versioner](https://github.com/Jamie-BitFlight/agent-marketplace-versioner),
-pinned to the same full commit SHA in [.pre-commit-config.yaml](../.pre-commit-config.yaml) and
-[bump-marketplace.yml](../.github/workflows/bump-marketplace.yml).
+pinned to the same moving `v1` tag in [.pre-commit-config.yaml](../.pre-commit-config.yaml) and
+[bump-marketplace.yml](../.github/workflows/bump-marketplace.yml). The workflow resolves `v1` on
+each run. A local hook environment keeps the release it first installed; run
+`prek clean && prek install --install-hooks` to pick up a newer `v1`.
 
 ## On a branch
 
