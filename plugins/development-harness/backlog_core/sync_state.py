@@ -21,6 +21,7 @@ import threading
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 import requests
 from github import GithubException
@@ -33,6 +34,9 @@ from .models import (
     GitHubRateLimitedError,
     UnsupportedBackendCapabilityError,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 # Transient-network exceptions that are also OSError subclasses, so they must be
 # checked before the generic OSError branch: asyncio.TimeoutError (Python 3.11+
@@ -59,6 +63,7 @@ __all__ = [
     "classify_github_failure",
     "classify_sync_error",
     "get_sync_state",
+    "parse_retry_after_header",
     "reset_sync_state",
     "retry_after_seconds",
 ]
@@ -405,13 +410,33 @@ def _find_wrapped_github_exception(exc: BaseException) -> GithubException | None
     return None
 
 
+def parse_retry_after_header(headers: Mapping[str, object] | None) -> float | None:
+    """Parse a ``Retry-After`` response header into seconds, tolerating header-name casing.
+
+    Args:
+        headers: Response headers, from ``requester.graphql_query`` or ``GithubException.headers``.
+
+    Returns:
+        The parsed value, or ``None`` when no such header is present or it does not parse as
+        a number (GitHub always sends a seconds count, never an HTTP date, for this header).
+    """
+    for name, value in (headers or {}).items():
+        if name.casefold() == "retry-after":
+            try:
+                return float(str(value))
+            except ValueError:
+                return None
+    return None
+
+
 def retry_after_seconds(exc: BaseException) -> float | None:
     """Return the ``Retry-After`` hint GitHub attached to a rate-limit failure, if any.
 
-    Checks ``exc`` and then its ``__cause__`` chain, because backends wrap the original
-    ``GitHubRateLimitedError`` in a plain ``BackendUnavailableError`` (e.g.
-    ``GitHubBackend.fetch_snapshot``). The shared source for both the sync loop's retry delay
-    and the MCP error response's ``retry_after`` field.
+    Checks ``exc`` and then its ``__cause__`` chain, because backends wrap the original error in
+    a plain ``BackendUnavailableError`` (e.g. ``GitHubBackend.fetch_snapshot``). Reads a
+    GraphQL ``GitHubRateLimitedError.retry_after``, or the ``Retry-After`` header of a REST 403/429
+    ``GithubException``. The shared source for both the sync loop's retry delay and the MCP
+    error response's ``retry_after`` field.
 
     Args:
         exc: The outermost exception a caller caught.
@@ -426,6 +451,10 @@ def retry_after_seconds(exc: BaseException) -> float | None:
             return None
         if isinstance(current, GitHubRateLimitedError) and current.retry_after is not None:
             return current.retry_after
+        if isinstance(current, GithubException) and current.status in {_HTTP_FORBIDDEN, _HTTP_TOO_MANY_REQUESTS}:
+            hint = parse_retry_after_header(current.headers)
+            if hint is not None:
+                return hint
         current = current.__cause__
     return None
 

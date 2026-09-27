@@ -73,7 +73,7 @@ from .parsing import (
     today,
 )
 from .status_registry import STATUS_LABEL_PREFIX, StatusLabel, pick_primary_status_label
-from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS, SyncErrorKind, classify_sync_error
+from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS, SyncErrorKind, classify_sync_error, parse_retry_after_header
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -725,32 +725,13 @@ def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, obj
         msg = first_error.get("message", str(response["errors"]))
         if first_error.get("type") == "RATE_LIMITED":
             msg_0 = f"GitHub GraphQL rate limit exceeded: {msg}"
-            raise GitHubRateLimitedError(msg_0, retry_after=_parse_retry_after_seconds(headers))
+            raise GitHubRateLimitedError(msg_0, retry_after=parse_retry_after_header(headers))
         msg_0 = f"GraphQL error: {msg}"
         raise BacklogError(msg_0)
     if (data := response.get("data")) is None:
         msg_0 = f"Unexpected GraphQL response — missing 'data' key: {response!r}"
         raise BacklogError(msg_0)
     return data
-
-
-def _parse_retry_after_seconds(headers: dict[str, Any]) -> float | None:
-    """Parse a ``Retry-After`` response header into seconds, tolerating header-name casing.
-
-    Args:
-        headers: Response headers as returned by ``repo.requester.graphql_query``.
-
-    Returns:
-        The parsed value, or ``None`` when no such header is present or it does not parse as
-        a number (GitHub always sends a seconds count, never an HTTP date, for this header).
-    """
-    for name, value in headers.items():
-        if name.casefold() == "retry-after":
-            try:
-                return float(value)
-            except (TypeError, ValueError):
-                return None
-    return None
 
 
 _ISSUE_NOT_FOUND_PREFIX = "graphql error: could not resolve to issue #"
