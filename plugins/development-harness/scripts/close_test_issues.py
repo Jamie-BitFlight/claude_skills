@@ -2,6 +2,7 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
+#   "cryptography>=50.0.0",
 #   "gitpython>=3.1.59",
 #   "pygithub>=2.8.1",
 #   "pydantic>=2.12.3",
