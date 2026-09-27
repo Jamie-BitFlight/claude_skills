@@ -60,16 +60,15 @@ _SAM_PACKAGES_DIR = str(_REPO_ROOT / "packages")
 if _SAM_PACKAGES_DIR not in sys.path:
     sys.path.insert(0, _SAM_PACKAGES_DIR)
 
-# dh_core is in plugins/development-harness/ — same directory as dh_paths.
-# Fallback: add plugin dir to sys.path for direct-script execution outside the venv.
-_PLUGIN_DIR = str(_REPO_ROOT / "plugins" / "development-harness")
+# dh_paths, dh_core and sam_schema live in the plugin root, three levels above this
+# scripts/ directory. Resolving it from this file holds in the monorepo and in an
+# installed plugin copy; the repo-root paths above do not (#3426).
+_PLUGIN_DIR = str(Path(__file__).resolve().parents[3])
 if _PLUGIN_DIR not in sys.path:
     sys.path.insert(0, _PLUGIN_DIR)
 
 # Import directly from submodules so static type checkers resolve concrete types
 # instead of the lazy ``object`` returned by sam_schema.__getattr__.
-# dh_paths is in plugins/development-harness/ — resolvable via the _PLUGIN_DIR
-# sys.path entry above, or the plugin runner's IMPORT_PATHS under pytest.
 import dh_paths
 from dh_core import operations
 from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider, plan_id_from_path
