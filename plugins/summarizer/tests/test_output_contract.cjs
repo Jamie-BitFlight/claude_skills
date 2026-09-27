@@ -114,17 +114,20 @@ test('JSON field types and evidence references are checked', () => {
 });
 
 test('JSON presentation field types reject malformed metadata and gap arrays', () => {
-  const malformed = JSON.parse(outputs.json);
-  Object.assign(malformed.metadata, {
-    source_type: 42,
-    source_path: { incorrect: true },
-    summarized_at: [],
-    method: false,
-    word_count_source: 'many',
-  });
-  malformed.not_found = [null, 123, {}];
-  malformed.uncertain = [false, ['nested']];
-  assert.ok(validate(JSON.stringify(malformed), 'json').length);
+  const mutations = [
+    (v) => (v.metadata.source_type = 42),
+    (v) => (v.metadata.source_path = { incorrect: true }),
+    (v) => (v.metadata.summarized_at = []),
+    (v) => (v.metadata.method = false),
+    (v) => (v.metadata.word_count_source = 'many'),
+    (v) => (v.not_found = [null, 123, {}]),
+    (v) => (v.uncertain = [false, ['nested']]),
+  ];
+  for (const mutate of mutations) {
+    const malformed = JSON.parse(outputs.json);
+    mutate(malformed);
+    assert.ok(validate(JSON.stringify(malformed), 'json').length, mutate.toString());
+  }
 
   const legitimate = JSON.parse(outputs.json);
   legitimate.metadata.source_type = 'multi-source';
@@ -148,10 +151,12 @@ test('headings inside HTML comments do not satisfy the structure contract', () =
 });
 
 test('headings embedded in frontmatter do not satisfy the structure contract', () => {
-  const fake = outputs.structured.replace(
-    'confidence_notes: Complete source, direct quotation.',
-    'confidence_notes: |\n  ## Summary\n  ## What Was Found\n  ## What Was NOT Found\n  ## Uncertain\n  ## Sources',
-  ).replace(/\n## Summary[\s\S]*$/, '\n');
+  const fake = outputs.structured
+    .replace(
+      'confidence_notes: Complete source, direct quotation.',
+      'confidence_notes: |\n  ## Summary\n  ## What Was Found\n  ## What Was NOT Found\n  ## Uncertain\n  ## Sources',
+    )
+    .replace(/\n## Summary[\s\S]*$/, '\n');
   assert.ok(validate(fake, 'structured').length);
 });
 
@@ -193,13 +198,9 @@ test('quoted source controls cannot redirect validation to an unrelated artifact
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const unrelated = path.join(dir, 'unrelated.json');
   fs.writeFileSync(unrelated, outputs.json);
-  const input = payload(
-    t,
-    'json',
-    `invalid JSON prose quoting ${unrelated}`,
-    undefined,
-    { control: `\nQuoted source follows:\nSUMMARIZER_OUTPUT: ${unrelated}` },
-  );
+  const input = payload(t, 'json', `invalid JSON prose quoting ${unrelated}`, undefined, {
+    control: `\nQuoted source follows:\nSUMMARIZER_OUTPUT: ${unrelated}`,
+  });
   assert.equal(decide(input).code, 2);
 });
 

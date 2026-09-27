@@ -88,7 +88,10 @@ function validateJson(text) {
       (!Number.isInteger(value.metadata.word_count_source) || value.metadata.word_count_source < 0)
     )
       errors.push('word_count_source must be a nonnegative integer or null.');
-    if (!Number.isInteger(value.metadata.word_count_summary) || value.metadata.word_count_summary < 0)
+    if (
+      !Number.isInteger(value.metadata.word_count_summary) ||
+      value.metadata.word_count_summary < 0
+    )
       errors.push('word_count_summary must be a nonnegative integer.');
     if (
       'compression_ratio' in value.metadata &&

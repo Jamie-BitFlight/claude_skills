@@ -17,7 +17,7 @@ function textOf(message) {
 function requestFrom(records) {
   const first = records.find((record) => record.type === 'user' && record.message?.role === 'user');
   const text = textOf(first?.message);
-  const lines = text.replace(/\\r\\n/g, '\\n').split('\\n');
+  const lines = text.replace(/\r\n/g, '\n').split('\n');
   const controls = [];
   let index = 0;
   while (index < lines.length) {
@@ -33,9 +33,9 @@ function requestFrom(records) {
     }
     break;
   }
-  const trusted = controls.join('\\n');
-  const formats = [...trusted.matchAll(/^SUMMARIZER_FORMAT:\\s*(\\S+)\\s*$/gm)];
-  const outputs = [...trusted.matchAll(/^SUMMARIZER_OUTPUT:[ \\t]*(.+?)[ \\t]*$/gm)];
+  const trusted = controls.join('\n');
+  const formats = [...trusted.matchAll(/^SUMMARIZER_FORMAT:\s*(\S+)\s*$/gm)];
+  const outputs = [...trusted.matchAll(/^SUMMARIZER_OUTPUT:[ \t]*(.+?)[ \t]*$/gm)];
   if (formats.length !== 1 || !FORMATS.includes(formats[0][1]) || outputs.length > 1) {
     throw new Error('Expected one caller SUMMARIZER_FORMAT control in the initial task prefix.');
   }
