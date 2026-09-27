@@ -43,7 +43,6 @@ class Plan(TypedDict):
     """Versioned, JSON-serializable selection shared by jobs and their runner."""
 
     version: int
-    full_tests: bool
     lint_all: bool
     reasons: list[str]
     base: str
@@ -263,9 +262,6 @@ def build_plan(
         and not (version_only and path == ".claude-plugin/marketplace.json")
     ]
     full_checks = paths is None or bool(shared)
-    # A plugin runner sees only its own imports and conftests, so plugin content
-    # selects that plugin's shard; the global shard runs in every plan.
-    full_tests = full_checks
     reasons = [reason]
     if version_only:
         reasons.append("Marketplace metadata.version-only change: retain targeted selection")
@@ -278,17 +274,19 @@ def build_plan(
             "runner": (targets[0] if owner != "global" else ""),
         }
         for owner, targets in sorted(suites.items())
-        if full_tests or owner == "global" or owner in owners
+        # A runner sees only its own imports and conftests, so plugin content selects
+        # only that plugin's shard; the global shard runs in every plan.
+        if full_checks or owner == "global" or owner in owners
     ]
-    integration, cross_backend = dh_lanes(suites, selected=full_tests or DH in owners)
-    if full_tests or any(under(path, "research") for path in changed):
+    integration, cross_backend = dh_lanes(suites, selected=full_checks or DH in owners)
+    if full_checks or any(under(path, "research") for path in changed):
         integration.append({
             "name": "research-backlinks",
             "paths": ["tests/research_backlinks"],
             "marker": "integration and not research_vault",
             "runner": "",
         })
-    if full_tests:
+    if full_checks:
         integration.append({
             "name": "rebase-publication",
             "paths": ["tests/test_rebase_publication_identity.py"],
@@ -317,10 +315,9 @@ def build_plan(
         "test-integration": bool(integration),
     })
     allowed_skips = ",".join(sorted(job for job, selected_job in checks.items() if not selected_job))
-    checks["research-validation"] = full_tests or any(under(path, "research") for path in changed)
+    checks["research-validation"] = full_checks or any(under(path, "research") for path in changed)
     return {
         "version": 1,
-        "full_tests": full_tests,
         "lint_all": full_checks,
         "reasons": reasons,
         "base": base,

@@ -148,7 +148,6 @@ def test_plugin_source_and_fixtures_stay_in_their_plugin(repository: Path, path:
     """Runners read only their own imports and conftests, so no other plugin can consume these."""
     plan = planner.build_plan(repository, [path])
     assert names(plan) == {"alpha", "global"}
-    assert not plan["full_tests"]
     assert not plan["lint_all"]
 
 
@@ -169,7 +168,6 @@ def test_plugin_source_and_fixtures_stay_in_their_plugin(repository: Path, path:
 def test_shared_or_unknown_inputs_fail_safe_to_full_checks(repository: Path, path: str) -> None:
     """An unclassified dependency cannot produce a falsely narrow success."""
     plan = planner.build_plan(repository, [path])
-    assert plan["full_tests"]
     assert plan["lint_all"]
 
 
@@ -399,7 +397,7 @@ def test_marketplace_version_bump_does_not_expand_plugin_content_change(
     head = git(repository, "rev-parse", "HEAD")
     paths, resolved, tip, reason = planner.changed_paths(repository, "pull_request", base, head)
     plan = planner.build_plan(repository, paths, resolved, tip, reason)
-    assert plan["full_tests"] is registry_changed
+    assert plan["lint_all"] is registry_changed
     assert names(plan) == (
         {"alpha", "beta", "development-harness", "global"} if registry_changed else {"alpha", "global"}
     )
@@ -409,7 +407,6 @@ def test_marketplace_version_bump_does_not_expand_plugin_content_change(
 def test_marketplace_comparison_without_history_is_conservative(repository: Path) -> None:
     """Unavailable manifest evidence does not become an assumed version-only bump."""
     plan = planner.build_plan(repository, [".claude-plugin/marketplace.json", "plugins/alpha/README.md"])
-    assert plan["full_tests"]
     assert plan["lint_all"]
 
 
