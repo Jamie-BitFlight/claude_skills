@@ -2,6 +2,7 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
+#   "cryptography>=50.0.0",
 #   "typer>=0.21.2",
 #   "ruamel.yaml>=0.18.0",
 #   "pydantic>=2.12.3",
