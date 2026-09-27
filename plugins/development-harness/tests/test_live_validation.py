@@ -78,8 +78,6 @@ def live_environment(
         "_config",
         bc_models.BacklogConfig(repo_root=project, backlog_dir=tmp_path / "backlog", default_repo=scope.repository),
     )
-    # Controlled CRUD and cold-read scenarios, not a claim about background startup.
-    monkeypatch.setattr(backlog_server, "_startup_sync_enabled", lambda: False)
     backend = GitHubBackend(repo=scope.repository, cache=FileCache(tmp_path / "writer"))
     set_config(BacklogConfig(backend=backend))
     try:

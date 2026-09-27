@@ -528,7 +528,7 @@ continuing to return readable siblings. Any non-empty `skipped` value makes the 
 incomplete, regardless of checkpoint age; listing provenance must withhold an authoritative item
 count unless the caller explicitly accepts cached, low-confidence data.
 
-Startup sync and explicit synchronization (`backlog_sync`) share one process-wide sync slot.
+The `sync_now` background worker holds one process-wide sync slot.
 Taking that slot atomically captures both the prior lifecycle status and `started_at` under the
 same thread lock that marks the slot running. A failed transient claimant restores only that
 captured snapshot. It must not restore state read before claiming because an intervening
@@ -538,8 +538,16 @@ No MCP tool schedules maintenance implicitly on a cold checkpoint anymore: a req
 (`backlog_list`, `backlog_view`, a duplicate/follow-up/normalize scan) writes through only the
 rows it fetched, never the whole backlog, so scheduling a whole-history background fetch after
 one would contradict "the cache holds only what was requested" (request-shaped-reads design,
-2026-09). A cold checkpoint stays absent until a configured startup sync or an explicit
-`backlog_sync` runs.
+2026-09). A cold checkpoint stays absent until an explicit `backlog_sync` or `sync_now` runs.
+
+The server starts without reading or writing the provider: it has no lifespan hook and no startup
+sync (removed 2026-09-28 after a startup full sync on a cold checkpoint posted an audit comment to
+about 50 issues on each start and exhausted GitHub's content-creation limit). A reconcile no
+command explicitly asked to push is read-only: `refresh_local_cache_from_github` defaults to
+`apply_local_patches=False`, and decision-context snapshots pass False. Only the `sync_now` worker
+and explicit write commands (`backlog_sync`, groom/update/strike write-through, `normalize`,
+`pull`, `list --refresh`) may apply patches. The `backlog.startup_sync.enabled` config key is no
+longer read.
 
 **Reconnect behavior**:
 
@@ -1095,8 +1103,8 @@ SOURCE: `parsing.py:find_item` (string-ID path at `# String-ID exact match` comm
 - Dispatch tools wrap `dispatch_state.DispatchStateManager` via `asyncio.to_thread()`
 - Use `if __name__ == "__main__": mcp.run()` for STDIO transport
 
-Neither transport starts synchronization implicitly; only an explicit sync/refresh operation, or a
-configured startup sync, performs maintenance. An MCP tool no longer schedules background
+Neither transport starts synchronization implicitly; only an explicit sync/refresh operation
+performs maintenance, and the server starts none at startup. An MCP tool no longer schedules background
 maintenance after assembling successful response data (removed with the request-shaped-reads
 design, 2026-09) — a request-shaped read already writes through the rows it fetched, and scheduling
 a whole-history fetch behind it would contradict that contract. Both transports leave ordinary

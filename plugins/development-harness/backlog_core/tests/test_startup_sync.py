@@ -4,9 +4,9 @@ All symbols are now implemented; these tests verify production behaviour.
 
 Behaviors covered (mapped to requirement numbers 1-9):
 
-1. Lifespan launches singleton background sync exactly once -- even across multiple
-   tool calls.  The lock and state reset fixtures defend against the event-loop
-   affinity hazard identified in the design doc Risk #2.
+1. Server start launches no sync; only ``sync_now`` does.  The lock and state
+   reset fixtures defend against the event-loop affinity hazard identified in
+   the design doc Risk #2.
 2. A sync request arriving while a sync is in progress does NOT start a second sync;
    it returns the in-flight progress fields (percent / started_at).
 3. Non-retryable backend error -> SyncState transitions to OFFLINE; background loop
@@ -47,7 +47,7 @@ from backlog_core.models import (
     ReconcileResult,
     ReconcileScope,
 )
-from backlog_core.sync_engine import _attempt_sync, _startup_sync_loop
+from backlog_core.sync_engine import _attempt_sync, _sync_loop
 from backlog_core.sync_state import (
     SyncErrorKind,
     SyncState,
@@ -123,54 +123,28 @@ class TestSyncStateInitialState:
 
 
 class TestSingletonSyncLaunch:
-    """The lifespan must start the background sync loop exactly once.
+    """Starting the server must not launch a sync.
 
-    This guards against FastMCP issue #1115 where a lifespan may re-run per
-    call, which would start multiple concurrent sync loops.
+    On 2026-09-27 a startup full sync wrote audit comments to ~50 issues and
+    repeated it on every start. The server now has no lifespan hook.
     """
 
-    @pytest.mark.allow_startup_sync
-    async def test_startup_sync_loop_called_exactly_once_on_lifespan_start(self, mocker: MockerFixture) -> None:
-        """Background sync starts exactly once when the lifespan initialises.
-
-        The lifespan is exercised by importing the mcp object and entering
-        its lifespan context.  The sync function is patched to count calls.
-        Requires backlog_core.server.mcp to have lifespan=_backlog_lifespan
-        configured -- this will fail with AttributeError until implemented.
-
-        Marked ``allow_startup_sync`` because it depends on the real
-        ``_startup_sync_enabled`` gate returning True; the plugin-root
-        autouse fixture disables it by default for every other test.
-        """
+    async def test_server_start_launches_no_sync(self, mocker: MockerFixture) -> None:
+        """Entering the server and calling tools starts no background sync."""
         reset_sync_state()
-
-        sync_called_count = 0
-
-        async def _fake_sync_loop(state: SyncState) -> None:
-            nonlocal sync_called_count
-            sync_called_count += 1
-            await asyncio.sleep(0)  # yield to event loop; makes this a genuine coroutine
-            state.status = SyncStatus.IDLE
-            state.last_success_at = datetime.now(UTC)
-
-        mocker.patch("backlog_core.sync_engine._startup_sync_loop", side_effect=_fake_sync_loop)
+        sync = mocker.patch("backlog_core.sync_engine._sync_loop")
 
         from fastmcp.client import Client
 
         from backlog_core.server import mcp
 
         async with Client(mcp) as client:
-            # Issue multiple tool calls to trigger any per-call lifespan re-run bug.
             await client.call_tool("sync_status", {})
             await client.call_tool("sync_status", {})
 
-        assert sync_called_count == 1, (
-            f"Background sync must start exactly once per process lifespan. "
-            f"Got {sync_called_count} start(s). "
-            "If >1, the lifespan is re-running on each tool call (FastMCP issue #1115)."
-        )
+        sync.assert_not_called()
+        assert get_sync_state().status == SyncStatus.IDLE
 
-    @pytest.mark.allow_startup_sync
     async def test_successful_read_on_cold_checkpoint_never_schedules_maintenance(self, mocker: MockerFixture) -> None:
         """A successful MCP read never schedules background maintenance (request-shaped-reads O1).
 
@@ -178,9 +152,8 @@ class TestSingletonSyncLaunch:
         absent" trigger was removed with the request-shaped-reads design
         (2026-09): a request-shaped read already writes through the rows it
         fetched, so scheduling a whole-history background fetch behind one
-        would contradict "the cache holds only what was requested". Only
-        configured startup sync (test_startup_sync_loop_called_exactly_once_on_lifespan_start
-        above) and an explicit ``backlog_sync`` still launch it.
+        would contradict "the cache holds only what was requested". Only an
+        explicit ``sync_now`` launches it.
         """
 
         class ColdSyncBackend(InMemoryBackend):
@@ -217,8 +190,7 @@ class TestSingletonSyncLaunch:
         mocker.patch("backlog_core.server.get_config", return_value=BackendConfig(backend=ColdSyncBackend()))
         mocker.patch("backlog_core.server.operations.list_items", return_value=result)
         mocker.patch("backlog_core.server._probe_backend_status", return_value=BackendStatus())
-        mocker.patch("backlog_core.server._startup_sync_enabled", return_value=True)
-        mocker.patch("backlog_core.sync_engine._startup_sync_loop", side_effect=counted_sync)
+        mocker.patch("backlog_core.sync_engine._sync_loop", side_effect=counted_sync)
 
         from backlog_core.server import backlog_list
 
@@ -240,17 +212,12 @@ class TestSingletonSyncLaunch:
 class TestInFlightSyncGuard:
     """A sync_now call while a sync is running must not start a second sync."""
 
-    @pytest.mark.allow_startup_sync
     async def test_second_sync_now_while_running_returns_progress_not_new_sync(self, mocker: MockerFixture) -> None:
         """sync_now while RUNNING: triggered=False, progress fields present, no second start.
 
-        Arrange: patch _startup_sync_loop so it holds state=RUNNING without completing.
+        Arrange: patch _sync_loop so it holds state=RUNNING without completing.
         Act: call sync_now twice while the lock is held.
         Assert: second call returns triggered=False with percent/started_at fields.
-
-        Marked ``allow_startup_sync`` because it depends on the real
-        ``_startup_sync_enabled`` gate returning True; the plugin-root
-        autouse fixture disables it by default for every other test.
         """
         reset_sync_state()
 
@@ -264,9 +231,9 @@ class TestInFlightSyncGuard:
             state.started_at = datetime.now(UTC)
             state.items_total = 10
             state.items_done = 3
-            await gate.wait()  # blocks until cancelled by lifespan teardown
+            await gate.wait()  # blocks until the test sets the gate
 
-        mocker.patch("backlog_core.sync_engine._startup_sync_loop", side_effect=_stalled_sync_loop)
+        mocker.patch("backlog_core.sync_engine._sync_loop", side_effect=_stalled_sync_loop)
 
         from fastmcp.client import Client
 
@@ -303,7 +270,7 @@ class TestInFlightSyncGuard:
         """Concurrent sync attempts: only one acquires the lock; second returns immediately.
 
         The lock on SyncState serialises sync workers.  Two coroutines that both
-        try to enter _startup_sync_loop must not both set status=RUNNING.
+        try to enter _sync_loop must not both set status=RUNNING.
         """
         state = fresh_sync_state
         results: list[str] = []
@@ -365,7 +332,7 @@ class TestNonRetryableErrorGoesOffline:
         mocker.patch("backlog_core.operations.refresh_local_cache_from_github", side_effect=missing_token.value)
 
         state = fresh_sync_state
-        await _startup_sync_loop(state)
+        await _sync_loop(state)
 
         assert (
             missing_token.value.retryable,
@@ -386,7 +353,7 @@ class TestNonRetryableErrorGoesOffline:
         )
 
         state = fresh_sync_state
-        await _startup_sync_loop(state)
+        await _sync_loop(state)
 
         assert state.status == SyncStatus.OFFLINE, "ValueError (config error) must produce OFFLINE state."
         assert state.offline_reason, "offline_reason must be non-empty after ValueError."
@@ -400,7 +367,7 @@ class TestNonRetryableErrorGoesOffline:
         )
 
         state = fresh_sync_state
-        await _startup_sync_loop(state)
+        await _sync_loop(state)
 
         assert state.status == SyncStatus.OFFLINE, "OSError (filesystem error) must produce OFFLINE state."
 
@@ -414,7 +381,7 @@ class TestNonRetryableErrorGoesOffline:
         mocker.patch("backlog_core.operations.refresh_local_cache_from_github", side_effect=exc_401)
 
         state = fresh_sync_state
-        await _startup_sync_loop(state)
+        await _sync_loop(state)
 
         assert state.status == SyncStatus.OFFLINE, (
             "HTTP 401 must produce OFFLINE state.  Bad credentials cannot self-heal."
@@ -430,7 +397,7 @@ class TestNonRetryableErrorGoesOffline:
         mocker.patch("backlog_core.operations.refresh_local_cache_from_github", side_effect=exc_404)
 
         state = fresh_sync_state
-        await _startup_sync_loop(state)
+        await _sync_loop(state)
 
         assert state.status == SyncStatus.OFFLINE, "HTTP 404 (repo not found) must produce OFFLINE state."
 
@@ -502,7 +469,7 @@ class TestRetryableErrorBoundedBackoff:
         mocker.patch("backlog_core.sync_engine.asyncio.sleep", side_effect=_instant_sleep)
 
         state = fresh_sync_state
-        await _startup_sync_loop(state)
+        await _sync_loop(state)
 
         # Design: attempt 1 immediate, attempt 2 after 30s, attempt 3 after 120s.
         # After 3 failures -> ERROR.
@@ -539,7 +506,7 @@ class TestRetryableErrorBoundedBackoff:
         mocker.patch("backlog_core.sync_engine.asyncio.sleep", side_effect=_record_sleep)
 
         state = fresh_sync_state
-        await _startup_sync_loop(state)
+        await _sync_loop(state)
 
         assert sleep_delays, "At least one asyncio.sleep call must occur between retries."
         assert all(d > 0 for d in sleep_delays), (
@@ -572,7 +539,7 @@ class TestRetryableErrorBoundedBackoff:
         mocker.patch("backlog_core.sync_engine.asyncio.sleep", side_effect=_instant_sleep)
 
         state = fresh_sync_state
-        await _startup_sync_loop(state)
+        await _sync_loop(state)
 
         assert state.status == SyncStatus.IDLE, (
             f"After a transient failure followed by success, status must be IDLE. Got {state.status!r}."
@@ -754,7 +721,7 @@ class TestSyncStatusTool:
         async def _noop_sync_loop(state: SyncState) -> None:
             await asyncio.sleep(0)
 
-        mocker.patch("backlog_core.sync_engine._startup_sync_loop", side_effect=_noop_sync_loop)
+        mocker.patch("backlog_core.sync_engine._sync_loop", side_effect=_noop_sync_loop)
 
         from fastmcp.client import Client
 
@@ -791,27 +758,22 @@ class TestSyncStatusTool:
             state.status = SyncStatus.IDLE
             state.last_success_at = datetime.now(UTC)
 
-        mocker.patch("backlog_core.sync_engine._startup_sync_loop", side_effect=_fast_success)
+        mocker.patch("backlog_core.sync_engine._sync_loop", side_effect=_fast_success)
 
         from fastmcp.client import Client
 
         from backlog_core.server import mcp
 
         async with Client(mcp) as client:
+            await client.call_tool("sync_now", {})
             await asyncio.sleep(0.05)  # let background task complete
             response = await client.call_tool("sync_status", {})
 
         data = response.structured_content
         assert data["status"] == "idle", f"After successful sync, status must be 'idle'. Got {data['status']!r}."
 
-    @pytest.mark.allow_startup_sync
     async def test_sync_status_offline_after_non_retryable_error(self, mocker: MockerFixture) -> None:
-        """After a non-retryable error, sync_status returns status='offline'.
-
-        Marked ``allow_startup_sync`` because it depends on the real
-        ``_startup_sync_enabled`` gate returning True; the plugin-root
-        autouse fixture disables it by default for every other test.
-        """
+        """After a non-retryable error, sync_status returns status='offline'."""
         reset_sync_state()
 
         from backlog_core.models import GitHubUnavailableError
@@ -826,6 +788,7 @@ class TestSyncStatusTool:
         from backlog_core.server import mcp
 
         async with Client(mcp) as client:
+            await client.call_tool("sync_now", {})
             await asyncio.sleep(0.1)  # let background loop fail and set OFFLINE
             response = await client.call_tool("sync_status", {})
 
@@ -965,7 +928,7 @@ class TestSyncStateTryClaim:
         assert fresh_sync_state.started_at == completed_claim_started_at
 
     def test_try_start_still_returns_bool_and_claims(self, fresh_sync_state: SyncState) -> None:
-        """try_start() keeps its existing bool contract for sync_now/lifespan."""
+        """try_start() keeps its existing bool contract for sync_now."""
         assert fresh_sync_state.try_start() is True
         assert fresh_sync_state.status == SyncStatus.RUNNING
         assert fresh_sync_state.try_start() is False
@@ -1054,26 +1017,21 @@ class TestSyncTaskDoneCallback:
     callback must call the module logger when the task raises an unexpected error.
     """
 
-    @pytest.mark.allow_startup_sync
     async def test_unexpected_exception_from_sync_task_is_logged(self, mocker: MockerFixture) -> None:
         """An unexpected exception escaping the sync task triggers logger.error.
 
-        Arrange: patch _startup_sync_loop to raise a RuntimeError (simulating an
+        Arrange: patch _sync_loop to raise a RuntimeError (simulating an
         unanticipated bug escaping the broad catch in _attempt_sync).
-        Act: enter the server lifespan so the background task is launched.
+        Act: call sync_now so the background task is launched.
         Assert: the module-level logger in server.py receives an error() call
         containing the exception message.
-
-        Marked ``allow_startup_sync`` because it depends on the real
-        ``_startup_sync_enabled`` gate returning True; the plugin-root
-        autouse fixture disables it by default for every other test.
         """
         reset_sync_state()
 
         async def _boom(state: SyncState) -> None:
             raise RuntimeError("simulated unexpected bug")
 
-        mocker.patch("backlog_core.sync_engine._startup_sync_loop", side_effect=_boom)
+        mocker.patch("backlog_core.sync_engine._sync_loop", side_effect=_boom)
 
         # Patch the logger used by _log_sync_task_exc in server.py.
         mock_logger = mocker.patch("backlog_core.server._sync_task_log")
@@ -1083,6 +1041,7 @@ class TestSyncTaskDoneCallback:
         from backlog_core.server import mcp
 
         async with Client(mcp) as client:
+            await client.call_tool("sync_now", {})
             # Yield enough times for the background task to complete and the
             # done-callback to fire.
             await asyncio.sleep(0)
@@ -1111,7 +1070,7 @@ class TestStuckRunningGuard:
     """Exceptions outside the narrow (BackendUnavailableError, GithubException,
     OSError, ValueError) catch must not leave status=RUNNING permanently.
 
-    The try/finally in _startup_sync_loop must set status=ERROR and release the
+    The try/finally in _sync_loop must set status=ERROR and release the
     lock so subsequent sync_now calls can proceed.  Finding #2.
     """
 
@@ -1121,7 +1080,7 @@ class TestStuckRunningGuard:
         """RuntimeError escaping _attempt_sync must set status=ERROR, not leave RUNNING.
 
         Arrange: _run_single_sync raises RuntimeError (not in the narrow catch set).
-        Act: call _startup_sync_loop.
+        Act: call _sync_loop.
         Assert: status is ERROR (not RUNNING), last_error is non-empty.
         """
         mocker.patch(
@@ -1132,7 +1091,7 @@ class TestStuckRunningGuard:
         state = fresh_sync_state
         # RuntimeError must propagate out (re-raised so done-callback logs it)
         with pytest.raises(RuntimeError, match="unexpected internal failure"):
-            await _startup_sync_loop(state)
+            await _sync_loop(state)
 
         assert state.status != SyncStatus.RUNNING, (
             f"status must not be RUNNING after an unexpected exception. Got {state.status!r}. "
@@ -1148,7 +1107,7 @@ class TestStuckRunningGuard:
 
         state = fresh_sync_state
         with pytest.raises(KeyboardInterrupt):
-            await _startup_sync_loop(state)
+            await _sync_loop(state)
 
         assert state.status != SyncStatus.RUNNING, "KeyboardInterrupt must not leave status=RUNNING."
 
@@ -1171,7 +1130,7 @@ class TestSuccessStateFields:
         )
 
         state = fresh_sync_state
-        await _startup_sync_loop(state)
+        await _sync_loop(state)
 
         assert state.completed_at is not None, (
             "completed_at must be set after a successful sync. "
@@ -1199,7 +1158,7 @@ class TestSuccessStateFields:
         mocker.patch("backlog_core.sync_engine.asyncio.sleep", side_effect=lambda _d: None)
 
         state = fresh_sync_state
-        await _startup_sync_loop(state)
+        await _sync_loop(state)
 
         assert state.retry_count == 0, (
             f"retry_count must be reset to 0 on success. Got {state.retry_count}. "
@@ -1335,7 +1294,7 @@ class TestCrossThreadProgressCallback:
         directly without call_soon_threadsafe, the mutation may not be visible
         to the event-loop thread under strict thread safety semantics.
 
-        A simpler observable contract: after _startup_sync_loop completes
+        A simpler observable contract: after _sync_loop completes
         successfully, items_done must equal items_total (i.e. 100% progress
         reached if total was set).
         """
@@ -1355,7 +1314,7 @@ class TestCrossThreadProgressCallback:
         mocker.patch("backlog_core.operations.refresh_local_cache_from_github", side_effect=_fake_refresh)
 
         state = fresh_sync_state
-        await _startup_sync_loop(state)
+        await _sync_loop(state)
 
         assert callback_calls, "progress_callback was not invoked -- test setup error."
         assert state.items_done == 3, (
@@ -1366,83 +1325,12 @@ class TestCrossThreadProgressCallback:
 
 
 # ---------------------------------------------------------------------------
-# Finding 7 -- LIFESPAN RE-ENTRY: gated create_task + module-level reference
+# sync_now refuses a backend with no reconciliation
 # ---------------------------------------------------------------------------
 
 
-class TestLifespanReEntryGuard:
-    """server._backlog_lifespan must NOT launch a second sync task when re-entered.
-
-    FastMCP issue #1115 may re-run the lifespan on each tool call in some
-    versions.  The lifespan must gate create_task on try_start() and keep a
-    module-level reference so re-entry is a no-op.  Finding #7.
-    """
-
-    async def test_lifespan_reentry_does_not_double_launch_sync(self, mocker: MockerFixture) -> None:
-        """Two consecutive lifespan entries must produce exactly one sync start."""
-        reset_sync_state()
-
-        launch_count = 0
-
-        async def _counted_sync(state: SyncState, full_refresh: bool = False) -> None:
-            nonlocal launch_count
-            launch_count += 1
-            await asyncio.sleep(0)
-            state.status = SyncStatus.IDLE
-            state.last_success_at = datetime.now(UTC)
-
-        mocker.patch("backlog_core.sync_engine._startup_sync_loop", side_effect=_counted_sync)
-
-        import backlog_core.server as srv
-        from backlog_core.server import _backlog_lifespan
-
-        # Simulate two lifespan entries (FastMCP #1115 scenario).
-        async with _backlog_lifespan(srv.mcp):
-            await asyncio.sleep(0)
-            async with _backlog_lifespan(srv.mcp):
-                await asyncio.sleep(0)
-
-        assert launch_count <= 1, (
-            f"Re-entering the lifespan must not launch a second sync. Got {launch_count} launch(es). Finding #7."
-        )
-
-
-# ---------------------------------------------------------------------------
-# Finding 8 -- KILL-SWITCH: backlog.startup_sync.enabled=false skips sync
-# ---------------------------------------------------------------------------
-
-
-class TestKillSwitch:
-    """When backlog.startup_sync.enabled is false in .dh/config.yaml, the
-    startup sync must be skipped entirely.  Finding #8.
-    """
-
-    async def test_sync_skipped_when_kill_switch_disabled(self, mocker: MockerFixture) -> None:
-        """startup sync is not launched when the kill-switch is false."""
-        reset_sync_state()
-
-        launch_count = 0
-
-        async def _counted_sync(state: SyncState, full_refresh: bool = False) -> None:
-            nonlocal launch_count
-            launch_count += 1
-            await asyncio.sleep(0)
-
-        mocker.patch("backlog_core.sync_engine._startup_sync_loop", side_effect=_counted_sync)
-        # Patch the kill-switch reader to return False (disabled).
-        mocker.patch("backlog_core.server._startup_sync_enabled", return_value=False)
-
-        from fastmcp.client import Client
-
-        from backlog_core.server import mcp
-
-        async with Client(mcp) as client:
-            await client.call_tool("sync_status", {})
-
-        assert launch_count == 0, (
-            f"When kill-switch is false, startup sync must be skipped entirely. "
-            f"Got {launch_count} launch(es). Finding #8."
-        )
+class TestSyncNowUnsupportedBackend:
+    """sync_now launches nothing for a backend that cannot reconcile."""
 
     @pytest.mark.parametrize(
         "backend",
@@ -1457,12 +1345,10 @@ class TestKillSwitch:
     ) -> None:
         reset_sync_state()
 
-        mocker.patch("backlog_core.server._startup_sync_enabled", return_value=True)
         mocker.patch("backlog_core.server.get_config", return_value=BackendConfig(backend=backend))
-        mocker.patch("backlog_core.server._active_startup_sync_task", None)
         create_task = mocker.patch("backlog_core.server.asyncio.create_task")
 
-        from backlog_core.server import _backlog_lifespan, sync_now
+        from backlog_core.server import sync_now
 
         # sync_now returns the SyncNowResponse instance directly (no
         # exclude_none/model_dump()), so its declared return type is accurate
@@ -1470,39 +1356,11 @@ class TestKillSwitch:
         # in-process rather than through Client(mcp) since that transport
         # relies on the real asyncio.create_task, which the mock above
         # replaces module-wide, and would hang.
-        async with _backlog_lifespan(object()):
-            result = await sync_now()
+        result = await sync_now()
 
         create_task.assert_not_called()
         assert result.triggered is False
         assert result.messages == ["Active backend does not support reconciliation."]
-
-    async def test_sync_runs_when_kill_switch_enabled(self, mocker: MockerFixture) -> None:
-        """startup sync IS launched when the kill-switch is true (default)."""
-        reset_sync_state()
-
-        launch_count = 0
-
-        async def _counted_sync(state: SyncState, full_refresh: bool = False) -> None:
-            nonlocal launch_count
-            launch_count += 1
-            await asyncio.sleep(0)
-            state.status = SyncStatus.IDLE
-            state.last_success_at = datetime.now(UTC)
-
-        mocker.patch("backlog_core.sync_engine._startup_sync_loop", side_effect=_counted_sync)
-        mocker.patch("backlog_core.server._startup_sync_enabled", return_value=True)
-
-        from fastmcp.client import Client
-
-        from backlog_core.server import mcp
-
-        async with Client(mcp) as client:
-            await client.call_tool("sync_status", {})
-
-        assert launch_count == 1, (
-            f"When kill-switch is true, startup sync must be launched once. Got {launch_count} launch(es). Finding #8."
-        )
 
 
 # ---------------------------------------------------------------------------
@@ -1535,7 +1393,7 @@ class TestBackendFailurePropagation:
         mocker.patch("backlog_core.operations.get_config", return_value=BackendConfig(backend=UnavailableSyncBackend()))
 
         state = fresh_sync_state
-        await _startup_sync_loop(state)
+        await _sync_loop(state)
 
         assert state.status == SyncStatus.OFFLINE, (
             f"GitHubUnavailableError from try_get_github must drive OFFLINE state. "
@@ -1558,7 +1416,7 @@ class TestBackendFailurePropagation:
         )
 
         state = fresh_sync_state
-        await _startup_sync_loop(state)
+        await _sync_loop(state)
 
         assert state.status == SyncStatus.OFFLINE, (
             f"BackendUnavailableError must reach the sync engine and set OFFLINE. Got {state.status!r}. Finding #1."

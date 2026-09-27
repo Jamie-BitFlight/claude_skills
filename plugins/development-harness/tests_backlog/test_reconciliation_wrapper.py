@@ -82,7 +82,9 @@ def test_refresh_wrapper_maps_label_and_progress(
         label="review", progress_callback=lambda done, total: progress.append((done, total))
     )
 
-    assert sync_provider.requests == [ReconcileRequest(scope=ReconcileScope.INCREMENTAL, label="review")]
+    assert sync_provider.requests == [
+        ReconcileRequest(scope=ReconcileScope.INCREMENTAL, label="review", apply_local_patches=False)
+    ]
     assert progress == expected_progress
     assert result["refreshed"] == 2
     assert result["reconciled"] == 1
@@ -150,7 +152,7 @@ def test_label_refresh_does_not_forward_unfiltered_cached_references(sync_provid
     refresh_local_cache_from_github(label="review", full_refresh=full_refresh)
 
     # Then: the provider receives the label query without targeted fallbacks
-    assert sync_provider.requests == [ReconcileRequest(scope=scope, label="review")]
+    assert sync_provider.requests == [ReconcileRequest(scope=scope, label="review", apply_local_patches=False)]
 
 
 def test_unscoped_refresh_does_not_turn_cached_references_into_provider_scope(sync_provider) -> None:
@@ -161,7 +163,7 @@ def test_unscoped_refresh_does_not_turn_cached_references_into_provider_scope(sy
     refresh_local_cache_from_github()
 
     # Then: cached provider rows do not define the live request scope.
-    assert sync_provider.requests == [ReconcileRequest(scope=ReconcileScope.INCREMENTAL)]
+    assert sync_provider.requests == [ReconcileRequest(scope=ReconcileScope.INCREMENTAL, apply_local_patches=False)]
 
 
 def test_list_wrapper_forwards_label_to_reconciliation(sync_provider) -> None:

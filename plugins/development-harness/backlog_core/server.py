@@ -29,7 +29,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, TypeGuard, cast
 
-import dh_paths
 import dispatch_schema
 import tiktoken
 from dh_core import operations
@@ -40,7 +39,6 @@ from github import GithubException
 from mcp.types import ToolAnnotations
 from progressive_markdown.exceptions import OrdinalNotFoundError
 from pydantic import BaseModel, Field, ValidationError as PydanticValidationError
-from ruamel.yaml import YAML
 
 from . import models, sync_engine
 from .artifact_manifest_store import artifact_content_reference, load_manifest as load_manifest_record, publish_artifact
@@ -155,7 +153,7 @@ _ALLOW_CACHED_DESCRIPTION = (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
+    from collections.abc import Callable, Mapping, Sequence
 
     from pydantic import GetJsonSchemaHandler
     from pydantic.json_schema import JsonSchemaValue
@@ -1173,11 +1171,9 @@ if _args.project_dir is not None:
 
 
 # ---------------------------------------------------------------------------
-# Lifespan: launch singleton background sync once per server process.
-# FastMCP 3.x already guards against concurrent lifespan re-entry via its
-# internal _lifespan_lock, so we do not need an additional boolean guard here.
-# The lifespan= parameter on FastMCP() must be an async context manager factory
-# (decorated with @asynccontextmanager), NOT a plain async generator.
+# Background sync worker, launched only by the sync_now tool. The server has no
+# lifespan hook: starting it reads and writes nothing on GitHub (2026-09-27, a
+# startup full sync wrote audit comments to ~50 issues on every start).
 # ---------------------------------------------------------------------------
 
 
@@ -1206,10 +1202,6 @@ def _log_sync_task_exc(task: asyncio.Task[None]) -> None:
 # completes prevents that.  See CPython asyncio.create_task docs.
 _bg_sync_tasks: set[asyncio.Task[None]] = set()
 
-# Module-level reference to the active startup sync task.  Set by _backlog_lifespan
-# on first entry; prevents FastMCP re-entry (issue #1115) from launching a second task.
-_active_startup_sync_task: asyncio.Task[None] | None = None
-
 
 def _register_bg_task(task: asyncio.Task[None]) -> None:
     """Retain a strong reference to *task* and wire its done-callbacks.
@@ -1223,136 +1215,17 @@ def _register_bg_task(task: asyncio.Task[None]) -> None:
 
 
 def _launch_background_sync(*, full_refresh: bool = False) -> asyncio.Task[None] | None:
-    """Atomically launch the singleton maintenance worker."""
+    """Atomically launch the singleton sync worker ``sync_now`` asked for.
+
+    The only launcher of a background sync: the server starts none on its own.
+    """
     state = get_sync_state()
     if not isinstance(get_config().backend, SyncProvider) or not state.try_start():
         return None
-    sync = (
-        sync_engine._startup_sync_loop(state, full_refresh=True)
-        if full_refresh
-        else sync_engine._startup_sync_loop(state)
-    )
+    sync = sync_engine._sync_loop(state, full_refresh=True) if full_refresh else sync_engine._sync_loop(state)
     task = asyncio.create_task(sync)
     _register_bg_task(task)
     return task
-
-
-def _read_enabled_from_config_file(yaml_parser: object, config_path: object) -> bool | None:
-    """Read ``backlog.startup_sync.enabled`` from one config file.
-
-    Isolates the try/except so the outer loop in
-    ``_read_startup_sync_enabled_from_yaml`` uses a plain
-    ``if result is not None`` check, avoiding the S112 try-except-continue
-    pattern.
-
-    Args:
-        yaml_parser: A ``ruamel.yaml.YAML`` instance.
-        config_path: Path to the YAML config file to read.
-
-    Returns:
-        The configured bool if present, otherwise ``None``.
-    """
-    if not isinstance(yaml_parser, YAML) or not isinstance(config_path, Path) or not config_path.is_file():
-        return None
-    try:
-        raw = yaml_parser.load(config_path.read_text(encoding="utf-8"))
-    except Exception:  # ruff: ignore[blind-except] — ruamel.yaml raises various internal exception types
-        return None
-    if not isinstance(raw, dict):
-        return None
-    backlog_section = raw.get("backlog")
-    if not isinstance(backlog_section, dict):
-        return None
-    startup_sync = backlog_section.get("startup_sync")
-    if not isinstance(startup_sync, dict):
-        return None
-    enabled = startup_sync.get("enabled")
-    return enabled if isinstance(enabled, bool) else None
-
-
-def _read_startup_sync_enabled_from_yaml() -> bool | None:
-    """Read ``backlog.startup_sync.enabled`` from .dh/config.yaml files.
-
-    Returns the configured boolean value or ``None`` when the key is absent
-    in all config files.  Implemented without private dh_config imports to
-    avoid PLC2701 violations.
-
-    Returns:
-        The configured bool, or ``None`` when the key is absent.
-    """
-    search_paths = []
-    with contextlib.suppress(FileNotFoundError, RuntimeError):
-        project_root = dh_paths.git_project_root()
-        search_paths.append(dh_paths.project_dh_dir(project_root) / "config.yaml")
-    search_paths.append(dh_paths._dh_user_root() / "config.yaml")
-
-    yaml = YAML(typ="safe")
-
-    for config_path in search_paths:
-        result = _read_enabled_from_config_file(yaml, config_path)
-        if result is not None:
-            return result
-    return None
-
-
-def _startup_sync_enabled() -> bool:
-    """Return True when the startup sync should run (default: True).
-
-    Reads ``backlog.startup_sync.enabled`` from ``.dh/config.yaml``.
-    Returns ``True`` when the key is absent (opt-out semantics: sync runs
-    unless explicitly disabled).
-
-    Named module-level function so tests can patch via:
-    ``mocker.patch("backlog_core.server._startup_sync_enabled", return_value=False)``.
-
-    Returns:
-        True if startup sync should proceed, False to skip it entirely.
-    """
-    configured = _read_startup_sync_enabled_from_yaml()
-    return True if configured is None else configured
-
-
-@contextlib.asynccontextmanager
-async def _backlog_lifespan(_server: object) -> AsyncGenerator[dict[str, object], None]:
-    """FastMCP lifespan: launch the background sync task before serving tools.
-
-    The background sync task starts immediately but does not block server
-    readiness — ``yield`` executes before the sync completes so tool calls
-    can be answered concurrently.
-
-    Args:
-        _server: The FastMCP server instance (not used directly).
-
-    Yields:
-        Empty lifespan context dict.
-    """
-    # Guard 1 — kill-switch: skip entirely when disabled in config.
-    # Guard 2 — re-entry (FastMCP #1115): try_start() is an atomic check-and-set;
-    #   if RUNNING is already set (second lifespan entry) we skip create_task so
-    #   only one background sync task runs per process lifetime.
-    global _active_startup_sync_task  # ruff: ignore[global-statement]
-    if _startup_sync_enabled():
-        bg_task = _launch_background_sync()
-        if bg_task is not None:
-            # Store module-level reference so a re-entrant lifespan (FastMCP #1115)
-            # cancels the same task on teardown rather than creating a dangling one.
-            _active_startup_sync_task = bg_task
-        else:
-            bg_task = _active_startup_sync_task
-    else:
-        bg_task = _active_startup_sync_task
-    try:
-        yield {}
-    finally:
-        if bg_task is not None:
-            bg_task.cancel()
-            # Suppress the expected teardown outcomes only: CancelledError (from the
-            # cancel above), TimeoutError (from wait_for), and any application-level
-            # error from the task — the done-callback (_log_sync_task_exc) already
-            # logged it; re-raising here would surface a clean shutdown as a crash.
-            # KeyboardInterrupt / SystemExit (BaseException) still propagate.
-            with contextlib.suppress(Exception, asyncio.CancelledError):
-                await asyncio.wait_for(bg_task, timeout=5.0)
 
 
 mcp = FastMCP(
@@ -1365,7 +1238,6 @@ mcp = FastMCP(
         "the failure and stop."
     ),
     version="0.1.0",
-    lifespan=_backlog_lifespan,
 )
 
 # fastmcp 4 requires a server exposing task-enabled tools (dispatch_spawn) to register

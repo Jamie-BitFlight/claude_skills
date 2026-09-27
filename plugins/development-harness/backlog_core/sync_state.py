@@ -171,8 +171,8 @@ class SyncState:
     def try_claim(self, *, track_started_at: bool = True) -> SyncClaim | None:
         """Atomically claim the sync slot, returning the state held before the claim.
 
-        The single-flight primitive underlying both ``try_start()`` (startup
-        sync and ``sync_now``, always called from the event-loop thread) and
+        The single-flight primitive underlying both ``try_start()``
+        (``sync_now``, always called from the event-loop thread) and
         the implicit cold-cache read-through in ``operations.list_items``
         (called from an ``asyncio.to_thread`` worker thread, and potentially
         from two such worker threads racing each other on overlapping
@@ -237,8 +237,8 @@ class SyncState:
     def try_start(self) -> bool:
         """Atomically claim the sync slot, returning True when claimed.
 
-        Thread-safe wrapper around ``try_claim()`` for callers — startup sync
-        and ``sync_now`` — that only need a boolean claim result and always
+        Thread-safe wrapper around ``try_claim()`` for callers — ``sync_now``
+        — that only need a boolean claim result and always
         run the full sync to completion (never restoring a prior status).
 
         Returns:
