@@ -38,8 +38,8 @@ sandbox credential as `GITHUB_TOKEN`, validate the scope before executing tests:
 ```bash
 uv run --locked python plugins/development-harness/scripts/close_test_issues.py --check-only
 uv run --locked python scripts/run_bounded.py --timeout-seconds 480 -- \
-  uv run --locked pytest -m e2e -n 0 -x -v --tb=long --capture=tee-sys \
-    -o faulthandler_timeout=60 plugins/development-harness/tests/test_live_validation.py
+  uv run --locked --script plugins/development-harness/run_pytests.py -m e2e -n 0 -x -v --tb=long \
+    --capture=tee-sys -o faulthandler_timeout=60
 uv run --locked python plugins/development-harness/scripts/close_test_issues.py
 ```
 

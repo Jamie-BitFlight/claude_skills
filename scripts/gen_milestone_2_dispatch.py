@@ -98,8 +98,11 @@ plan = DispatchPlan(
         ),
     ],
     quality_gates=QualityGates(
-        pre_merge=["uv run pytest plugins/development-harness/tests/ -x -q", "uv run prek run --all-files"],
-        post_merge=["uv run pytest plugins/development-harness/tests/ -q"],
+        pre_merge=[
+            "uv run --locked --script plugins/development-harness/run_pytests.py tests -x -q",
+            "uv run prek run --all-files",
+        ],
+        post_merge=["uv run --locked --script plugins/development-harness/run_pytests.py tests -q"],
     ),
 )
 
