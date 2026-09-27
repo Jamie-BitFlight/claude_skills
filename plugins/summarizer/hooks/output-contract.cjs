@@ -67,7 +67,7 @@ function validateJson(text) {
     for (const key of METADATA) {
       if (!(key in value.metadata)) errors.push(`Missing metadata.${key}`);
     }
-    if (!['file', 'url', 'image', 'multi-source'].includes(value.metadata.source_type))
+    if (!['file', 'url', 'image', 'inline', 'multi-source'].includes(value.metadata.source_type))
       errors.push('Invalid source_type.');
     const sourcePath = value.metadata.source_path;
     if (
