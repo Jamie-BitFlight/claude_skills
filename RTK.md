@@ -6,7 +6,9 @@ RTK filters shell-command output for agent context. It is optional project tooli
 
 Before the first RTK-wrapped command in a task, run `command -v rtk && rtk --version`.
 
-If that check does not succeed, run the original commands without an `rtk` prefix and state that RTK filtering was unavailable. Do not report token savings or command rewriting in that state.
+If that check does not succeed, tell the user exactly: `RTK is not installed on this machine. I can install it from https://github.com/rtk-ai/rtk. Shall I proceed? [y/n]` Stop for the answer; do not install RTK automatically.
+
+If the answer is no, run the original commands without an `rtk` prefix and state that RTK filtering was unavailable. Do not report token savings or command rewriting in that state. If the answer is yes, follow the official RTK installation instructions and verify the correct Rust Token Killer binary with `command -v rtk && rtk --version` before using it.
 
 ## When RTK is available
 
