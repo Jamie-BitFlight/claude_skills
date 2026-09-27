@@ -1036,11 +1036,12 @@ class TestMakeGithubClient:
         assert client.requester.kwargs["timeout"] == DEFAULT_TIMEOUT
 
 
-@pytest.mark.integration
+@pytest.mark.e2e
 class TestAgainstLiveGitHub:
     """Proves the module reaches GitHub from whatever network is actually present.
 
-    Deselected by default. Run with ``-m integration``. The unit tests above assert the
+    Deselected by default. It needs the live network, so it belongs to the e2e lane: run
+    with ``-m e2e`` and ``DH_ALLOW_TEST_NETWORK=1``. The unit tests above assert the
     TLS context's shape; only a real request proves that shape completes a handshake.
     """
 

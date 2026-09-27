@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -46,7 +47,7 @@ def test_gate_enforces_every_cross_backend_matrix_leg(workflow: dict) -> None:
     """The ruleset requires only Quality Gate, so the backend legs must vote through it."""
     job = workflow["jobs"]["test-cross-backend"]
     assert "test-cross-backend" in workflow["jobs"]["quality-gate"]["needs"]
-    assert job["strategy"] == {"fail-fast": False, "matrix": {"backend": ["memory", "sqlite"]}}
+    assert job["env"]["BACKLOG_BACKEND"] == "${{ matrix.backend }}"
 
 
 def test_selected_lanes_use_the_same_plan_and_exact_job_key(workflow: dict) -> None:
@@ -58,7 +59,14 @@ def test_selected_lanes_use_the_same_plan_and_exact_job_key(workflow: dict) -> N
         assert job["if"] == f"${{{{ fromJSON(needs.changes.outputs.plan).checks['{name}'] }}}}"
 
 
-@pytest.mark.parametrize(("name", "lane"), [("test-python", "unit_matrix"), ("test-integration", "integration_matrix")])
+@pytest.mark.parametrize(
+    ("name", "lane"),
+    [
+        ("test-python", "unit_matrix"),
+        ("test-integration", "integration_matrix"),
+        ("test-cross-backend", "cross_backend_matrix"),
+    ],
+)
 def test_matrix_executes_paths_via_json_not_shell(workflow: dict, name: str, lane: str) -> None:
     """Matrix targets remain data, and a failing shard does not cancel its peers."""
     job = workflow["jobs"][name]
@@ -107,3 +115,22 @@ def test_live_e2e_retains_sandbox_and_cleanup_boundaries(workflow: dict) -> None
     assert cleanup["env"]["GITHUB_TOKEN"] == "${{ secrets.DH_E2E_TOKEN }}"
     assert "scripts/run_bounded.py --timeout-seconds 90" in cleanup["run"]
     assert any(step.get("uses") == "actions/upload-artifact@v7" and step.get("if") == "always()" for step in steps)
+
+
+def test_workflow_names_no_plugin_test_path() -> None:
+    """A plugin's runner owns its test roots; a workflow path drifts from the lane's marker."""
+    text = (ROOT / ".github/workflows/code-quality.yml").read_text(encoding="utf-8")
+    assert re.findall(r"plugins/[^/\s]+/(?:tests\w*|[\w/]*/tests)/", text) == []
+
+
+def test_live_e2e_runs_through_the_plugin_runner(workflow: dict) -> None:
+    """The e2e lane is the dh runner plus its marker, so every e2e test it owns is collected."""
+    step = next(step for step in workflow["jobs"]["test-e2e"]["steps"] if step.get("name") == "Run e2e tests")
+    assert "uv run --locked --script plugins/development-harness/run_pytests.py -m e2e -n 0 -x" in step["run"]
+
+
+def test_dependency_cache_key_includes_runner_lockfiles() -> None:
+    """A runner resolves from its own script lockfile, so that lockfile must invalidate the cache."""
+    action = YAML(typ="safe").load((ROOT / ".github/actions/setup-python/action.yml").read_text(encoding="utf-8"))
+    setup = next(step for step in action["runs"]["steps"] if step.get("uses", "").startswith("astral-sh/setup-uv@"))
+    assert setup["with"]["cache-dependency-glob"].split() == ["**/uv.lock", "**/run_pytests.py.lock"]

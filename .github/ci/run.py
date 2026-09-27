@@ -44,7 +44,7 @@ def pytest_command(shard: dict[str, object]) -> list[str]:
 
     Raises:
         TypeError: If the runner or marker is not a string.
-        ValueError: If the runner or paths are not safe relative paths.
+        ValueError: If the runner or paths are not safe relative paths, or a runner shard names paths.
     """
     runner = shard.get("runner", "")
     if not isinstance(runner, str):
@@ -58,7 +58,9 @@ def pytest_command(shard: dict[str, object]) -> list[str]:
     if marker:
         args.extend(["-m", marker, "-v"])
     paths = shard.get("paths", [])
-    if runner and paths == []:
+    if runner:
+        if paths != []:
+            raise ValueError(f"The plugin runner owns its test paths: {runner}")
         return args
     return [*args, *paths_from(paths)]
 

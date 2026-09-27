@@ -68,8 +68,8 @@ if _PLUGIN_DIR not in sys.path:
 
 # Import directly from submodules so static type checkers resolve concrete types
 # instead of the lazy ``object`` returned by sam_schema.__getattr__.
-# dh_paths is in plugins/development-harness/ — resolvable via the uv workspace
-# (root pyproject.toml pythonpath includes the plugin directory).
+# dh_paths is in plugins/development-harness/ — resolvable via the _PLUGIN_DIR
+# sys.path entry above, or the plugin runner's IMPORT_PATHS under pytest.
 import dh_paths
 from dh_core import operations
 from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider, plan_id_from_path

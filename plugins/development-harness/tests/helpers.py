@@ -2,8 +2,8 @@
 
 Centralises helpers used across multiple test files to eliminate copy-paste
 duplication. Both ``tests/`` and ``tests_backlog/`` import from here via
-``from tests.helpers import ...`` — enabled by the ``pythonpath = ["."]``
-pytest configuration in pyproject.toml.
+``from tests.helpers import ...`` — enabled by the plugin root (``.``) in
+``run_pytests.py``'s ``IMPORT_PATHS``.
 """
 
 from __future__ import annotations

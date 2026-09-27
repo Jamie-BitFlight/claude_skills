@@ -6,8 +6,7 @@ import json
 import tomllib
 from pathlib import Path
 
-ROOT = Path(__file__).parents[1]
-PLUGIN = ROOT / "plugins" / "frustration-analyzer"
+PLUGIN = Path(__file__).parents[1]
 
 
 def test_frustration_analyzer_server_imports_on_current_interpreter() -> None:
@@ -16,10 +15,8 @@ def test_frustration_analyzer_server_imports_on_current_interpreter() -> None:
     Replaces a prior version of this test that asserted the PEP 723
     ``requires-python`` bound equaled a literal string -- a tautology that
     proved only that the string was edited, not that the server actually
-    works on the interpreters it claims to support. Reuses the existing
-    ``_server`` loader from the plugin's own test suite (importable here
-    via the shared ``pythonpath`` entry in the root ``pyproject.toml``)
-    instead of duplicating its importlib boilerplate.
+    works on the interpreters it claims to support. Reuses the ``_server``
+    loader beside this file, which the plugin runner puts on ``pythonpath``.
     """
     import _server
 
