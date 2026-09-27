@@ -297,7 +297,7 @@ def check_open_prs_for_issue(issue_num: int, repo: str = "") -> list[PullRequest
         return get_config().backend.check_open_prs_for_issue(issue_num, repo)
     except (BacklogError, *RETRYABLE_TRANSIENT_EXCEPTIONS) as exc:
         msg = f"Open-PR search failed for issue #{issue_num}; use force=True to bypass this safety check: {exc}"
-        raise BacklogError(msg) from exc
+        raise BacklogError(msg, retryable=getattr(exc, "retryable", None)) from exc
 
 
 def _search_open_prs(issue_num: int, repo: str) -> list[PullRequestRef]:
@@ -317,7 +317,7 @@ def _search_open_prs(issue_num: int, repo: str) -> list[PullRequestRef]:
         return check_open_prs_for_issue(issue_num, repo)
     except (GithubException, BacklogError, *RETRYABLE_TRANSIENT_EXCEPTIONS) as exc:
         msg = f"Open-PR search failed for issue #{issue_num}: {exc}. Retry, or use force=True to bypass the check."
-        raise BacklogError(msg) from exc
+        raise BacklogError(msg, retryable=getattr(exc, "retryable", None)) from exc
 
 
 def close_github_issue(
@@ -6205,7 +6205,7 @@ def list_issues(
         raise
     except (GithubException, BacklogError) as e:
         msg = f"GitHub API error fetching issues: {e}"
-        raise BacklogError(msg) from e
+        raise BacklogError(msg, retryable=getattr(e, "retryable", None)) from e
     return {"issues": issue_list, "count": len(issue_list), **out.to_dict()}
 
 
@@ -6250,7 +6250,7 @@ def comment_issue(
         raise
     except (GithubException, BacklogError) as e:
         msg = f"GitHub API error adding comment: {e}"
-        raise BacklogError(msg) from e
+        raise BacklogError(msg, retryable=getattr(e, "retryable", None)) from e
     return {
         "issue_number": issue_number,
         "comment_id": added_comment.id,
@@ -6303,7 +6303,7 @@ def list_comments(
         raise
     except (GithubException, BacklogError) as e:
         msg = f"GitHub API error fetching comments: {e}"
-        raise BacklogError(msg) from e
+        raise BacklogError(msg, retryable=getattr(e, "retryable", None)) from e
 
     window = all_comments[offset : offset + limit]
     has_more = len(all_comments) > offset + limit
@@ -6381,7 +6381,7 @@ def read_comment(
         raise
     except (GithubException, BacklogError) as e:
         msg = f"GitHub API error reading comment: {e}"
-        raise BacklogError(msg) from e
+        raise BacklogError(msg, retryable=getattr(e, "retryable", None)) from e
     return {
         "id": comment.id,
         "author": comment.author,

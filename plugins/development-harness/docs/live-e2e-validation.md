@@ -90,7 +90,7 @@ provider contracts.
 | L5 changes status | Native GitHub labels independently confirm in-progress state | STRENGTHEN |
 | L6/L7 full and incremental grooming | Native audit comments and a fresh-cache MCP reader retain both known content values; raw issue bodies remain human-owned | STRENGTHEN |
 | L8 sync publishes changes | Seed an unacknowledged mutation through the public backend queue, confirm it is absent remotely, then explicit sync and a fresh reader must observe it while preserving earlier grooming | STRENGTHEN |
-| L9 pull refreshes cached work | An independent native title/body edit followed by targeted pull and a non-refresh title lookup; a numeric lookup would mask a no-op pull | REPLACE |
+| L9 pull refreshes cached work | An independent native title/body edit, then targeted pull, then a provider-unavailable read-back through the writer's own backend and cache with `allow_cached=True`; a fresh empty-cache reader would prove nothing about what pull wrote | REPLACE |
 | L10/L11 close and resolve | Each API transition is followed by native closed-state verification on a separately created issue | STRENGTHEN |
 | Request-shaped cache fill | A separate empty-cache reader lists the open fixture; the public backend cache holds exactly the listed rows, never an unrequested closed fixture the list never asked for. A targeted view of the closed fixture then adds it, with its closed state, and no read ever advances the checkpoint | REPLACE |
 

@@ -122,9 +122,7 @@ def listed_references(items: list[dict[str, object]]) -> set[str]:
     return {str(item.get("issue", "")) for item in items}
 
 
-async def test_live_crud_persists_changes_and_preserves_other_sections(
-    live_environment: LiveEnvironment, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def test_live_crud_persists_changes_and_preserves_other_sections(live_environment: LiveEnvironment) -> None:
     env = live_environment
     # Warm CRUD has an explicit, real open-issue snapshot. Historical cold-cache
     # recovery belongs to the independent scenario below, not an accidental list side effect.
@@ -152,8 +150,11 @@ async def test_live_crud_persists_changes_and_preserves_other_sections(
 
             with env.journal.phase("plan association and status"):
                 plan = "plan/live-test-plan.md"
-                updated = await calls.call("backlog_update", {"selector": title, "plan": plan})
-                assert updated["plan"] == plan, updated
+                # backlog_update echoes its own "plan" argument unconditionally (it does not
+                # read back the mutation), so asserting on it here proves nothing beyond a
+                # successful call -- which calls.call already enforces. The view below is
+                # the actual oracle for whether the association persisted.
+                await calls.call("backlog_update", {"selector": title, "plan": plan})
                 associated = await calls.call("backlog_view", {"selector": title, "summary": False})
                 assert associated["plan"] == plan, associated
                 updated = await calls.call("backlog_update", {"selector": title, "status": "in-progress"})
@@ -191,7 +192,13 @@ async def test_live_crud_persists_changes_and_preserves_other_sections(
                 # Grooming itself reconciles immediately, so syncing an already-groomed
                 # item alone would let a no-op backlog_sync pass this scenario.
                 env.backend.put_work_item(queued)
-                assert env.backend.has_pending_writes()
+                # has_pending_writes() alone is non-discriminating here: the companion's
+                # add from setup is already queued, so it is true regardless of this seed.
+                # Look up the seeded mutation itself.
+                pending_items = env.backend.pending_work_items()
+                seeded = next((item for item in pending_items if item.issue == f"#{primary}"), None)
+                assert seeded is not None, pending_items
+                assert sync_content in (seeded.description or ""), seeded
                 with env.fresh_reader():
                     before_sync = await calls.call("backlog_view", {"selector": f"#{primary}", "summary": False})
                     assert sync_content not in str(before_sync["body"]), before_sync
@@ -210,15 +217,15 @@ async def test_live_crud_persists_changes_and_preserves_other_sections(
                 changed_body = f"{env.scope.body_marker}\n\nProvider edit not present in the writer cache."
                 await asyncio.to_thread(remote.edit, title=changed_title, body=changed_body)
                 await calls.call("backlog_pull", {"selector": f"#{companion}"})
-                # Force the read-back through the writer cache populated by pull.
-                # Live-first title selection would otherwise re-fetch GitHub and let a
-                # no-op pull satisfy this phase.
-                with env.fresh_reader() as reader:
+                # Read back through the WRITER's own backend and cache -- the one pull
+                # just populated -- with its provider fetch made unavailable. A fresh
+                # reader has an empty cache and would prove nothing about what pull wrote.
 
-                    def unavailable_fetch(request: ReconcileRequest) -> ProviderSnapshot:
-                        raise BackendUnavailableError("offline read-back after pull")
+                def unavailable_fetch(request: ReconcileRequest) -> ProviderSnapshot:
+                    raise BackendUnavailableError("offline read-back after pull")
 
-                    monkeypatch.setattr(reader, "fetch_snapshot", unavailable_fetch)
+                with pytest.MonkeyPatch.context() as writer_offline:
+                    writer_offline.setattr(env.backend, "fetch_snapshot", unavailable_fetch)
                     pulled = await calls.call(
                         "backlog_view", {"selector": changed_title, "summary": False, "allow_cached": True}
                     )
