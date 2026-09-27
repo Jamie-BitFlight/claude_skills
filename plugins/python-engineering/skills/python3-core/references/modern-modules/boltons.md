@@ -527,7 +527,7 @@ except Exception:
 - **Repository**: [@github/mahmoud/boltons](https://github.com/mahmoud/boltons)
 - **Documentation**: [@readthedocs](https://boltons.readthedocs.io/)
 - **PyPI**: [@pypi/boltons](https://pypi.org/project/boltons/)
-- **Context7**: [@context7/mahmoud/boltons](/mahmoud/boltons)
+- **Context7**: [@context7/mahmoud/boltons](https://context7.com/mahmoud/boltons)
 - **Architecture**: [@readthedocs/architecture](https://boltons.readthedocs.io/en/latest/architecture.html)
 
 ---

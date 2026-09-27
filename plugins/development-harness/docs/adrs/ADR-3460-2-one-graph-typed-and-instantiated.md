@@ -1,7 +1,7 @@
 # ADR-3460-2: Add the missing relations to the ledger, and finish the migration, rather than replace Task and Plan
 
 **Status:** Proposed — authored on `worktree-melodic-plotting-emerson`, not yet reviewed or merged.
-See [rules/adr-lifecycle.md](../../../../rules/adr-lifecycle.md).
+See [rules/adr-lifecycle.md](https://github.com/Jamie-BitFlight/claude_skills/blob/main/rules/adr-lifecycle.md).
 
 ## Context
 
