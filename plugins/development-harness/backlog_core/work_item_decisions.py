@@ -12,6 +12,7 @@ from .backend_types import (
     ListPageRequest,
     RepositoryScopedCachedListing,
     RequestShapedListing,
+    SyncProvider,
     WorkItemBackend,
 )
 from .gh_client import selector_fits_search
@@ -166,8 +167,47 @@ class WorkItemDecisionContext:
             return False
         return True
 
+    def write_through(self, snapshot: ProviderSnapshot, *, refresh: bool = False) -> None:
+        """Write one live observation's rows through to the cache with a TARGETED reconcile (D7).
+
+        ``apply_local_patches`` follows *refresh*, so a plain read acknowledges
+        nothing while ``refresh=True`` also pushes local intent for these rows
+        only (D6). The checkpoint never moves: TARGETED never advances it. A
+        failed write-through is warned, not raised — the read it is attached to
+        has already succeeded. A plain read reports only failures, since a silent
+        one leaves later ``allow_cached`` reads stale.
+        """
+        if not isinstance(self.backend, SyncProvider):
+            return
+        output = self.output or Output()
+        references = [item.reference for item in snapshot.items]
+        try:
+            result = self.backend.reconcile(
+                ReconcileRequest(
+                    scope=ReconcileScope.TARGETED, repo=self.repo, references=references, apply_local_patches=refresh
+                ),
+                snapshot=snapshot,
+            )
+        except BacklogError as exc:
+            output.warn(f"  WARNING: Could not write this page through to the local cache: {exc}")
+            return
+        if refresh or result.failures:
+            summary = (
+                f"Reconciled {result.fetched_items} provider item(s): {result.local_updates} local updates, "
+                f"{result.provider_patches} patches, {result.no_ops} no-ops, {result.conflicts} conflicts, "
+                f"{result.failures} failures, {result.pending_mutations} pending mutation(s), "
+                f"{result.rejected_mutations} rejected mutation(s)."
+            )
+            if result.conflicts or result.failures or result.pending_mutations or result.rejected_mutations:
+                output.warn(summary)
+            else:
+                output.info(summary)
+
     def select(self, selector: str, *, purpose: Literal["read", "mutation"]) -> DecisionTarget:
         """Select live provider fact and separately indexed queued local intent.
+
+        A live read selection writes its targeted snapshot through to the
+        cache (D7); a mutation's caller reconciles the snapshot itself.
 
         Returns:
             Read selections return provider fact and snapshot without pending intent or a mutation base.
@@ -203,6 +243,8 @@ class WorkItemDecisionContext:
             provider, snapshot = self._select_by_title(selector, purpose=purpose)
         pending = None
         mutation_base = None
+        if purpose == "read" and snapshot is not None:
+            self.write_through(snapshot)
         if purpose == "mutation":
             pending_selector = (
                 provider.reference if provider is not None else f"#{exact}" if exact is not None else selector

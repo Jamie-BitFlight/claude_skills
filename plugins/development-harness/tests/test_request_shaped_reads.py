@@ -1236,3 +1236,16 @@ def test_count_only_refresh_still_reconciles_the_page(fixture: FakeGitHubFixture
     assert [(r.scope, r.apply_local_patches, r.references) for r in requests] == [
         (ReconcileScope.TARGETED, True, ["#1"])
     ], requests
+
+
+@pytest.mark.parametrize("selector", ["#1", "selected target"])
+def test_live_read_selection_writes_its_target_through_to_the_cache(fixture: FakeGitHubFixture, selector: str) -> None:
+    fixture.add_tracked_issue(1, "selected target", state="OPEN")
+    fixture.add_tracked_issue(2, "unrelated", state="OPEN")
+
+    context = WorkItemDecisionContext(fixture.backend, repo=f"{fixture.owner}/{fixture.name}")
+    target = context.select(selector, purpose="read")
+
+    assert target.provider is not None
+    assert [item.issue for item in fixture.backend.list_work_items()] == ["#1"]
+    assert fixture.backend.has_synced_snapshot() is False

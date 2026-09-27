@@ -1661,9 +1661,7 @@ def _open_scan(context: WorkItemDecisionContext) -> _OpenScan:
         force_hydration=True,
     )
     if page.provider_snapshot is not None:
-        _write_page_through(
-            context.backend, context.repo, page.provider_snapshot, refresh=False, output=context.output or Output()
-        )
+        context.write_through(page.provider_snapshot)
     pending = [it for it in context.pending() if _is_live_candidate(it)]
     return _OpenScan(items=page.provider_items + pending, live=page.provider_snapshot is not None)
 
@@ -2422,44 +2420,6 @@ def _page_match(
     return True
 
 
-def _write_page_through(
-    backend: object, repo: str, snapshot: ProviderSnapshot, *, refresh: bool, output: Output
-) -> None:
-    """Write one live page's rows through to the cache with a TARGETED reconcile (D7).
-
-    ``apply_local_patches`` follows *refresh*, so a plain read acknowledges
-    nothing while ``refresh=True`` also pushes local intent for these rows
-    only (D6). The checkpoint never moves: TARGETED never advances it. A
-    failed write-through is warned, not raised — the read it is attached to
-    has already succeeded. A plain read reports only failures, since a silent
-    one leaves later ``allow_cached`` reads stale.
-    """
-    if not isinstance(backend, SyncProvider):
-        return
-    references = [item.reference for item in snapshot.items]
-    try:
-        result = backend.reconcile(
-            ReconcileRequest(
-                scope=ReconcileScope.TARGETED, repo=repo, references=references, apply_local_patches=refresh
-            ),
-            snapshot=snapshot,
-        )
-    except (BackendUnavailableError, BacklogError) as exc:
-        output.warn(f"  WARNING: Could not write this page through to the local cache: {exc}")
-        return
-    if refresh or result.failures:
-        summary = (
-            f"Reconciled {result.fetched_items} provider item(s): {result.local_updates} local updates, "
-            f"{result.provider_patches} patches, {result.no_ops} no-ops, {result.conflicts} conflicts, "
-            f"{result.failures} failures, {result.pending_mutations} pending mutation(s), "
-            f"{result.rejected_mutations} rejected mutation(s)."
-        )
-        if result.conflicts or result.failures or result.pending_mutations or result.rejected_mutations:
-            output.warn(summary)
-        else:
-            output.info(summary)
-
-
 def _read_list_page(
     *,
     backend: object,
@@ -2483,7 +2443,7 @@ def _read_list_page(
     """Read one request-shaped GitHub list page and write it through the cache.
 
     Every successful live page writes exactly the rows it fetched through
-    :func:`_write_page_through`. A *count_only* page without *refresh* reads
+    :meth:`WorkItemDecisionContext.write_through`. A *count_only* page without *refresh* reads
     no work-item content and so writes nothing through; with *refresh* it
     reads and reconciles its rows like any page, as *refresh* promises.
 
@@ -2521,7 +2481,7 @@ def _read_list_page(
         ),
     )
     if page.provider_snapshot is not None and not metadata_only:
-        _write_page_through(backend, repo, page.provider_snapshot, refresh=refresh, output=output)
+        context.write_through(page.provider_snapshot, refresh=refresh)
     return page
 
 
