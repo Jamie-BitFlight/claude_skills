@@ -136,10 +136,15 @@ and the caller must retry rather than assume the append succeeded. See
 
 The CLI and MCP are two transports over the same routing boundary. Use the
 surface available to the caller; do not infer a different source of truth from
-the transport. The CLI schedules no implicit synchronization. After assembling
-successful response data, MCP may schedule the existing single-flight
-maintenance worker when the remote reconciliation checkpoint is absent; it
-does not await that worker or use it to produce the response.
+the transport. Neither transport schedules implicit synchronization: a
+request-shaped read (`backlog_list`, `backlog_view`, a duplicate/follow-up/
+normalize scan) writes through only the rows it fetched (see "Snapshot
+completeness and listing provenance" in
+[ARCHITECTURE.md](../backlog_core/ARCHITECTURE.md)), and MCP no longer
+schedules a whole-history background fetch behind one (removed with the
+request-shaped-reads design, 2026-09 — that would contradict "the cache holds
+only what was requested"). Only a configured startup sync or an explicit
+`backlog_sync` performs whole-backlog maintenance.
 
 Provider requests are individually bounded to no more than 30 seconds. An
 ordinary command that performs several provider requests has no default
@@ -210,12 +215,31 @@ the accepted state.
 
 ### Command-scoped provider observations and provenance
 
-Each GitHub work-item command owns one live provider observation. Exact numeric,
-`#N`, and GitHub-URL selectors use a targeted read unless the command already
-has a bulk observation. Title selectors and operations that decide across the
-backlog use one complete bulk snapshot for that command. Selection, status
-facts, duplicate checks, and compatible reconciliation reuse that observation
-instead of independently refetching or consulting cached provider state.
+Each GitHub work-item command owns live provider observations shaped by what it
+actually needs, not a whole-history read (the request-shaped-reads design,
+2026-09). Exact numeric, `#N`, and GitHub-URL selectors use a targeted read.
+A title selector resolves through GitHub's search index. A title-selected
+mutation also scans open issue titles and merges them with the search results
+by issue number, so a second open match that search has not indexed yet raises
+`AmbiguousSelectorError` instead of letting the one indexed match become the
+target. When nothing matches, a titles-only scan of open and closed issues
+decides. A targeted read of the one match follows. None of these steps reads
+issue bodies or a full listing. `backlog_list` walks a forward cursor page
+shaped by the requested offset/limit/filters, stopping as soon as it has
+enough matches; it never pages the whole repository history for a bounded
+request. Whole-set consumers that still need every candidate — the duplicate
+check in `backlog_add`, `list_followups`, `normalize` — scan the OPEN state
+set only; a closed origin or duplicate candidate is out of scope for those
+(a repository-owner decision recorded in the request-shaped-reads design
+brief). Selection, status facts, and duplicate checks reuse whichever
+observation the command already made instead of independently refetching or
+consulting cached provider state. A successful live read writes the rows it
+fetched through a TARGETED reconcile as it returns (see "Snapshot
+completeness and listing provenance" in
+[ARCHITECTURE.md](../backlog_core/ARCHITECTURE.md)); the cache is the union
+of what earlier requests have hydrated, never a mirror of the whole
+repository, and the checkpoint only ever advances on an explicit
+`backlog_sync`/`backlog_pull`.
 
 Creation and update are separate operations. Generic `backlog add` accepts an optional
 `--reference`. A provider that supports caller-assigned references accepts it. A provider that

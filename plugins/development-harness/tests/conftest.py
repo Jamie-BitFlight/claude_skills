@@ -13,7 +13,8 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
+from types import SimpleNamespace
+from typing import TYPE_CHECKING, cast
 from unittest.mock import MagicMock
 
 # Ensure backlog_core package is importable when running tests from repo root.
@@ -39,7 +40,7 @@ if str(_docs_dir) not in sys.path:
 import backlog_core.models as bc_models
 import pytest
 from backlog_core.backend_protocol import reset_config, set_config
-from backlog_core.backend_types import BacklogConfig
+from backlog_core.backend_types import BacklogConfig, ListPageResult
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.github_sync import render_issue_body
 from backlog_core.models import (
@@ -49,10 +50,16 @@ from backlog_core.models import (
     ReconcileRequest,
     ReconcileResult,
     ReconcileScope,
+    parse_issue_number,
 )
+from backlog_core.reconciliation import provider_item_to_backlog_item as _provider_item_to_backlog_item
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from backlog_core.backend_types import ListPageRequest
     from backlog_core.models import GroomedData, Section
+    from github.Repository import Repository
 
 
 class ProviderMemoryBackend(InMemoryBackend):
@@ -79,6 +86,7 @@ class ProviderMemoryBackend(InMemoryBackend):
         self.provider_items: list[BacklogItem] = []
         self.reconcile_requests: list[ReconcileRequest] = []
         self.snapshot_requests: list[ReconcileRequest] = []
+        self.page_requests: list[object] = []
         self.reconcile_result = ReconcileResult()
 
     def fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot:
@@ -87,7 +95,17 @@ class ProviderMemoryBackend(InMemoryBackend):
         items = [
             ProviderItem(
                 provider_id=item.issue or item.reference,
-                reference=item.issue or item.reference,
+                # Canonicalize to "#N" -- a real provider reference is always
+                # this shape, regardless of how a fixture's own BacklogItem.issue
+                # string happened to be spelled ("99" vs "#99"). A caller that
+                # resolves a reference independently (e.g. a title search
+                # returning a raw issue number) must find the same row a
+                # differently-spelled fixture would otherwise hide from it.
+                reference=(
+                    f"#{number}"
+                    if (number := parse_issue_number(item.issue or item.reference)) is not None
+                    else (item.issue or item.reference)
+                ),
                 title=item.title,
                 body=render_issue_body(item),
                 state=("CLOSED" if item.status.casefold() in {"closed", "completed", "done", "resolved"} else "OPEN"),
@@ -98,6 +116,9 @@ class ProviderMemoryBackend(InMemoryBackend):
             for item in self.provider_items
         ]
         if request.scope in {ReconcileScope.LINKED, ReconcileScope.TARGETED}:
+            # Canonicalize both sides to "#N" -- a real provider always resolves
+            # a targeted fetch by number, regardless of how a fixture's own
+            # BacklogItem.issue string happened to be spelled ("99" vs "#99").
             by_reference = {item.reference: item for item in items}
             items = [
                 by_reference.get(
@@ -116,6 +137,68 @@ class ProviderMemoryBackend(InMemoryBackend):
                 for reference in request.references
             ]
         return ProviderSnapshot(items=items, sync_started_at="2026-09-24T00:00:00+00:00", pages_fetched=1)
+
+    def get_github(self, repo: str = "", timeout: int = 15) -> Repository:
+        """Return a structural repository stand-in carrying only ``full_name``."""
+        del timeout
+        return cast("Repository", SimpleNamespace(full_name=repo or "owner/repository"))
+
+    def fetch_page(
+        self, request: ListPageRequest, *, match: Callable[[BacklogItem, ProviderItem], bool], force_hydration: bool
+    ) -> ListPageResult:
+        """Apply *match* directly over ``provider_items`` (see ``RequestShapedListing``)."""
+        del force_hydration
+        self.page_requests.append(request)
+        provider_items = [
+            ProviderItem(
+                provider_id=item.issue or item.reference,
+                reference=item.issue or item.reference,
+                title=item.title,
+                body=render_issue_body(item),
+                state=("CLOSED" if item.status.casefold() in {"closed", "completed", "done", "resolved"} else "OPEN"),
+                labels=list(item.metadata.labels),
+                revision=item.metadata.updated_at or f"test-{item.issue}",
+                milestone=item.metadata.milestone,
+            )
+            for item in self.provider_items
+        ]
+        matched = [pi for pi in provider_items if match(_provider_item_to_backlog_item(pi), pi)]
+        after_offset = matched[request.offset :]
+        if request.limit > 0:
+            has_more = len(after_offset) > request.limit
+            page_items = after_offset[: request.limit]
+        else:
+            has_more = False
+            page_items = after_offset
+        return ListPageResult(
+            items=page_items, has_more=has_more, total=len(matched), sync_started_at="2026-09-24T00:00:00+00:00"
+        )
+
+    def _fetch_issues_page_graphql(self, repo: object, owner: str, repo_name: str, **kwargs: object) -> object:
+        """Unused by this double's own ``fetch_page`` -- present only to satisfy ``RequestShapedListing``."""
+        raise NotImplementedError
+
+    def search_issues_by_title(self, repo: str, selector: str) -> list[tuple[int, str]]:
+        """Return ``(number, title)`` for every provider item whose title contains *selector*."""
+        del repo
+        return [
+            (int(item.issue.lstrip("#")), item.title)
+            for item in self.provider_items
+            if item.issue and selector.lower() in item.title.lower()
+        ]
+
+    def confirm_issues_reachable(self, repo: str) -> None:
+        """Answer every reachability check; this double has no transport to fail."""
+        del repo
+
+    def fetch_issue_titles(self, repo: str, *, open_only: bool = False) -> list[tuple[int, str]]:
+        """Return every provider item's ``(number, title)``, open only when *open_only*."""
+        del repo
+        return [
+            (int(item.issue.lstrip("#")), item.title)
+            for item in self.provider_items
+            if item.issue and not (open_only and item.status.casefold() in {"closed", "completed", "done", "resolved"})
+        ]
 
     def pending_work_items(self, repo: str = "") -> list[BacklogItem]:
         """Return unlinked local intent separately from live provider rows."""

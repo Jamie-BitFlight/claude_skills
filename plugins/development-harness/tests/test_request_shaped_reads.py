@@ -1,0 +1,1312 @@
+"""Request-shaped live reads over a fake GitHub GraphQL transport.
+
+Design brief: request-shaped-reads (repository owner, 2026-09). These tests
+pin the request COUNT and SHAPE the GitHub backend sends for a list, a
+title-selected mutation, and a duplicate/follow-up/normalize scan — not just
+the returned rows. Only the network seam is fake: a real ``GitHubBackend``,
+a real ``FileCache(tmp_path)``, and a real in-memory content store drive
+every read through the actual GraphQL request-building, hydration, and
+reconcile-engine code paths. See ``FakeRequester.graphql_query`` for the
+in-memory issue table this exercises, mirroring the ``_FakeRequester``
+pattern in ``tests/test_github_contents.py``.
+"""
+
+from __future__ import annotations
+
+from collections import UserList
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, cast
+
+import pytest
+from backlog_core.backend_types import ListPageRequest
+from backlog_core.backends._github_work_item_versions import (
+    WorkItemHead,
+    render_work_item_comment,
+    root_revision,
+    work_item_head_ref,
+)
+from backlog_core.backends.github_backend import GitHubBackend
+from backlog_core.file_cache import FileCache
+from backlog_core.models import (
+    BackendUnavailableError,
+    BacklogItem,
+    ContentNotFoundError,
+    ContentQuery,
+    ContentRecord,
+    ContentRef,
+    ContentWrite,
+    ProviderItem,
+)
+from backlog_core.parsing import AmbiguousSelectorError
+from backlog_core.work_item_decisions import WorkItemDecisionContext
+
+# ---------------------------------------------------------------------------
+# In-memory content store — backs the work-item head/comment records a real
+# _GitHubContentsStore would keep in the repo's dh-content branch.
+# ---------------------------------------------------------------------------
+
+
+class FakeContentStore:
+    """In-memory ``_ContentPersistence`` + ``get_many`` batch reader."""
+
+    def __init__(self) -> None:
+        self._records: dict[tuple[str, str, str, str], ContentRecord] = {}
+        self.get_many_calls: list[list[ContentRef]] = []
+
+    def _key(self, reference: ContentRef) -> tuple[str, str, str, str]:
+        return (reference.kind.value, reference.namespace, reference.artifact_type, reference.name)
+
+    def get(self, reference: ContentRef) -> ContentRecord:
+        record = self._records.get(self._key(reference))
+        if record is None:
+            raise ContentNotFoundError(f"no fake content for {reference!r}")
+        return record
+
+    def get_many(self, references: Sequence[ContentRef]) -> Sequence[ContentRecord]:
+        self.get_many_calls.append(list(references))
+        results: list[ContentRecord] = []
+        for reference in references:
+            record = self._records.get(self._key(reference))
+            if record is not None:
+                results.append(record)
+        return results
+
+    def put(self, request: ContentWrite) -> ContentRecord:
+        record = ContentRecord(reference=request.reference, content=request.content, revision="fake-revision")
+        self._records[self._key(request.reference)] = record
+        return record
+
+    # NB: named `list`, matching the `_ContentPersistence` Protocol it satisfies
+    # structurally -- annotate with `Sequence`, not `list[...]`, so this method
+    # never shadows the builtin generic within this class's own annotations.
+    def list(self, query: ContentQuery) -> Sequence[ContentRecord]:
+        del query
+        return list(self._records.values())
+
+    def seed_head(self, reference: str, *, node_id: str, raw_body: str, tracked_body: str, comment_id: str) -> str:
+        """Register a fully tracked work-item head + its audit comment.
+
+        Returns:
+            The root revision computed for this head (== its parent/root
+            revision, since this is the first version).
+        """
+        root = root_revision(reference, node_id, raw_body)
+        head = WorkItemHead.create(reference, root, root, tracked_body, comment_id)
+        self.put(ContentWrite(reference=work_item_head_ref(reference), content=head.model_dump_json()))
+        return root
+
+
+# ---------------------------------------------------------------------------
+# In-memory issue table + fake GraphQL transport.
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class FakeIssue:
+    number: int
+    title: str
+    state: str = "OPEN"
+    raw_body: str = ""
+    labels: list[str] = field(default_factory=lambda: ["priority:p1"])
+    updated_at: str = ""
+
+    def as_node(self) -> dict[str, Any]:
+        return {
+            "id": f"I_{self.number}",
+            "number": self.number,
+            "title": self.title,
+            "state": self.state,
+            "body": self.raw_body,
+            "createdAt": self.updated_at,
+            "updatedAt": self.updated_at,
+            "labels": {"nodes": [{"name": name, "id": f"L_{name}"} for name in self.labels]},
+            "milestone": None,
+            "assignees": {"nodes": []},
+        }
+
+
+class RequestLog(UserList):
+    """Every GraphQL call this fixture served, in order."""
+
+    def operation_names(self) -> list[str]:
+        return [entry["operation"] for entry in self]
+
+    def count_operation(self, operation: str) -> int:
+        return sum(1 for entry in self if entry["operation"] == operation)
+
+
+class FakeRequester:
+    """Dispatches ``repo.requester.graphql_query`` by operation name.
+
+    Understands exactly the query shapes this backend sends for a
+    request-shaped list, a title search, a targeted resolve, and an audit
+    comment batch — anything else is a fixture gap and raises loudly rather
+    than silently returning an empty page.
+    """
+
+    def __init__(self, fixture: FakeGitHubFixture) -> None:
+        self._fixture = fixture
+        self.log = RequestLog()
+
+    def graphql_query(self, query: str, variables: dict[str, object]) -> tuple[dict[str, object], dict[str, object]]:
+        if "query ListIssues(" in query:
+            operation = "ListIssues"
+            data = self._list_issues(variables)
+        elif "query TargetedIssues(" in query:
+            operation = "TargetedIssues"
+            data = self._targeted_issues(variables)
+        elif "query AuditComments(" in query:
+            operation = "AuditComments"
+            data = self._audit_comments(variables)
+        elif "query IssueTitleSearch(" in query:
+            operation = "IssueTitleSearch"
+            data = self._title_search(variables)
+        elif "query IssueTitles(" in query:
+            operation = "IssueTitles"
+            data = self._issue_titles(variables)
+        elif "query GetComment(" in query:
+            operation = "GetComment"
+            data = self._get_comment(variables)
+        elif "mutation AddComment(" in query:
+            operation = "AddComment"
+            data = self._add_comment(variables)
+        else:
+            raise AssertionError(f"FakeRequester does not understand this query shape:\n{query}")
+        self.log.append({"operation": operation, "variables": dict(variables), "query": query})
+        return {}, {"data": data}
+
+    def _matching_issues(self, states: list[str], label: str | None) -> list[FakeIssue]:
+        issues = [issue for issue in self._fixture.issues.values() if issue.state in states]
+        if label:
+            issues = [issue for issue in issues if label in issue.labels]
+        return sorted(issues, key=lambda issue: issue.updated_at, reverse=True)
+
+    def _list_issues(self, variables: dict[str, object]) -> dict[str, object]:
+        states = cast("list[str]", variables.get("states") or [])
+        labels = variables.get("labels")
+        label = labels[0] if isinstance(labels, list) and labels else None
+        matching = self._matching_issues(states, label)
+        after = variables.get("after")
+        first = cast("int", variables.get("first") or 100)
+        start = 0
+        if after:
+            start = next(i + 1 for i, issue in enumerate(matching) if f"cursor-{issue.number}" == after)
+        page = matching[start : start + first]
+        has_next = (start + first) < len(matching)
+        end_cursor = f"cursor-{page[-1].number}" if page and has_next else None
+        return {
+            "repository": {
+                "issues": {
+                    "totalCount": len(matching),
+                    "nodes": [issue.as_node() for issue in page],
+                    "pageInfo": {"hasNextPage": has_next, "endCursor": end_cursor},
+                }
+            }
+        }
+
+    def _targeted_issues(self, variables: dict[str, object]) -> dict[str, object]:
+        repository_data: dict[str, object] = {}
+        index = 0
+        while f"number{index}" in variables:
+            number = cast("int", variables[f"number{index}"])
+            issue = self._fixture.issues.get(number)
+            repository_data[f"i{index}"] = issue.as_node() if issue is not None else None
+            index += 1
+        return {"repository": repository_data}
+
+    def _audit_comments(self, variables: dict[str, object]) -> dict[str, object]:
+        ids = variables.get("ids")
+        if not isinstance(ids, list):
+            raise TypeError(f"AuditComments called without an ids list: {variables!r}")
+        nodes = [self._fixture.comment_nodes.get(str(comment_id)) for comment_id in ids]
+        return {"nodes": nodes}
+
+    def _title_search(self, variables: dict[str, object]) -> dict[str, object]:
+        query_text = str(variables.get("searchQuery", ""))
+        selector = query_text.split('in:title "', 1)[-1].rsplit('"', 1)[0]
+        matches = [issue for issue in self._fixture.issues.values() if selector.lower() in issue.title.lower()]
+        matches.sort(key=lambda issue: issue.updated_at, reverse=True)
+        return {
+            "search": {
+                "nodes": [issue.as_node() for issue in matches],
+                "pageInfo": {"hasNextPage": False, "endCursor": None},
+            }
+        }
+
+    def _get_comment(self, variables: dict[str, object]) -> dict[str, object]:
+        comment_id = str(variables.get("id", ""))
+        return {"node": self._fixture.comment_nodes.get(comment_id)}
+
+    def _add_comment(self, variables: dict[str, object]) -> dict[str, object]:
+        new_id = f"IC_new_{len(self._fixture.comment_nodes) + 1}"
+        body = str(variables.get("body", ""))
+        database_id = 9000 + len(self._fixture.comment_nodes)
+        self._fixture.comment_nodes[new_id] = {
+            "id": new_id,
+            "fullDatabaseId": database_id,
+            "body": body,
+            "url": "",
+            "author": {"login": "tester"},
+            "createdAt": "2024-01-01T00:00:00Z",
+            "updatedAt": "2024-01-01T00:00:00Z",
+        }
+        return {"addComment": {"commentEdge": {"node": {"id": new_id, "fullDatabaseId": database_id}}}}
+
+    def _issue_titles(self, variables: dict[str, object]) -> dict[str, object]:
+        states = cast("list[str]", variables["states"])
+        issues = sorted(
+            (issue for issue in self._fixture.issues.values() if issue.state in states),
+            key=lambda issue: issue.updated_at,
+            reverse=True,
+        )
+        return {
+            "repository": {
+                "issues": {
+                    "nodes": [{"number": issue.number, "title": issue.title} for issue in issues],
+                    "pageInfo": {"hasNextPage": False, "endCursor": None},
+                }
+            }
+        }
+
+
+class FakeRepository:
+    """Structural stand-in for ``github.Repository.Repository``."""
+
+    def __init__(self, fixture: FakeGitHubFixture, owner: str, name: str) -> None:
+        self.full_name = f"{owner}/{name}"
+        self.node_id = "R_1"
+        self.requester = FakeRequester(fixture)
+
+
+class FakeGitHubFixture:
+    """Owns the fake issue table, content store, and transport for one test."""
+
+    def __init__(self, tmp_path: Path, *, owner: str = "owner", name: str = "repo") -> None:
+        self.owner, self.name = owner, name
+        self.issues: dict[int, FakeIssue] = {}
+        self.comment_nodes: dict[str, dict[str, object]] = {}
+        self.contents = FakeContentStore()
+        self.repository = FakeRepository(self, owner, name)
+        self.backend = GitHubBackend(repo=f"{owner}/{name}", cache=FileCache(tmp_path), contents=self.contents)
+        self.backend.get_github = lambda repo="", timeout=15: self.repository  # ty: ignore[invalid-assignment]
+        self.backend.try_get_github = lambda repo="": self.repository  # ty: ignore[invalid-assignment]
+
+    @property
+    def requester(self) -> FakeRequester:
+        return self.repository.requester
+
+    def add_tracked_issue(
+        self,
+        number: int,
+        title: str,
+        *,
+        state: str = "OPEN",
+        labels: list[str] | None = None,
+        tracked_body: str = "",
+        updated_at: str | None = None,
+    ) -> FakeIssue:
+        """Register an issue with a real, resolvable work-item head + audit comment."""
+        reference = f"#{number}"
+        node_id = f"I_{number}"
+        raw_body = f"raw github body for {reference}"
+        comment_id = f"IC_{number}"
+        root = self.contents.seed_head(
+            reference, node_id=node_id, raw_body=raw_body, tracked_body=tracked_body, comment_id=comment_id
+        )
+        self.comment_nodes[comment_id] = {
+            "id": comment_id,
+            "body": render_work_item_comment(root, tracked_body),
+            "url": "",
+            "author": {"login": "tester"},
+            "createdAt": "2024-01-01T00:00:00Z",
+            "updatedAt": "2024-01-01T00:00:00Z",
+        }
+        issue = FakeIssue(
+            number=number,
+            title=title,
+            state=state,
+            raw_body=raw_body,
+            labels=list(labels) if labels is not None else ["priority:p1"],
+            updated_at=updated_at or f"2024-01-01T00:{number % 60:02d}:{number // 60:02d}Z",
+        )
+        self.issues[number] = issue
+        return issue
+
+    def close_issue(self, number: int) -> None:
+        self.issues[number].state = "CLOSED"
+
+
+@pytest.fixture
+def fixture(tmp_path: Path) -> FakeGitHubFixture:
+    return FakeGitHubFixture(tmp_path)
+
+
+def _default_request(fixture: FakeGitHubFixture, **overrides: object) -> ListPageRequest:
+    return ListPageRequest(repo=f"{fixture.owner}/{fixture.name}", **overrides)  # ty: ignore[invalid-argument-type]
+
+
+def _items(result: Mapping[str, object]) -> list[dict[str, str | bool]]:
+    """Narrow an operations.list_items()-shaped result's heterogeneous ``items`` value."""
+    return cast("list[dict[str, str | bool]]", result["items"])
+
+
+# ---------------------------------------------------------------------------
+# T1 — a bounded list does not page repository history.
+# ---------------------------------------------------------------------------
+
+
+def test_t1_limit_one_does_not_page_history(fixture: FakeGitHubFixture) -> None:
+    for number in range(1, 121):
+        fixture.add_tracked_issue(number, f"open {number}", state="OPEN")
+    for number in range(121, 251):
+        fixture.add_tracked_issue(number, f"closed {number}", state="CLOSED")
+
+    result = fixture.backend.fetch_page(
+        _default_request(fixture, limit=1), match=lambda item, provider: True, force_hydration=False
+    )
+
+    list_calls = [entry for entry in fixture.requester.log if entry["operation"] == "ListIssues"]
+    assert len(list_calls) == 1, fixture.requester.log
+    assert list_calls[0]["variables"]["states"] == ["OPEN"]
+    assert list_calls[0]["variables"]["first"] <= 2
+    assert result.has_more is True
+    assert result.total is None or isinstance(result.total, int)
+    assert len(result.items) == 1
+
+
+# ---------------------------------------------------------------------------
+# T2 — hydration only for the rows the page actually returns.
+# ---------------------------------------------------------------------------
+
+
+def test_t2_hydration_only_for_returned_rows(fixture: FakeGitHubFixture) -> None:
+    for number in range(1, 121):
+        fixture.add_tracked_issue(number, f"open {number}", state="OPEN")
+    for number in range(121, 251):
+        fixture.add_tracked_issue(number, f"closed {number}", state="CLOSED")
+
+    result = fixture.backend.fetch_page(
+        _default_request(fixture, limit=1), match=lambda item, provider: True, force_hydration=False
+    )
+
+    assert len(result.items) == 1
+    returned_reference = result.items[0].reference
+    hydrated_references = {ref.namespace for call in fixture.contents.get_many_calls for ref in call}
+    assert hydrated_references == {returned_reference}, fixture.contents.get_many_calls
+    audit_calls = [entry for entry in fixture.requester.log if entry["operation"] == "AuditComments"]
+    assert len(audit_calls) == 1, audit_calls
+    assert audit_calls[0]["variables"]["ids"] == [f"IC_{returned_reference.lstrip('#')}"]
+
+
+# ---------------------------------------------------------------------------
+# T10 — write-through holds exactly the rows the page fetched.
+# ---------------------------------------------------------------------------
+
+
+def test_t10_write_through_holds_exactly_the_hydrated_page(fixture: FakeGitHubFixture) -> None:
+    from backlog_core import operations
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+
+    for number in range(1, 51):
+        fixture.add_tracked_issue(number, f"issue {number}", state="OPEN")
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        result = operations.list_items(limit=2)
+    finally:
+        reset_config()
+
+    assert result["count"] == 2, result
+    listed_references = {item["issue"] for item in _items(result)}
+    cached_references = {item.issue for item in fixture.backend.list_work_items()}
+    assert cached_references == listed_references, (cached_references, listed_references)
+    assert fixture.backend.has_synced_snapshot() is False
+
+
+# ---------------------------------------------------------------------------
+# T4 — offset walk visits every match once, in order, with an exact has_more.
+# ---------------------------------------------------------------------------
+
+
+def test_t4_offset_walk_and_exact_has_more(fixture: FakeGitHubFixture) -> None:
+    for number in range(1, 6):
+        fixture.add_tracked_issue(number, f"issue {number}", state="OPEN")
+
+    seen_in_order: list[str] = []
+    for offset in range(5):
+        result = fixture.backend.fetch_page(
+            _default_request(fixture, offset=offset, limit=1), match=lambda item, provider: True, force_hydration=False
+        )
+        assert len(result.items) == 1, (offset, result)
+        seen_in_order.append(result.items[0].reference)
+        assert result.has_more is (offset < 4), (offset, result.has_more)
+
+    # UPDATED_AT DESC: issue 5 (latest) first, issue 1 (earliest) last, no repeats.
+    assert seen_in_order == ["#5", "#4", "#3", "#2", "#1"]
+
+
+# ---------------------------------------------------------------------------
+# T5 — a local, label-less "has a section" predicate pages correctly and
+# never overcounts totalCount when it removed rows.
+# ---------------------------------------------------------------------------
+
+
+def test_t5_local_predicate_paging_and_honest_total(fixture: FakeGitHubFixture) -> None:
+    unsectioned = {2, 5, 8}
+    for number in range(1, 11):
+        if number in unsectioned:
+            fixture.add_tracked_issue(number, f"issue {number}", state="OPEN", labels=[], tracked_body="")
+        else:
+            fixture.add_tracked_issue(number, f"issue {number}", state="OPEN")
+
+    def has_section(item: BacklogItem, provider: ProviderItem) -> bool:
+        del provider
+        return bool(item.section)
+
+    result = fixture.backend.fetch_page(_default_request(fixture, limit=3), match=has_section, force_hydration=False)
+
+    assert len(result.items) == 3
+    assert all(item.reference not in {f"#{n}" for n in unsectioned} for item in result.items)
+    # Walked to completion (only 10 issues exist) -- total must be exact, never a raw totalCount.
+    assert result.total == 7, result.total
+
+
+# ---------------------------------------------------------------------------
+# T6 — pushed filters (label + status) match the pre-existing local semantics.
+# ---------------------------------------------------------------------------
+
+
+def test_t6_pushed_filters_match_local_semantics(fixture: FakeGitHubFixture) -> None:
+    from backlog_core import operations
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+
+    fixture.add_tracked_issue(
+        1, "matching open", state="OPEN", labels=["priority:p1", "type:bug", "status:in-progress"]
+    )
+    fixture.add_tracked_issue(2, "wrong type", state="OPEN", labels=["priority:p1", "status:in-progress"])
+    fixture.add_tracked_issue(3, "wrong status", state="OPEN", labels=["priority:p1", "type:bug", "status:groomed"])
+    fixture.add_tracked_issue(
+        4, "matching closed", state="CLOSED", labels=["priority:p1", "type:bug", "status:in-progress"]
+    )
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        result = operations.list_items(label="type:bug", status="status:in-progress", include_closed=True)
+    finally:
+        reset_config()
+
+    assert {item["issue"] for item in _items(result)} == {"#1", "#4"}, result
+    list_calls = [entry for entry in fixture.requester.log if entry["operation"] == "ListIssues"]
+    assert list_calls, fixture.requester.log
+    assert list_calls[0]["variables"]["states"] == ["OPEN", "CLOSED"]
+    assert set(list_calls[0]["variables"]["labels"]) == {"type:bug", "status:in-progress"}
+
+
+# ---------------------------------------------------------------------------
+# T11 — the cache holds the tracked head's content, not the raw issue body.
+# ---------------------------------------------------------------------------
+
+
+def test_t11_cache_holds_hydrated_head_not_raw_body(fixture: FakeGitHubFixture) -> None:
+    from backlog_core import operations
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+
+    distinctive = "Tracked head content distinct from the raw issue body."
+    fixture.add_tracked_issue(1, "tracked", state="OPEN", tracked_body=distinctive)
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        operations.list_items(limit=1)
+    finally:
+        reset_config()
+
+    cached = next(item for item in fixture.backend.list_work_items() if item.issue == "#1")
+    assert distinctive in cached.description, cached.description
+    assert "raw github body" not in cached.description
+
+
+# ---------------------------------------------------------------------------
+# T12 — allow_cached serves exactly the previously cached rows after a failure.
+# ---------------------------------------------------------------------------
+
+
+def test_t12_allow_cached_serves_exactly_the_cached_rows(fixture: FakeGitHubFixture) -> None:
+    from backlog_core import operations
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+    from github import GithubException
+
+    for number in range(1, 51):
+        fixture.add_tracked_issue(number, f"issue {number}", state="OPEN")
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        first = operations.list_items(limit=2)
+        first_refs = {item["issue"] for item in _items(first)}
+
+        def fail(query: str, variables: dict[str, object]) -> tuple[dict[str, object], dict[str, object]]:
+            del query, variables
+            raise GithubException(503, {"message": "offline"}, {})
+
+        fixture.repository.requester.graphql_query = fail  # ty: ignore[invalid-assignment]
+
+        with pytest.raises(BackendUnavailableError):
+            operations.list_items(limit=2)
+
+        fallback = operations.list_items(limit=2, allow_cached=True)
+    finally:
+        reset_config()
+
+    assert {item["issue"] for item in _items(fallback)} == first_refs, fallback
+    assert fallback["from_cache"] is True
+    assert fallback.get("warnings"), fallback
+
+
+# ---------------------------------------------------------------------------
+# T13 — pending intent survives the write-through when it disagrees with GitHub.
+# ---------------------------------------------------------------------------
+
+
+def test_t13_pending_intent_survives_write_through(fixture: FakeGitHubFixture) -> None:
+    from backlog_core import operations
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+
+    fixture.add_tracked_issue(7, "tracked seven", state="OPEN", tracked_body="Original tracked body.")
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        operations.list_items(limit=1)  # first list -- populates the cache via write-through
+
+        pending = fixture.backend.get_work_item("#7").model_copy(deep=True)
+        pending.description = "Locally edited description not yet acknowledged."
+        fixture.backend.put_work_item(pending)
+        assert fixture.backend.has_pending_writes()
+
+        operations.list_items(limit=1)  # write-through must not clobber or acknowledge disagreeing intent
+
+        assert fixture.backend.has_pending_writes(), "pending intent that disagrees with the provider must survive"
+        stored = fixture.backend.get_work_item("#7")
+        assert "Locally edited description" in stored.description
+    finally:
+        reset_config()
+
+
+# ---------------------------------------------------------------------------
+# T14 — refresh reconciles only the rows the page actually listed.
+# ---------------------------------------------------------------------------
+
+
+def test_t14_refresh_reconciles_only_listed_rows(fixture: FakeGitHubFixture) -> None:
+    from backlog_core import operations
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+
+    fixture.add_tracked_issue(
+        8, "listed newer", state="OPEN", tracked_body="Original eight.", updated_at="2024-02-01T00:00:00Z"
+    )
+    fixture.add_tracked_issue(
+        7, "not listed older", state="OPEN", tracked_body="Original seven.", updated_at="2024-01-01T00:00:00Z"
+    )
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        operations.list_items(limit=0)  # unbounded first pass -- populates both rows via write-through
+
+        pending_eight = fixture.backend.get_work_item("#8").model_copy(deep=True)
+        pending_eight.description = "Edited eight, not yet on GitHub."
+        fixture.backend.put_work_item(pending_eight)
+        pending_seven = fixture.backend.get_work_item("#7").model_copy(deep=True)
+        pending_seven.description = "Edited seven, not yet on GitHub."
+        fixture.backend.put_work_item(pending_seven)
+
+        result = operations.list_items(refresh=True, limit=1)
+        assert {item["issue"] for item in _items(result)} == {"#8"}, result
+
+        assert fixture.backend.has_synced_snapshot() is False
+        # Refresh must not reconcile a row it never listed -- #7's disagreeing
+        # intent stays exactly as queued.
+        assert fixture.backend.get_work_item("#7").description == "Edited seven, not yet on GitHub."
+    finally:
+        reset_config()
+
+
+# ---------------------------------------------------------------------------
+# T7 — a title selector resolves through search, not a full list.
+# ---------------------------------------------------------------------------
+
+
+def test_t7_title_selector_is_targeted(fixture: FakeGitHubFixture) -> None:
+    for number in range(1, 200):
+        fixture.add_tracked_issue(number, f"issue {number}", state="OPEN")
+    fixture.add_tracked_issue(199, "a wholly unique groomable title", state="OPEN")
+
+    context = WorkItemDecisionContext(fixture.backend, repo=f"{fixture.owner}/{fixture.name}")
+    target = context.select("wholly unique groomable", purpose="mutation")
+
+    assert target.provider is not None
+    assert target.provider.issue == "#199", target.provider
+
+    log = fixture.requester.log
+    assert log.count_operation("IssueTitleSearch") == 1, log
+    assert log.count_operation("ListIssues") == 0, log
+    targeted_calls = [entry for entry in log if entry["operation"] == "TargetedIssues"]
+    assert len(targeted_calls) == 1, targeted_calls
+    numbered_variables = {
+        key: value for key, value in targeted_calls[0]["variables"].items() if key.startswith("number")
+    }
+    assert list(numbered_variables.values()) == [199], numbered_variables
+    assert log.count_operation("AuditComments") == 1, log
+
+
+# ---------------------------------------------------------------------------
+# T8 — title ambiguity from search is preserved.
+# ---------------------------------------------------------------------------
+
+
+def test_t8_title_ambiguity_is_preserved(fixture: FakeGitHubFixture) -> None:
+    fixture.add_tracked_issue(1, "shared ambiguous phrase alpha", state="OPEN")
+    fixture.add_tracked_issue(2, "shared ambiguous phrase beta", state="OPEN")
+
+    context = WorkItemDecisionContext(fixture.backend, repo=f"{fixture.owner}/{fixture.name}")
+
+    with pytest.raises(AmbiguousSelectorError):
+        context.select("shared ambiguous phrase", purpose="read")
+
+
+# ---------------------------------------------------------------------------
+# T9 — a search miss falls back to the titles scan.
+# ---------------------------------------------------------------------------
+
+
+def test_t9_search_miss_falls_back_to_titles_scan(fixture: FakeGitHubFixture) -> None:
+    fixture.add_tracked_issue(1, "an issue search will not find", state="OPEN")
+
+    context = WorkItemDecisionContext(fixture.backend, repo=f"{fixture.owner}/{fixture.name}")
+    # The fake search index only ever returns issues whose title contains the
+    # selector -- simulate a genuine miss (tokenization/lag) with a selector
+    # that matches nothing in search but everything in the titles scan.
+    original_title_search = fixture.requester._title_search
+    fixture.requester._title_search = lambda variables: {  # ty: ignore[invalid-assignment]
+        "search": {"nodes": [], "pageInfo": {"hasNextPage": False, "endCursor": None}}
+    }
+    try:
+        target = context.select("an issue search", purpose="read")
+    finally:
+        fixture.requester._title_search = original_title_search  # ty: ignore[invalid-assignment]
+
+    assert target.provider is not None
+    assert target.provider.issue == "#1", target.provider
+    log = fixture.requester.log
+    assert log.count_operation("IssueTitles") == 1, log
+    assert all(
+        entry["variables"].get("states") != ["OPEN", "CLOSED"] for entry in log if entry["operation"] == "ListIssues"
+    )
+
+
+# ---------------------------------------------------------------------------
+# T15 — whole-set consumers (add_item, normalize_items) never read CLOSED history.
+# ---------------------------------------------------------------------------
+
+
+def test_t15_whole_set_consumers_scan_open_only(fixture: FakeGitHubFixture) -> None:
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+    from backlog_core.operations import _decision_context, _open_scan
+
+    fixture.add_tracked_issue(1, "an existing open item", state="OPEN")
+    fixture.add_tracked_issue(2, "an existing closed item", state="CLOSED")
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        context = _decision_context(repo=f"{fixture.owner}/{fixture.name}")
+        scan = _open_scan(context)  # shared by add_item's duplicate check, list_followups, and normalize_items
+    finally:
+        reset_config()
+
+    assert {item.issue for item in scan.items} == {"#1"}, scan.items
+    assert scan.live is True
+    list_calls = [entry for entry in fixture.requester.log if entry["operation"] == "ListIssues"]
+    assert list_calls, fixture.requester.log
+    assert all("CLOSED" not in entry["variables"]["states"] for entry in list_calls), list_calls
+
+
+def test_t15_force_add_item_probes_instead_of_scanning(fixture: FakeGitHubFixture) -> None:
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+    from backlog_core.operations import _decision_context, _probe_provider_liveness
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        context = _decision_context(repo=f"{fixture.owner}/{fixture.name}")
+        assert _probe_provider_liveness(context) is True
+    finally:
+        reset_config()
+
+    list_calls = [entry for entry in fixture.requester.log if entry["operation"] == "ListIssues"]
+    assert len(list_calls) == 1, fixture.requester.log
+    assert "CLOSED" not in list_calls[0]["variables"]["states"], list_calls
+
+
+# ---------------------------------------------------------------------------
+# T17 — the deletions this design requires are gone.
+# ---------------------------------------------------------------------------
+
+
+def test_t17_dead_code_is_removed() -> None:
+    import backlog_core.operations as operations_module
+    import backlog_core.work_item_decisions as decisions_module
+
+    assert not hasattr(operations_module, "read_through_cold_cache")
+    assert not hasattr(decisions_module.WorkItemDecisionContext, "all")
+
+
+# ---------------------------------------------------------------------------
+# Priority follow-up (2026-09, repository owner): backlog_add and backlog_list
+# must complete, not hang reading a whole-history page. Pins the exact
+# offline request count for each, and that the per-page query fetch_page
+# sends never selects the assignees connection or createdAt (GitHub's
+# GraphQL cost model penalizes nested connections, and neither field is read
+# by any request-shaped-reads consumer -- see _ISSUES_LIST_QUERY_LIGHT).
+# ---------------------------------------------------------------------------
+
+
+def test_backlog_add_force_true_makes_exactly_one_bounded_request(fixture: FakeGitHubFixture) -> None:
+    # add_item(force=True) skips the duplicate scan entirely and reduces to
+    # exactly this liveness probe (operations._probe_provider_liveness) --
+    # unit-test that seam directly rather than also exercising issue
+    # creation (a separate, unrelated concern this fixture does not fake).
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+    from backlog_core.operations import _decision_context, _probe_provider_liveness
+
+    for number in range(1, 251):
+        fixture.add_tracked_issue(number, f"issue {number}", state="OPEN" if number <= 120 else "CLOSED")
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        context = _decision_context(repo=f"{fixture.owner}/{fixture.name}")
+        assert _probe_provider_liveness(context) is True
+    finally:
+        reset_config()
+
+    list_calls = [entry for entry in fixture.requester.log if entry["operation"] == "ListIssues"]
+    assert len(list_calls) == 1, fixture.requester.log
+    assert list_calls[0]["variables"]["first"] <= 2, list_calls
+    assert "assignees" not in list_calls[0]["query"], list_calls[0]["query"]
+    assert "createdAt" not in list_calls[0]["query"], list_calls[0]["query"]
+
+
+def test_backlog_list_limit_one_makes_exactly_one_light_request(fixture: FakeGitHubFixture) -> None:
+    from backlog_core import operations
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+
+    for number in range(1, 251):
+        fixture.add_tracked_issue(number, f"issue {number}", state="OPEN" if number <= 120 else "CLOSED")
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        result = operations.list_items(limit=1)
+    finally:
+        reset_config()
+
+    assert result["count"] == 1, result
+    list_calls = [entry for entry in fixture.requester.log if entry["operation"] == "ListIssues"]
+    assert len(list_calls) == 1, fixture.requester.log
+    assert list_calls[0]["variables"]["states"] == ["OPEN"], list_calls
+    assert list_calls[0]["variables"]["first"] <= 2, list_calls
+    assert "assignees" not in list_calls[0]["query"], list_calls[0]["query"]
+    assert "createdAt" not in list_calls[0]["query"], list_calls[0]["query"]
+
+
+# ---------------------------------------------------------------------------
+# PR #3969 review (Codex) regressions.
+# ---------------------------------------------------------------------------
+
+
+def _fail_every_request(fixture: FakeGitHubFixture) -> None:
+    from github import GithubException
+
+    def fail(query: str, variables: dict[str, object]) -> tuple[dict[str, object], dict[str, object]]:
+        del query, variables
+        raise GithubException(503, {"message": "offline"}, {})
+
+    fixture.repository.requester.graphql_query = fail  # ty: ignore[invalid-assignment]
+
+
+def test_total_stays_unknown_when_a_local_predicate_matched_the_whole_prefix(fixture: FakeGitHubFixture) -> None:
+    # The newest 11 of 20 issues have a section; the walk stops after those
+    # 11, all matching, with the 9 unsectioned issues unseen. totalCount (20)
+    # counts rows the predicate would reject, so it is not the filtered total.
+    for number in range(1, 21):
+        if number <= 9:
+            fixture.add_tracked_issue(number, f"issue {number}", state="OPEN", labels=[], tracked_body="")
+        else:
+            fixture.add_tracked_issue(number, f"issue {number}", state="OPEN")
+
+    def has_section(item: BacklogItem, provider: ProviderItem) -> bool:
+        del provider
+        return bool(item.section)
+
+    result = fixture.backend.fetch_page(_default_request(fixture, limit=10), match=has_section, force_hydration=False)
+
+    assert len(result.items) == 10
+    assert result.has_more is True
+    assert result.total is None, result.total
+
+
+def test_unsearchable_title_selector_finds_a_closed_issue(fixture: FakeGitHubFixture) -> None:
+    # A double quote skips GitHub search, so only the titles fallback can
+    # resolve this selector; it must see closed issues as search would.
+    fixture.add_tracked_issue(1, 'fix the "quoted" parser', state="CLOSED")
+
+    context = WorkItemDecisionContext(fixture.backend, repo=f"{fixture.owner}/{fixture.name}")
+    target = context.select('the "quoted" parser', purpose="read")
+
+    assert target.provider is not None
+    assert target.provider.issue == "#1", target.provider
+    assert fixture.requester.log.count_operation("IssueTitleSearch") == 0, fixture.requester.log
+
+
+def test_cached_fallback_filtered_to_zero_does_not_report_an_empty_cache(fixture: FakeGitHubFixture) -> None:
+    from backlog_core import operations
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+
+    for number in range(1, 6):
+        fixture.add_tracked_issue(number, f"issue {number}", state="OPEN")
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        operations.list_items(limit=2)
+        _fail_every_request(fixture)
+        fallback = operations.list_items(allow_cached=True, title="matches nothing cached")
+    finally:
+        reset_config()
+
+    assert fallback["from_cache"] is True
+    assert fallback["count"] == 0, fallback
+    warnings = cast("list[str]", fallback.get("warnings", []))
+    assert not any("cache holds no items" in warning for warning in warnings), warnings
+
+
+def test_cached_normalize_does_not_reconcile_live_after_the_provider_failed(fixture: FakeGitHubFixture) -> None:
+    from backlog_core import operations
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+
+    for number in range(1, 4):
+        fixture.add_tracked_issue(number, f"issue {number}", state="OPEN")
+
+    repo = f"{fixture.owner}/{fixture.name}"
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        operations.list_items(repo=repo)
+        _fail_every_request(fixture)
+        result = operations.normalize_items(repo=repo, allow_cached=True)
+    finally:
+        reset_config()
+
+    assert result["normalized"] == 3, result
+
+
+def _hydration_reads(fixture: FakeGitHubFixture) -> tuple[list[str], list[str]]:
+    """Return every head-record reference and audit-comment id this fixture served, with repeats."""
+    heads = [ref.namespace for call in fixture.contents.get_many_calls for ref in call]
+    comments = [
+        str(comment_id)
+        for entry in fixture.requester.log
+        if entry["operation"] == "AuditComments"
+        for comment_id in entry["variables"]["ids"]
+    ]
+    return heads, comments
+
+
+@pytest.mark.parametrize("force_hydration", [True, False])
+def test_each_returned_row_is_hydrated_exactly_once(fixture: FakeGitHubFixture, *, force_hydration: bool) -> None:
+    # Odd issues carry a priority label (the classification shortcut); even
+    # issues do not, so classification hydrates them. A forced walk
+    # hydrates every row during classification.
+    for number in range(1, 7):
+        labels = ["priority:p1"] if number % 2 else []
+        fixture.add_tracked_issue(number, f"issue {number}", state="OPEN", labels=labels, tracked_body="## P1\n")
+
+    result = fixture.backend.fetch_page(
+        _default_request(fixture), match=lambda item, provider: True, force_hydration=force_hydration
+    )
+
+    returned = sorted(item.reference for item in result.items)
+    assert returned == [f"#{n}" for n in range(1, 7)]
+    heads, comments = _hydration_reads(fixture)
+    assert sorted(heads) == returned, heads
+    assert sorted(comments) == sorted(f"IC_{n}" for n in range(1, 7)), comments
+    assert all(item.body for item in result.items), result.items
+
+
+# ---------------------------------------------------------------------------
+# PR #3969 re-review (Codex, ff26523) regressions.
+# ---------------------------------------------------------------------------
+
+
+async def _call_backlog_list(fixture: FakeGitHubFixture, params: dict[str, object]) -> dict[str, Any]:
+    """Call the real ``backlog_list`` MCP tool against this fixture's backend."""
+    from unittest.mock import patch
+
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+    from backlog_core.models import BackendAvailability, BackendStatus
+    from backlog_core.server import mcp
+
+    from tests.helpers import call_mcp_tool
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        with patch(
+            "backlog_core.server._probe_backend_status",
+            return_value=BackendStatus(availability=BackendAvailability.NOT_CHECKED),
+        ):
+            return await call_mcp_tool(mcp, "backlog_list", params)
+    finally:
+        reset_config()
+
+
+async def test_unbounded_list_applies_offset_once(fixture: FakeGitHubFixture) -> None:
+    for number in range(1, 7):
+        fixture.add_tracked_issue(number, f"issue {number}", state="OPEN")
+
+    response = await _call_backlog_list(fixture, {"offset": 2})
+
+    assert [item["issue"] for item in response["items"]] == ["#4", "#3", "#2", "#1"], response
+    assert response["pagination"]["total"] == 6, response["pagination"]
+
+
+async def test_count_only_list_reads_no_work_item_content(fixture: FakeGitHubFixture) -> None:
+    for number in range(1, 7):
+        fixture.add_tracked_issue(number, f"issue {number}", state="OPEN")
+
+    response = await _call_backlog_list(fixture, {"count_only": True})
+
+    assert response["count"] == 6, response
+    heads, comments = _hydration_reads(fixture)
+    assert heads == [], heads
+    assert comments == [], comments
+
+
+def test_title_selector_falls_back_to_cache_when_the_targeted_read_fails(fixture: FakeGitHubFixture) -> None:
+    from backlog_core import operations
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+    from github import GithubException
+
+    fixture.add_tracked_issue(1, "cached title item", state="OPEN")
+    repo = f"{fixture.owner}/{fixture.name}"
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        operations.list_items(repo=repo)
+        serve = fixture.requester.graphql_query
+
+        def fail_targeted(query: str, variables: dict[str, object]) -> tuple[dict[str, object], dict[str, object]]:
+            if "query TargetedIssues(" in query:
+                raise GithubException(503, {"message": "offline"}, {})
+            return serve(query, variables)
+
+        fixture.repository.requester.graphql_query = fail_targeted  # ty: ignore[invalid-assignment]
+        context = WorkItemDecisionContext(fixture.backend, repo=repo, allow_cached=True)
+        target = context.select("cached title", purpose="read")
+    finally:
+        reset_config()
+
+    assert target.provider is not None
+    assert target.provider.issue == "#1", target.provider
+
+
+def test_title_selector_scans_titles_when_search_returns_only_false_positives(fixture: FakeGitHubFixture) -> None:
+    fixture.add_tracked_issue(1, "parser rewrite", state="OPEN")
+    decoy = fixture.add_tracked_issue(2, "rewrite the parser", state="OPEN")
+    fixture.requester._title_search = lambda variables: {  # ty: ignore[invalid-assignment]
+        "search": {"nodes": [decoy.as_node()], "pageInfo": {"hasNextPage": False, "endCursor": None}}
+    }
+
+    context = WorkItemDecisionContext(fixture.backend, repo=f"{fixture.owner}/{fixture.name}")
+    target = context.select("parser rewrite", purpose="read")
+
+    assert target.provider is not None
+    assert target.provider.issue == "#1", target.provider
+
+
+def test_search_miss_finds_a_closed_issue(fixture: FakeGitHubFixture) -> None:
+    fixture.add_tracked_issue(1, "closed and not yet indexed", state="CLOSED")
+    fixture.requester._title_search = lambda variables: {  # ty: ignore[invalid-assignment]
+        "search": {"nodes": [], "pageInfo": {"hasNextPage": False, "endCursor": None}}
+    }
+
+    context = WorkItemDecisionContext(fixture.backend, repo=f"{fixture.owner}/{fixture.name}")
+    target = context.select("not yet indexed", purpose="read")
+
+    assert target.provider is not None
+    assert target.provider.issue == "#1", target.provider
+
+
+def test_plain_list_warns_when_its_write_through_fails(fixture: FakeGitHubFixture) -> None:
+    from backlog_core import operations
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+    from backlog_core.models import ReconcileResult
+
+    fixture.add_tracked_issue(1, "issue 1", state="OPEN")
+    fixture.backend.reconcile = lambda request, snapshot=None: ReconcileResult(fetched_items=1, failures=1)  # ty: ignore[invalid-assignment]
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        result = operations.list_items(repo=f"{fixture.owner}/{fixture.name}")
+    finally:
+        reset_config()
+
+    warnings = cast("list[str]", result.get("warnings", []))
+    assert any("1 failures" in warning for warning in warnings), warnings
+
+
+def test_open_scan_writes_its_live_rows_through_to_the_cache(fixture: FakeGitHubFixture) -> None:
+    # add_item's duplicate check and list_followups read through _open_scan;
+    # a later allow_cached read must see what that scan observed.
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+    from backlog_core.operations import _decision_context, _open_scan
+
+    for number in range(1, 4):
+        fixture.add_tracked_issue(number, f"issue {number}", state="OPEN")
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        _open_scan(_decision_context(repo=f"{fixture.owner}/{fixture.name}"))
+    finally:
+        reset_config()
+
+    assert {item.issue for item in fixture.backend.list_work_items()} == {"#1", "#2", "#3"}
+    assert fixture.backend.has_synced_snapshot() is False
+
+
+def test_section_filter_matches_the_tracked_head_priority(fixture: FakeGitHubFixture) -> None:
+    # The label and raw issue body say P1; the tracked head moved the item to P2.
+    from backlog_core import operations
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+    from backlog_core.github_sync import render_issue_body
+
+    moved = BacklogItem(title="moved to P2", issue="#1", priority="P2")
+    fixture.add_tracked_issue(1, "moved to P2", state="OPEN", tracked_body=render_issue_body(moved))
+    fixture.add_tracked_issue(2, "still P1", state="OPEN")
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        result = operations.list_items(repo=f"{fixture.owner}/{fixture.name}", section="P2", limit=1)
+    finally:
+        reset_config()
+
+    assert [item["issue"] for item in _items(result)] == ["#1"], result
+    assert result["has_more"] is False, result
+
+
+def _search_returns(fixture: FakeGitHubFixture, issues: list[FakeIssue]) -> None:
+    nodes = [issue.as_node() for issue in issues]
+    fixture.requester._title_search = lambda variables: {  # ty: ignore[invalid-assignment]
+        "search": {"nodes": nodes, "pageInfo": {"hasNextPage": False, "endCursor": None}}
+    }
+
+
+def _title_scan_states(fixture: FakeGitHubFixture) -> list[list[str]]:
+    return [entry["variables"]["states"] for entry in fixture.requester.log if entry["operation"] == "IssueTitles"]
+
+
+def test_title_mutation_is_ambiguous_when_search_indexed_only_one_match(fixture: FakeGitHubFixture) -> None:
+    indexed = fixture.add_tracked_issue(1, "flaky parser test", state="OPEN")
+    fixture.add_tracked_issue(2, "flaky parser test again", state="OPEN")
+    _search_returns(fixture, [indexed])
+
+    context = WorkItemDecisionContext(fixture.backend, repo=f"{fixture.owner}/{fixture.name}")
+    with pytest.raises(AmbiguousSelectorError):
+        context.select("flaky parser", purpose="mutation")
+
+
+@pytest.mark.parametrize("search_finds_it", [True, False])
+def test_title_mutation_scans_open_titles_only_when_it_finds_the_target(
+    fixture: FakeGitHubFixture, *, search_finds_it: bool
+) -> None:
+    target = fixture.add_tracked_issue(1, "unique open target", state="OPEN")
+    fixture.add_tracked_issue(2, "something closed", state="CLOSED")
+    _search_returns(fixture, [target] if search_finds_it else [])
+
+    context = WorkItemDecisionContext(fixture.backend, repo=f"{fixture.owner}/{fixture.name}")
+    selected = context.select("unique open target", purpose="mutation")
+
+    assert selected.provider is not None
+    assert selected.provider.issue == "#1", selected.provider
+    assert _title_scan_states(fixture) == [["OPEN"]], fixture.requester.log
+
+
+def test_title_mutation_falls_back_to_closed_titles_when_nothing_open_matches(fixture: FakeGitHubFixture) -> None:
+    fixture.add_tracked_issue(1, "closed and not yet indexed", state="CLOSED")
+    _search_returns(fixture, [])
+
+    context = WorkItemDecisionContext(fixture.backend, repo=f"{fixture.owner}/{fixture.name}")
+    selected = context.select("not yet indexed", purpose="mutation")
+
+    assert selected.provider is not None
+    assert selected.provider.issue == "#1", selected.provider
+    assert _title_scan_states(fixture) == [["OPEN"], ["OPEN", "CLOSED"]], fixture.requester.log
+
+
+def test_title_read_stays_search_first(fixture: FakeGitHubFixture) -> None:
+    indexed = fixture.add_tracked_issue(1, "flaky parser test", state="OPEN")
+    fixture.add_tracked_issue(2, "flaky parser test again", state="OPEN")
+    _search_returns(fixture, [indexed])
+
+    context = WorkItemDecisionContext(fixture.backend, repo=f"{fixture.owner}/{fixture.name}")
+    selected = context.select("flaky parser", purpose="read")
+
+    assert selected.provider is not None
+    assert selected.provider.issue == "#1", selected.provider
+    assert _title_scan_states(fixture) == [], fixture.requester.log
+
+
+def test_liveness_probe_reads_no_work_item_content(fixture: FakeGitHubFixture) -> None:
+    # The newest issue has no priority label, so any fetch_page walk would
+    # hydrate it during classification.
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+    from backlog_core.operations import _decision_context, _probe_provider_liveness
+
+    fixture.add_tracked_issue(1, "labelled", state="OPEN")
+    fixture.add_tracked_issue(2, "unlabelled", state="OPEN", labels=[])
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        assert _probe_provider_liveness(_decision_context(repo=f"{fixture.owner}/{fixture.name}")) is True
+    finally:
+        reset_config()
+
+    assert _hydration_reads(fixture) == ([], []), fixture.requester.log
+    list_calls = [entry for entry in fixture.requester.log if entry["operation"] == "ListIssues"]
+    assert len(list_calls) == 1, fixture.requester.log
+    assert list_calls[0]["variables"]["first"] == 1, list_calls
+
+
+def test_title_search_requests_only_title_identity(fixture: FakeGitHubFixture) -> None:
+    fixture.add_tracked_issue(1, "searchable title", state="OPEN")
+
+    context = WorkItemDecisionContext(fixture.backend, repo=f"{fixture.owner}/{fixture.name}")
+    selected = context.select("searchable title", purpose="read")
+
+    assert selected.provider is not None
+    assert selected.provider.issue == "#1", selected.provider
+    searches = [entry["query"] for entry in fixture.requester.log if entry["operation"] == "IssueTitleSearch"]
+    assert len(searches) == 1, fixture.requester.log
+    for field_name in ("body", "labels", "milestone"):
+        assert field_name not in searches[0], searches[0]
+
+
+def test_count_only_refresh_still_reconciles_the_page(fixture: FakeGitHubFixture) -> None:
+    from backlog_core import operations
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+    from backlog_core.models import ReconcileRequest, ReconcileScope
+
+    fixture.add_tracked_issue(1, "issue 1", state="OPEN")
+    requests: list[ReconcileRequest] = []
+    reconcile = fixture.backend.reconcile
+
+    def recording_reconcile(request: ReconcileRequest, snapshot: object = None) -> object:
+        requests.append(request)
+        return reconcile(request, snapshot=snapshot)  # ty: ignore[invalid-argument-type]
+
+    fixture.backend.reconcile = recording_reconcile  # ty: ignore[invalid-assignment]
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        result = operations.list_items(repo=f"{fixture.owner}/{fixture.name}", refresh=True, count_only=True)
+    finally:
+        reset_config()
+
+    assert result["count"] == 1, result
+    assert [(r.scope, r.apply_local_patches, r.references) for r in requests] == [
+        (ReconcileScope.TARGETED, True, ["#1"])
+    ], requests
+
+
+@pytest.mark.parametrize("selector", ["#1", "selected target"])
+def test_live_view_writes_its_target_through_to_the_cache(fixture: FakeGitHubFixture, selector: str) -> None:
+    from backlog_core import operations
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+
+    fixture.add_tracked_issue(1, "selected target", state="OPEN")
+    fixture.add_tracked_issue(2, "unrelated", state="OPEN")
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        viewed = operations.view_item(selector, repo=f"{fixture.owner}/{fixture.name}")
+    finally:
+        reset_config()
+
+    assert viewed.title == "selected target", viewed
+    assert [item.issue for item in fixture.backend.list_work_items()] == ["#1"]
+    assert fixture.backend.has_synced_snapshot() is False
+
+
+def test_cache_io_failure_in_write_through_does_not_fail_the_live_list(fixture: FakeGitHubFixture) -> None:
+    from backlog_core import operations
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+
+    fixture.add_tracked_issue(1, "issue 1", state="OPEN")
+
+    def unwritable(request: object, snapshot: object = None) -> object:
+        del request, snapshot
+        raise PermissionError("cache directory is read-only")
+
+    fixture.backend.reconcile = unwritable  # ty: ignore[invalid-assignment]
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        result = operations.list_items(repo=f"{fixture.owner}/{fixture.name}")
+    finally:
+        reset_config()
+
+    assert [item["issue"] for item in _items(result)] == ["#1"], result
+    warnings = cast("list[str]", result.get("warnings", []))
+    assert any("read-only" in warning for warning in warnings), warnings
+
+
+def test_dry_run_normalize_writes_nothing_to_the_cache(fixture: FakeGitHubFixture) -> None:
+    from backlog_core import operations
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+
+    for number in range(1, 3):
+        fixture.add_tracked_issue(number, f"issue {number}", state="OPEN")
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        result = operations.normalize_items(dry_run=True, repo=f"{fixture.owner}/{fixture.name}")
+    finally:
+        reset_config()
+
+    assert result["normalized"] == 2, result
+    assert fixture.backend.list_work_items() == []
+
+
+def test_title_read_finds_the_live_issue_when_pending_intent_shares_its_title(fixture: FakeGitHubFixture) -> None:
+    repo = f"{fixture.owner}/{fixture.name}"
+    fixture.add_tracked_issue(1, "shared title", state="OPEN")
+    fixture.backend.put_work_item(BacklogItem(title="shared title", priority="P1"), repo)
+    assert any(not item.issue for item in fixture.backend.pending_work_items(repo))
+
+    context = WorkItemDecisionContext(fixture.backend, repo=repo)
+    target = context.select("shared title", purpose="read")
+
+    assert target.provider is not None
+    assert target.provider.issue == "#1", target.provider

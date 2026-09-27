@@ -171,10 +171,17 @@ class TestSingletonSyncLaunch:
         )
 
     @pytest.mark.allow_startup_sync
-    async def test_successful_read_returns_while_cold_checkpoint_maintenance_is_blocked(
-        self, mocker: MockerFixture
-    ) -> None:
-        """A successful MCP read schedules one singleton sync without awaiting it."""
+    async def test_successful_read_on_cold_checkpoint_never_schedules_maintenance(self, mocker: MockerFixture) -> None:
+        """A successful MCP read never schedules background maintenance (request-shaped-reads O1).
+
+        The post-command "schedule the singleton sync when the checkpoint is
+        absent" trigger was removed with the request-shaped-reads design
+        (2026-09): a request-shaped read already writes through the rows it
+        fetched, so scheduling a whole-history background fetch behind one
+        would contradict "the cache holds only what was requested". Only
+        configured startup sync (test_startup_sync_loop_called_exactly_once_on_lifespan_start
+        above) and an explicit ``backlog_sync`` still launch it.
+        """
 
         class ColdSyncBackend(InMemoryBackend):
             def has_synced_snapshot(self) -> bool:
@@ -187,16 +194,12 @@ class TestSingletonSyncLaunch:
                 return ReconcileResult()
 
         reset_sync_state()
-        started = asyncio.Event()
-        release = asyncio.Event()
         launch_count = 0
 
-        async def blocked_sync(state: SyncState, full_refresh: bool = False) -> None:
+        async def counted_sync(state: SyncState, full_refresh: bool = False) -> None:
             nonlocal launch_count
             del full_refresh
             launch_count += 1
-            started.set()
-            await release.wait()
             state.status = SyncStatus.IDLE
 
         result = {
@@ -215,22 +218,18 @@ class TestSingletonSyncLaunch:
         mocker.patch("backlog_core.server.operations.list_items", return_value=result)
         mocker.patch("backlog_core.server._probe_backend_status", return_value=BackendStatus())
         mocker.patch("backlog_core.server._startup_sync_enabled", return_value=True)
-        mocker.patch("backlog_core.sync_engine._startup_sync_loop", side_effect=blocked_sync)
+        mocker.patch("backlog_core.sync_engine._startup_sync_loop", side_effect=counted_sync)
 
         from backlog_core.server import backlog_list
 
-        try:
-            first = await backlog_list(count_only=True)
-            await asyncio.wait_for(started.wait(), timeout=1.0)
-            second = await backlog_list(count_only=True)
-            await asyncio.sleep(0)
+        first = await backlog_list(count_only=True)
+        await asyncio.sleep(0)
+        second = await backlog_list(count_only=True)
+        await asyncio.sleep(0)
 
-            assert first["count"] == second["count"] == 0
-            assert get_sync_state().status == SyncStatus.RUNNING
-            assert launch_count == 1
-        finally:
-            release.set()
-            await asyncio.sleep(0)
+        assert first["count"] == second["count"] == 0
+        assert get_sync_state().status == SyncStatus.IDLE
+        assert launch_count == 0
 
 
 # ---------------------------------------------------------------------------
