@@ -1,9 +1,9 @@
 """Session-level network guard for the development-harness test suite.
 
 This file lives above every test directory in the plugin subtree, so it applies to
-each of this plugin's ``[tool.pytest.ini_options] testpaths`` entries without
-naming them here — ``tests/test_network_guard.py`` reads that list from
-``pyproject.toml`` and proves the guard reaches every entry.
+each test root this plugin's ``run_pytests.py`` declares without naming them
+here — ``tests/test_network_guard.py`` reads that list from the runner and
+proves the guard reaches every entry.
 
 Unit tests must never perform real network I/O: it is slow, non-deterministic,
 credential-dependent, and -- as observed with the GitHub backend -- capable of
@@ -199,12 +199,28 @@ _real_connect_ex = socket.socket.connect_ex
 _real_getaddrinfo = socket.getaddrinfo
 
 
+_MARKERS = (
+    "allow_startup_sync: marks tests that must exercise the real backlog_core.server._startup_sync_enabled gate instead of the autouse override",
+    "critical: marks tests covering critical-path code requiring stronger correctness guarantees (e.g. round-trip property tests)",
+    "cross_backend: marks tests that run only in the test-cross-backend CI matrix job",
+    "e2e: marks tests as end-to-end tests",
+    "integration: marks tests as integration tests",
+    "slow: marks tests as slow",
+    "unit: marks tests as unit tests",
+)
+
+
 def pytest_configure(config: pytest.Config) -> None:
-    """Install the socket guard for the whole session.
+    """Register this plugin's markers and install the socket guard for the whole session.
+
+    The plugin's ``run_pytests.py`` reads no parent pytest config, so the markers
+    its tests use are registered here rather than inherited from a root file.
 
     Args:
-        config: The pytest config object (unused).
+        config: The pytest config object.
     """
+    for marker in _MARKERS:
+        config.addinivalue_line("markers", marker)
     _network_patch.setattr(socket.socket, "connect", _guarded_connect)
     _network_patch.setattr(socket.socket, "connect_ex", _guarded_connect_ex)
     _network_patch.setattr(socket, "getaddrinfo", _guarded_getaddrinfo)

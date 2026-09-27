@@ -3,7 +3,7 @@
 Split out of plugins/development-harness/tests/test_placeholder_vocabulary_drift.py: both
 assertions here target repo-root files (`AGENTS.md`, `.claude/CLAUDE.md`) and the whole
 `plugins/` tree, not dh plugin code. Under the dh plugin's standalone runner
-(`plugins/development-harness/tests/run_pytest.py`), that file's `_REPO_ROOT` resolves to the
+(`plugins/development-harness/run_pytests.py`), that file's `_REPO_ROOT` resolves to the
 install's parent directory rather than this repo's root — the `AGENTS.md` read raised
 `FileNotFoundError` there, and the `plugins/` scan silently passed having read zero files. This
 repo's own AGENTS.md test-placement rule exists for exactly this failure shape: "A plugin test

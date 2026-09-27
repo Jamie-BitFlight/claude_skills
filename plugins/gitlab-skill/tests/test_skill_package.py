@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
 import re
+import signal
 import ssl
 import subprocess
+import sys
 import threading
+import time
 import tomllib
 from base64 import b64encode
 from datetime import date
@@ -21,7 +25,7 @@ from marko.inline import Link
 
 PLUGIN_ROOT = Path(__file__).parents[1]
 SKILL_ROOT = PLUGIN_ROOT / "skills" / "gitlab-skill"
-REPOSITORY_ROOT = PLUGIN_ROOT.parents[1]
+BOUNDED_TIMEOUT_SECONDS = 10
 
 OBSOLETE_STEPS_TERMS = ("CI/CD Steps", "`step:`", "`step.yml`", "${{ step_dir }}", "${{ job.")
 
@@ -837,27 +841,63 @@ def write_fake_release_command(path: Path) -> None:
 
 
 def run_bounded(
-    arguments: list[str], cwd: Path, environment: dict[str, str] | None = None
+    arguments: list[str],
+    cwd: Path,
+    environment: dict[str, str] | None = None,
+    timeout_seconds: float = BOUNDED_TIMEOUT_SECONDS,
 ) -> subprocess.CompletedProcess[str]:
-    """Run a subprocess through the repository's process-group timeout wrapper."""
-    return subprocess.run(
-        [
-            "uv",
-            "run",
-            "--script",
-            str(REPOSITORY_ROOT / "scripts" / "run_bounded.py"),
-            "--timeout-seconds",
-            "10",
-            "--",
-            *arguments,
-        ],
+    """Run a subprocess in its own process group and kill the whole group on timeout.
+
+    These tests already require a POSIX shell. The helper lives here rather than
+    calling the repository's ``scripts/run_bounded.py``, which a standalone copy of
+    this plugin does not have. A timeout returns 124, matching that script. A
+    descendant that left the process group survives the kill and can hold the output
+    pipes open, so reading them after the kill is bounded too, and whatever output that
+    descendant still holds is dropped.
+    """
+    with subprocess.Popen(
+        arguments,
         cwd=cwd,
         env=environment,
         text=True,
-        capture_output=True,
-        check=False,
-        timeout=20,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        start_new_session=True,
+    ) as process:
+        try:
+            stdout, stderr = process.communicate(timeout=timeout_seconds)
+        except subprocess.TimeoutExpired:
+            # Darwin answers EPERM, not ESRCH, when every member of the group is an unreaped zombie.
+            with contextlib.suppress(ProcessLookupError, PermissionError):
+                os.killpg(process.pid, signal.SIGKILL)
+            try:
+                stdout, stderr = process.communicate(timeout=timeout_seconds)
+            except subprocess.TimeoutExpired:
+                stdout, stderr = "", ""
+            return subprocess.CompletedProcess(
+                arguments, 124, stdout, f"{stderr}timed out after {timeout_seconds} seconds\n"
+            )
+    return subprocess.CompletedProcess(arguments, process.returncode, stdout, stderr)
+
+
+def test_run_bounded_returns_when_a_descendant_leaves_the_process_group(tmp_path: Path) -> None:
+    """A descendant in its own session keeps the pipes open after the group kill; the helper still returns."""
+    pid_file = tmp_path / "orphan.pid"
+    script = (
+        "import subprocess, time\n"
+        "orphan = subprocess.Popen(['sleep', '30'], start_new_session=True)\n"
+        f"open({str(pid_file)!r}, 'w').write(str(orphan.pid))\n"
+        "time.sleep(30)\n"
     )
+    started = time.monotonic()
+    try:
+        result = run_bounded([sys.executable, "-c", script], tmp_path, timeout_seconds=1)
+    finally:
+        if pid_file.exists():
+            with contextlib.suppress(ProcessLookupError):
+                os.kill(int(pid_file.read_text()), signal.SIGKILL)
+    assert result.returncode == 124
+    assert time.monotonic() - started < 10
 
 
 def create_http_git_repository(tmp_path: Path) -> Path:
@@ -1216,7 +1256,8 @@ def test_adapter_indexes_create_real_branch_boundaries() -> None:
         assert references.joinpath(destination).is_file(), destination
 
 
-def test_default_pytest_collection_includes_plugin_tests() -> None:
-    """The normal repository suite must collect this plugin's tests."""
-    pyproject = tomllib.loads((PLUGIN_ROOT.parents[1] / "pyproject.toml").read_text(encoding="utf-8"))
-    assert "plugins/gitlab-skill/tests" in pyproject["tool"]["pytest"]["ini_options"]["testpaths"]
+def test_plugin_owns_pytest_collection_entrypoint() -> None:
+    """The plugin test boundary is executable without root testpath registration."""
+    runner = PLUGIN_ROOT / "run_pytests.py"
+    assert runner.is_file()
+    assert '"tests"' in runner.read_text(encoding="utf-8")

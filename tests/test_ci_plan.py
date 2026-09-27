@@ -32,17 +32,12 @@ runner = load_module("ci_run_under_test", ROOT / ".github/ci/run.py")
 @pytest.fixture
 def repository(tmp_path: Path) -> Path:
     """Create distinct plugin, nested, colocated, and global test boundaries."""
-    paths = [
-        "plugins/alpha/tests",
-        "plugins/alpha/model/tests",
-        "plugins/alpha/scripts",
-        "plugins/beta/tests",
-        "plugins/development-harness/tests",
-        "tests",
-        ".agents/tool/scripts",
-    ]
-    for path in [*paths, "plugins/content-only", ".claude", "tests/research_backlinks"]:
+    paths = ["tests", ".agents/tool/scripts"]
+    plugin_dirs = ["plugins/alpha", "plugins/beta", "plugins/development-harness"]
+    for path in [*paths, *plugin_dirs, "plugins/content-only", ".claude", "tests/research_backlinks"]:
         (tmp_path / path).mkdir(parents=True, exist_ok=True)
+    for plugin in plugin_dirs:
+        (tmp_path / plugin / "run_pytests.py").write_text("# runner\n", encoding="utf-8")
     (tmp_path / "tests/test_rebase_publication_identity.py").write_text("", encoding="utf-8")
     (tmp_path / "pyproject.toml").write_text(
         "[tool.pytest.ini_options]\n"
@@ -63,7 +58,8 @@ def test_plugin_change_keeps_all_nested_and_colocated_paths(repository: Path) ->
     plan = planner.build_plan(repository, ["plugins/alpha/skills/example/SKILL.md"])
     assert names(plan) == {"alpha", "global"}
     alpha = next(shard for shard in plan["unit_matrix"]["include"] if shard["name"] == "alpha")
-    assert alpha["paths"] == ["plugins/alpha/tests", "plugins/alpha/model/tests", "plugins/alpha/scripts"]
+    assert alpha["runner"] == "plugins/alpha/run_pytests.py"
+    assert alpha["paths"] == []
     assert plan["checks"]["lint-markdown"]
     assert not plan["checks"]["lint-python"]
     assert not plan["checks"]["test-cross-backend"]
@@ -74,18 +70,14 @@ def test_plugin_change_keeps_all_nested_and_colocated_paths(repository: Path) ->
 def test_full_partition_equals_authoritative_testpaths_once(repository: Path) -> None:
     """No configured directory disappears or runs in two shards after partitioning."""
     plan = planner.build_plan(repository, None)
-    actual = [path for shard in plan["unit_matrix"]["include"] for path in shard["paths"]]
-    expected = [
-        "plugins/alpha/tests",
-        "plugins/alpha/model/tests",
-        "plugins/alpha/scripts",
-        "plugins/beta/tests",
-        "plugins/development-harness/tests",
-        "tests",
-        ".agents/tool/scripts",
-    ]
-    assert sorted(actual) == sorted(expected)
-    assert len(actual) == len(set(actual))
+    runners = {shard["runner"] for shard in plan["unit_matrix"]["include"] if shard["runner"]}
+    assert runners == {
+        "plugins/alpha/run_pytests.py",
+        "plugins/beta/run_pytests.py",
+        "plugins/development-harness/run_pytests.py",
+    }
+    global_shard = next(shard for shard in plan["unit_matrix"]["include"] if shard["name"] == "global")
+    assert global_shard["paths"] == ["tests", ".agents/tool/scripts"]
     assert plan["allowed_skips"] == ""
     assert names(plan, "integration_matrix") == {"development-harness", "research-backlinks", "rebase-publication"}
 
@@ -180,7 +172,8 @@ def test_deleted_plugin_is_not_sent_to_validator(repository: Path) -> None:
 
 def test_missing_configured_suite_is_an_error(repository: Path) -> None:
     """Removing a suite directory without updating testpaths cannot pass silently."""
-    (repository / "plugins/beta/tests").rmdir()
+    config = repository / "pyproject.toml"
+    config.write_text(config.read_text(encoding="utf-8").replace('"tests"', '"missing-tests"'), encoding="utf-8")
     with pytest.raises(ValueError, match="Configured testpath does not exist"):
         planner.build_plan(repository, ["README.md"])
 
@@ -364,3 +357,16 @@ def test_marketplace_comparison_without_history_is_conservative(repository: Path
     plan = planner.build_plan(repository, [".claude-plugin/marketplace.json", "plugins/alpha/README.md"])
     assert plan["full_tests"]
     assert plan["lint_all"]
+
+
+@pytest.mark.parametrize("runner_path", ["--with=evil", "../other/run_pytests.py", "/abs/run_pytests.py"])
+def test_runner_rejects_an_unsafe_shard_runner(runner_path: str) -> None:
+    """The shard's runner path is validated like its target paths before it reaches argv."""
+    with pytest.raises(ValueError, match="Unsafe target path"):
+        runner.command("pytest", {}, {"name": "alpha", "runner": runner_path, "paths": [], "marker": ""})
+
+
+def test_runner_runs_a_plugin_shard_from_its_script_lockfile() -> None:
+    """A plugin shard resolves from the runner's committed lockfile, never a fresh resolution."""
+    shard = {"name": "alpha", "runner": "plugins/alpha/run_pytests.py", "paths": [], "marker": ""}
+    assert runner.command("pytest", {}, shard) == ["uv", "run", "--locked", "--script", "plugins/alpha/run_pytests.py"]
