@@ -18,9 +18,8 @@ import pytest
 
 # ---------------------------------------------------------------------------
 # Import the script under test.
-# `plugins/development-harness/scripts` is on sys.path via the root
-# pyproject.toml [tool.pytest.ini_options] pythonpath list — no manual
-# sys.path manipulation is needed here.
+# `scripts` is on sys.path via the plugin runner's IMPORT_PATHS
+# (run_pytests.py) — no manual sys.path manipulation is needed here.
 # ---------------------------------------------------------------------------
 from migrate_tasks_to_github import (
     SamTask as MigrateSamTask,

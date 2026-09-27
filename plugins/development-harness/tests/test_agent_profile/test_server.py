@@ -16,8 +16,9 @@ tree by patching:
 The server functions are synchronous, so ``mocker.patch`` (not ``AsyncMock``)
 is used throughout.
 
-Integration tests (``@pytest.mark.integration``) call the real plugins/
-filesystem and are gated behind the ``integration`` marker.
+Integration tests (``@pytest.mark.integration``) run real discovery over a tmp_path
+plugins/ tree holding dh's own agents and a stand-in sibling plugin, and are gated
+behind the ``integration`` marker.
 
 Response shape contract
 -----------------------
@@ -41,6 +42,8 @@ Each skill in profile_load.skills:
 
 from __future__ import annotations
 
+import shutil
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -49,8 +52,6 @@ from agent_profile.server import mcp
 from fastmcp.client import Client
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from pytest_mock import MockerFixture
 
 # ---------------------------------------------------------------------------
@@ -703,28 +704,47 @@ class TestToolRegistration:
 # ---------------------------------------------------------------------------
 
 
+#: Language-plugin agents swarm-task-planner matches tasks against. They belong to a
+#: sibling plugin, so the integration tree below supplies stand-ins rather than reading
+#: that plugin's files: dh's tests must run the same in a standalone copy of dh.
+_SIBLING_AGENTS = ("code-reviewer", "python-cli-architect", "python-pytest-architect")
+
+
 @pytest.mark.integration
 class TestRealPluginsIntegration:
-    """Integration tests using the real plugins/ filesystem.
+    """Integration tests using dh's real agent files in a real plugins/ layout.
 
     Tests: profile_load and profile_list work end-to-end against real agent files.
-    Strategy: No mocking — tools use the real get_plugins_root() resolution.
+    Strategy: No mocking — tools use the real get_plugins_root() resolution over a
+    tmp_path plugins/ tree holding a copy of dh's own agents and manifest, plus a
+    stand-in python-engineering sibling.
     """
 
     @pytest.fixture(autouse=True)
-    def _set_plugin_root(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Set CLAUDE_PLUGIN_ROOT to the development-harness plugin directory.
+    def _set_plugin_root(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        """Point CLAUDE_PLUGIN_ROOT at dh inside a self-contained plugins/ tree.
 
         In the MCP server process, CLAUDE_PLUGIN_ROOT may point to a plugin cache
         path rather than the development-harness repo root, causing get_plugins_root()
-        to resolve to a directory with zero agents.  Overriding the env var here
-        directs discovery at the correct source tree for the duration of each test.
+        to resolve to a directory with zero agents. The tree gives discovery a known
+        root that does not depend on which sibling plugins sit next to dh on disk.
         """
-        from pathlib import Path
-
         # tests/test_agent_profile/test_server.py → development-harness/
-        plugin_dir = str(Path(__file__).parent.parent.parent)
-        monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", plugin_dir)
+        plugin_dir = Path(__file__).resolve().parent.parent.parent
+        plugins = tmp_path / "plugins"
+        dh = plugins / "development-harness"
+        shutil.copytree(plugin_dir / "agents", dh / "agents")
+        shutil.copytree(plugin_dir / ".claude-plugin", dh / ".claude-plugin")
+        sibling = plugins / "python-engineering"
+        (sibling / ".claude-plugin").mkdir(parents=True)
+        (sibling / ".claude-plugin" / "plugin.json").write_text('{"name": "python-engineering"}\n', encoding="utf-8")
+        (sibling / "agents").mkdir()
+        for name in _SIBLING_AGENTS:
+            (sibling / "agents" / f"{name}.md").write_text(
+                f"---\nname: {name}\ndescription: Stand-in sibling agent for discovery tests.\n---\n\nBody.\n",
+                encoding="utf-8",
+            )
+        monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(dh))
 
     async def test_profile_list_returns_nonzero_count(self) -> None:
         """profile_list against real plugins returns at least one agent.

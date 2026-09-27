@@ -285,7 +285,7 @@ With this plugin installed, Claude will:
 ### Automatic Behaviors
 
 - **On every git commit**: The `agent-marketplace-versioner` hook checks, without editing, that `plugin.json` component arrays and marketplace membership match the plugin directories. Versions are never changed on a branch.
-- **After merge to `main`**: CI patch-bumps each changed plugin and the marketplace version in one commit. See [Marketplace versioning](../../docs/marketplace-versioning.md).
+- **After merge to `main`**: CI patch-bumps each changed plugin and the marketplace version in one commit. See [Marketplace versioning](https://github.com/Jamie-BitFlight/claude_skills/blob/main/docs/marketplace-versioning.md).
 
 ## Installation
 

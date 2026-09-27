@@ -17,8 +17,8 @@ The `quality-gate` summary job requires ALL of these to pass:
 | `manifest-sync` | Versioner hook in check-only mode (component arrays, marketplace membership), its pinned integration test, and on PRs `scripts/check_branch_version_fields.py` rejecting any branch-side version change — `bump-marketplace.yml` assigns versions on `main` |
 | `file-hygiene` | trailing whitespace, line endings, large files, merge conflicts |
 | `test-python` | pytest fast suite (default addopts filter) |
-| `test-cross-backend` | pytest `-m cross_backend` on a memory/sqlite matrix (`BACKLOG_BACKEND` env) |
-| `test-integration` | pytest `-m integration` on `plugins/development-harness/tests/` |
+| `test-cross-backend` | development-harness cross-backend lane; shards from `dh_lanes()` in `.github/ci/plan.py` |
+| `test-integration` | Integration shards from `build_plan()` and `dh_lanes()` in `.github/ci/plan.py` |
 
 Advisory jobs outside the gate: `research-validation` (research-corpus template gaps) and
 `test-e2e` (live GitHub sandbox issues; main push / manual dispatch only).
