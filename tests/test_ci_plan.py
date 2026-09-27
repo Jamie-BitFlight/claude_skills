@@ -364,3 +364,9 @@ def test_runner_rejects_an_unsafe_shard_runner(runner_path: str) -> None:
     """The shard's runner path is validated like its target paths before it reaches argv."""
     with pytest.raises(ValueError, match="Unsafe target path"):
         runner.command("pytest", {}, {"name": "alpha", "runner": runner_path, "paths": [], "marker": ""})
+
+
+def test_runner_runs_a_plugin_shard_from_its_script_lockfile() -> None:
+    """A plugin shard resolves from the runner's committed lockfile, never a fresh resolution."""
+    shard = {"name": "alpha", "runner": "plugins/alpha/run_pytests.py", "paths": [], "marker": ""}
+    assert runner.command("pytest", {}, shard) == ["uv", "run", "--locked", "--script", "plugins/alpha/run_pytests.py"]

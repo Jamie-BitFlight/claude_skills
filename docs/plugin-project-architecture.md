@@ -14,7 +14,7 @@ A plugin owns everything specific to its behavior:
 - skills, agents, commands, hooks, and MCP entry points;
 - implementation modules used by those entry points;
 - tests and fixtures for plugin behavior;
-- a PEP 723 `run_pytests.py` when it owns pytest tests;
+- a PEP 723 `run_pytests.py` and its `run_pytests.py.lock` when it owns pytest tests;
 - runtime and test dependencies declared at executable consumption boundaries;
 - plugin-facing documentation.
 
@@ -54,7 +54,8 @@ plugins/<name>/
 ├── hooks/
 ├── scripts/                # plugin-owned executable/support code
 ├── tests/                  # plugin-owned tests/fixtures
-└── run_pytests.py          # when the plugin owns pytest tests
+├── run_pytests.py          # when the plugin owns pytest tests
+└── run_pytests.py.lock     # its script lockfile (uv lock --script run_pytests.py)
 ```
 
 Do not create empty directories to satisfy this example. Existing module-local or skill-local test directories may remain; `run_pytests.py` is their authority.

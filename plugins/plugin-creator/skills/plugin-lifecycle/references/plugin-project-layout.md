@@ -11,7 +11,7 @@ Before implementation, classify every proposed file as either:
 
 Do not create `plugins/<name>/pyproject.toml` or a plugin-local `uv.lock` merely to make a plugin self-contained. PEP 723 executable entry points own their execution dependencies. The root project owns monorepo development policy.
 
-If the plugin owns pytest tests, require `plugins/<name>/run_pytests.py`. It owns the complete plugin test topology and must run without parent pytest configuration or root PYTHONPATH assumptions.
+If the plugin owns pytest tests, require `plugins/<name>/run_pytests.py`. It owns the complete plugin test topology and must run without parent pytest configuration or root PYTHONPATH assumptions. Commit its script lockfile, `run_pytests.py.lock`, created with `uv lock --script run_pytests.py` and refreshed whenever the PEP 723 block changes, so the runner can be run with `uv run --locked --script`.
 
 ## Referential-integrity gate
 

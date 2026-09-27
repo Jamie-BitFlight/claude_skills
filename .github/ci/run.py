@@ -51,7 +51,7 @@ def pytest_command(shard: dict[str, object]) -> list[str]:
         raise TypeError("The pytest runner must be a string")
     if runner:
         paths_from([runner])
-    args = ["uv", "run", "--script", runner] if runner else ["uv", "run", "--locked", "pytest"]
+    args = ["uv", "run", "--locked", "--script", runner] if runner else ["uv", "run", "--locked", "pytest"]
     marker = shard.get("marker", "")
     if not isinstance(marker, str):
         raise TypeError("The pytest marker must be a string")

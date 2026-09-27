@@ -163,3 +163,12 @@ def test_plugin_marker_registrations_match_the_root_markers() -> None:
     assert registered, "no plugin conftest registers a marker, so this check examined nothing"
     drift = [(source, line) for source, line in registered if root.get(line.split(":", 1)[0]) != line]
     assert not drift, f"plugin marker registrations differ from root pyproject markers: {drift}"
+
+
+@pytest.mark.parametrize("runner", RUNNERS, ids=lambda path: path.parent.name)
+def test_runner_lockfile_matches_its_dependencies(runner: Path) -> None:
+    """Each runner's committed ``run_pytests.py.lock`` satisfies its PEP 723 block, as CI's --locked run requires."""
+    result = subprocess.run(
+        ["uv", "lock", "--script", str(runner), "--check"], capture_output=True, text=True, check=False
+    )
+    assert result.returncode == 0, f"{runner.parent.name}: run `uv lock --script {runner}`\n{result.stderr}"
