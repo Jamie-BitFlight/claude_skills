@@ -1641,11 +1641,12 @@ class _OpenScan(BaseModel):
     live: bool
 
 
-def _open_scan(context: WorkItemDecisionContext) -> _OpenScan:
+def _open_scan(context: WorkItemDecisionContext, *, write_through: bool = True) -> _OpenScan:
     """Read every open, live-candidate item, hydrated, with no closed history (O3).
 
     A live scan writes its rows through to the cache (D7) like any list page,
-    acknowledging no local intent.
+    acknowledging no local intent, unless *write_through* is false (a dry run
+    that must not modify files).
 
     Returns:
         The open-scan items (page rows plus queued pending intent) and
@@ -1660,7 +1661,7 @@ def _open_scan(context: WorkItemDecisionContext) -> _OpenScan:
         match=lambda item, provider: _is_live_candidate(item),
         force_hydration=True,
     )
-    if page.provider_snapshot is not None:
+    if write_through and page.provider_snapshot is not None:
         context.write_through(page.provider_snapshot)
     pending = [it for it in context.pending() if _is_live_candidate(it)]
     return _OpenScan(items=page.provider_items + pending, live=page.provider_snapshot is not None)
@@ -5276,7 +5277,7 @@ def normalize_items(
     """
     out = output or Output()
     context = _decision_context(repo=repo, allow_cached=allow_cached, output=out)
-    scan = _open_scan(context)
+    scan = _open_scan(context, write_through=not dry_run)
     by_reference = {item.reference: item for item in scan.items}
     items = list(by_reference.values())
     if not items:

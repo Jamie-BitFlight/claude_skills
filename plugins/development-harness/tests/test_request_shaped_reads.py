@@ -1279,3 +1279,21 @@ def test_cache_io_failure_in_write_through_does_not_fail_the_live_list(fixture: 
     assert [item["issue"] for item in _items(result)] == ["#1"], result
     warnings = cast("list[str]", result.get("warnings", []))
     assert any("read-only" in warning for warning in warnings), warnings
+
+
+def test_dry_run_normalize_writes_nothing_to_the_cache(fixture: FakeGitHubFixture) -> None:
+    from backlog_core import operations
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+
+    for number in range(1, 3):
+        fixture.add_tracked_issue(number, f"issue {number}", state="OPEN")
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        result = operations.normalize_items(dry_run=True, repo=f"{fixture.owner}/{fixture.name}")
+    finally:
+        reset_config()
+
+    assert result["normalized"] == 2, result
+    assert fixture.backend.list_work_items() == []
