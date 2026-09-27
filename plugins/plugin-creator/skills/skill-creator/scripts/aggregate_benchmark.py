@@ -231,10 +231,7 @@ def generate_benchmark(benchmark_dir: Path, skill_name: str = "", skill_path: st
     ]
     complete = bool(runs) and all(run["result"]["pass_rate"] is not None for run in runs)
     if complete and len(results) == 2:
-        coverage = [
-            Counter((run["eval_id"], run["run_number"]) for run in records)
-            for records in results.values()
-        ]
+        coverage = [Counter((run["eval_id"], run["run_number"]) for run in records) for records in results.values()]
         complete = coverage[0] == coverage[1] and all(count == 1 for count in coverage[0].values())
     return {
         "metadata": {
