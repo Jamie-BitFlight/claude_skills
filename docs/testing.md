@@ -56,7 +56,7 @@ null until the validation runner records an observed result. It is not a passing
 
 - **Framework**: pytest with `pytest-xdist` (parallel), `pytest-asyncio` (async), `pytest-mock`
 - **Markers**: `unit`, `integration`, `e2e`, `slow`, `demos`, `cross_backend`, `critical`,
-  `allow_startup_sync`, `research_vault`
+  `research_vault`
 - **Default deselection**: addopts include `-m "not e2e and not cross_backend and not integration and not research_vault"`,
   so a bare `uv run pytest` runs the fast in-process suite only. Integration tests (real-subprocess
   CLI/network-guard behavior, ~2-30s each) and cross-backend tests run as separate CI jobs; the

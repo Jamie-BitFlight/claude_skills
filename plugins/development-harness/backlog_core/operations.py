@@ -2034,7 +2034,7 @@ def refresh_local_cache_from_github(
     output: Output | None = None,
     full_refresh: bool = False,
     progress_callback: Callable[[int, int | None], None] | None = None,
-    apply_local_patches: bool = True,
+    apply_local_patches: bool = False,
 ) -> dict[str, int | list[str]]:
     """Reconcile provider items through the configured backend.
 
@@ -2047,7 +2047,10 @@ def refresh_local_cache_from_github(
         progress_callback: Optional callable invoked after each issue is
             reconciled. Receives ``(items_done, items_total)``.
         apply_local_patches: Whether reconciliation may push queued local
-            mutations to the provider.
+            mutations to the provider. Off by default, so a reconcile no
+            command explicitly asked to push only reads; on a cold cache a
+            pushing reconcile posts an audit comment to every drifted issue.
+            Only the ``sync_now`` worker passes True.
 
     Returns:
         Dict with count of refreshed (open) issues, count of reconciled

@@ -1,6 +1,6 @@
 """GitHub's ``Retry-After`` hint must reach both consumers of a rate-limit failure.
 
-``GitHubRateLimitedError.retry_after`` carries the seconds GitHub says to wait. The startup sync
+``GitHubRateLimitedError.retry_after`` carries the seconds GitHub says to wait. The sync_now sync
 loop's fixed 30s/120s schedule can spend every attempt before GitHub allows another request, and
 an MCP caller that only sees ``retryable: true`` cannot tell when a retry would be allowed. These
 tests confirm the sync loop waits at least that long and the MCP error response carries the hint,
@@ -17,7 +17,7 @@ from github import GithubException
 
 from backlog_core.models import BackendUnavailableError, GitHubRateLimitedError
 from backlog_core.server import mcp
-from backlog_core.sync_engine import _startup_sync_loop
+from backlog_core.sync_engine import _sync_loop
 from backlog_core.sync_state import (
     SyncErrorKind,
     SyncState,
@@ -65,7 +65,7 @@ async def _sleeps_before_success(mocker: MockerFixture, state: SyncState, first_
 
     mocker.patch("backlog_core.sync_engine._run_single_sync", side_effect=_fail_then_succeed)
     mocker.patch("backlog_core.sync_engine.asyncio.sleep", side_effect=_record_sleep)
-    await _startup_sync_loop(state)
+    await _sync_loop(state)
     assert calls == 2, "the loop must retry exactly once and stop after the patched success"
     return delays
 
