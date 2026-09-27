@@ -25,9 +25,11 @@ import socket
 import sqlite3
 import threading
 from collections.abc import Callable, Iterator
+from pathlib import Path
 from socket import AddressFamily, SocketKind
 from typing import TYPE_CHECKING, Literal, ParamSpec
 
+import git
 import pytest
 
 if TYPE_CHECKING:
@@ -44,10 +46,11 @@ _ADVICE = (
 # statement. Read by the guarded functions and flipped by ``_network_policy``.
 _state = {"allowed": False}
 
-# Single module-level MonkeyPatch installs the guard at session start and
-# undoes it at session end, restoring the real socket functions reliably and
-# without inline type-suppression comments.
+# Module-level MonkeyPatches, undone at session end, restore the real functions
+# reliably and without inline type-suppression comments. The socket guard and
+# the tiktoken fallback each own one, so removing the guard leaves the fallback.
 _network_patch = pytest.MonkeyPatch()
+_tiktoken_patch = pytest.MonkeyPatch()
 _P = ParamSpec("_P")
 
 
@@ -67,6 +70,39 @@ def track_sqlite_connections(
         return connection
 
     return tracked_connect
+
+
+@pytest.fixture(scope="session")
+def _hermetic_project_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Create one throwaway git repository whose ``.dh/config.yaml`` declares nothing.
+
+    Returns:
+        The repository root.
+    """
+    project = tmp_path_factory.mktemp("dh-project")
+    git.Repo.init(project)
+    (project / ".dh").mkdir()
+    (project / ".dh" / "config.yaml").write_text("{}\n", encoding="utf-8")
+    return project
+
+
+@pytest.fixture(autouse=True)
+def _hermetic_dh_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) -> None:
+    """Keep every non-e2e test off the host's project config and the user's dh state.
+
+    ``dh_paths.infer_project_root`` honours ``DH_PROJECT_ROOT`` before the IDE
+    variables and the cwd's repository, and ``dh_paths.state_root`` and the config
+    loaders honour ``DH_STATE_HOME`` before ``~/.dh``. Without this, a test reads
+    whichever ``.dh/config.yaml`` the host repository has (for example its
+    ``sam.plan_index_issue``) and writes under the real ``~/.dh/projects/``. A
+    test that depends on a config value declares it in its own config file.
+    Skips for tests marked ``@pytest.mark.e2e``, which set up their own state to
+    exercise the real runtime path.
+    """
+    if request.node.get_closest_marker("e2e"):
+        return
+    monkeypatch.setenv("DH_PROJECT_ROOT", str(request.getfixturevalue("_hermetic_project_root")))
+    monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh_state"))
 
 
 @pytest.fixture(autouse=True)
@@ -111,7 +147,7 @@ except OSError:
         """
         return _mock_enc
 
-    _network_patch.setattr(tiktoken, "get_encoding", _mock_get_encoding)
+    _tiktoken_patch.setattr(tiktoken, "get_encoding", _mock_get_encoding)
 
 
 def _is_local(address: _Address) -> bool:
@@ -221,17 +257,28 @@ def pytest_configure(config: pytest.Config) -> None:
     """
     for marker in _MARKERS:
         config.addinivalue_line("markers", marker)
+    install_network_guard()
+
+
+def pytest_unconfigure(config: pytest.Config) -> None:
+    """Restore the real socket and tiktoken functions at session teardown.
+
+    Args:
+        config: The pytest config object (unused).
+    """
+    remove_network_guard()
+    _tiktoken_patch.undo()
+
+
+def install_network_guard() -> None:
+    """Replace the socket connect and DNS functions with their guarded versions."""
     _network_patch.setattr(socket.socket, "connect", _guarded_connect)
     _network_patch.setattr(socket.socket, "connect_ex", _guarded_connect_ex)
     _network_patch.setattr(socket, "getaddrinfo", _guarded_getaddrinfo)
 
 
-def pytest_unconfigure(config: pytest.Config) -> None:
-    """Restore the real socket functions at session teardown.
-
-    Args:
-        config: The pytest config object (unused).
-    """
+def remove_network_guard() -> None:
+    """Restore the real socket connect and DNS functions."""
     _network_patch.undo()
 
 

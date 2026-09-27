@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Protocol
@@ -37,6 +38,8 @@ from github import GithubException
 from sam_schema.core.artifact_registry_client import ArtifactRegistryClient, PlanIndexUnavailableError
 from sam_schema.core.plan_id_index import PlanIndexEntry, _serialize_index_yaml
 
+_PLAN_INDEX_ISSUE = 2531
+
 
 class _RemoteArtifactProviderFakeSpec(Protocol):
     def store_artifact_content(self, owner: int, artifact_type: str, path: str, content: str) -> None: ...
@@ -63,6 +66,19 @@ class _InMemoryContents:
 @pytest.fixture(autouse=True)
 def _isolated_contents_store(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(github_backend_module, "_GitHubContentsStore", lambda _repository: _InMemoryContents())
+
+
+@pytest.fixture(autouse=True)
+def _declared_plan_index_issue() -> None:
+    """Declare the sentinel issue these tests' fake remotes use as ``_PLAN_INDEX_ISSUE``.
+
+    The backend reads ``sam.plan_index_issue`` through the real config loader. The
+    plugin conftest points the project root at an empty config and ``DH_STATE_HOME``
+    at a per-test directory, so the value is written to the user-level config there.
+    """
+    state_home = Path(os.environ["DH_STATE_HOME"])
+    state_home.mkdir(parents=True, exist_ok=True)
+    (state_home / "config.yaml").write_text(f"sam:\n  plan_index_issue: {_PLAN_INDEX_ISSUE}\n", encoding="utf-8")
 
 
 def _issue(number: int, revision: str = "rev-1") -> dict[str, object]:
@@ -397,7 +413,7 @@ def test_github_content_provider_keeps_linked_plans_separate_by_plan_id(tmp_path
     artifact_provider.read_artifact_content_from_remote.side_effect = lambda owner, artifact_type, path: (
         remote_content.get((owner, artifact_type, path))
     )
-    remote_content[2531, "plan-index", "sam-plan/plan-index.yaml"] = _serialize_index_yaml([
+    remote_content[_PLAN_INDEX_ISSUE, "plan-index", "sam-plan/plan-index.yaml"] = _serialize_index_yaml([
         PlanIndexEntry(plan_id="Pfirst", issue=42, slug="first", created_at="2026-08-12T00:00:00Z"),
         PlanIndexEntry(plan_id="Psecond", issue=42, slug="second", created_at="2026-08-12T00:00:00Z"),
     ])
@@ -425,7 +441,7 @@ def test_github_content_provider_reads_legacy_linked_plan_path(tmp_path: Path) -
     ])
     artifact_provider = MagicMock()
     artifact_provider.read_artifact_content_from_remote.side_effect = lambda owner, artifact_type, path: {
-        (2531, "plan-index", "sam-plan/plan-index.yaml"): index,
+        (_PLAN_INDEX_ISSUE, "plan-index", "sam-plan/plan-index.yaml"): index,
         (42, "task-plan", "sam-plan/task-plan-issue-42.yaml"): "legacy content",
     }.get((owner, artifact_type, path))
     backend = GitHubBackend(cache=FileCache(tmp_path), artifact_provider=artifact_provider)
@@ -448,8 +464,8 @@ def test_github_content_provider_discovers_remote_plans_with_empty_cache(tmp_pat
         PlanIndexEntry(plan_id="Premote", issue=None, slug="remote-plan", created_at="2026-08-12T00:00:00Z")
     ])
     remote_content = {
-        (2531, "plan-index", "sam-plan/plan-index.yaml"): index,
-        (2531, "plan", "sam-plan/unlinked/Premote.yaml"): "remote body",
+        (_PLAN_INDEX_ISSUE, "plan-index", "sam-plan/plan-index.yaml"): index,
+        (_PLAN_INDEX_ISSUE, "plan", "sam-plan/unlinked/Premote.yaml"): "remote body",
     }
     artifact_provider.read_artifact_content_from_remote.side_effect = lambda owner, artifact_type, path: (
         remote_content.get((owner, artifact_type, path))
@@ -469,12 +485,12 @@ def test_github_content_provider_discovers_remote_plans_with_empty_cache(tmp_pat
 def test_github_content_provider_reads_dispatch_content_without_sam_plan_index(tmp_path: Path) -> None:
     # Given: two provider-owned dispatch envelopes and no SAM plan index.
     remote_content: dict[tuple[int, str, str], str] = {
-        (2531, "dispatch-plan", "dispatch-plan/dispatch-milestone-10.json"): (
+        (_PLAN_INDEX_ISSUE, "dispatch-plan", "dispatch-plan/dispatch-milestone-10.json"): (
             _GitHubDispatchPersistence._serialize_envelope(
                 "dispatch-milestone-10", "", '{"milestone":{"number":10},"state":"final"}'
             )
         ),
-        (2531, "dispatch-plan", "dispatch-plan/dispatch-milestone-11.json"): (
+        (_PLAN_INDEX_ISSUE, "dispatch-plan", "dispatch-plan/dispatch-milestone-11.json"): (
             _GitHubDispatchPersistence._serialize_envelope("dispatch-milestone-11", "#3", '{"milestone":{"number":11}}')
         ),
     }
@@ -519,8 +535,8 @@ def test_github_content_provider_reads_dispatch_content_without_sam_plan_index(t
 def test_github_content_provider_reads_legacy_name_only_dispatch_index(tmp_path: Path) -> None:
     reference = ContentRef(kind=ContentKind.DISPATCH_PLAN, name="dispatch-milestone-10")
     remote_content = {
-        (2531, "dispatch-plan-index", "dispatch-plan/index.json"): '["dispatch-milestone-10"]',
-        (2531, "dispatch-plan", "dispatch-plan/dispatch-milestone-10.json"): "legacy",
+        (_PLAN_INDEX_ISSUE, "dispatch-plan-index", "dispatch-plan/index.json"): '["dispatch-milestone-10"]',
+        (_PLAN_INDEX_ISSUE, "dispatch-plan", "dispatch-plan/dispatch-milestone-10.json"): "legacy",
     }
     artifact_provider = MagicMock(spec=_RemoteArtifactProviderFakeSpec)
     artifact_provider.read_artifact_content_from_remote.side_effect = lambda owner, artifact_type, path: (
@@ -560,7 +576,7 @@ def test_artifact_registry_client_index_read_never_uses_local_artifact_storage()
     client = ArtifactRegistryClient(provider)
 
     # When: the index is absent from its configured remote provider
-    content = client.read_index(2531)
+    content = client.read_index(_PLAN_INDEX_ISSUE)
 
     # Then: the client reports the miss without accessing arbitrary local artifact storage
     assert content is None
@@ -575,7 +591,7 @@ def test_artifact_registry_client_index_read_raises_when_remote_is_unavailable()
 
     # When: the plan index is read
     with pytest.raises(PlanIndexUnavailableError):
-        client.read_index(2531)
+        client.read_index(_PLAN_INDEX_ISSUE)
 
     # Then: the failure remains distinct from a confirmed missing index
     provider.read_local_artifact_content.assert_not_called()
@@ -668,7 +684,7 @@ def test_github_plan_content_outage_uses_provider_cache(tmp_path: Path, operatio
     artifact_provider = MagicMock()
 
     def read_remote(owner: int, artifact_type: str, path: str) -> str | None:
-        if (owner, artifact_type, path) == (2531, "plan-index", "sam-plan/plan-index.yaml"):
+        if (owner, artifact_type, path) == (_PLAN_INDEX_ISSUE, "plan-index", "sam-plan/plan-index.yaml"):
             return index
         raise BacklogError("plan gist unavailable")
 
@@ -701,7 +717,7 @@ def test_github_dispatch_content_outage_uses_provider_cache(tmp_path: Path, oper
     artifact_provider = MagicMock()
 
     def read_remote(owner: int, artifact_type: str, path: str) -> str:
-        if (owner, artifact_type, path) == (2531, "dispatch-plan-index", "dispatch-plan/index.json"):
+        if (owner, artifact_type, path) == (_PLAN_INDEX_ISSUE, "dispatch-plan-index", "dispatch-plan/index.json"):
             return '{"version":1,"entries":[{"name":"dispatch-cached","owner_reference":""}]}'
         raise BacklogError("dispatch gist unavailable")
 

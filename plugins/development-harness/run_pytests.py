@@ -59,21 +59,20 @@ def default_parallelism(args: list[str]) -> list[str]:
     return [] if any("no:xdist" in arg for arg in args) else list(PARALLEL_ARGS)
 
 
-def main() -> int:
-    """Run this plugin's tests with no dependency on a parent directory.
+def isolated_options() -> list[str]:
+    """Return the options that replace parent pytest configuration for this plugin.
 
     ``-c os.devnull`` and ``--confcutdir`` keep a parent ``pyproject.toml`` and
     parent ``conftest.py`` files out of the run, so it behaves the same inside the
     monorepo and in a standalone copy. The options that parent config would
     have supplied are set here instead. ``TEST_PATHS`` go to pytest as
-    ``testpaths`` and ``FAST_MARKER`` as a leading ``-m``, so a caller's explicit
-    paths or ``-m`` replace them (``-m ""`` selects every marker).
+    ``testpaths``, so a caller's explicit paths replace them. Tests that start
+    their own pytest subprocess reuse this list, so it cannot drift from the runner.
 
     Returns:
-        The pytest process exit code.
+        The pytest options, without marker selection or parallelism.
     """
-    os.chdir(PLUGIN_ROOT)
-    return pytest.main([
+    return [
         "-c",
         os.devnull,
         "--rootdir",
@@ -88,11 +87,20 @@ def main() -> int:
         "--strict-markers",
         "--import-mode=importlib",
         "--asyncio-mode=auto",
-        "-m",
-        FAST_MARKER,
-        *default_parallelism(sys.argv[1:]),
-        *sys.argv[1:],
-    ])
+    ]
+
+
+def main() -> int:
+    """Run this plugin's tests with no dependency on a parent directory.
+
+    ``FAST_MARKER`` goes to pytest as a leading ``-m``, so a caller's explicit
+    ``-m`` replaces it (``-m ""`` selects every marker).
+
+    Returns:
+        The pytest process exit code.
+    """
+    os.chdir(PLUGIN_ROOT)
+    return pytest.main([*isolated_options(), "-m", FAST_MARKER, *default_parallelism(sys.argv[1:]), *sys.argv[1:]])
 
 
 if __name__ == "__main__":
