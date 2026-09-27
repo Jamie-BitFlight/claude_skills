@@ -2,6 +2,9 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = ["ruamel-yaml>=0.19.1"]
+#
+# [tool.ty.environment]
+# root = ["..", "."]
 # ///
 """Evaluate description triggering in disposable, per-sample projects.
 
@@ -13,6 +16,7 @@ User-level configuration is still inherited; this is not a clean-room model eval
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import math
 import os
@@ -197,14 +201,14 @@ def _read_process_output(process: subprocess.Popen[bytes], timeout: float, clean
 def _terminate(process: subprocess.Popen[bytes]) -> None:
     """Stop this sample's process group before disposing of its workspace."""
     if os.name == "posix":
-        try:
+        with contextlib.suppress(ProcessLookupError):
             os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
     elif process.poll() is None:
         subprocess.run(
             ["taskkill", "/PID", str(process.pid), "/T", "/F"],
-            check=True, capture_output=True, timeout=_CLEANUP_SECONDS,
+            check=True,
+            capture_output=True,
+            timeout=_CLEANUP_SECONDS,
         )
     process.wait(timeout=_CLEANUP_SECONDS)
 
@@ -231,8 +235,12 @@ def run_single_query(
         with tempfile.TemporaryFile() as stderr:
             try:
                 process = subprocess.Popen(
-                    _build_claude_cmd(query, model), stdout=subprocess.PIPE, stderr=stderr,
-                    cwd=workspace, env=env, start_new_session=os.name == "posix",
+                    _build_claude_cmd(query, model),
+                    stdout=subprocess.PIPE,
+                    stderr=stderr,
+                    cwd=workspace,
+                    env=env,
+                    start_new_session=os.name == "posix",
                 )
                 try:
                     return _read_process_output(process, timeout, clean_name)
@@ -247,9 +255,15 @@ def run_single_query(
 
 
 def run_eval(
-    eval_set: list[dict[str, Any]], skill_name: str, description: str, num_workers: int,
-    timeout: int, project_root: Path, runs_per_query: int = 1,
-    trigger_threshold: float = 0.5, model: str | None = None,
+    eval_set: list[dict[str, Any]],
+    skill_name: str,
+    description: str,
+    num_workers: int,
+    timeout: int,
+    project_root: Path,
+    runs_per_query: int = 1,
+    trigger_threshold: float = 0.5,
+    model: str | None = None,
 ) -> dict[str, Any]:
     """Keep invalid runs out of behavioral denominators and passing case verdicts."""
     validate_eval_set(eval_set)
@@ -260,9 +274,11 @@ def run_eval(
     observations: dict[str, list[dict[str, Any]]] = {item["query"]: [] for item in eval_set}
     with ThreadPoolExecutor(max_workers=num_workers) as executor:
         futures = {
-            executor.submit(run_single_query, item["query"], skill_name, description, timeout, str(project_root), model):
-            (item["query"], run + 1)
-            for item in eval_set for run in range(runs_per_query)
+            executor.submit(
+                run_single_query, item["query"], skill_name, description, timeout, str(project_root), model
+            ): (item["query"], run + 1)
+            for item in eval_set
+            for run in range(runs_per_query)
         }
         for future in as_completed(futures):
             query, run = futures[future]
@@ -283,14 +299,34 @@ def run_eval(
         passed = None
         if valid == runs_per_query and rate is not None:
             passed = rate >= trigger_threshold if item["should_trigger"] else rate < trigger_threshold
-        results.append({**item, "trigger_rate": rate, "triggers": triggers, "runs": len(records),
-                        "valid_runs": valid, "errors": len(records) - valid, "pass": passed, "observations": records})
-    summary = {"total": len(results), "passed": sum(r["pass"] is True for r in results),
-               "failed": sum(r["pass"] is False for r in results),
-               "inconclusive": sum(r["pass"] is None for r in results)}
-    return {"skill_name": skill_name, "description": description, "results": results, "summary": summary,
-            "environment": {"model": model, "caller_project": str(project_root),
-                            "sample_project": "disposable-per-run", "user_host_context": "inherited-not-isolated"}}
+        results.append({
+            **item,
+            "trigger_rate": rate,
+            "triggers": triggers,
+            "runs": len(records),
+            "valid_runs": valid,
+            "errors": len(records) - valid,
+            "pass": passed,
+            "observations": records,
+        })
+    summary = {
+        "total": len(results),
+        "passed": sum(r["pass"] is True for r in results),
+        "failed": sum(r["pass"] is False for r in results),
+        "inconclusive": sum(r["pass"] is None for r in results),
+    }
+    return {
+        "skill_name": skill_name,
+        "description": description,
+        "results": results,
+        "summary": summary,
+        "environment": {
+            "model": model,
+            "caller_project": str(project_root),
+            "sample_project": "disposable-per-run",
+            "user_host_context": "inherited-not-isolated",
+        },
+    }
 
 
 def main() -> None:
@@ -309,8 +345,17 @@ def main() -> None:
     try:
         eval_set = json.loads(Path(args.eval_set).read_text(encoding="utf-8"))
         name, description, _ = parse_skill_md(Path(args.skill_path))
-        output = run_eval(eval_set, name, args.description or description, args.num_workers, args.timeout,
-                          find_project_root(), args.runs_per_query, args.trigger_threshold, args.model)
+        output = run_eval(
+            eval_set,
+            name,
+            args.description or description,
+            args.num_workers,
+            args.timeout,
+            find_project_root(),
+            args.runs_per_query,
+            args.trigger_threshold,
+            args.model,
+        )
     except (OSError, ValueError) as exc:
         print(json.dumps({"error": str(exc)}), file=sys.stderr)
         raise SystemExit(2) from exc

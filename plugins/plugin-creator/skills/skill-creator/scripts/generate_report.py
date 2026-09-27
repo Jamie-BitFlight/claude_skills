@@ -4,6 +4,7 @@
 The input's legacy test_* fields represent candidate selection, not an untouched
 final generalization test. Only the producer's eligible candidate is highlighted.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -40,9 +41,14 @@ def score_class(correct: int, total: int) -> str:
 
 def _build_html_header(title_prefix: str, refresh_tag: str) -> str:
     """Retain the report's table layout with explicit evidence-state styling."""
-    return """<!DOCTYPE html>
-<html><head><meta charset="utf-8">""" + refresh_tag + """
-<title>""" + title_prefix + """Skill Description Optimization</title>
+    return (
+        """<!DOCTYPE html>
+<html><head><meta charset="utf-8">"""
+        + refresh_tag
+        + """
+<title>"""
+        + title_prefix
+        + """Skill Description Optimization</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600&family=Lora:wght@400;500&display=swap" rel="stylesheet">
@@ -70,13 +76,16 @@ td.test-result { background:#f0f6fc; }
 th.positive-col { border-bottom:3px solid #788c5d; } th.negative-col { border-bottom:3px solid #c44; }
 .legend { display:flex; gap:20px; margin-bottom:10px; font-size:13px; }
 pre { white-space:pre-wrap; text-align:left; font-size:12px; }
-</style></head><body><h1>""" + title_prefix + """Skill Description Optimization</h1>
+</style></head><body><h1>"""
+        + title_prefix
+        + """Skill Description Optimization</h1>
 <div class="explainer">Training cases guide description changes. Selection cases choose among candidates;
 the legacy <code>test_*</code> fields do not represent an untouched final test.
 Scores count valid observations only. INCONCLUSIVE cases retain execution failures and cannot pass
 or qualify a candidate for selection. A matching invocation does not prove successful skill execution.
 The report does not apply a description to the skill.</div>
 """
+    )
 
 
 def _build_summary_section(data: dict, best_test_score: object) -> str:
@@ -91,7 +100,7 @@ def _build_summary_section(data: dict, best_test_score: object) -> str:
 <p><strong>Original:</strong> {original}</p><p class="best"><strong>Candidate:</strong> {best}</p>
 <p><strong>Score:</strong> {score} ({role})</p><p><strong>Exit:</strong> {reason}</p>
 <p><strong>Final generalization test:</strong> {final}</p>
-<p>Iterations: {data.get('iterations_run', 0)} | Training: {data.get('train_size', '?')} | Selection: {data.get('test_size', '?')}</p>
+<p>Iterations: {data.get("iterations_run", 0)} | Training: {data.get("train_size", "?")} | Selection: {data.get("test_size", "?")}</p>
 </div>"""
 
 
@@ -108,7 +117,9 @@ def _build_table_header_cols(train_queries: list[dict], test_queries: list[dict]
 def _result_cell(result: dict, extra_class: str = "") -> str:
     """Render incomplete observations separately from observed behavioral failures."""
     passed = result.get("pass")
-    label, css = ("✓", "pass") if passed is True else (("✗", "fail") if passed is False else ("INCONCLUSIVE", "inconclusive"))
+    label, css = (
+        ("✓", "pass") if passed is True else (("✗", "fail") if passed is False else ("INCONCLUSIVE", "inconclusive"))
+    )
     attempted = result.get("runs", 0)
     valid = result.get("valid_runs", attempted if passed is not None else 0)
     errors = result.get("errors", attempted - valid)
@@ -116,11 +127,15 @@ def _result_cell(result: dict, extra_class: str = "") -> str:
     if errors:
         raw = html.escape(json.dumps(result.get("observations", []), ensure_ascii=False))
         details = f"<details><summary>Execution evidence</summary><pre>{raw}</pre></details>"
-    return (f'<td class="result {extra_class} {css}">{label}<span class="rate">'
-            f'{result.get("triggers", 0)}/{valid} valid; {attempted} attempted; {errors} errors</span>{details}</td>')
+    return (
+        f'<td class="result {extra_class} {css}">{label}<span class="rate">'
+        f"{result.get('triggers', 0)}/{valid} valid; {attempted} attempted; {errors} errors</span>{details}</td>"
+    )
 
 
-def _build_iteration_row(history: dict, train_queries: list[dict], test_queries: list[dict], best_iter: object) -> list[str]:
+def _build_iteration_row(
+    history: dict, train_queries: list[dict], test_queries: list[dict], best_iter: object
+) -> list[str]:
     """Use the producer's candidate identity, not a second selection algorithm."""
     train = history.get("train_results", history.get("results", [])) or []
     selection = history.get("test_results") or []
@@ -128,7 +143,9 @@ def _build_iteration_row(history: dict, train_queries: list[dict], test_queries:
     selection_by_query = {item["query"]: item for item in selection}
     row_class = "best-row" if best_iter is not None and history.get("iteration") == best_iter else ""
     complete = history.get("complete") is True
-    cells = [f'<tr class="{row_class}"><td>{history.get("iteration", "?")}' + ("" if complete else " INCOMPLETE") + "</td>"]
+    cells = [
+        f'<tr class="{row_class}"><td>{history.get("iteration", "?")}' + ("" if complete else " INCOMPLETE") + "</td>"
+    ]
     for group in (train, selection):
         correct, total = aggregate_runs(group)
         cells.append(f'<td><span class="score {score_class(correct, total)}">{correct}/{total} valid</span></td>')
@@ -148,10 +165,14 @@ def generate_html(data: dict, auto_refresh: bool = False, skill_name: str = "") 
     title = html.escape(skill_name + " — ") if skill_name else ""
     # Retain the existing five-second live-display refresh, not an evaluation budget.
     refresh = '<meta http-equiv="refresh" content="5">' if auto_refresh else ""
-    parts = [_build_html_header(title, refresh), _build_summary_section(data, data.get("best_test_score")),
-             '<div class="legend">Green underline: should trigger. Red: should not trigger. Blue columns: selection.</div>',
-             '<div class="table-container"><table><thead><tr><th>Iter</th><th>Training</th><th>Selection</th><th class="query-col">Description</th>',
-             *_build_table_header_cols(train, selection), "</tr></thead><tbody>"]
+    parts = [
+        _build_html_header(title, refresh),
+        _build_summary_section(data, data.get("best_test_score")),
+        '<div class="legend">Green underline: should trigger. Red: should not trigger. Blue columns: selection.</div>',
+        '<div class="table-container"><table><thead><tr><th>Iter</th><th>Training</th><th>Selection</th><th class="query-col">Description</th>',
+        *_build_table_header_cols(train, selection),
+        "</tr></thead><tbody>",
+    ]
     for entry in history:
         parts.extend(_build_iteration_row(entry, train, selection, data.get("best_iteration")))
     parts.extend(["</tbody></table></div></body></html>"])

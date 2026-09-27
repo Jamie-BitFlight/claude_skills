@@ -5,6 +5,7 @@ Supports eval-N/<configuration>/run-N and runs/eval-N/<configuration>/run-N.
 Missing values remain null. A report accounts for observed directories only; it
 cannot establish that an unprovided expected run inventory was completed.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -15,7 +16,6 @@ from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-
 
 METRICS = ("pass_rate", "time_seconds", "tokens")
 
@@ -29,8 +29,13 @@ def calculate_stats(values: list[float | int | None]) -> dict[str, float | int |
         return {**result, "mean": None, "stddev": None, "min": None, "max": None}
     mean = sum(observed) / n
     deviation = math.sqrt(sum((v - mean) ** 2 for v in observed) / (n - 1)) if n > 1 else 0.0
-    return {**result, "mean": round(mean, 4), "stddev": round(deviation, 4),
-            "min": round(min(observed), 4), "max": round(max(observed), 4)}
+    return {
+        **result,
+        "mean": round(mean, 4),
+        "stddev": round(deviation, 4),
+        "min": round(min(observed), 4),
+        "max": round(max(observed), 4),
+    }
 
 
 def _read_object(path: Path, gaps: list[str]) -> dict[str, Any]:
@@ -47,8 +52,7 @@ def _read_object(path: Path, gaps: list[str]) -> dict[str, Any]:
 
 def _number(value: Any, *, integer: bool = False) -> bool:
     """Exclude booleans, non-finite numbers, negative counts and unit mismatches."""
-    return (type(value) in (int, float) and math.isfinite(value) and value >= 0
-            and (not integer or type(value) is int))
+    return type(value) in (int, float) and math.isfinite(value) and value >= 0 and (not integer or type(value) is int)
 
 
 def _resolve_eval_id(eval_dir: Path, eval_idx: int) -> int | str:
@@ -57,7 +61,7 @@ def _resolve_eval_id(eval_dir: Path, eval_idx: int) -> int | str:
     if metadata.exists():
         gaps: list[str] = []
         value = _read_object(metadata, gaps).get("eval_id")
-        if type(value) in (int, str):
+        if isinstance(value, (int, str)) and not isinstance(value, bool):
             return value
         if gaps:
             print("\n".join(gaps), file=sys.stderr)
@@ -79,7 +83,10 @@ def _load_timing(result: dict, grading: dict, run_dir: Path) -> None:
         if path.exists():
             carriers.append((filename, _read_object(path, gaps)))
     provenance = result.setdefault("measurement_sources", {})
-    for target, source, integer in (("time_seconds", "total_duration_seconds", False), ("tokens", "total_tokens", True)):
+    for target, source, integer in (
+        ("time_seconds", "total_duration_seconds", False),
+        ("tokens", "total_tokens", True),
+    ):
         observations = []
         invalid = False
         for name, data in carriers:
@@ -111,8 +118,11 @@ def _build_run_result(eval_id: int | str, run_number: int, grading: dict, gradin
     for key in ("passed", "failed", "total"):
         value = summary.get(key)
         result[key] = value if _number(value, integer=True) else None
-    counts_valid = (all(result[key] is not None for key in ("passed", "failed", "total"))
-                    and result["total"] > 0 and result["passed"] + result["failed"] == result["total"])
+    counts_valid = (
+        all(result[key] is not None for key in ("passed", "failed", "total"))
+        and result["total"] > 0
+        and result["passed"] + result["failed"] == result["total"]
+    )
     result["pass_rate"] = result["passed"] / result["total"] if counts_valid else None
     if not counts_valid:
         result["measurement_gaps"].append(f"{grading_file}: missing or inconsistent grading counts")
@@ -120,7 +130,11 @@ def _build_run_result(eval_id: int | str, run_number: int, grading: dict, gradin
     metrics = grading.get("execution_metrics", {})
     if not isinstance(metrics, dict):
         metrics = {}
-    for target, source in (("tool_calls", "total_tool_calls"), ("errors", "errors_encountered"), ("output_chars", "output_chars")):
+    for target, source in (
+        ("tool_calls", "total_tool_calls"),
+        ("errors", "errors_encountered"),
+        ("output_chars", "output_chars"),
+    ):
         value = metrics.get(source)
         result[target] = value if _number(value, integer=True) else None
         if value is not None and result[target] is None:
@@ -169,8 +183,10 @@ def load_run_results(benchmark_dir: Path) -> dict[str, list]:
 
 def aggregate_results(results: dict) -> dict:
     """Report per-metric coverage; compare only complete matching observed arms."""
-    stats = {config: {metric: calculate_stats([run.get(metric) for run in runs]) for metric in METRICS}
-             for config, runs in results.items()}
+    stats = {
+        config: {metric: calculate_stats([run.get(metric) for run in runs]) for metric in METRICS}
+        for config, runs in results.items()
+    }
     configs = list(results)
     delta = dict.fromkeys(METRICS)
     # The public convention is first configuration minus second configuration.
@@ -182,33 +198,56 @@ def aggregate_results(results: dict) -> dict:
         if left and left_keys == right_keys and all(count == 1 for count in left_keys.values()):
             for metric, precision in (("pass_rate", 2), ("time_seconds", 1), ("tokens", 0)):
                 a, b = (stats[config][metric] for config in configs)
-                if a["missing"] == b["missing"] == 0:
-                    delta[metric] = f"{a['mean'] - b['mean']:+.{precision}f}"
+                left_mean, right_mean = a["mean"], b["mean"]
+                if a["missing"] == b["missing"] == 0 and left_mean is not None and right_mean is not None:
+                    delta[metric] = f"{left_mean - right_mean:+.{precision}f}"
     return {**stats, "delta": delta}
 
 
 def generate_benchmark(benchmark_dir: Path, skill_name: str = "", skill_path: str = "") -> dict:
     """Bind statistics to observed counts and distinguish unavailable measurements."""
     results = load_run_results(benchmark_dir)
-    runs = [{"eval_id": run["eval_id"], "configuration": config, "run_number": run["run_number"],
-             "result": {key: run.get(key) for key in (*METRICS, "passed", "failed", "total", "tool_calls", "errors", "output_chars")},
-             "expectations": run["expectations"], "notes": run["notes"],
-             "measurement_gaps": run["measurement_gaps"], "measurement_sources": run["measurement_sources"]}
-            for config, records in results.items() for run in records]
+    runs: list[dict[str, Any]] = [
+        {
+            "eval_id": run["eval_id"],
+            "configuration": config,
+            "run_number": run["run_number"],
+            "result": {
+                key: run.get(key)
+                for key in (*METRICS, "passed", "failed", "total", "tool_calls", "errors", "output_chars")
+            },
+            "expectations": run["expectations"],
+            "notes": run["notes"],
+            "measurement_gaps": run["measurement_gaps"],
+            "measurement_sources": run["measurement_sources"],
+        }
+        for config, records in results.items()
+        for run in records
+    ]
     counts = Counter((run["eval_id"], run["configuration"]) for run in runs)
     uniform = set(counts.values())
-    run_counts = [{"eval_id": eid, "configuration": config, "observed_runs": count}
-                  for (eid, config), count in counts.items()]
+    run_counts = [
+        {"eval_id": eid, "configuration": config, "observed_runs": count} for (eid, config), count in counts.items()
+    ]
     complete = bool(runs) and all(run["result"]["pass_rate"] is not None for run in runs)
-    return {"metadata": {"skill_name": skill_name or "<skill-name>", "skill_path": skill_path or "<path/to/skill>",
-                         "executor_model": "<model-name>", "analyzer_model": "<model-name>",
-                         "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                         "evals_run": sorted({run["eval_id"] for run in runs}, key=str),
-                         "runs_per_configuration": next(iter(uniform)) if len(uniform) == 1 else None,
-                         "run_counts": run_counts, "coverage": "observed-directories-only",
-                         "units": {"time_seconds": "seconds", "tokens": "tokens", "output_chars": "characters"},
-                         "grading_status": "COMPLETE" if complete else "INCOMPLETE"},
-            "runs": runs, "run_summary": aggregate_results(results), "notes": []}
+    return {
+        "metadata": {
+            "skill_name": skill_name or "<skill-name>",
+            "skill_path": skill_path or "<path/to/skill>",
+            "executor_model": "<model-name>",
+            "analyzer_model": "<model-name>",
+            "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "evals_run": sorted({run["eval_id"] for run in runs}, key=str),
+            "runs_per_configuration": next(iter(uniform)) if len(uniform) == 1 else None,
+            "run_counts": run_counts,
+            "coverage": "observed-directories-only",
+            "units": {"time_seconds": "seconds", "tokens": "tokens", "output_chars": "characters"},
+            "grading_status": "COMPLETE" if complete else "INCOMPLETE",
+        },
+        "runs": runs,
+        "run_summary": aggregate_results(results),
+        "notes": [],
+    }
 
 
 def _display(stats: dict, metric: str) -> str:
@@ -216,28 +255,47 @@ def _display(stats: dict, metric: str) -> str:
     if stats.get("mean") is None:
         return f"N/A (observed {stats.get('observed', 0)}, missing {stats.get('missing', 0)})"
     scale, suffix = (100, "%") if metric == "pass_rate" else (1, "s" if metric == "time_seconds" else "")
-    return (f"{stats['mean'] * scale:.2f}{suffix} ± {stats['stddev'] * scale:.2f}{suffix} "
-            f"(n={stats.get('observed', '?')}, missing={stats.get('missing', '?')})")
+    return (
+        f"{stats['mean'] * scale:.2f}{suffix} ± {stats['stddev'] * scale:.2f}{suffix} "
+        f"(n={stats.get('observed', '?')}, missing={stats.get('missing', '?')})"
+    )
 
 
 def generate_markdown(benchmark: dict) -> str:
     """Render all observed configurations with measurement coverage and pairing limits."""
     metadata, summary = benchmark["metadata"], benchmark["run_summary"]
     configs = [key for key in summary if key != "delta"]
-    lines = [f"# Skill Benchmark: {metadata['skill_name']}", "", f"**Model**: {metadata['executor_model']}",
-             f"**Date**: {metadata['timestamp']}", f"**Grading**: {metadata.get('grading_status', 'UNKNOWN')}",
-             "**Coverage**: observed run directories only; missing expected directories are not discoverable.", "",
-             "## Observed repetitions", ""]
-    for count in metadata.get("run_counts", []):
-        lines.append(f"- Eval {count['eval_id']}, {count['configuration']}: {count['observed_runs']} observed run(s)")
-    lines.extend(["", "## Summary", "", "| Metric | " + " | ".join(configs) + " | Delta |",
-                  "|---|" + "---|" * (len(configs) + 1)])
+    lines = [
+        f"# Skill Benchmark: {metadata['skill_name']}",
+        "",
+        f"**Model**: {metadata['executor_model']}",
+        f"**Date**: {metadata['timestamp']}",
+        f"**Grading**: {metadata.get('grading_status', 'UNKNOWN')}",
+        "**Coverage**: observed run directories only; missing expected directories are not discoverable.",
+        "",
+        "## Observed repetitions",
+        "",
+    ]
+    lines.extend(
+        f"- Eval {count['eval_id']}, {count['configuration']}: {count['observed_runs']} observed run(s)"
+        for count in metadata.get("run_counts", [])
+    )
+    lines.extend([
+        "",
+        "## Summary",
+        "",
+        "| Metric | " + " | ".join(configs) + " | Delta |",
+        "|---|" + "---|" * (len(configs) + 1),
+    ])
     for metric in METRICS:
         cells = [_display(summary[config].get(metric, {}), metric) for config in configs]
         lines.append("| " + metric + " | " + " | ".join(cells) + " | " + (summary["delta"].get(metric) or "N/A") + " |")
     lines.extend(["", "Delta is first arm minus second, only for two complete matching observed case/run sets."])
-    gaps = [f"Eval {run['eval_id']}/{run['configuration']}/run-{run['run_number']}: {gap}"
-            for run in benchmark["runs"] for gap in run.get("measurement_gaps", [])]
+    gaps = [
+        f"Eval {run['eval_id']}/{run['configuration']}/run-{run['run_number']}: {gap}"
+        for run in benchmark["runs"]
+        for gap in run.get("measurement_gaps", [])
+    ]
     notes = [*benchmark.get("notes", []), *gaps]
     if notes:
         lines.extend(["", "## Notes", "", *(f"- {note}" for note in notes)])
@@ -262,8 +320,13 @@ def main() -> None:
     except (OSError, ValueError) as exc:
         print(json.dumps({"error": str(exc)}), file=sys.stderr)
         raise SystemExit(2) from exc
-    print(json.dumps({"benchmark": str(output), "report": str(output.with_suffix('.md')),
-                      "grading_status": benchmark["metadata"]["grading_status"]}))
+    print(
+        json.dumps({
+            "benchmark": str(output),
+            "report": str(output.with_suffix(".md")),
+            "grading_status": benchmark["metadata"]["grading_status"],
+        })
+    )
     raise SystemExit(0 if benchmark["metadata"]["grading_status"] == "COMPLETE" else 2)
 
 

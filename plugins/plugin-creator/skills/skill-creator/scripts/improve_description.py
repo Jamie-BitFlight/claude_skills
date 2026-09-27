@@ -2,6 +2,9 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = ["anthropic>=0.89.0", "ruamel-yaml>=0.19.1"]
+#
+# [tool.ty.environment]
+# root = ["..", "."]
 # ///
 """Improve a skill description based on eval results.
 

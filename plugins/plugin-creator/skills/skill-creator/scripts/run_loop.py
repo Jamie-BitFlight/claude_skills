@@ -2,12 +2,16 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = ["anthropic>=0.89.0", "ruamel-yaml>=0.19.1"]
+#
+# [tool.ty.environment]
+# root = ["..", "."]
 # ///
 """Optimize descriptions using training and candidate-selection observations.
 
 Legacy test_* JSON keys name the selection set, not an untouched final test.
 Incomplete execution is not a negative observation or an eligible candidate.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -20,12 +24,16 @@ import time
 import webbrowser
 from pathlib import Path
 
+import anthropic
+
 if __package__:
     from .generate_report import generate_html
+    from .improve_description import improve_description
     from .run_eval import find_project_root, run_eval, validate_eval_set
     from .utils import parse_skill_md
 else:
     from generate_report import generate_html
+    from improve_description import improve_description
     from run_eval import find_project_root, run_eval, validate_eval_set
     from utils import parse_skill_md
 
@@ -56,9 +64,12 @@ def split_eval_set(eval_set: list[dict], holdout: float, seed: int = 42) -> tupl
 
 def _summarize(results: list[dict]) -> dict:
     """Keep case failures and inconclusive observations separate."""
-    return {"total": len(results), "passed": sum(r.get("pass") is True for r in results),
-            "failed": sum(r.get("pass") is False for r in results),
-            "inconclusive": sum(r.get("pass") is None for r in results)}
+    return {
+        "total": len(results),
+        "passed": sum(r.get("pass") is True for r in results),
+        "failed": sum(r.get("pass") is False for r in results),
+        "inconclusive": sum(r.get("pass") is None for r in results),
+    }
 
 
 def _split_results(all_results: dict, train_set: list[dict]) -> tuple[dict, dict | None]:
@@ -66,8 +77,10 @@ def _split_results(all_results: dict, train_set: list[dict]) -> tuple[dict, dict
     train_queries = {item["query"] for item in train_set}
     train = [r for r in all_results["results"] if r["query"] in train_queries]
     selection = [r for r in all_results["results"] if r["query"] not in train_queries]
-    return ({"results": train, "summary": _summarize(train)},
-            {"results": selection, "summary": _summarize(selection)} if selection else None)
+    return (
+        {"results": train, "summary": _summarize(train)},
+        {"results": selection, "summary": _summarize(selection)} if selection else None,
+    )
 
 
 def _build_history_entry(iteration: int, description: str, train_results: dict, test_results: dict | None) -> dict:
@@ -85,8 +98,13 @@ def _build_history_entry(iteration: int, description: str, train_results: dict, 
 
 def _compute_best(history: list[dict], test_set: list[dict]) -> tuple[dict | None, str]:
     """Select only fully observed candidates; a holdout used here is a selection set."""
-    eligible = [h for h in history if h.get("complete") is True and h.get("train_total", 0) > 0
-                and (not test_set or h.get("test_total", 0) == len(test_set))]
+    eligible = [
+        h
+        for h in history
+        if h.get("complete") is True
+        and h.get("train_total", 0) > 0
+        and (not test_set or h.get("test_total", 0) == len(test_set))
+    ]
     if not eligible:
         return None, "INCONCLUSIVE"
     prefix = "test" if test_set else "train"
@@ -95,22 +113,25 @@ def _compute_best(history: list[dict], test_set: list[dict]) -> tuple[dict | Non
 
 
 def _propose_description(**kwargs) -> str:
-    """Load the provider only after completed evidence actually needs improvement."""
-    import anthropic
-
-    if __package__:
-        from .improve_description import improve_description
-    else:
-        from improve_description import improve_description
+    """Open a provider client only after completed evidence actually needs improvement."""
     with anthropic.Anthropic() as client:
         return improve_description(client=client, **kwargs)
 
 
 def run_loop(
-    eval_set: list[dict], skill_path: Path, description_override: str | None,
-    num_workers: int, timeout: int, max_iterations: int, runs_per_query: int,
-    trigger_threshold: float, holdout: float, model: str, verbose: bool,
-    live_report_path: Path | None = None, log_dir: Path | None = None,
+    eval_set: list[dict],
+    skill_path: Path,
+    description_override: str | None,
+    num_workers: int,
+    timeout: int,
+    max_iterations: int,
+    runs_per_query: int,
+    trigger_threshold: float,
+    holdout: float,
+    model: str,
+    verbose: bool,
+    live_report_path: Path | None = None,
+    log_dir: Path | None = None,
 ) -> dict:
     """Run comparable iterations, retaining errors and selection provenance.
 
@@ -128,8 +149,17 @@ def run_loop(
     output = {}
     for iteration in range(1, max_iterations + 1):
         started = time.monotonic()
-        result = run_eval(train_set + test_set, name, current_description, num_workers, timeout,
-                          project_root, runs_per_query, trigger_threshold, model)
+        result = run_eval(
+            train_set + test_set,
+            name,
+            current_description,
+            num_workers,
+            timeout,
+            project_root,
+            runs_per_query,
+            trigger_threshold,
+            model,
+        )
         # Missing/duplicate/unexpected case returns invalidate the comparison.
         expected = {item["query"] for item in eval_set}
         actual = [item["query"] for item in result["results"]]
@@ -139,18 +169,33 @@ def run_loop(
         entry = _build_history_entry(iteration, current_description, train, selection)
         history.append(entry)
         if verbose:
-            print(json.dumps({"iteration": iteration, "train": train["summary"],
-                              "selection": selection["summary"] if selection else None,
-                              "elapsed_seconds": time.monotonic() - started}), file=sys.stderr)
+            print(
+                json.dumps({
+                    "iteration": iteration,
+                    "train": train["summary"],
+                    "selection": selection["summary"] if selection else None,
+                    "elapsed_seconds": time.monotonic() - started,
+                }),
+                file=sys.stderr,
+            )
         best, score = _compute_best(history, test_set)
-        output = {"original_description": original_description, "best_description": best["description"] if best else None,
-                  "best_iteration": best["iteration"] if best else None, "best_score": score,
-                  "best_train_score": f"{best['train_passed']}/{best['train_total']}" if best else None,
-                  "best_test_score": f"{best['test_passed']}/{best['test_total']}" if best and test_set else None,
-                  "final_description": current_description, "iterations_run": len(history), "holdout": holdout,
-                  "train_size": len(train_set), "test_size": len(test_set), "history": history,
-                  "holdout_role": "candidate-selection" if test_set else "none",
-                  "final_generalization_test": "NOT_RUN", "environment": result.get("environment", {})}
+        output = {
+            "original_description": original_description,
+            "best_description": best["description"] if best else None,
+            "best_iteration": best["iteration"] if best else None,
+            "best_score": score,
+            "best_train_score": f"{best['train_passed']}/{best['train_total']}" if best else None,
+            "best_test_score": f"{best['test_passed']}/{best['test_total']}" if best and test_set else None,
+            "final_description": current_description,
+            "iterations_run": len(history),
+            "holdout": holdout,
+            "train_size": len(train_set),
+            "test_size": len(test_set),
+            "history": history,
+            "holdout_role": "candidate-selection" if test_set else "none",
+            "final_generalization_test": "NOT_RUN",
+            "environment": result.get("environment", {}),
+        }
         if live_report_path:
             live_report_path.write_text(generate_html(output, auto_refresh=True, skill_name=name), encoding="utf-8")
         if not entry["complete"]:
@@ -164,15 +209,26 @@ def run_loop(
         # Selection observations are never fed to the description-writing model.
         blinded = [{k: v for k, v in item.items() if not k.startswith("test_") and k != "complete"} for item in history]
         current_description = _propose_description(
-            skill_name=name, skill_content=content, current_description=current_description,
-            eval_results=train, history=blinded, model=model, log_dir=log_dir, iteration=iteration,
+            skill_name=name,
+            skill_content=content,
+            current_description=current_description,
+            eval_results=train,
+            history=blinded,
+            model=model,
+            log_dir=log_dir,
+            iteration=iteration,
         )
     output["exit_reason"] = exit_reason
     # Earlier complete results remain recorded after a later failed experiment,
     # but an incomplete comparison never supplies an actionable recommendation.
     if exit_reason == "inconclusive_evaluation":
-        output.update(best_description=None, best_iteration=None, best_score="INCONCLUSIVE",
-                      best_train_score=None, best_test_score=None)
+        output.update(
+            best_description=None,
+            best_iteration=None,
+            best_score="INCONCLUSIVE",
+            best_train_score=None,
+            best_test_score=None,
+        )
     return output
 
 
@@ -208,15 +264,29 @@ def main() -> None:
                     report = Path(file.name)
             else:
                 report = Path(args.report)
-            report.write_text("<html><body>Evaluation starting<meta http-equiv='refresh' content='5'></body></html>", encoding="utf-8")
+            report.write_text(
+                "<html><body>Evaluation starting<meta http-equiv='refresh' content='5'></body></html>", encoding="utf-8"
+            )
             webbrowser.open(str(report))
         if args.results_dir:
             parent = Path(args.results_dir)
             parent.mkdir(parents=True, exist_ok=True)
             results_dir = Path(tempfile.mkdtemp(prefix=time.strftime("%Y-%m-%d_%H%M%S_"), dir=parent))
-        output = run_loop(cases, skill, args.description, args.num_workers, args.timeout, args.max_iterations,
-                          args.runs_per_query, args.trigger_threshold, args.holdout, args.model, args.verbose,
-                          report, results_dir / "logs" if results_dir else None)
+        output = run_loop(
+            cases,
+            skill,
+            args.description,
+            args.num_workers,
+            args.timeout,
+            args.max_iterations,
+            args.runs_per_query,
+            args.trigger_threshold,
+            args.holdout,
+            args.model,
+            args.verbose,
+            report,
+            results_dir / "logs" if results_dir else None,
+        )
         serialized = json.dumps(output, separators=(",", ":"), allow_nan=False)
         print(serialized)
         if results_dir:
