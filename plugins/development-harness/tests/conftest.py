@@ -280,22 +280,3 @@ def write_test_item() -> object:
         return reference
 
     return _write
-
-
-# ---------------------------------------------------------------------------
-# State isolation
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture(autouse=True)
-def _isolated_state_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) -> None:
-    """Redirect DH_STATE_HOME to a temp directory for all non-e2e tests.
-
-    Without this, dh_paths.state_root() falls back to the real ~/.dh/projects/{slug}/
-    directory, letting any test that reaches it (dispatch state, SAM context, etc.)
-    read or write real user state. Skips for tests marked @pytest.mark.e2e, which
-    set up their own DH_STATE_HOME to exercise the real runtime path.
-    """
-    if request.node.get_closest_marker("e2e"):
-        return
-    monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh_state"))

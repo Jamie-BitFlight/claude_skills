@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["anthropic>=0.89.0", "ruamel-yaml>=0.19.1"]
+#
+# [tool.ty.environment]
+# root = ["..", "."]
+# ///
 """Improve a skill description based on eval results.
 
 Takes eval results (from run_eval.py) and generates an improved description
@@ -17,7 +24,10 @@ from typing import TYPE_CHECKING
 import anthropic
 from anthropic.types import TextBlock, ThinkingBlock
 
-from scripts.utils import parse_skill_md
+if __package__:
+    from .utils import parse_skill_md
+else:
+    from utils import parse_skill_md
 
 if TYPE_CHECKING:
     from anthropic.types import MessageParam
@@ -46,6 +56,17 @@ def _build_prompt(
     Returns:
         The formatted prompt string ready to send to Claude.
     """
+    # A provider failure is not evidence that description wording was wrong.
+    # This guard also protects callers invoking improve_description directly.
+    records = [eval_results, *([test_results] if test_results is not None else [])]
+    for record in records:
+        rows = record.get("results", [])
+        if not rows or any(type(row.get("pass")) is not bool or row.get("errors", 0) for row in rows):
+            raise ValueError("description improvement requires complete behavioral observations")
+    for previous in history:
+        if any(type(row.get("pass")) is not bool or row.get("errors", 0) for row in previous.get("results", [])):
+            raise ValueError("description history contains incomplete behavioral observations")
+
     failed_triggers = [r for r in eval_results["results"] if r["should_trigger"] and not r["pass"]]
     false_triggers = [r for r in eval_results["results"] if not r["should_trigger"] and not r["pass"]]
 

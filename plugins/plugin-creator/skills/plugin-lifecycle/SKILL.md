@@ -25,6 +25,10 @@ Arguments: `<invocation_args/>`
 - `new <concept>` — Create a plugin from scratch. Enters at Phase 0 (RT-ICA Prerequisite Check).
 - `existing <plugin-path>` — Improve an existing plugin. Enters at Phase 1 (Assess).
 
+## Plugin project boundary
+
+Before designing or changing plugin layout, read `references/plugin-project-layout.md` and classify proposed files as plugin product or repository development policy. Apply its isolation and extraction gates before accepting the design.
+
 ## Domain Knowledge Prerequisites
 
 Load the branch-specific prerequisites from `references/domain-knowledge-prerequisites.md` before

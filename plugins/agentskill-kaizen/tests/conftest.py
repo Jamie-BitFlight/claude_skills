@@ -36,7 +36,11 @@ def pytest_configure(config: pytest.Config) -> None:
     tests, so this must not disable xdist globally -- only when every
     collection target on the command line resolves under this directory.
     xdist reads numprocesses/dist in pytest_sessionstart, after this hook runs.
+
+    Also registers the ``slow`` marker this suite uses, so the plugin's own
+    runner, which reads no parent pytest config, does not warn about it.
     """
+    config.addinivalue_line("markers", "slow: marks tests as slow")
     this_dir = Path(__file__).resolve().parent
     targets = [Path(arg.split("::")[0]).resolve() for arg in config.args]
     kaizen_only = bool(targets) and all(target == this_dir or this_dir in target.parents for target in targets)

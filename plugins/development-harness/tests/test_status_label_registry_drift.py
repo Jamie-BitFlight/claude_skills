@@ -5,8 +5,9 @@
 (``apply_status_in_progress``, ``apply_status_verified``, ``apply_status_groomed``,
 ``apply_status_blocked``, primary-status selection, ...), with no canonical
 source of truth. A second, independent copy of one of those labels
-(``VERIFIED_LABEL = 'status:verified'``) is hardcoded in
-``.github/workflows/quality-gate-audit.yml``'s inline JS. ``backlog_core/server.py``
+(``VERIFIED_LABEL = 'status:verified'``) is hardcoded in the host repository's
+``.github/workflows/quality-gate-audit.yml`` inline JS. That workflow does not ship
+with the plugin, so its check skips in a standalone copy. ``backlog_core/server.py``
 and ``backlog_core/operations.py`` also reference concrete ``status:X`` labels in
 their MCP tool/CLI descriptions and docstrings (e.g. "Filter by status value e.g.
 'status:in-progress'") — an agent reads these strings to decide what to pass back
@@ -32,6 +33,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
 from backlog_core.status_registry import StatusLabel
 
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
@@ -83,7 +85,10 @@ def test_quality_gate_audit_workflow_verified_label_matches_registry() -> None:
     Why: This is the cross-language duplicate #3004 flags — a Python-only registry
          does not catch a JS-side rename on its own; this test is the catch.
     """
-    found = _scan(_REPO_ROOT / ".github" / "workflows" / "quality-gate-audit.yml")
+    workflow = _REPO_ROOT / ".github" / "workflows" / "quality-gate-audit.yml"
+    if not workflow.is_file():
+        pytest.skip(f"{workflow} is absent: this is a standalone copy of the plugin, not the host repository")
+    found = _scan(workflow)
     assert StatusLabel.VERIFIED.value in found, (
         f"Expected quality-gate-audit.yml to reference {StatusLabel.VERIFIED.value!r}, found {sorted(found)}"
     )

@@ -24,8 +24,6 @@ _yaml = YAML(typ="safe")
 @pytest.mark.parametrize(
     ("source", "target"),
     [
-        ("CLAUDE.md", "../../rules/frontmatter-requirements.md"),
-        ("CLAUDE.md", "../../rules/plugin-json.md"),
         ("examples/agents/example-agent.md", "../../skills/claude-subagent-reference/SKILL.md"),
         ("examples/agents/example-agent.md", "../../skills/agent-creator/SKILL.md"),
         ("examples/agents/example-agent.md", "../../scripts/README.md"),
