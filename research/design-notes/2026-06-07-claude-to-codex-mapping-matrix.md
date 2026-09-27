@@ -106,7 +106,7 @@ Practical rule:
 - **Superseded 2026-08-19**: keep the top-level `mcpServers` wrapper in `.mcp.json` — do not
   strip it to a direct server map. The `frustration-analyzer` canonical-manifest fix
   (`f9adf1f8`) established and tested the wrapped shape
-  (`tests/test_frustration_analyzer_python_compatibility.py::test_codex_mcp_launcher_...`
+  (`plugins/frustration-analyzer/tests/test_python_compatibility.py::test_codex_mcp_launcher_defers_interpreter_selection_to_pep_723`
   reads `config["mcpServers"]["frustration-analyzer"]`), and every `.mcp.json` shipped in this
   repo (`process-siren`, `development-harness`, `plugin-creator`,
   `agentskill-kaizen`) now uses the wrapper. `scripts/sync_codex_plugin_manifests.py` was fixed
