@@ -12,7 +12,7 @@ The workflow is [Code quality](../workflows/code-quality.yml).
 | `plugins/<name>/...`, including its source and any `conftest.py` | That plugin's `run_pytests.py` and the global shard | Affected plugin validation, manifest checks, applicable file linters |
 | Root documentation, `docs/`, `rules/` documentation | Global shard | Applicable file linters |
 | `research/` documentation | Global shard | Research integration and advisory whole-vault validation |
-| Development-harness content | Its `run_pytests.py` and the global shard | Its integration and cross-backend lanes |
+| Content of a plugin whose runner declares `LANES` | Its `run_pytests.py` and the global shard | Each declared lane (e.g. development-harness integration and cross-backend) |
 | Root/shared code, CI, dependencies, tool configuration, or unclassified inputs | All configured shards | Full checks |
 | Main push, manual dispatch, or unavailable PR comparison history | All configured shards | Full checks |
 
@@ -58,14 +58,16 @@ outside the diff; these are cross-file invariants rather than file-local lint.
 The runner's unnamed `prek` operation is this global hygiene lane. Only explicitly
 named language hooks use changed-file selection.
 
-The development-harness lanes beyond its runner's fast default are defined in
-`dh_lanes()` in `plan.py`; `build_plan()` there adds the repository-owned
-integration shards. Each dh lane is the runner plus a marker, never a list of
-test files. The runner owns the test roots, so a test that gains a marker
-anywhere in the plugin joins its lane; `run.py` rejects a runner shard that names
-paths. The planner schedules these lanes only while the runner exists. Move the
-lane table into the runner contract once a second plugin needs a lane beyond its
-fast default. Pinned versioner integration remains in the manifest lane.
+A plugin runner declares its lanes beyond the fast default in a `LANES` table
+(lane name to marker), such as `integration` or `cross_backend`; `plan.py`'s
+`RUNNER_LANES` lists the lanes that have a CI job, and a runner naming any other
+lane fails planning. `runner_lanes()` parses the table without importing the
+runner, and `build_plan()` adds the repository-owned integration shards. Each
+runner lane is the runner plus a marker, never a list of test files. The runner
+owns the test roots, so a test that gains a marker anywhere in the plugin joins
+its lane; `run.py` rejects a runner shard that names paths. The planner schedules
+these lanes only while the runner exists, for the same changes that select the
+runner's fast shard. Pinned versioner integration remains in the manifest lane.
 Research-vault validation stays advisory. The live-E2E job retains its existing
 main/manual trigger, sandbox credentials, serialization, process deadlines,
 cleanup and evidence uploads, and runs the development-harness runner with its
