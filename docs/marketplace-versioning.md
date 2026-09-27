@@ -27,12 +27,14 @@ not refresh from branch work. To exercise a plugin from your working copy, load 
 
 [bump-marketplace.yml](../.github/workflows/bump-marketplace.yml) runs on every push to `main`:
 
-1. `repair` patch-bumps every plugin manifest (`.claude-plugin`, `.codex-plugin`, `.cursor-plugin`)
-   whose plugin directory changed after the commit that last changed that manifest's version.
-   Several PRs merged before a run are covered by one bump per plugin.
-2. `sync --marketplace`, diffing the run's starting revision against the new plugin versions,
-   bumps `.claude-plugin/marketplace.json`'s `metadata.version` once if any plugin was bumped or
-   catalog membership changed.
+1. `repair` patch-bumps every plugin manifest (`.claude-plugin`, `.codex-plugin`, `.cursor-plugin`,
+   including eval fixture manifests nested inside a plugin) whose directory changed after the commit
+   that last changed that manifest's version. Several PRs merged before a run are covered by one
+   bump per plugin. A plugin added by a merge keeps the version it was added with.
+2. `sync --marketplace` bumps `.claude-plugin/marketplace.json`'s `metadata.version` once if any
+   plugin directory changed since the last version commit (or, before the first one exists, since
+   the triggering commit's parent), which includes a newly added plugin. Removing a plugin alone
+   does not bump it: the pinned versioner compares only plugins that still exist.
 3. The result is pushed to `main` as one commit titled
    `chore(plugins): assign plugin versions`. If another merge landed meanwhile, the commit is
    rebased onto it and pushed again (three attempts).

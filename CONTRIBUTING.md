@@ -97,7 +97,8 @@ Remove the plugin entry from `.claude-plugin/marketplace.json`. Find and delete 
 python3 -m json.tool .claude-plugin/marketplace.json > /dev/null
 ```
 
-CI bumps the marketplace version after the removal merges to `main`.
+Do not edit the marketplace `version`. A removal alone does not bump it after merge; the next merged
+plugin change does. See [marketplace versioning](docs/marketplace-versioning.md).
 
 ## Updating an Existing Plugin
 

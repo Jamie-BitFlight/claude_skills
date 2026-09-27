@@ -37,23 +37,22 @@ jobs:
             exit 1
           fi
 
-      - name: Mint versioning app token
-        id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          client-id: ${{ vars.VERSIONER_APP_CLIENT_ID }}
-          private-key: ${{ secrets.VERSIONER_APP_PRIVATE_KEY }}
-          permission-contents: write
-
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: main
           persist-credentials: false
           fetch-depth: 0
 
+      # `base` is the last version commit (the pre-merge revision before the
+      # first one exists), so the marketplace diff covers every change merged
+      # since versions were last assigned, including plugins added by a merge
+      # and changes from pushes whose own queued run was superseded.
       - name: Record starting revision
         id: start
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          base="$(git log -1 --format=%H --grep='^chore(plugins): assign plugin versions$')"
+          echo "base=${base:-$(git rev-parse HEAD^)}" >> "$GITHUB_OUTPUT"
 
       - name: Bump plugins changed since their last version bump
         uses: Jamie-BitFlight/agent-marketplace-versioner@562755fd8f14ee76280130eb6db4612af72fdf45 # v0.1.2
@@ -64,27 +63,37 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -u -- ':(glob)plugins/*/.*-plugin/plugin.json'
+          git add -u
           if ! git diff --cached --quiet; then
             git commit -q -m 'chore(plugins): assign plugin versions'
           fi
 
-      # Bumps the catalog version when the commit above changed a plugin, or
-      # when catalog membership drifted from plugins/ (no base diff otherwise).
+      # Bumps the catalog version when any plugin directory changed since `base`,
+      # or when catalog membership drifted from plugins/. The pinned versioner
+      # compares only plugins that still exist, so a removal alone does not bump it.
       - name: Synchronize marketplace
         uses: Jamie-BitFlight/agent-marketplace-versioner@562755fd8f14ee76280130eb6db4612af72fdf45 # v0.1.2
         with:
           command: sync
           marketplace: 'true'
-          base-ref: ${{ steps.start.outputs.sha }}
+          base-ref: ${{ steps.start.outputs.base }}
           head-ref: HEAD
+
+      # Minted last, so no earlier step runs while a write token exists.
+      - name: Mint versioning app token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.VERSIONER_APP_CLIENT_ID }}
+          private-key: ${{ secrets.VERSIONER_APP_PRIVATE_KEY }}
+          permission-contents: write
 
       - name: Push version commit to main
         env:
           START: ${{ steps.start.outputs.sha }}
           TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          git add -u -- ':(glob)**/marketplace.json'
+          git add -u
           if ! git diff --cached --quiet; then
             if [[ "$(git rev-parse HEAD)" == "$START" ]]; then
               git commit -q -m 'chore(plugins): assign plugin versions'

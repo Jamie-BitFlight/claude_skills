@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 from typing import Any, Final
@@ -92,6 +93,10 @@ def test_branch_commits_keep_versions_and_main_workflow_bumps_once(tmp_path: Pat
         manifest.parent.mkdir(parents=True)
         manifest.write_text(json.dumps({"name": name, "version": "1.0.0"}))
         (consumer / f"plugins/{name}/README.md").write_text(f"{name}\n")
+    # An eval fixture nested inside a plugin is also a manifest the versioner bumps.
+    fixture = consumer / "plugins/tool/evals/fixture/.claude-plugin/plugin.json"
+    fixture.parent.mkdir(parents=True)
+    fixture.write_text(json.dumps({"name": "fixture", "version": "1.0.0"}))
     catalog = consumer / ".claude-plugin/marketplace.json"
     catalog.parent.mkdir()
     catalog.write_text(
@@ -130,7 +135,9 @@ def test_branch_commits_keep_versions_and_main_workflow_bumps_once(tmp_path: Pat
     (consumer / "plugins/other/README.md").write_text("other changed\n")
     run(consumer, "git", "commit", "-qam", "Second merged change")
     (consumer / "plugins/tool/README.md").write_text("tool changed twice\n")
-    run(consumer, "git", "commit", "-qam", "Third merged change")
+    (fixture.parent.parent / "input.md").write_text("fixture input\n")
+    run(consumer, "git", "add", ".")
+    run(consumer, "git", "commit", "-qm", "Third merged change")
     run(consumer, "git", "push", "-q", str(remote), "main")
 
     action = tmp_path / "action"
@@ -149,7 +156,8 @@ def test_branch_commits_keep_versions_and_main_workflow_bumps_once(tmp_path: Pat
         checkout = tmp_path / f"checkout-{next(runs)}"
         run(tmp_path, "git", "clone", "--quiet", str(remote), str(checkout))
         run(checkout, "git", "config", f"url.{remote}.insteadOf", PUSH_URL)
-        start = run(checkout, "git", "rev-parse", "HEAD").stdout.strip()
+        outputs_file = tmp_path / f"{checkout.name}.outputs"
+        outputs_file.touch()
         env = {
             **os.environ,
             "GITHUB_REPOSITORY": "owner/repo",
@@ -157,9 +165,14 @@ def test_branch_commits_keep_versions_and_main_workflow_bumps_once(tmp_path: Pat
             "SETUPTOOLS_SCM_PRETEND_VERSION": "0+action",
             "VERSIONER_SOURCE": str(action),
             "VERSIONER_REPOSITORY": str(checkout),
-            "START": start,
+            "GITHUB_OUTPUT": str(outputs_file),
             "TOKEN": "fixture",
         }
+        outputs: dict[str, str] = {}
+
+        def resolve(value: str) -> str:
+            return re.sub(r"\$\{\{ steps\.start\.outputs\.(\w+) \}\}", lambda match: outputs[match[1]], value)
+
         for step in load_yaml(WORKFLOW)["jobs"]["bump"]["steps"]:
             name = step.get("name", "")
             if "agent-marketplace-versioner@" in step.get("uses", ""):
@@ -168,11 +181,12 @@ def test_branch_commits_keep_versions_and_main_workflow_bumps_once(tmp_path: Pat
                 env |= {
                     "VERSIONER_COMMAND": inputs["command"],
                     "VERSIONER_MARKETPLACE": inputs.get("marketplace", "false"),
-                    "VERSIONER_BASE": start,
+                    "VERSIONER_BASE": resolve(inputs.get("base-ref", "")),
                     "VERSIONER_HEAD": inputs.get("head-ref", "HEAD"),
                 }
-            elif name in {"Commit plugin versions", "Push version commit to main"}:
+            elif name in {"Record starting revision", "Commit plugin versions", "Push version commit to main"}:
                 script = step["run"]
+                env |= {key: resolve(value) for key, value in step.get("env", {}).items() if key != "TOKEN"}
                 if race and name.startswith("Push"):
                     # Another merge lands between checkout and push.
                     (consumer / race).write_text("raced\n")
@@ -181,6 +195,7 @@ def test_branch_commits_keep_versions_and_main_workflow_bumps_once(tmp_path: Pat
             else:
                 continue
             run(checkout, "bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", script, env=env)
+            outputs = dict(line.split("=", 1) for line in outputs_file.read_text().splitlines())
         return checkout
 
     def on_main(path: str, *keys: str) -> Any:
@@ -199,6 +214,7 @@ def test_branch_commits_keep_versions_and_main_workflow_bumps_once(tmp_path: Pat
     run_workflow(race="plugins/idle/README.md")
     assert run(tmp_path, "git", "--git-dir", str(remote), "log", "-1", "--format=%s", "main").stdout.strip() == SUBJECT
     assert plugin_versions() == ["1.0.1", "1.0.1", "1.0.0"]
+    assert on_main("plugins/tool/evals/fixture/.claude-plugin/plugin.json", "version") == "1.0.1"
     assert on_main(".claude-plugin/marketplace.json", "metadata", "version") == "1.0.1"
 
     # The run queued behind it bumps only the plugin the racing merge changed.
@@ -211,3 +227,18 @@ def test_branch_commits_keep_versions_and_main_workflow_bumps_once(tmp_path: Pat
     rerun = run_workflow()
     assert main_head() == head
     assert not run(rerun, "git", "status", "--porcelain").stdout
+
+    # A merge that adds a plugin (registered by hand, already at its first version) bumps the catalog.
+    run(consumer, "git", "pull", "-q", "--rebase", str(remote), "main")
+    added = consumer / "plugins/fresh/.claude-plugin/plugin.json"
+    added.parent.mkdir(parents=True)
+    added.write_text(json.dumps({"name": "fresh", "version": "1.0.0"}))
+    data = json.loads(catalog.read_text())
+    data["plugins"].append({"name": "fresh", "source": "./plugins/fresh"})
+    catalog.write_text(json.dumps(data))
+    run(consumer, "git", "add", ".")
+    run(consumer, "git", "commit", "-qm", "Add a plugin")
+    run(consumer, "git", "push", "-q", str(remote), "main")
+    run_workflow()
+    assert on_main("plugins/fresh/.claude-plugin/plugin.json", "version") == "1.0.0"
+    assert on_main(".claude-plugin/marketplace.json", "metadata", "version") == "1.0.3"
