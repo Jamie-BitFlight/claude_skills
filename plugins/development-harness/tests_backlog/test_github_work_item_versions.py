@@ -3,6 +3,7 @@ from __future__ import annotations
 from _thread import LockType
 from collections.abc import Sequence
 from threading import Barrier, Lock, Thread
+from typing import cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -24,6 +25,7 @@ from backlog_core.models import (
     ContentRef,
     ContentUnavailableError,
     ContentWrite,
+    GitHubMutationOutcomeUnknownError,
     PatchResult,
     ProviderPatch,
     ReconcileRequest,
@@ -195,6 +197,9 @@ def _backend(
     )
     backend._fetch_issues_graphql = MagicMock(return_value=[_issue()])
     backend._fetch_comment_by_id_graphql = MagicMock(side_effect=lambda _repo, comment_id: comments[comment_id])
+    backend._fetch_issue_comments_graphql = MagicMock(
+        side_effect=lambda _repo, _owner, _name, _number, **_kwargs: list(comments.values())
+    )
 
     lock = comment_lock or Lock()
 
@@ -331,3 +336,75 @@ def test_github_work_item_backend_concurrent_initial_cas_has_one_winner_and_two_
     # Then: one Contents head wins, while both comments remain forensic evidence
     assert sorted(result.status for result in results) == ["applied", "conflict"]
     assert sorted(comment.body.split("\n", 1)[1] for comment in comments.values()) == ["one", "two"]
+
+
+def _head_comment_id(contents: _ContentsFake) -> str:
+    return parse_work_item_head(contents.get(work_item_head_ref("#42")).content).comment_id
+
+
+def test_an_audit_comment_already_posted_for_this_revision_is_reused() -> None:
+    # Given: an audit comment for exactly this parent revision and body, posted by a write whose
+    # outcome was unknown (so no head points at it yet)
+    root = root_revision("#42", "issue-node", "Human-owned body")
+    comments = {"comment-1": _comment("comment-1", root, "first")}
+    contents = _ContentsFake()
+    backend = _backend(contents, comments)
+
+    # When: the same patch is applied
+    [result] = backend._apply_patches([
+        ProviderPatch(provider_id="issue-node", reference="#42", expected_revision=root, body="first")
+    ])
+
+    # Then: no second comment is posted, the head advances onto the existing one, and the lookup
+    # cost one read
+    assert result.status == "applied"
+    assert cast("MagicMock", backend._add_comment_graphql).call_count == 0
+    assert list(comments) == ["comment-1"]
+    assert _head_comment_id(contents) == "comment-1"
+    assert cast("MagicMock", backend._fetch_issue_comments_graphql).call_count == 1
+
+
+def test_an_audit_comment_for_another_parent_revision_is_not_reused() -> None:
+    # Given: an audit comment with the same body but a different parent revision
+    root = root_revision("#42", "issue-node", "Human-owned body")
+    comments = {"comment-1": _comment("comment-1", "some-other-revision", "first")}
+    contents = _ContentsFake()
+    backend = _backend(contents, comments)
+
+    # When: the patch is applied
+    backend._apply_patches([
+        ProviderPatch(provider_id="issue-node", reference="#42", expected_revision=root, body="first")
+    ])
+
+    # Then: a fresh audit comment is posted and the head points at it
+    assert cast("MagicMock", backend._add_comment_graphql).call_count == 1
+    assert _head_comment_id(contents) == "comment-2"
+
+
+def test_a_retry_after_a_timed_out_audit_comment_lands_posts_no_duplicate() -> None:
+    # Given: an audit comment whose request timed out but which still landed on GitHub
+    root = root_revision("#42", "issue-node", "Human-owned body")
+    comments: dict[str, IssueCommentNode] = {}
+    contents = _ContentsFake()
+    backend = _backend(contents, comments)
+    add_comment = cast("MagicMock", backend._add_comment_graphql)
+    post = add_comment.side_effect
+
+    def _lands_then_times_out(repo: object, issue_id: str, body: str) -> AddedCommentNode:
+        post(repo, issue_id, body)
+        msg = "GraphQL mutation timed out after 60s (operation: AddComment); its outcome is unknown"
+        raise GitHubMutationOutcomeUnknownError(msg, timeout_seconds=60)
+
+    add_comment.side_effect = _lands_then_times_out
+    patch = ProviderPatch(provider_id="issue-node", reference="#42", expected_revision=root, body="first")
+    with pytest.raises(GitHubMutationOutcomeUnknownError):
+        backend._apply_patches([patch])
+
+    # When: the reconcile is retried after that worker finished
+    add_comment.side_effect = post
+    [result] = backend._apply_patches([patch])
+
+    # Then: the landed comment backs the head and no duplicate is posted
+    assert result.status == "applied"
+    assert list(comments) == ["comment-1"]
+    assert _head_comment_id(contents) == "comment-1"

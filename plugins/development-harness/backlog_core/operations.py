@@ -1405,6 +1405,9 @@ def _reconcile_item(
         # A corrupted local cache state file needs operator attention — never
         # degrade it to a routine "queued" message alongside the two cases below.
         raise
+    except GitHubMutationOutcomeUnknownError:
+        # A timed-out audit write may still land: report that, never "queued".
+        raise
     except BacklogError:
         # BackendUnavailableError (auth/config) and a bare BacklogError (e.g. a
         # transient GraphQL failure inside reconcile()) both mean this attempt
@@ -4910,7 +4913,8 @@ def _reconcile_strike(item: BacklogItem, snapshot: ProviderSnapshot | None, outp
         backend.reconcile(
             ReconcileRequest(scope=ReconcileScope.TARGETED, repo=repo, references=[item.issue]), snapshot=snapshot
         )
-    except CacheStateCorruptError:
+    except (CacheStateCorruptError, GitHubMutationOutcomeUnknownError):
+        # A timed-out audit write may still land: report that, never "queued".
         raise
     except BacklogError:
         output.info(f"  Queued {item.issue} for provider reconciliation.")

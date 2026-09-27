@@ -28,6 +28,7 @@ from backlog_core import gh_client, rendering
 from backlog_core.backends._github_work_item_versions import (
     WorkItemHead,
     WorkItemVersion,
+    find_work_item_comment,
     is_work_item_head_ref,
     parse_work_item_comment,
     parse_work_item_head,
@@ -81,6 +82,11 @@ if TYPE_CHECKING:
 _TARGET_BATCH_SIZE = 100
 
 
+#: Newest issue comments searched for an existing audit comment before posting one (GitHub's
+#: page maximum, so the search is always one request).
+_AUDIT_COMMENT_LOOKBACK = 100
+
+
 @runtime_checkable
 class _ReferenceContentPersistence(Protocol):
     """Content stores that can resolve many references in one round trip."""
@@ -121,6 +127,10 @@ class _IssueGateway(Protocol):
     def _add_comment_graphql(self, repo: Repository, issue_node_id: str, body: str) -> AddedCommentNode: ...
 
     def _fetch_comment_by_id_graphql(self, repo: Repository, comment_node_id: str) -> IssueCommentNode: ...
+
+    def _fetch_issue_comments_graphql(
+        self, repo: Repository, owner: str, repo_name: str, issue_number: int, *, latest: int | None = None
+    ) -> list[IssueCommentNode]: ...
 
 
 class _ReconcileProvider(Protocol):
@@ -290,6 +300,25 @@ class _GitHubWorkItemSync:
             results.append(self._write_patch(repository, issue, patch, current.revision, head_record, root))
         return results
 
+    def _audit_comment_id(self, repository: Repository, issue: IssueNode, revision: str, body: str) -> str:
+        """Return the audit comment for this revision and body, posting one only if none exists.
+
+        A comment from an earlier write whose outcome was unknown may already be on the issue with
+        no head pointing at it; reusing it keeps a retried reconcile from posting a duplicate.
+
+        Returns:
+            The audit comment's node id (empty when GitHub answered the post with none).
+        """
+        owner, repo_name = repository.full_name.split("/", 1)
+        # ponytail: only the newest _AUDIT_COMMENT_LOOKBACK comments are searched; an orphaned audit
+        # comment is posted moments before the retry, so a busier issue would need a wider window.
+        recent = self._issues._fetch_issue_comments_graphql(
+            repository, owner, repo_name, issue["number"], latest=_AUDIT_COMMENT_LOOKBACK
+        )
+        if (existing := find_work_item_comment(recent, revision, body)) is not None:
+            return existing.id
+        return self._issues._add_comment_graphql(repository, issue["id"], render_work_item_comment(revision, body)).id
+
     def _write_patch(
         self,
         repository: Repository,
@@ -310,17 +339,15 @@ class _GitHubWorkItemSync:
                 error instead would let a later reconcile post the same comment again.
         """
         try:
-            added_comment = self._issues._add_comment_graphql(
-                repository, issue["id"], render_work_item_comment(revision, patch.body)
-            )
-            if not added_comment.id:
+            comment_id = self._audit_comment_id(repository, issue, revision, patch.body)
+            if not comment_id:
                 return PatchResult(
                     provider_id=patch.provider_id,
                     reference=patch.reference,
                     status="error",
                     message="GitHub work-item audit comment response was invalid",
                 )
-            head = WorkItemHead.create(patch.reference, revision, root, patch.body, added_comment.id)
+            head = WorkItemHead.create(patch.reference, revision, root, patch.body, comment_id)
             written = self._contents().put(
                 ContentWrite(
                     reference=work_item_head_ref(patch.reference),

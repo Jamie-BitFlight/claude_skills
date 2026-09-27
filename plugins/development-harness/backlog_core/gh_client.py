@@ -368,10 +368,10 @@ mutation AddSubIssue($parentId: ID!, $childId: ID!) {
 """
 
 _ISSUE_COMMENTS_QUERY = """
-query GetIssueComments($owner: String!, $repo: String!, $number: Int!, $first: Int!, $after: String) {
+query GetIssueComments($owner: String!, $repo: String!, $number: Int!, $first: Int, $last: Int, $after: String) {
   repository(owner: $owner, name: $repo) {
     issue(number: $number) {
-      comments(first: $first, after: $after) {
+      comments(first: $first, last: $last, after: $after) {
         nodes {
           id
           fullDatabaseId
@@ -1241,7 +1241,7 @@ def _parse_comment_node(node: dict[str, object]) -> IssueCommentNode:
 
 
 def _fetch_issue_comments_graphql(
-    repo: Repository, owner: str, repo_name: str, issue_number: int
+    repo: Repository, owner: str, repo_name: str, issue_number: int, *, latest: int | None = None
 ) -> list[IssueCommentNode]:
     """Fetch all comments for an issue via GraphQL, handling pagination.
 
@@ -1250,6 +1250,8 @@ def _fetch_issue_comments_graphql(
         owner: GitHub owner name.
         repo_name: GitHub repository name.
         issue_number: Issue number (positive integer).
+        latest: When set, fetch only the newest ``latest`` comments (at most 100) in one request
+            instead of the whole history.
 
     Returns:
         List of ``IssueCommentNode`` dicts with ``id``, ``body``, ``url``,
@@ -1265,7 +1267,8 @@ def _fetch_issue_comments_graphql(
             "owner": owner,
             "repo": repo_name,
             "number": issue_number,
-            "first": 100,
+            "first": None if latest is not None else 100,
+            "last": latest,
             "after": cursor,
         }
         data = _graphql_request(repo, _ISSUE_COMMENTS_QUERY, variables)
@@ -1274,7 +1277,7 @@ def _fetch_issue_comments_graphql(
         nodes: list[dict[str, object]] = list(comments_data.get("nodes") or [])
         comments.extend(_parse_comment_node(node) for node in nodes)
         page_info: dict[str, object] = comments_data.get("pageInfo") or {}
-        if not page_info.get("hasNextPage"):
+        if latest is not None or not page_info.get("hasNextPage"):
             break
         raw_cursor = page_info.get("endCursor")
         if not isinstance(raw_cursor, str):
