@@ -746,12 +746,23 @@ class GitHubMutationOutcomeUnknownError(BackendUnavailableError):
 
     Attributes:
         timeout_seconds: The total deadline that elapsed.
+        created_issue_number: An issue an earlier step of the same operation already created,
+            so a caller can record it instead of creating it again. ``None`` when none was.
+        created_comment_id: A comment an earlier step already posted, for the same reason.
     """
 
-    def __init__(self, *args: object, timeout_seconds: float) -> None:
-        """Initialize with the usual exception args and the deadline that elapsed."""
+    def __init__(
+        self,
+        *args: object,
+        timeout_seconds: float,
+        created_issue_number: int | None = None,
+        created_comment_id: str | None = None,
+    ) -> None:
+        """Initialize with the usual exception args, the deadline, and what already exists."""
         super().__init__(*args, retryable=False)
         self.timeout_seconds = timeout_seconds
+        self.created_issue_number = created_issue_number
+        self.created_comment_id = created_comment_id
 
 
 # Maps a capability flag name to the runtime_checkable Protocol it gates, for use in

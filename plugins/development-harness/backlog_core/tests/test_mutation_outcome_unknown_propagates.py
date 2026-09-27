@@ -31,6 +31,7 @@ from backlog_core.models import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
     from pytest_mock import MockerFixture
@@ -204,3 +205,39 @@ def test_migrate_task_propagates(mocker: MockerFixture) -> None:
 
     with pytest.raises(GitHubMutationOutcomeUnknownError):
         migrate._migrate_task(task, "f", Mock(), 1, [])
+
+
+class TestAnEarlierStepsCreatedObjectIsReported:
+    """When a later step's outcome is unknown, the error names what an earlier step created."""
+
+    def test_a_sub_issue_link_timeout_carries_the_created_issue_number(self, mocker: MockerFixture) -> None:
+        _gh_client_issue_setup(mocker, "_graphql_request")
+        mocker.patch.object(gh_client, "_get_repo_node_id", return_value="R_1")
+        mocker.patch.object(
+            gh_client, "_create_issue_graphql", return_value={"id": "I_2", "number": 6, "title": "t", "url": ""}
+        )
+
+        with pytest.raises(GitHubMutationOutcomeUnknownError) as excinfo:
+            gh_client.create_task_issue(Mock(full_name="o/r"), 1, SamTask(task_id="T1", feature="f", task_type="impl"))
+
+        assert excinfo.value.created_issue_number == 6
+        assert "#6" in str(excinfo.value)
+
+    @pytest.mark.parametrize(
+        "close",
+        [
+            lambda: gh_client.close_github_issue("#5", "done", repo="o/r"),
+            lambda: gh_client.resolve_github_issue("#5", summary="done", repo="o/r"),
+        ],
+        ids=["close", "resolve"],
+    )
+    def test_a_close_timeout_after_the_comment_carries_the_comment_id(
+        self, mocker: MockerFixture, close: Callable[[], None]
+    ) -> None:
+        _gh_client_issue_setup(mocker, "_update_issue_graphql")
+
+        with pytest.raises(GitHubMutationOutcomeUnknownError) as excinfo:
+            close()
+
+        assert excinfo.value.created_comment_id == "C_1"
+        assert "C_1" in str(excinfo.value)

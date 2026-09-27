@@ -1714,6 +1714,22 @@ def create_issue_for_item(
     return created["number"]
 
 
+def _close_after_comment(repository: Repository, issue_id: str, num: int, comment: AddedCommentNode) -> None:
+    """Close an issue whose closing comment is already posted.
+
+    Raises:
+        GitHubMutationOutcomeUnknownError: When the close times out; it names the posted
+            comment, so a retry does not post it a second time.
+    """
+    try:
+        _update_issue_graphql(repository, issue_id, state="CLOSED")
+    except GitHubMutationOutcomeUnknownError as exc:
+        msg = f"Posted the closing comment {comment.id} on issue #{num}, but closing the issue: {exc}"
+        raise GitHubMutationOutcomeUnknownError(
+            msg, timeout_seconds=exc.timeout_seconds, created_comment_id=comment.id
+        ) from exc
+
+
 def close_github_issue(
     issue_ref: str, reason: str, *, reference: str = "", comment: str = "", repo: str = "", output: Output | None = None
 ) -> None:
@@ -1731,8 +1747,8 @@ def close_github_issue(
             parts.append(f"**Reference**: {reference}")
         if comment:
             parts.append(f"\n{comment}")
-        _add_comment_graphql(repository, issue["id"], " ".join(parts))
-        _update_issue_graphql(repository, issue["id"], state="CLOSED")
+        posted = _add_comment_graphql(repository, issue["id"], " ".join(parts))
+        _close_after_comment(repository, issue["id"], num, posted)
         out.info(f"  GitHub issue #{num} closed ({reason}).")
     except GitHubMutationOutcomeUnknownError:
         raise  # outcome unknown; a fallback here could repeat the mutation
@@ -1769,8 +1785,8 @@ def resolve_github_issue(
             body_parts.append(f"\n### Follow-ups\n\n{follow_ups}")
         if findings:
             body_parts.append(f"\n### Findings\n\n{findings}")
-        _add_comment_graphql(repository, issue["id"], "\n".join(body_parts))
-        _update_issue_graphql(repository, issue["id"], state="CLOSED")
+        posted = _add_comment_graphql(repository, issue["id"], "\n".join(body_parts))
+        _close_after_comment(repository, issue["id"], num, posted)
         out.info(f"  GitHub issue #{num} resolved.")
     except GitHubMutationOutcomeUnknownError:
         raise  # outcome unknown; a fallback here could repeat the mutation
@@ -2507,8 +2523,12 @@ def create_task_issue(
         parent = _fetch_issue_graphql(repo, owner, repo_name, parent_issue_number)
         _graphql_request(repo, _ADD_SUB_ISSUE_MUTATION, {"parentId": parent["id"], "childId": task_issue["id"]})
         out.info(f"  Linked #{task_issue['number']} as sub-issue of #{parent_issue_number}")
-    except GitHubMutationOutcomeUnknownError:
-        raise  # outcome unknown; a fallback here could repeat the mutation
+    except GitHubMutationOutcomeUnknownError as exc:
+        # The issue exists either way; name it so the caller records it instead of creating another.
+        msg = f"Created task issue #{task_issue['number']}, but linking it as a sub-issue of #{parent_issue_number}: {exc}"
+        raise GitHubMutationOutcomeUnknownError(
+            msg, timeout_seconds=exc.timeout_seconds, created_issue_number=task_issue["number"]
+        ) from exc
     except BacklogError as e:
         out.warn(f"  WARNING: Created issue #{task_issue['number']} but could not link as sub-issue: {e}")
 
