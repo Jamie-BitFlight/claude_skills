@@ -82,11 +82,6 @@ if TYPE_CHECKING:
 _TARGET_BATCH_SIZE = 100
 
 
-#: Newest issue comments searched for an existing audit comment before posting one (GitHub's
-#: page maximum, so the search is always one request).
-_AUDIT_COMMENT_LOOKBACK = 100
-
-
 @runtime_checkable
 class _ReferenceContentPersistence(Protocol):
     """Content stores that can resolve many references in one round trip."""
@@ -310,10 +305,9 @@ class _GitHubWorkItemSync:
             The audit comment's node id (empty when GitHub answered the post with none).
         """
         owner, repo_name = repository.full_name.split("/", 1)
-        # ponytail: only the newest _AUDIT_COMMENT_LOOKBACK comments are searched; an orphaned audit
-        # comment is posted moments before the retry, so a busier issue would need a wider window.
+        # Only the newest gh_client.RECENT_COMMENT_WINDOW comments are searched; see its ceiling note.
         recent = self._issues._fetch_issue_comments_graphql(
-            repository, owner, repo_name, issue["number"], latest=_AUDIT_COMMENT_LOOKBACK
+            repository, owner, repo_name, issue["number"], latest=gh_client.RECENT_COMMENT_WINDOW
         )
         if (existing := find_work_item_comment(recent, revision, body)) is not None:
             return existing.id

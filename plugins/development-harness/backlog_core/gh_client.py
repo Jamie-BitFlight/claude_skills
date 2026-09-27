@@ -1747,19 +1747,36 @@ def create_issue_for_item(
     return created["number"]
 
 
-def _close_after_comment(repository: Repository, issue_id: str, num: int, comment: AddedCommentNode) -> None:
-    """Close an issue whose closing comment is already posted.
+#: Newest issue comments searched for a comment an earlier write may already have posted (GitHub's
+#: page maximum, so the search is always one request).
+# ponytail: only this window is searched; a write whose comment landed and was then buried under
+# more than 100 newer comments before the retry posts it again. Page backward if that ever happens.
+RECENT_COMMENT_WINDOW: Final = 100
+
+
+def _comment_then_close(
+    repository: Repository, owner: str, repo_name: str, issue: IssueNode, num: int, body: str
+) -> None:
+    """Post the closing comment unless it is already there, then close the issue.
+
+    A retry after an earlier close timed out finds the comment that attempt posted among the
+    newest comments and only closes, instead of posting it a second time.
 
     Raises:
-        GitHubMutationOutcomeUnknownError: When the close times out; it names the posted
-            comment, so a retry does not post it a second time.
+        GitHubMutationOutcomeUnknownError: When the close times out; it names the comment, so a
+            retry does not post it a second time.
     """
+    recent = _fetch_issue_comments_graphql(repository, owner, repo_name, num, latest=RECENT_COMMENT_WINDOW)
+    wanted = body.replace("\r\n", "\n")
+    comment_id = next((c.id for c in recent if c.body.replace("\r\n", "\n") == wanted), None)
+    if comment_id is None:
+        comment_id = _add_comment_graphql(repository, issue["id"], body).id
     try:
-        _update_issue_graphql(repository, issue_id, state="CLOSED")
+        _update_issue_graphql(repository, issue["id"], state="CLOSED")
     except GitHubMutationOutcomeUnknownError as exc:
-        msg = f"Posted the closing comment {comment.id} on issue #{num}, but closing the issue: {exc}"
+        msg = f"Posted the closing comment {comment_id} on issue #{num}, but closing the issue: {exc}"
         raise GitHubMutationOutcomeUnknownError(
-            msg, timeout_seconds=exc.timeout_seconds, created_comment_id=comment.id
+            msg, timeout_seconds=exc.timeout_seconds, created_comment_id=comment_id
         ) from exc
 
 
@@ -1780,8 +1797,7 @@ def close_github_issue(
             parts.append(f"**Reference**: {reference}")
         if comment:
             parts.append(f"\n{comment}")
-        posted = _add_comment_graphql(repository, issue["id"], " ".join(parts))
-        _close_after_comment(repository, issue["id"], num, posted)
+        _comment_then_close(repository, owner, repo_name, issue, num, " ".join(parts))
         out.info(f"  GitHub issue #{num} closed ({reason}).")
     except GitHubMutationOutcomeUnknownError:
         raise  # outcome unknown; a fallback here could repeat the mutation
@@ -1818,8 +1834,7 @@ def resolve_github_issue(
             body_parts.append(f"\n### Follow-ups\n\n{follow_ups}")
         if findings:
             body_parts.append(f"\n### Findings\n\n{findings}")
-        posted = _add_comment_graphql(repository, issue["id"], "\n".join(body_parts))
-        _close_after_comment(repository, issue["id"], num, posted)
+        _comment_then_close(repository, owner, repo_name, issue, num, "\n".join(body_parts))
         out.info(f"  GitHub issue #{num} resolved.")
     except GitHubMutationOutcomeUnknownError:
         raise  # outcome unknown; a fallback here could repeat the mutation

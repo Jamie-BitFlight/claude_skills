@@ -17,7 +17,7 @@ from unittest.mock import Mock
 import pytest
 
 from backlog_core import gh_client, operations
-from backlog_core.backend_types import BacklogConfig
+from backlog_core.backend_types import AddedCommentNode, BacklogConfig, IssueCommentNode
 from backlog_core.backends.github_backend import GitHubBackend
 from backlog_core.backends.github_work_items import _GitHubWorkItemSync
 from backlog_core.file_cache import FileCache
@@ -111,6 +111,7 @@ def _gh_client_issue_setup(mocker: MockerFixture, mutation: str) -> None:
     mocker.patch.object(gh_client, "get_github", return_value=Mock(full_name="o/r"))
     mocker.patch.object(gh_client, "_fetch_issue_graphql", return_value=_ISSUE)
     mocker.patch.object(gh_client, "_resolve_label_ids_graphql", return_value={})
+    mocker.patch.object(gh_client, "_fetch_issue_comments_graphql", return_value=[])
     mocker.patch.object(gh_client, "_add_comment_graphql", return_value=Mock(id="C_1", database_id=1))
     mocker.patch.object(gh_client, "_update_issue_graphql", return_value=None)
     mocker.patch.object(gh_client, mutation, side_effect=_outcome_unknown)
@@ -274,3 +275,46 @@ class TestReconcileReportsTheUnknownOutcomeNotQueued:
             operations._reconcile_strike(BacklogItem(title="t", issue="#5"), snapshot, out, repo="o/r")
 
         assert not any("Queued" in message for message in out.to_dict().get("messages", []))
+
+
+class TestARetriedCloseDoesNotRepostItsComment:
+    """The closing comment landed but the close failed: the retry only closes."""
+
+    @pytest.mark.parametrize(
+        "close",
+        [
+            lambda: gh_client.close_github_issue("#5", "done", repo="o/r"),
+            lambda: gh_client.resolve_github_issue("#5", summary="done", repo="o/r"),
+        ],
+        ids=["close", "resolve"],
+    )
+    def test_the_retry_reuses_the_landed_comment_and_closes(
+        self, mocker: MockerFixture, close: Callable[[], None]
+    ) -> None:
+        _gh_client_issue_setup(mocker, "_update_issue_graphql")
+        comments: list[IssueCommentNode] = []
+
+        def _post(_repo: object, _issue_id: str, body: str) -> AddedCommentNode:
+            comment_id = f"C_{len(comments) + 1}"
+            comments.append(
+                IssueCommentNode(id=comment_id, body=body, url="", author="agent", created_at="", updated_at="")
+            )
+            return AddedCommentNode(id=comment_id, database_id=None)
+
+        add_comment = mocker.patch.object(gh_client, "_add_comment_graphql", side_effect=_post)
+        mocker.patch.object(
+            gh_client, "_fetch_issue_comments_graphql", side_effect=lambda *_args, **_kwargs: list(comments)
+        )
+        update = mocker.patch.object(
+            gh_client,
+            "_update_issue_graphql",
+            side_effect=[GitHubMutationOutcomeUnknownError("close timed out", timeout_seconds=60), None],
+        )
+        with pytest.raises(GitHubMutationOutcomeUnknownError):
+            close()
+
+        close()
+
+        assert add_comment.call_count == 1
+        assert update.call_count == 2
+        assert update.call_args.kwargs["state"] == "CLOSED"
