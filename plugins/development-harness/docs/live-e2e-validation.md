@@ -92,12 +92,15 @@ provider contracts.
 | L8 sync publishes changes | Seed an unacknowledged mutation through the public backend queue, confirm it is absent remotely, then explicit sync and a fresh reader must observe it while preserving earlier grooming | STRENGTHEN |
 | L9 pull refreshes cached work | An independent native title/body edit followed by targeted pull and a non-refresh title lookup; a numeric lookup would mask a no-op pull | REPLACE |
 | L10/L11 close and resolve | Each API transition is followed by native closed-state verification on a separately created issue | STRENGTHEN |
-| Implicit cold bootstrap | A separate empty-cache scenario triggers default listing; the public backend cache must recover a known closed issue as well as the listed open issue | REPLACE |
+| Request-shaped cache fill | A separate empty-cache reader lists the open fixture; the public backend cache holds exactly the listed rows, never an unrequested closed fixture the list never asked for. A targeted view of the closed fixture then adds it, with its closed state, and no read ever advances the checkpoint | REPLACE |
 
-The cold scenario checks recovery at the backend-cache boundary, independently of the MCP
-listing's presentation filters. Its source dataset includes a natively closed fixture, so an
-open-only recovery cannot satisfy the assertion. Warm CRUD explicitly establishes a real open-item
-snapshot in setup; it does not fabricate a checkpoint or disable cold-read behavior in production.
+The cold scenario checks the request-shaped-reads promise at the backend-cache boundary,
+independently of the MCP listing's presentation filters: the cache holds exactly what a request
+fetched, not a whole-history mirror. Its source dataset includes a natively closed fixture
+precisely so the assertion can tell "never read" apart from "read and excluded" — the list must
+not have hydrated or cached it, and a later targeted view of it must add it without ever
+establishing a synced snapshot. Warm CRUD explicitly establishes a real open-item snapshot in
+setup; it does not fabricate a checkpoint or disable cold-read behavior in production.
 
 The sync setup uses the public backend queue to represent an accepted offline mutation. Grooming
 reconciles immediately, so a sync performed only after successful grooming would let a no-op sync
