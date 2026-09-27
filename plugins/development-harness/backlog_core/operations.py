@@ -1735,8 +1735,9 @@ def _try_create_github_issue(item_data: BacklogItem, repo: str, out: Output) -> 
     except GitHubMutationOutcomeUnknownError as exc:
         # No local item is stored: a later sync would create this issue on GitHub a second time.
         msg = (
-            f"{exc} No local item was stored. To recover, retry backlog_add without force; its "
-            "duplicate check finds the issue if it was created."
+            f"{exc} No local item was stored. The earlier createIssue may still complete: retry "
+            "backlog_add without force after the earlier createIssue request has finished; its "
+            "duplicate check then finds the issue if it was created."
         )
         raise GitHubMutationOutcomeUnknownError(msg, timeout_seconds=exc.timeout_seconds) from exc
     except (GithubException, BacklogError) as e:
@@ -1862,8 +1863,9 @@ def add_item(
             Integer-ID backends (GitHub, sqlite, memory) do not raise this.
         GitHubMutationOutcomeUnknownError: When GitHub's createIssue timed out and may
             still land. No item is stored, because a local-only item would be created on
-            GitHub again by a later sync. Retrying without ``force`` is safe: the duplicate
-            check finds the issue if it was created.
+            GitHub again by a later sync. A retry without ``force`` is safe once the earlier
+            request has finished (this process refuses new writes until then): the duplicate
+            check then finds the issue if it was created.
     """
     _validate_add_item_title(title)
     _validate_add_item_priority(priority)

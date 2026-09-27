@@ -630,10 +630,15 @@ killed, so bounding only the abandoned ones would let concurrent callers oversho
 
 _live_graphql_workers: set[threading.Thread] = set()
 _abandoned_graphql_workers: set[threading.Thread] = set()
+#: The subset of abandoned workers sending a mutation. While any is alive, every new mutation is
+#: refused: the abandoned one may still land, so a second write (a retry above all) could duplicate it.
+_abandoned_mutation_workers: set[threading.Thread] = set()
 _graphql_workers_lock = threading.Lock()
 
 
-def _call_with_deadline(fn: Callable[[], tuple[dict[str, Any], dict[str, Any]]], timeout: float) -> tuple[dict, dict]:
+def _call_with_deadline(
+    fn: Callable[[], tuple[dict[str, Any], dict[str, Any]]], timeout: float, *, is_mutation: bool = False
+) -> tuple[dict, dict]:
     """Run ``fn`` under a hard wall-clock deadline that ``requests``/``urllib3`` cannot enforce.
 
     ``Github(timeout=...)`` only bounds the gap between two consecutive reads on the socket (see
@@ -652,6 +657,8 @@ def _call_with_deadline(fn: Callable[[], tuple[dict[str, Any], dict[str, Any]]],
     Args:
         fn: Zero-argument callable to run — the caller closes over its own arguments.
         timeout: Seconds to wait before giving up.
+        is_mutation: Whether ``fn`` sends a mutation. A timed-out mutation blocks every later
+            mutation until its worker finishes, and a mutation is refused while one is blocked.
 
     Returns:
         Whatever ``fn`` returned, once it returns within the deadline.
@@ -662,7 +669,7 @@ def _call_with_deadline(fn: Callable[[], tuple[dict[str, Any], dict[str, Any]]],
             expected to convert this into a typed, retryable error naming the operation and the
             timeout.
         BackendUnavailableError: Retryable, without starting a thread, when every worker slot
-            is taken.
+            is taken, or when ``is_mutation`` and an earlier mutation's worker is still running.
     """
     outcome: list[tuple[dict, dict]] = []
     failure: list[BaseException] = []
@@ -676,9 +683,16 @@ def _call_with_deadline(fn: Callable[[], tuple[dict[str, Any], dict[str, Any]]],
             with _graphql_workers_lock:
                 _live_graphql_workers.discard(threading.current_thread())
                 _abandoned_graphql_workers.discard(threading.current_thread())
+                _abandoned_mutation_workers.discard(threading.current_thread())
 
     thread = threading.Thread(target=_run, daemon=True, name="gh-graphql-request")
     with _graphql_workers_lock:
+        if is_mutation and _abandoned_mutation_workers:
+            msg = (
+                "An earlier GitHub write timed out and is still running; refusing new writes so they "
+                "cannot duplicate it. Retry after it finishes."
+            )
+            raise BackendUnavailableError(msg, retryable=True)
         if len(_live_graphql_workers) >= _MAX_LIVE_GRAPHQL_WORKERS:
             msg = (
                 f"{len(_live_graphql_workers)} GitHub GraphQL requests are still running "
@@ -698,6 +712,8 @@ def _call_with_deadline(fn: Callable[[], tuple[dict[str, Any], dict[str, Any]]],
         # Still live means the worker has not reached its ``finally``; it removes itself later.
         if thread in _live_graphql_workers:
             _abandoned_graphql_workers.add(thread)
+            if is_mutation:
+                _abandoned_mutation_workers.add(thread)
             msg = f"total timeout of {timeout}s elapsed"
             raise _DeadlineExceeded(msg)
     if failure:
@@ -759,11 +775,14 @@ def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, obj
         BacklogError: On answered GraphQL errors or invalid response shapes.
     """
     timeout = _graphql_total_timeout_seconds()
+    is_mutation = _GRAPHQL_READ_PATTERN.match(query) is None
     try:
-        _headers, response = _call_with_deadline(lambda: repo.requester.graphql_query(query, variables or {}), timeout)
+        _headers, response = _call_with_deadline(
+            lambda: repo.requester.graphql_query(query, variables or {}), timeout, is_mutation=is_mutation
+        )
     except _DeadlineExceeded as exc:
         operation = _graphql_operation_name(query)
-        if _GRAPHQL_READ_PATTERN.match(query) is None:
+        if is_mutation:
             # The abandoned worker thread may still land the mutation, so a retry could duplicate it.
             msg = (
                 f"GraphQL mutation timed out after {timeout}s (operation: {operation}); its outcome is "

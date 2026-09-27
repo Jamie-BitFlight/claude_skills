@@ -329,3 +329,41 @@ class TestWorkerSlotsAreReservedBeforeStart:
             _graphql_request(repo, "query ListIssues { viewer { login } }")
 
         assert _graphql_request(repo, "query ListIssues { viewer { login } }") == {"viewer": {"login": "octocat"}}
+
+
+_MUTATION = "mutation AddComment($subjectId: ID!) { addComment { clientMutationId } }"
+_READ = "query ListIssues { viewer { login } }"
+
+
+class TestWritesWaitForAnAbandonedWrite:
+    """While a timed-out mutation may still land, a second write could duplicate it."""
+
+    def _abandon_one_mutation(self, requester: _RecordingSlowRequester) -> None:
+        with pytest.raises(GitHubMutationOutcomeUnknownError):
+            _graphql_request(_FakeRepo(requester), _MUTATION)
+
+    def test_a_mutation_is_refused_while_an_abandoned_mutation_runs(self) -> None:
+        requester = _RecordingSlowRequester()
+        self._abandon_one_mutation(requester)
+
+        with pytest.raises(BackendUnavailableError) as excinfo:
+            _graphql_request(_FakeRepo(requester), _MUTATION)
+
+        assert not isinstance(excinfo.value, GitHubMutationOutcomeUnknownError)
+        assert excinfo.value.retryable is True
+        assert "earlier GitHub write timed out and is still running" in str(excinfo.value)
+        assert "Retry after it finishes" in str(excinfo.value)
+        assert len(requester.queries) == 1, "the refused mutation must not reach the transport"
+
+    def test_a_read_is_allowed_while_an_abandoned_mutation_runs(self) -> None:
+        self._abandon_one_mutation(_RecordingSlowRequester())
+
+        assert _graphql_request(_FakeRepo(_FastRequester()), _READ) == {"viewer": {"login": "octocat"}}
+
+    def test_a_mutation_is_allowed_once_the_abandoned_one_finishes(self) -> None:
+        self._abandon_one_mutation(_RecordingSlowRequester())
+        _RELEASE.set()
+        for worker in _graphql_workers():
+            worker.join(_FAKE_SLOW_RESPONSE_SECONDS)
+
+        assert _graphql_request(_FakeRepo(_FastRequester()), _MUTATION) == {"viewer": {"login": "octocat"}}

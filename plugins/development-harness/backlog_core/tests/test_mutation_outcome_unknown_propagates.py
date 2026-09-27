@@ -67,8 +67,11 @@ def test_add_item_fails_and_stores_no_local_item(tmp_path: Path, mocker: MockerF
     with pytest.raises(GitHubMutationOutcomeUnknownError) as excinfo:
         operations.add_item("new item", "new description", "P1", type_="Bug", force=True)
 
-    assert "retry backlog_add" in str(excinfo.value)
-    assert "duplicate check finds the issue if it was created" in str(excinfo.value)
+    message = str(excinfo.value)
+    assert "timed out" in message
+    assert "may still complete" in message
+    assert "retry backlog_add without force after the earlier createIssue request has finished" in message
+    assert "its duplicate check then finds the issue if it was created" in message
     assert backend.list_work_items() == []
 
 
