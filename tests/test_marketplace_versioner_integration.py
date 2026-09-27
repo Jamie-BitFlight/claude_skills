@@ -42,7 +42,8 @@ def test_hook_checks_only_and_workflow_bumps_on_main() -> None:
     """Branches validate manifests without bumping; only main pushes assign versions."""
     shared = shared_hook_repo()
     (hook,) = shared["hooks"]
-    assert hook["entry"] == "agent-marketplace-versioner reconcile --dry-run"
+    assert hook["id"] == "agent-marketplace-versioner-check"
+    assert "entry" not in hook
 
     workflow = load_yaml(WORKFLOW)
     assert set(workflow["on"]) == {"push", "workflow_dispatch"}
@@ -94,7 +95,7 @@ def test_branch_commits_keep_versions_and_main_workflow_bumps_once(tmp_path: Pat
         manifest.parent.mkdir(parents=True)
         manifest.write_text(json.dumps({"name": name, "version": "1.0.0"}))
         (consumer / f"plugins/{name}/README.md").write_text(f"{name}\n")
-    # An eval fixture nested inside a plugin is also a manifest the versioner bumps.
+    # An eval fixture nested inside a plugin is that plugin's content, not a plugin: repair leaves it.
     fixture = consumer / "plugins/tool/evals/fixture/.claude-plugin/plugin.json"
     fixture.parent.mkdir(parents=True)
     fixture.write_text(json.dumps({"name": "fixture", "version": "1.0.0"}))
@@ -116,7 +117,7 @@ def test_branch_commits_keep_versions_and_main_workflow_bumps_once(tmp_path: Pat
     # When a branch commit changes plugin content, the hook passes without touching versions.
     (consumer / "plugins/tool/README.md").write_text("tool changed\n")
     run(consumer, "git", "add", "plugins/tool/README.md")
-    run(consumer, str(ROOT / ".venv/bin/prek"), "run", "agent-marketplace-versioner")
+    run(consumer, str(ROOT / ".venv/bin/prek"), "run", "agent-marketplace-versioner-check")
     assert run(consumer, "git", "diff", "--cached", "--name-only").stdout.split() == ["plugins/tool/README.md"]
     run(consumer, "git", "commit", "-m", "First merged change")
 
@@ -125,7 +126,7 @@ def test_branch_commits_keep_versions_and_main_workflow_bumps_once(tmp_path: Pat
     stray.parent.mkdir(parents=True)
     stray.write_text(json.dumps({"name": "stray", "version": "1.0.0"}))
     run(consumer, "git", "add", str(stray))
-    rejected = run(consumer, str(ROOT / ".venv/bin/prek"), "run", "agent-marketplace-versioner", ok=False)
+    rejected = run(consumer, str(ROOT / ".venv/bin/prek"), "run", "agent-marketplace-versioner-check", ok=False)
     assert rejected.returncode == 1, rejected.stdout + rejected.stderr
     assert "Drift detected" in rejected.stdout
     assert [entry["name"] for entry in json.loads(catalog.read_text())["plugins"]] == list(names)
@@ -215,7 +216,7 @@ def test_branch_commits_keep_versions_and_main_workflow_bumps_once(tmp_path: Pat
     run_workflow(race="plugins/idle/README.md")
     assert run(tmp_path, "git", "--git-dir", str(remote), "log", "-1", "--format=%s", "main").stdout.strip() == SUBJECT
     assert plugin_versions() == ["1.0.1", "1.0.1", "1.0.0"]
-    assert on_main("plugins/tool/evals/fixture/.claude-plugin/plugin.json", "version") == "1.0.1"
+    assert on_main("plugins/tool/evals/fixture/.claude-plugin/plugin.json", "version") == "1.0.0"
     assert on_main(".claude-plugin/marketplace.json", "metadata", "version") == "1.0.1"
 
     # The version commit's own run (which replaces the racing merge's pending run) bumps what that merge changed.
@@ -229,7 +230,7 @@ def test_branch_commits_keep_versions_and_main_workflow_bumps_once(tmp_path: Pat
     assert main_head() == head
     assert not run(rerun, "git", "status", "--porcelain").stdout
 
-    # A merge that adds a plugin (registered by hand, already at its first version) bumps the catalog.
+    # A merge that adds a plugin (registered by hand, already at its first version) bumps the catalog minor.
     run(consumer, "git", "pull", "-q", "--rebase", str(remote), "main")
     added = consumer / "plugins/fresh/.claude-plugin/plugin.json"
     added.parent.mkdir(parents=True)
@@ -242,4 +243,4 @@ def test_branch_commits_keep_versions_and_main_workflow_bumps_once(tmp_path: Pat
     run(consumer, "git", "push", "-q", str(remote), "main")
     run_workflow()
     assert on_main("plugins/fresh/.claude-plugin/plugin.json", "version") == "1.0.0"
-    assert on_main(".claude-plugin/marketplace.json", "metadata", "version") == "1.0.3"
+    assert on_main(".claude-plugin/marketplace.json", "metadata", "version") == "1.1.0"

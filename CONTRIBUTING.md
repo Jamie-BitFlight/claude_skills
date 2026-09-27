@@ -51,7 +51,7 @@ All validation checks must pass with no errors.
 
 The `name` field is the install name users will use (`/plugin install your-plugin-name@jamie-bitflight-skills`). It can differ from the directory name — for example, `development-harness` installs as `dh` and `the-rewrite-room` installs as `rwr`.
 
-**Note:** The `agent-marketplace-versioner` pre-commit hook fails if a plugin under `plugins/` is missing from the marketplace catalogs. It does not edit files. CI assigns patch versions to plugins and the marketplace after merge to `main`; set a version in your PR only for a deliberate minor or major bump. See [marketplace versioning](docs/marketplace-versioning.md).
+**Note:** The `agent-marketplace-versioner-check` pre-commit hook fails if a plugin under `plugins/` is missing from the marketplace catalogs. It does not edit files. CI assigns patch versions to plugins and the marketplace after merge to `main`; set a version in your PR only for a deliberate minor or major bump. See [marketplace versioning](docs/marketplace-versioning.md).
 
 #### Validate Marketplace JSON
 
@@ -97,12 +97,11 @@ Remove the plugin entry from `.claude-plugin/marketplace.json`. Find and delete 
 python3 -m json.tool .claude-plugin/marketplace.json > /dev/null
 ```
 
-A removal alone does not bump the marketplace `version` after merge; the next merged plugin change
-does. See [marketplace versioning](docs/marketplace-versioning.md).
+After merge, CI bumps the marketplace `version` to its next major version for the removal. See [marketplace versioning](docs/marketplace-versioning.md).
 
 ## Updating an Existing Plugin
 
-Make your changes and commit. The `agent-marketplace-versioner`
+Make your changes and commit. The `agent-marketplace-versioner-check`
 pre-commit hook checks, without editing, that:
 
 - A `plugin.json` that lists `skills`, `agents` or `commands` explicitly matches the files on disk
