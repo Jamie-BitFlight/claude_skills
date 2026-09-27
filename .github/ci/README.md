@@ -21,8 +21,9 @@ CI decides which plugin needs testing; the plugin decides how it is tested.
 [`pyproject.toml`](../../pyproject.toml)'s `tool.pytest.ini_options.testpaths`
 lists only repository-owned tests (root tests, example tests and repository-local
 skill tests), which form the `global` shard. Each `plugins/<name>/run_pytests.py`
-is one plugin shard: the planner discovers the runner and passes it only the fast
-marker, and the runner owns that plugin's test roots and dependencies. A plugin
+is one plugin shard: the planner discovers the runner and passes it no marker, so
+the runner's own default selects the fast lane, and the runner owns that plugin's
+test roots and dependencies. A plugin
 path in root `testpaths`, or a missing configured directory, fails planning; a
 plugin without a runner gets no pytest shard. New tests still have to satisfy the
 test-root coverage guard, which reads both authorities.

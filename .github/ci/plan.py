@@ -83,7 +83,6 @@ LINT_CONFIG_NAMES = frozenset({
     ".gitignore",
     ".gitattributes",
 })
-FAST_PLUGIN_MARKER = "not e2e and not cross_backend and not integration and not research_vault"
 LANGUAGE_SUFFIXES = {
     "lint-python": {".py", ".pyi"},
     "lint-js": {".js", ".jsx", ".cjs", ".mjs", ".ts", ".tsx", ".mts", ".cts", ".json", ".jsonc", ".css"},
@@ -265,7 +264,7 @@ def build_plan(
         {
             "name": owner,
             "paths": ([] if owner != "global" else targets),
-            "marker": (FAST_PLUGIN_MARKER if owner != "global" else ""),
+            "marker": "",
             "runner": (targets[0] if owner != "global" else ""),
         }
         for owner, targets in sorted(suites.items())

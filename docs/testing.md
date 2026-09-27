@@ -5,7 +5,7 @@
 ```bash
 uv run pytest                              # Repository-owned fast suite (parallel via xdist); e2e, cross_backend, integration, and research_vault are deselected by addopts
 uv run pytest -m "not e2e and not cross_backend and not integration and not research_vault and not slow"  # Same, also excluding slow tests
-uv run --script plugins/<name>/run_pytests.py -m "not e2e and not cross_backend and not integration and not research_vault"  # One plugin's fast suite, from any cwd
+uv run --script plugins/<name>/run_pytests.py  # One plugin's fast suite (the runner's default -m), from any cwd; -m "" selects every marker
 uv run --script plugins/development-harness/run_pytests.py -m "integration and not research_vault" tests  # development-harness integration tests
 uv run pytest -m "integration and not research_vault" tests/research_backlinks/  # Repository integration tests (deselected by default)
 uv run pytest -m research_vault tests/research_backlinks/test_graph_asymmetry.py  # Advisory, read-only production-vault scan

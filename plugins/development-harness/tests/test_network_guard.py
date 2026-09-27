@@ -39,7 +39,7 @@ def _configured_testpaths() -> list[str]:
     assert spec.loader is not None
     runner = module_from_spec(spec)
     spec.loader.exec_module(runner)
-    return list(runner._DEFAULT_TEST_PATHS)
+    return list(runner.TEST_PATHS)
 
 
 def _probe_command(probe: Path, *args: str) -> list[str]:

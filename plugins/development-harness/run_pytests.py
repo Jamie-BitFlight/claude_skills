@@ -23,18 +23,19 @@
 #   "typer>=0.21.0",
 # ]
 # ///
-"""Run development-harness tests without a plugin-local project environment."""
+"""Run the development-harness plugin's pytest suites under this runner's own configuration."""
 
 from __future__ import annotations
 
 import os
+import shlex
 import sys
 from pathlib import Path
 
 import pytest
 
-_PLUGIN_ROOT = Path(__file__).resolve().parent
-_DEFAULT_TEST_PATHS = [
+PLUGIN_ROOT = Path(__file__).resolve().parent
+TEST_PATHS = (
     "tests",
     "tests_sam",
     "tests_backlog",
@@ -42,12 +43,13 @@ _DEFAULT_TEST_PATHS = [
     "backlog_core/tests",
     "skills/implementation-manager/scripts",
     "skills/kage-bunshin/tests",
-]
-_REQUIRED_ARGS = ["--asyncio-mode=auto", "--strict-config"]
-_PARALLEL_ARGS = ["-n", "2", "--dist", "loadgroup"]
+)
+IMPORT_PATHS = (".", "scripts", "skills/implementation-manager/scripts")
+FAST_MARKER = "not e2e and not cross_backend and not integration and not research_vault"
+PARALLEL_ARGS = ("-n", "2", "--dist", "loadgroup")
 
 
-def _default_parallelism(args: list[str]) -> list[str]:
+def default_parallelism(args: list[str]) -> list[str]:
     """Return the default xdist options unless the caller disabled the xdist plugin.
 
     The defaults precede the caller's arguments, so an explicit ``-n`` or
@@ -57,37 +59,41 @@ def _default_parallelism(args: list[str]) -> list[str]:
     Returns:
         The xdist options to prepend, or an empty list.
     """
-    return [] if any("no:xdist" in arg for arg in args) else _PARALLEL_ARGS
+    return [] if any("no:xdist" in arg for arg in args) else list(PARALLEL_ARGS)
 
 
 def main() -> int:
-    """Run the plugin test suites from the bundle root and forward arguments.
+    """Run this plugin's tests with no dependency on a parent directory.
 
-    ``-c os.devnull`` keeps a parent ``pyproject.toml`` from configuring the
-    run, so the suite behaves the same inside the monorepo and in a standalone
-    bundle. Without that config, ``asyncio_mode = "auto"`` must be passed here
-    or pytest's strict default would silently skip this plugin's
-    intentionally-undecorated async tests. ``--strict-config`` turns invalid or
-    unavailable pytest configuration into a hard failure instead of a silently
-    degraded warning. The default suites go to pytest as ``testpaths`` so an
-    option-only invocation (``-m``, ``--collect-only``) still collects only
-    them, while explicit path arguments override them. Tests run on two xdist
-    workers with ``loadgroup`` distribution by default, matching the monorepo's
-    root configuration; see ``_default_parallelism`` for overriding it.
+    ``-c os.devnull`` and ``--confcutdir`` keep a parent ``pyproject.toml`` and
+    parent ``conftest.py`` files out of the run, so it behaves the same inside the
+    monorepo and in a standalone copy. The options that parent config would
+    have supplied are set here instead. ``TEST_PATHS`` go to pytest as
+    ``testpaths`` and ``FAST_MARKER`` as a leading ``-m``, so a caller's explicit
+    paths or ``-m`` replace them (``-m ""`` selects every marker).
 
     Returns:
         The pytest process exit code.
     """
-    os.chdir(_PLUGIN_ROOT)
+    os.chdir(PLUGIN_ROOT)
     return pytest.main([
         "-c",
         os.devnull,
         "--rootdir",
-        str(_PLUGIN_ROOT),
+        str(PLUGIN_ROOT),
+        "--confcutdir",
+        str(PLUGIN_ROOT),
         "-o",
-        f"testpaths={' '.join(_DEFAULT_TEST_PATHS)}",
-        *_REQUIRED_ARGS,
-        *_default_parallelism(sys.argv[1:]),
+        f"testpaths={shlex.join(TEST_PATHS)}",
+        "-o",
+        f"pythonpath={shlex.join(str(PLUGIN_ROOT / path) for path in IMPORT_PATHS)}",
+        "--strict-config",
+        "--strict-markers",
+        "--import-mode=importlib",
+        "--asyncio-mode=auto",
+        "-m",
+        FAST_MARKER,
+        *default_parallelism(sys.argv[1:]),
         *sys.argv[1:],
     ])
 
