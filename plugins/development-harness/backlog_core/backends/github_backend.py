@@ -460,19 +460,19 @@ class GitHubBackend:
             )
             raise BackendUnavailableError(f"GitHub title search unavailable: {exc}", retryable=retryable) from exc
 
-    def fetch_open_issue_titles(self, repo: str) -> list[tuple[int, str]]:
-        """Fetch every open issue's ``(number, title)`` with no body or hydration (D5 fallback).
+    def fetch_issue_titles(self, repo: str, *, include_closed: bool = False) -> list[tuple[int, str]]:
+        """Fetch every issue's ``(number, title)`` with no body or hydration (D5 fallback).
 
         Resolves the repository and converts a transport failure the same
         way :meth:`search_issues_by_title` does.
 
         Returns:
-            Every open issue's number and title.
+            Every open issue's number and title, plus closed ones when *include_closed* is set.
         """
         try:
             repository = self.get_github(repo)
             owner, repo_name = repository.full_name.split("/", 1)
-            return gh_client._fetch_open_issue_titles_graphql(repository, owner, repo_name)
+            return gh_client._fetch_issue_titles_graphql(repository, owner, repo_name, include_closed=include_closed)
         except ContentNotFoundError:
             raise
         except BacklogError:
@@ -482,7 +482,7 @@ class GitHubBackend:
             retryable = (
                 True if kind is SyncErrorKind.RETRYABLE else False if kind is SyncErrorKind.NON_RETRYABLE else None
             )
-            raise BackendUnavailableError(f"GitHub open-issue titles unavailable: {exc}", retryable=retryable) from exc
+            raise BackendUnavailableError(f"GitHub issue titles unavailable: {exc}", retryable=retryable) from exc
 
     def _update_issue_graphql(
         self,

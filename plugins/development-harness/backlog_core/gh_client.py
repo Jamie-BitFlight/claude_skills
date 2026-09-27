@@ -300,12 +300,12 @@ query IssueTitleSearch($searchQuery: String!, $first: Int!, $after: String) {
 }
 """
 
-_OPEN_ISSUE_TITLES_QUERY = """
-query OpenIssueTitles($owner: String!, $repo: String!, $first: Int!, $after: String) {
+_ISSUE_TITLES_QUERY = """
+query IssueTitles($owner: String!, $repo: String!, $states: [IssueState!]!, $first: Int!, $after: String) {
   repository(owner: $owner, name: $repo) {
     issues(
       first: $first, after: $after,
-      filterBy: {states: [OPEN]},
+      filterBy: {states: $states},
       orderBy: {field: UPDATED_AT, direction: DESC}
     ) {
       nodes { number title }
@@ -931,7 +931,7 @@ def _search_issues_by_title_graphql(repo: Repository, owner: str, repo_name: str
     Uses GitHub's search index rather than a full repository list — see D5 in
     the request-shaped-reads design brief. Tokenizes rather than matching
     substrings, and the index can lag a just-created or just-edited issue
-    (risk R-A); callers fall back to :func:`_fetch_open_issue_titles_graphql`
+    (risk R-A); callers fall back to :func:`_fetch_issue_titles_graphql`
     on an empty result.
 
     Returns:
@@ -961,16 +961,19 @@ def _search_issues_by_title_graphql(repo: Repository, owner: str, repo_name: str
     return all_issues
 
 
-def _fetch_open_issue_titles_graphql(repo: Repository, owner: str, repo_name: str) -> list[tuple[int, str]]:
-    """Fetch every open issue's ``(number, title)`` with no body or hydration.
+def _fetch_issue_titles_graphql(
+    repo: Repository, owner: str, repo_name: str, *, include_closed: bool = False
+) -> list[tuple[int, str]]:
+    """Fetch every issue's ``(number, title)`` with no body or hydration.
 
-    The D5 fallback for a title selector the search index missed (risk R-A):
-    a titles-only scan of the open set, cheap enough to run unconditionally
-    when search returns nothing. Never requests closed issues — a selector
-    that only matches a closed issue stays reachable through search alone.
+    The D5 fallback for a title selector the search index missed (risk R-A)
+    or could not accept (risk R-B). After a search miss the open set is
+    enough -- a closed issue stays reachable through search. A selector
+    search cannot accept has no other path to a closed issue, so that caller
+    passes *include_closed*.
 
     Returns:
-        Every open issue's number and title, cursors followed to the end.
+        Every matching-state issue's number and title, cursors followed to the end.
 
     Raises:
         BacklogError: On GraphQL errors.
@@ -979,7 +982,15 @@ def _fetch_open_issue_titles_graphql(repo: Repository, owner: str, repo_name: st
     cursor: str | None = None
     while True:
         data = _graphql_request(
-            repo, _OPEN_ISSUE_TITLES_QUERY, {"owner": owner, "repo": repo_name, "first": 100, "after": cursor}
+            repo,
+            _ISSUE_TITLES_QUERY,
+            {
+                "owner": owner,
+                "repo": repo_name,
+                "states": ["OPEN", "CLOSED"] if include_closed else ["OPEN"],
+                "first": 100,
+                "after": cursor,
+            },
         )
         repo_data = data.get("repository") or {}
         issues_conn = repo_data.get("issues") if isinstance(repo_data, dict) else None

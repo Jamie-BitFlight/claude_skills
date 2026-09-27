@@ -308,16 +308,12 @@ class _GitHubWorkItemSync:
 
         matched_nodes: list[IssueNode] = []
         matched_items: list[BacklogItem] = []
-        fetched_count = 0
-        total_count = 0
         cursor: str | None = None
         has_next_page = True
         while True:
             page = self._issues._fetch_issues_page_graphql(
                 repo, owner, repo_name, states=states, labels=labels, first=page_size, after=cursor, light=True
             )
-            total_count = page["total_count"]
-            fetched_count += len(page["issues"])
             page_nodes, page_items = self._classify_page_candidates(
                 repo, owner, repo_name, page["issues"], match=match, force_hydration=force_hydration
             )
@@ -346,16 +342,10 @@ class _GitHubWorkItemSync:
             self.provider_item_from_issue(repo, owner, repo_name, issue, heads, comments) for issue in slice_nodes
         ]
 
-        total: int | None
-        if not has_next_page:
-            total = len(matched_items)
-        elif fetched_count == len(matched_items):
-            # Every fetched row matched -- no local predicate removed one --
-            # so the connection's own totalCount is exact even though the
-            # walk stopped short of the end (D4).
-            total = total_count
-        else:
-            total = None
+        # Only an exhausted walk knows the filtered total. totalCount counts
+        # rows *match* would reject, and every list caller's *match* carries
+        # the local "has a section" rule, so it is never the filtered total.
+        total = None if has_next_page else len(matched_items)
 
         return ListPageResult(items=hydrated, has_more=has_more, total=total, sync_started_at=sync_started_at)
 

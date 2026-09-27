@@ -163,9 +163,9 @@ class FakeRequester:
         elif "query IssueTitleSearch(" in query:
             operation = "IssueTitleSearch"
             data = self._title_search(variables)
-        elif "query OpenIssueTitles(" in query:
-            operation = "OpenIssueTitles"
-            data = self._open_issue_titles(variables)
+        elif "query IssueTitles(" in query:
+            operation = "IssueTitles"
+            data = self._issue_titles(variables)
         elif "query GetComment(" in query:
             operation = "GetComment"
             data = self._get_comment(variables)
@@ -254,17 +254,17 @@ class FakeRequester:
         }
         return {"addComment": {"commentEdge": {"node": {"id": new_id, "fullDatabaseId": database_id}}}}
 
-    def _open_issue_titles(self, variables: dict[str, object]) -> dict[str, object]:
-        del variables
-        open_issues = sorted(
-            (issue for issue in self._fixture.issues.values() if issue.state == "OPEN"),
+    def _issue_titles(self, variables: dict[str, object]) -> dict[str, object]:
+        states = cast("list[str]", variables["states"])
+        issues = sorted(
+            (issue for issue in self._fixture.issues.values() if issue.state in states),
             key=lambda issue: issue.updated_at,
             reverse=True,
         )
         return {
             "repository": {
                 "issues": {
-                    "nodes": [{"number": issue.number, "title": issue.title} for issue in open_issues],
+                    "nodes": [{"number": issue.number, "title": issue.title} for issue in issues],
                     "pageInfo": {"hasNextPage": False, "endCursor": None},
                 }
             }
@@ -703,7 +703,8 @@ def test_t9_search_miss_falls_back_to_open_titles(fixture: FakeGitHubFixture) ->
     assert target.provider is not None
     assert target.provider.issue == "#1", target.provider
     log = fixture.requester.log
-    assert log.count_operation("OpenIssueTitles") == 1, log
+    assert log.count_operation("IssueTitles") == 1, log
+    assert all(entry["variables"]["states"] == ["OPEN"] for entry in log if entry["operation"] == "IssueTitles")
     assert all(
         entry["variables"].get("states") != ["OPEN", "CLOSED"] for entry in log if entry["operation"] == "ListIssues"
     )
@@ -823,3 +824,94 @@ def test_backlog_list_limit_one_makes_exactly_one_light_request(fixture: FakeGit
     assert list_calls[0]["variables"]["first"] <= 2, list_calls
     assert "assignees" not in list_calls[0]["query"], list_calls[0]["query"]
     assert "createdAt" not in list_calls[0]["query"], list_calls[0]["query"]
+
+
+# ---------------------------------------------------------------------------
+# PR #3969 review (Codex) regressions.
+# ---------------------------------------------------------------------------
+
+
+def _fail_every_request(fixture: FakeGitHubFixture) -> None:
+    from github import GithubException
+
+    def fail(query: str, variables: dict[str, object]) -> tuple[dict[str, object], dict[str, object]]:
+        del query, variables
+        raise GithubException(503, {"message": "offline"}, {})
+
+    fixture.repository.requester.graphql_query = fail  # ty: ignore[invalid-assignment]
+
+
+def test_total_stays_unknown_when_a_local_predicate_matched_the_whole_prefix(fixture: FakeGitHubFixture) -> None:
+    # The newest 11 of 20 issues have a section; the walk stops after those
+    # 11, all matching, with the 9 unsectioned issues unseen. totalCount (20)
+    # counts rows the predicate would reject, so it is not the filtered total.
+    for number in range(1, 21):
+        if number <= 9:
+            fixture.add_tracked_issue(number, f"issue {number}", state="OPEN", labels=[], tracked_body="")
+        else:
+            fixture.add_tracked_issue(number, f"issue {number}", state="OPEN")
+
+    def has_section(item: BacklogItem, provider: ProviderItem) -> bool:
+        del provider
+        return bool(item.section)
+
+    result = fixture.backend.fetch_page(_default_request(fixture, limit=10), match=has_section, force_hydration=False)
+
+    assert len(result.items) == 10
+    assert result.has_more is True
+    assert result.total is None, result.total
+
+
+def test_unsearchable_title_selector_finds_a_closed_issue(fixture: FakeGitHubFixture) -> None:
+    # A double quote skips GitHub search, so only the titles fallback can
+    # resolve this selector; it must see closed issues as search would.
+    fixture.add_tracked_issue(1, 'fix the "quoted" parser', state="CLOSED")
+
+    context = WorkItemDecisionContext(fixture.backend, repo=f"{fixture.owner}/{fixture.name}")
+    target = context.select('the "quoted" parser', purpose="read")
+
+    assert target.provider is not None
+    assert target.provider.issue == "#1", target.provider
+    assert fixture.requester.log.count_operation("IssueTitleSearch") == 0, fixture.requester.log
+
+
+def test_cached_fallback_filtered_to_zero_does_not_report_an_empty_cache(fixture: FakeGitHubFixture) -> None:
+    from backlog_core import operations
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+
+    for number in range(1, 6):
+        fixture.add_tracked_issue(number, f"issue {number}", state="OPEN")
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        operations.list_items(limit=2)
+        _fail_every_request(fixture)
+        fallback = operations.list_items(allow_cached=True, title="matches nothing cached")
+    finally:
+        reset_config()
+
+    assert fallback["from_cache"] is True
+    assert fallback["count"] == 0, fallback
+    warnings = cast("list[str]", fallback.get("warnings", []))
+    assert not any("cache holds no items" in warning for warning in warnings), warnings
+
+
+def test_cached_normalize_does_not_reconcile_live_after_the_provider_failed(fixture: FakeGitHubFixture) -> None:
+    from backlog_core import operations
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+
+    for number in range(1, 4):
+        fixture.add_tracked_issue(number, f"issue {number}", state="OPEN")
+
+    repo = f"{fixture.owner}/{fixture.name}"
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        operations.list_items(repo=repo)
+        _fail_every_request(fixture)
+        result = operations.normalize_items(repo=repo, allow_cached=True)
+    finally:
+        reset_config()
+
+    assert result["normalized"] == 3, result

@@ -198,13 +198,14 @@ class ProviderMemoryBackend(InMemoryBackend):
             if item.issue and selector.lower() in item.title.lower()
         ]
 
-    def fetch_open_issue_titles(self, repo: str) -> list[tuple[int, str]]:
-        """Return every open provider item's ``(number, title)``."""
+    def fetch_issue_titles(self, repo: str, *, include_closed: bool = False) -> list[tuple[int, str]]:
+        """Return every provider item's ``(number, title)``, open only unless *include_closed*."""
         del repo
         return [
             (int(item.issue.lstrip("#")), item.title)
             for item in self.provider_items
-            if item.issue and item.status.casefold() not in {"closed", "completed", "done", "resolved"}
+            if item.issue
+            and (include_closed or item.status.casefold() not in {"closed", "completed", "done", "resolved"})
         ]
 
     def pending_work_items(self, repo: str = "") -> list[BacklogItem]:

@@ -2850,9 +2850,10 @@ def list_items(
     _, has_pending_writes, low_confidence, confirmed_complete = _listing_provenance(backend)
     from_cache = read.from_cache
     low_confidence = low_confidence and from_cache
+    cached_count = page.cached_count if page is not None and page.cached_count is not None else len(read.provider_items)
     if (
         read.from_cache
-        and not read.provider_items
+        and cached_count == 0
         and isinstance(get_config().backend, SyncProvider)
         and not confirmed_complete
     ):
@@ -5285,7 +5286,9 @@ def normalize_items(
             _put_work_item(item, repo)
         backend = get_config().backend
         rewritten_references = [reference for reference in by_reference if parse_issue_number(reference) is not None]
-        if isinstance(backend, SyncProvider) and rewritten_references:
+        # A cached scan means the provider just failed; the writes above stay
+        # queued intent for the next sync instead of a live reconcile.
+        if scan.live and isinstance(backend, SyncProvider) and rewritten_references:
             backend.reconcile(
                 ReconcileRequest(
                     scope=ReconcileScope.TARGETED, repo=repo, references=rewritten_references, apply_local_patches=True

@@ -423,8 +423,7 @@ class ListPageResult(BaseModel):
     has_more: bool
     total: int | None
     """Exact count when the walk reached the end of the matching state set,
-    ``issues.totalCount`` when every fetched row matched (no local predicate
-    removed any), otherwise ``None`` — an unknown total, not a guess."""
+    otherwise ``None`` — an unknown total, not a guess."""
     sync_started_at: str
 
 
@@ -460,7 +459,7 @@ class RequestShapedListing(Protocol):
         light: bool = False,
     ) -> object: ...
     def search_issues_by_title(self, repo: str, selector: str) -> list[IssueNode]: ...
-    def fetch_open_issue_titles(self, repo: str) -> list[tuple[int, str]]: ...
+    def fetch_issue_titles(self, repo: str, *, include_closed: bool = False) -> list[tuple[int, str]]: ...
 
 
 @runtime_checkable

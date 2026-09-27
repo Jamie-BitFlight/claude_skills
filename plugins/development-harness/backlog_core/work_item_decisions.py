@@ -60,6 +60,10 @@ class ListPage(CommandWorkItems):
 
     total: int | None = None
     has_more: bool = False
+    cached_count: int | None = None
+    """Unfiltered count of this repository's cached rows, set only on an
+    ``allow_cached`` fallback, so a filter matching none of them is not read
+    as an empty cache."""
 
 
 class DecisionTarget(BaseModel):
@@ -126,7 +130,13 @@ class WorkItemDecisionContext:
             cached = self._cached_items()
             matched = [item for item in cached.provider_items if match(item, _blank_provider_item(item))]
             page_items, has_more = _slice(matched, request.offset, request.limit)
-            return ListPage(provider_items=page_items, from_cache=True, total=len(matched), has_more=has_more)
+            return ListPage(
+                provider_items=page_items,
+                from_cache=True,
+                total=len(matched),
+                has_more=has_more,
+                cached_count=len(cached.provider_items),
+            )
         snapshot = ProviderSnapshot(items=result.items, sync_started_at=result.sync_started_at)
         observed = self._from_snapshot(snapshot)
         return ListPage(
@@ -190,10 +200,11 @@ class WorkItemDecisionContext:
         Pending (not-yet-created) items are checked first -- a slug or
         string-id selector matching queued intent skips the live search
         entirely (D5 point 4). A selector unsafe for GitHub's search endpoint
-        (too long, or carrying a quote -- risk R-B) goes straight to the
-        titles-only open-issue fallback. An empty search result falls back to
-        the same open-issue titles scan (risk R-A: search tokenizes and can
-        lag a just-created or just-edited issue).
+        (too long, or carrying a quote -- risk R-B) goes straight to a
+        titles-only scan of open and closed issues, since nothing else can
+        reach a closed one. An empty search result falls back to an open-only
+        titles scan (risk R-A: search tokenizes and can lag a just-created or
+        just-edited issue).
 
         Returns:
             The matched item and its targeted snapshot (``None`` for a
@@ -206,11 +217,10 @@ class WorkItemDecisionContext:
             # match as target.pending/mutation_base; skip the search entirely.
             return None, None
         try:
-            candidates = (
-                self._pages.search_issues_by_title(self.repo, selector) if selector_fits_search(selector) else []
-            )
+            searchable = selector_fits_search(selector)
+            candidates = self._pages.search_issues_by_title(self.repo, selector) if searchable else []
             if not candidates:
-                titles = self._pages.fetch_open_issue_titles(self.repo)
+                titles = self._pages.fetch_issue_titles(self.repo, include_closed=not searchable)
         except BackendUnavailableError as exc:
             if not self.allow_cached:
                 raise

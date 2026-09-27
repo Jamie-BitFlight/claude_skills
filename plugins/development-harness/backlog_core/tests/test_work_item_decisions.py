@@ -153,10 +153,14 @@ class DecisionBackend(InMemoryBackend):
         self.search_requests.append(selector)
         return [_issue_node_from_provider(item) for item in self.live_items if selector.lower() in item.title.lower()]
 
-    def fetch_open_issue_titles(self, repo: str) -> list[tuple[int, str]]:
-        """Return every live open item's ``(number, title)``."""
+    def fetch_issue_titles(self, repo: str, *, include_closed: bool = False) -> list[tuple[int, str]]:
+        """Return every live item's ``(number, title)``, open only unless *include_closed*."""
         del repo
-        return [(int(item.reference.lstrip("#")), item.title) for item in self.live_items if item.state == "OPEN"]
+        return [
+            (int(item.reference.lstrip("#")), item.title)
+            for item in self.live_items
+            if include_closed or item.state == "OPEN"
+        ]
 
     def pending_work_items(self, repo: str = "") -> list[BacklogItem]:
         """Return queued local intent independently from provider observations."""

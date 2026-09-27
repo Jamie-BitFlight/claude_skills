@@ -165,9 +165,9 @@ class _LiveBackend(InMemoryBackend):
             if selector.lower() in item.title.lower()
         ]
 
-    def fetch_open_issue_titles(self, repo: str) -> list[tuple[int, str]]:
+    def fetch_issue_titles(self, repo: str, *, include_closed: bool = False) -> list[tuple[int, str]]:
         """Return every live item's ``(number, title)``."""
-        del repo
+        del repo, include_closed
         return [(int(item.issue.lstrip("#")), item.title) for item in self.live_items]
 
     def get_work_item(self, reference: str) -> BacklogItem:
