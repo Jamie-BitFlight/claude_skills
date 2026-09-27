@@ -284,7 +284,7 @@ With this plugin installed, Claude will:
 
 ### Automatic Behaviors
 
-- **On every git commit**: The shared `agent-marketplace-versioner` hook detects plugin content changes, synchronizes applicable manifest entries, and bumps plugin versions (major for deletion, minor for addition, patch for modification). Marketplace membership is reconciled locally; its version bump is deferred to the post-merge repair flow described in [Marketplace versioning](https://github.com/Jamie-BitFlight/claude_skills/blob/main/docs/marketplace-versioning.md).
+- **On every git commit**: The shared `agent-marketplace-versioner` hook detects plugin content changes, synchronizes applicable manifest entries, and bumps plugin versions (major for deletion, minor for addition, patch for modification). Marketplace membership is reconciled locally; its version bump is deferred to the post-merge repair flow described in [Marketplace versioning](../../docs/marketplace-versioning.md).
 
 ## Installation
 
