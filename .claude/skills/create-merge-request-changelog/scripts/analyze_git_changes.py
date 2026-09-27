@@ -3,7 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #     "typer>=0.21.0",
-#     "gitpython>=3.1.45",
+#     "gitpython>=3.1.59",
 # ]
 # ///
 """Git change analysis script - extracts commits, diffs, and statistics.

@@ -6,7 +6,7 @@
 #   "ruamel.yaml>=0.18.0",
 #   "pydantic>=2.12.3",
 #   "pygithub>=2.8.1",
-#   "gitpython>=3.1.0",
+#   "gitpython>=3.1.59",
 #   "marko>=2.0.0",
 # ]
 #

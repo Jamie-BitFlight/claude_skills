@@ -4,7 +4,7 @@
 # dependencies = [
 #   "fastmcp[tasks]>=4.0.0",
 #   "httpx>=0.27.0",
-#   "gitpython>=3.1.0",
+#   "gitpython>=3.1.59",
 #   "pygithub>=2.8.1",
 #   "pydantic>=2.12.3",
 #   "marko>=2.0.0",

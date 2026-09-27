@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["typer>=0.21.0", "python-gitlab>=4.0.0", "gitpython>=3.1.0"]
+# dependencies = ["typer>=0.21.0", "python-gitlab>=4.0.0", "gitpython>=3.1.59"]
 # ///
 """GitLab merge request fetcher - extracts MR metadata and changes via python-gitlab.
 
