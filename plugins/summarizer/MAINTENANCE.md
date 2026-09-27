@@ -26,7 +26,7 @@ behavioral verification.
 | S11 | PRESERVED in synthesis with qualification-level support and copied-origin distinction |
 | S12 | PRESERVED direct/agent routes; agent bodies RELOCATED into canonical source methods |
 | S13 | PRESERVED caller envelope, artifact reference and observation/conclusion separation |
-| S14 | UNCHANGED at this step; mechanical source improvements belong to train part 3 |
+| S14 | PRESERVED metrics API; UTF-8 split probes, zero-tail expansion and silent replacement decoding corrected by regression tests |
 | S15 | PRESERVED structural checks; heuristic semantic verdicts replaced by explicit evidence review |
 
 Remove duplicated examples only after their decision rule and applicable edge conditions remain

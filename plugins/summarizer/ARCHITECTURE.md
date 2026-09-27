@@ -12,6 +12,7 @@ records the pre-change comparison criteria and original semantic inventory.
 | agent adapters | Loading the canonical source method in a delegated context | A second copy of the methodology |
 | fidelity/execution references | Shared meaning, handoff and completion requirements | Automatic semantic correctness |
 | summary_record.py | Versioned record schema, reference checks and caller/output identity | Actual source access or factual support |
+| source_tools.py | Complete text partitions, receipt reconciliation and full CSV/TSV aggregates | Agent comprehension or universal streaming performance |
 | templates | The selected presentation | Different truth/coverage rules |
 | output-contract.cjs | Structural checks and a host-independent CLI | Complete YAML parsing or semantic fidelity |
 | SubagentStop hook | Claude payload adaptation and one correction opportunity | A fail-closed acceptance boundary |

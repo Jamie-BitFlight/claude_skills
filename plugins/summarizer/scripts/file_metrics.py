@@ -18,6 +18,7 @@ Output (--json):  JSON object with all metrics
 from __future__ import annotations
 
 import argparse
+import codecs
 import json
 import mimetypes
 import sys
@@ -27,6 +28,7 @@ from typing import Any
 # Strategy thresholds (word counts)
 SMALL_THRESHOLD = 2000
 MEDIUM_THRESHOLD = 10000
+TEXT_PROBE_BYTES = 8192
 
 # File type categories for summarization strategy selection
 FILE_CATEGORIES: dict[str, list[str]] = {
@@ -115,27 +117,33 @@ def detect_category(file_path: Path) -> str:
     return "unknown"
 
 
-def is_text_file(file_path: Path) -> bool:
-    """Check if file appears to be text by reading first 8KB.
+def probe_text(file_path: Path) -> bool:
+    """Probe a UTF-8 prefix without mistaking a split code point for binary data.
 
     Returns:
-        True if file content is valid UTF-8 with no null bytes.
+        Whether the available UTF-8 prefix appears textual.
+    """
+    with file_path.open("rb") as stream:
+        chunk = stream.read(TEXT_PROBE_BYTES)
+    if b"\x00" in chunk:
+        return False
+    try:
+        codecs.getincrementaldecoder("utf-8")().decode(chunk, final=len(chunk) < TEXT_PROBE_BYTES)
+    except UnicodeDecodeError:
+        return False
+    return True
+
+
+def is_text_file(file_path: Path) -> bool:
+    """Return whether the prefix appears textual; preserve the legacy boolean API.
+
+    Returns:
+        Whether the prefix appears textual, or false when inaccessible.
     """
     try:
-        with file_path.open("rb") as f:
-            chunk = f.read(8192)
-        # Check for null bytes (binary indicator)
-        if b"\x00" in chunk:
-            return False
-        # Try to decode as UTF-8
-        try:
-            chunk.decode("utf-8")
-        except UnicodeDecodeError:
-            return False
+        return probe_text(file_path)
     except OSError:
         return False
-    else:
-        return True
 
 
 def count_metrics(file_path: Path) -> dict[str, Any]:
@@ -146,8 +154,8 @@ def count_metrics(file_path: Path) -> dict[str, Any]:
         or with those keys as None plus an error key on failure.
     """
     try:
-        content = file_path.read_text(encoding="utf-8", errors="replace")
-    except OSError as e:
+        content = file_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as e:
         return {"word_count": None, "line_count": None, "char_count": None, "error": str(e)}
 
     lines = content.splitlines()
@@ -164,8 +172,8 @@ def extract_excerpt(file_path: Path, head_lines: int = 20, tail_lines: int = 10)
         or head=None, tail=None, error on failure.
     """
     try:
-        content = file_path.read_text(encoding="utf-8", errors="replace")
-    except OSError as e:
+        content = file_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as e:
         return {"head": None, "tail": None, "error": str(e)}
 
     lines = content.splitlines()
@@ -173,7 +181,9 @@ def extract_excerpt(file_path: Path, head_lines: int = 20, tail_lines: int = 10)
 
     head = "\n".join(lines[:head_lines]) if total > 0 else ""
 
-    if total > head_lines + tail_lines:
+    if tail_lines == 0:
+        tail = None
+    elif total > head_lines + tail_lines:
         tail = "\n".join(lines[-tail_lines:])
     elif total > head_lines:
         tail = "\n".join(lines[head_lines:])
@@ -187,8 +197,8 @@ def summarization_strategy(word_count: int | None) -> str:
     """Recommend summarization strategy based on word count.
 
     Returns:
-        Strategy name: "small" (< 2000 words), "medium" (2000-10000),
-        "large" (> 10000), or "unknown" if word_count is None.
+        Strategy name: "small" (< 2000 words), "medium" (2000 to <10000),
+        "large" (>= 10000), or "unknown" if word_count is None.
     """
     if word_count is None:
         return "unknown"
@@ -219,8 +229,11 @@ def get_file_metrics(file_path: Path, excerpt_lines: int = 20, tail_lines: int =
 
     category = detect_category(file_path)
     mime_type, _ = mimetypes.guess_type(str(file_path))
-    is_text = is_text_file(file_path)
-    file_size = file_path.stat().st_size
+    try:
+        is_text = probe_text(file_path)
+        file_size = file_path.stat().st_size
+    except OSError as error:
+        return {"error": str(error), "path": str(file_path)}
 
     result: dict[str, Any] = {
         "path": str(file_path.resolve()),
@@ -237,15 +250,19 @@ def get_file_metrics(file_path: Path, excerpt_lines: int = 20, tail_lines: int =
         result.update(metrics)
         result["strategy"] = summarization_strategy(metrics.get("word_count"))
 
+        if "error" in metrics:
+            return result
         if excerpt_lines > 0:
             excerpt = extract_excerpt(file_path, head_lines=excerpt_lines, tail_lines=tail_lines)
             result["excerpt"] = excerpt
+            if "error" in excerpt:
+                result["error"] = excerpt["error"]
     else:
         result["word_count"] = None
         result["line_count"] = None
         result["char_count"] = None
         result["strategy"] = "binary"
-        result["note"] = "Binary file. Cannot extract text content for summarization."
+        result["note"] = "Binary or non-UTF-8 prefix. Use an appropriate media/encoding-aware reader."
 
     return result
 
