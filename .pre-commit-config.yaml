@@ -158,7 +158,15 @@ repos:
   - repo: https://github.com/Jamie-BitFlight/agent-marketplace-versioner
     rev: 562755fd8f14ee76280130eb6db4612af72fdf45 # frozen: v0.1.2
     hooks:
+      # Check only: branches never change version fields. The stock `sync` entry
+      # bumps versions on every commit; .github/workflows/bump-marketplace.yml
+      # assigns them on main instead. `reconcile --dry-run` fails when plugin.json
+      # component arrays or marketplace membership disagree with plugins/.
       - id: agent-marketplace-versioner
+        name: Check plugin manifests and marketplace membership
+        entry: agent-marketplace-versioner reconcile --dry-run
+        always_run: false
+        files: ^(plugins/|\.claude-plugin/|\.agents/plugins/)
 
   # Local hooks for type checking
   - repo: local

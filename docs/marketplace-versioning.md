@@ -1,42 +1,63 @@
 # Marketplace versioning
 
-The repository uses the stock Python hook and GitHub Action from
+Plugin and marketplace versions are assigned once, by CI, after changes land on `main`.
+Feature branches and pull requests never change a `version` field. This keeps open PRs that touch
+the same plugin from conflicting on the `version` line of its manifests.
+
+The repository uses the stock hook and GitHub Action from
 [agent-marketplace-versioner](https://github.com/Jamie-BitFlight/agent-marketplace-versioner),
-pinned to the same full commit SHA in `.pre-commit-config.yaml` and both versioning workflows.
-There is no repository-specific adapter or versioner configuration.
+pinned to the same full commit SHA in [.pre-commit-config.yaml](../.pre-commit-config.yaml) and
+[bump-marketplace.yml](../.github/workflows/bump-marketplace.yml).
 
-Local commits synchronize and stage plugin versions through
-`uv run prek run agent-marketplace-versioner`. These plugin versions are local development
-cache busters: manual or automatic cache refresh can pick up changes during the session.
-Marketplace membership changes locally when plugins are added or removed, but its version
-bump belongs to the normal post-merge/default-branch release flow.
-The `Local / Manifest sync` CI job also checks
-the PR's actual base and head revisions; a missing version bump fails the quality gate.
+## On a branch
 
-After plugin changes merge, `bump-marketplace.yml` runs the shared `repair` and `sync` commands
-against current `main`. Historical audits and collision repair remain available. The workflow
-opens or updates `automation/marketplace-version-repair` as a normal PR instead of pushing to
-`main`. Corrections take effect only after that PR passes checks and is reviewed and merged.
-The generated title, `chore(marketplace): repair versions and synchronize catalog`, is owned
-by the workflow: retain it in the merge commit message. The workflow recognizes it to avoid
-opening another repair PR for its own merge, while ordinary required CI still runs.
-All other plugin changes, including manifest-only edits, retain the original push trigger.
+The `agent-marketplace-versioner` pre-commit hook runs `reconcile --dry-run`. It changes no files.
+It fails when a `plugin.json` that lists `skills`, `agents` or `commands` explicitly is missing one
+that exists on disk (or lists one that does not), or when a marketplace catalog
+(`.claude-plugin/marketplace.json`, `.agents/plugins/marketplace.json`) does not list exactly the
+plugins under `plugins/`. Fix the reported entry by hand. Do not edit
+`version` fields. The `Local / Manifest sync` CI job runs the same hook on every PR that touches
+plugins.
 
-## Repair workflow credential
+Branch commits no longer change a plugin's version, so the plugin cache keyed on that version does
+not refresh from branch work. To exercise a plugin from your working copy, load it directly:
+`claude --plugin-dir plugins/<name>`.
 
-Before enabling automated repair delivery, a maintainer must configure the Actions secret
-`VERSIONER_PR_TOKEN`: a fine-grained personal access token restricted to this repository with
-Contents and Pull requests write permissions. A trusted GitHub App installation token with
-the same permissions can also be supplied by the deployment's credential management.
-The workflow fails before checkout or repair if the secret is absent.
+## On main
 
-The built-in `GITHUB_TOKEN` is unsuitable for this delivery path because its PR events do not
-trigger the required downstream workflows. See the
-[create-pull-request token requirements](https://github.com/peter-evans/create-pull-request#token).
-The workflow token itself retains only Contents read permission; the repair credential does
-not bypass branch protection, approve, or merge the PR.
+[bump-marketplace.yml](../.github/workflows/bump-marketplace.yml) runs on every push to `main`:
+
+1. `repair` patch-bumps every plugin manifest (`.claude-plugin`, `.codex-plugin`, `.cursor-plugin`)
+   whose plugin directory changed after the commit that last changed that manifest's version.
+   Several PRs merged before a run are covered by one bump per plugin.
+2. `sync --marketplace`, diffing the run's starting revision against the new plugin versions,
+   bumps `.claude-plugin/marketplace.json`'s `metadata.version` once if any plugin was bumped or
+   catalog membership changed.
+3. The result is pushed to `main` as one commit titled
+   `chore(plugins): assign plugin versions`. If another merge landed meanwhile, the commit is
+   rebased onto it and pushed again (three attempts).
+
+Loop guard: a rerun on the version commit finds nothing changed since the last bump and exits
+without committing. The job also skips pushes whose head commit carries that title, to save a
+runner. Runs share one concurrency group without cancellation, and a queued run starts from the
+newest `main`, so it covers anything an earlier run's commit did not.
+
+## Credential and ruleset bypass
+
+The default-branch ruleset requires a pull request and the `Quality Gate` check, and the built-in
+`GITHUB_TOKEN` is not on its bypass list. The workflow therefore pushes with a GitHub App
+installation token. Before the workflow can push, a maintainer must:
+
+- Create or choose a GitHub App installed on this repository with **Contents: read and write**.
+- Add that App to the `push-protection` ruleset's bypass list with mode **Always**.
+- Set the repository variable `VERSIONER_APP_CLIENT_ID` to the App's client ID.
+- Set the repository secret `VERSIONER_APP_PRIVATE_KEY` to a private key for the App.
+
+The workflow fails before checkout if either value is missing.
 
 ## Changing versioning behavior
 
-Fix shared versioning behavior in [agent-marketplace-versioner](https://github.com/Jamie-BitFlight/agent-marketplace-versioner), then move the pin.
-This repository carries no consumer adapter.
+Fix shared versioning behavior in [agent-marketplace-versioner](https://github.com/Jamie-BitFlight/agent-marketplace-versioner),
+then move the pin in `.pre-commit-config.yaml` and `bump-marketplace.yml` together.
+[test_marketplace_versioner_integration.py](../tests/test_marketplace_versioner_integration.py) checks that both pins match and runs the pinned
+hook and action against a fixture repository.

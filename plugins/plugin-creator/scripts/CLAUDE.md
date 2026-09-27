@@ -81,7 +81,7 @@ Scripts integrated into `.pre-commit-config.yaml`:
 
 | Hook ID                | Script                    | Trigger Pattern                                           | Purpose                                 |
 | ---------------------- | ------------------------- | --------------------------------------------------------- | --------------------------------------- |
-| `agent-marketplace-versioner` | [agent-marketplace-versioner](https://github.com/Jamie-BitFlight/agent-marketplace-versioner) (external) | `^plugins/` | Synchronize plugin manifests and versions; defer marketplace repair |
+| `agent-marketplace-versioner` | [agent-marketplace-versioner](https://github.com/Jamie-BitFlight/agent-marketplace-versioner) (external) | `^plugins/` | Check component arrays and marketplace membership; no version changes (CI bumps on `main`) |
 | `skilllint`            | `skilllint`               | `^plugins/.*(SKILL\.md\|agents/.*\.md\|commands/.*\.md\|plugin\.json)$` | Comprehensive plugin validation with token metrics |
 
 ## Execution Requirements

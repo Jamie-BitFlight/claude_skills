@@ -51,7 +51,7 @@ All validation checks must pass with no errors.
 
 The `name` field is the install name users will use (`/plugin install your-plugin-name@jamie-bitflight-skills`). It can differ from the directory name — for example, `development-harness` installs as `dh` and `the-rewrite-room` installs as `rwr`.
 
-**Note:** The shared `agent-marketplace-versioner` pre-commit hook bumps plugin versions and synchronizes manifest entries for staged plugin changes. Marketplace version repair is proposed after merge in a normal PR. Do not manually edit version fields for the normal local workflow; see [marketplace versioning](docs/marketplace-versioning.md).
+**Note:** The `agent-marketplace-versioner` pre-commit hook fails if a plugin under `plugins/` is missing from the marketplace catalogs. It does not edit files. Never edit `version` fields on a branch: CI assigns plugin and marketplace versions after merge to `main`. See [marketplace versioning](docs/marketplace-versioning.md).
 
 #### Validate Marketplace JSON
 
@@ -97,17 +97,19 @@ Remove the plugin entry from `.claude-plugin/marketplace.json`. Find and delete 
 python3 -m json.tool .claude-plugin/marketplace.json > /dev/null
 ```
 
-Version bumping happens automatically on commit via the pre-commit hook.
+CI bumps the marketplace version after the removal merges to `main`.
 
 ## Updating an Existing Plugin
 
-Make your changes and commit. The shared `agent-marketplace-versioner` pre-commit hook:
+Make your changes and commit. Do not change any `version` field. The `agent-marketplace-versioner`
+pre-commit hook checks, without editing, that:
 
-- Bumps the plugin version in `.claude-plugin/plugin.json`
-- Syncs the component arrays (skills, agents, commands) in `plugin.json`
-- Reconciles local marketplace membership; marketplace version repair is deferred to the post-merge repair PR
+- A `plugin.json` that lists `skills`, `agents` or `commands` explicitly matches the files on disk
+- The marketplace catalogs list exactly the plugins under `plugins/`
 
-You do not need to manually bump any version field.
+After the PR merges, [bump-marketplace.yml](./.github/workflows/bump-marketplace.yml) patch-bumps each plugin that changed
+and the marketplace version, in one commit on `main`. See
+[marketplace versioning](docs/marketplace-versioning.md).
 
 ### Plugin Validation
 

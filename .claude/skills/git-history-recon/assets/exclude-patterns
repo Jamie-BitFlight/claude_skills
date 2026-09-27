@@ -17,12 +17,13 @@
 #   git log --name-only --since='1 year ago' --format='' -- <path> \
 #     | grep -v '^$' | wc -l
 
-# Claude Code plugin manifest — plugins/*/.claude-plugin/plugin.json is
+# Claude Code plugin manifest — plugins/*/.claude-plugin/plugin.json was
 # rewritten by this repo's agent-marketplace-versioner pre-commit hook
 # (https://github.com/Jamie-BitFlight/agent-marketplace-versioner) on
-# every commit that touches any component inside
+# every commit that touched any component inside
 # that plugin, bumping the version field regardless of whether the commit
-# fixed a defect. Confirmed via git log: plugins/development-harness's
+# fixed a defect. Since that hook became check-only, CI on main bumps it
+# once per merged change instead — still mechanical churn. Confirmed via git log: plugins/development-harness's
 # plugin.json is consistently among the top hotspot file-change counts in a
 # 1-year window, almost entirely from these mechanical bumps rather than
 # hand-edited plugin.json content — reproduce with the command above.
