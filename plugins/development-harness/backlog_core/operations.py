@@ -64,6 +64,7 @@ from .models import (
     DuplicateItemError,
     Entry,
     EntryNotFoundError,
+    GitHubMutationOutcomeUnknownError,
     GroomedData,
     GroomedSectionMetadata,
     IssueLocalFields,
@@ -815,6 +816,8 @@ def _create_issue_and_update_item(item: BacklogItem, repo: str, output: Output |
         return None
     try:
         issue_num = create_issue_for_item(repository, item, dry_run=False, output=out)
+    except GitHubMutationOutcomeUnknownError:
+        raise  # outcome unknown; a fallback here could repeat the mutation
     except (GithubException, BacklogError) as e:
         out.warn(f"  WARNING: Issue creation failed: {e}")
         return None
@@ -884,6 +887,8 @@ def _rename_item_title(
                 issue_node = _fetch_issue_graphql(repository, owner, repo_name, num)
                 _update_issue_graphql(repository, issue_node["id"], title=title)
                 out.info(f"  GitHub issue {issue_ref} title updated to: {title}")
+            except GitHubMutationOutcomeUnknownError:
+                raise  # outcome unknown; a fallback here could repeat the mutation
             except (GithubException, BacklogError, *RETRYABLE_TRANSIENT_EXCEPTIONS) as e:
                 out.warn(f"  WARNING: Could not update issue {issue_ref} title: {e}")
 
@@ -974,6 +979,8 @@ def _apply_plan_to_item(
                 issue_node = _fetch_issue_graphql(repository, owner, repo_name, num)
                 _add_comment_graphql(repository, issue_node["id"], f"**Plan**: {plan}")
                 out.info(f"  Plan comment posted to issue {issue_ref}")
+            except GitHubMutationOutcomeUnknownError:
+                raise  # outcome unknown; a fallback here could repeat the mutation
             except (GithubException, BacklogError, *RETRYABLE_TRANSIENT_EXCEPTIONS) as e:
                 out.warn(f"  WARNING: Could not post plan to issue {issue_ref}: {e}")
 
@@ -1710,6 +1717,9 @@ def _try_create_github_issue(item_data: BacklogItem, repo: str, out: Output) -> 
         genuine, actionable failure and is recorded via ``out.record_error``
         so callers see it in the response's ``errors`` list rather than only
         a discardable warning (#3182).
+
+    Raises:
+        GitHubMutationOutcomeUnknownError: When createIssue timed out, naming how to recover.
     """
     try:
         repository = try_get_github(repo)
@@ -1722,6 +1732,13 @@ def _try_create_github_issue(item_data: BacklogItem, repo: str, out: Output) -> 
         return None
     try:
         return create_issue_for_item(repository, item_data, dry_run=False, output=out)
+    except GitHubMutationOutcomeUnknownError as exc:
+        # No local item is stored: a later sync would create this issue on GitHub a second time.
+        msg = (
+            f"{exc} No local item was stored. To recover, retry backlog_add without force; its "
+            "duplicate check finds the issue if it was created."
+        )
+        raise GitHubMutationOutcomeUnknownError(msg, timeout_seconds=exc.timeout_seconds) from exc
     except (GithubException, BacklogError) as e:
         out.record_error(f"Issue creation failed: {e}")
         return None
@@ -1842,8 +1859,11 @@ def add_item(
             subsequent ``backend.put_work_item()`` call retries creation for a
             still-issueless item and raises instead of falling back to a
             local-only item a second time (see ``BeadsBackend.put_work_item``).
-            Integer-ID backends (GitHub, sqlite, memory) do not raise this —
-            their local-only fallback is unconditional.
+            Integer-ID backends (GitHub, sqlite, memory) do not raise this.
+        GitHubMutationOutcomeUnknownError: When GitHub's createIssue timed out and may
+            still land. No item is stored, because a local-only item would be created on
+            GitHub again by a later sync. Retrying without ``force`` is safe: the duplicate
+            check finds the issue if it was created.
     """
     _validate_add_item_title(title)
     _validate_add_item_priority(priority)

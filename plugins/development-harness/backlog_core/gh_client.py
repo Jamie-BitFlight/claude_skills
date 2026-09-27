@@ -1681,6 +1681,8 @@ def close_github_issue(
         _add_comment_graphql(repository, issue["id"], " ".join(parts))
         _update_issue_graphql(repository, issue["id"], state="CLOSED")
         out.info(f"  GitHub issue #{num} closed ({reason}).")
+    except GitHubMutationOutcomeUnknownError:
+        raise  # outcome unknown; a fallback here could repeat the mutation
     except BacklogError as e:
         out.warn(f"  WARNING: Could not close issue: {e}")
 
@@ -1717,6 +1719,8 @@ def resolve_github_issue(
         _add_comment_graphql(repository, issue["id"], "\n".join(body_parts))
         _update_issue_graphql(repository, issue["id"], state="CLOSED")
         out.info(f"  GitHub issue #{num} resolved.")
+    except GitHubMutationOutcomeUnknownError:
+        raise  # outcome unknown; a fallback here could repeat the mutation
     except BacklogError as e:
         out.warn(f"  WARNING: Could not close issue: {e}")
 
@@ -1922,6 +1926,8 @@ def _apply_status_label(
         desired_ids = [id_map[n] for n in desired_names if n in id_map]
         _update_issue_graphql(repository, issue["id"], label_ids=desired_ids)
         output.info(applied_message)
+    except GitHubMutationOutcomeUnknownError:
+        raise  # outcome unknown; a fallback here could repeat the mutation
     except BacklogError as e:
         output.warn(f"  WARNING: Could not set status: {e}")
 
@@ -2336,6 +2342,8 @@ def sync_groomed_to_github_issue(
         if new_body == body:
             return False
         _update_issue_graphql(repo_obj, issue["id"], body=new_body)
+    except GitHubMutationOutcomeUnknownError:
+        raise  # outcome unknown; a fallback here could repeat the mutation
     except BacklogError as e:
         out.warn(f"  WARNING: Could not sync to GitHub issue: {e}")
         return False
@@ -2435,6 +2443,8 @@ def create_task_issue(
     try:
         task_issue = _create_issue_graphql(repo, repo_node_id, title, body, label_ids)
         out.info(f"  Created task issue #{task_issue['number']}: {title[:70]}")
+    except GitHubMutationOutcomeUnknownError:
+        raise  # outcome unknown; a fallback here could repeat the mutation
     except BacklogError as e:
         out.warn(f"  WARNING: Could not create task issue: {e}")
         return None
@@ -2444,6 +2454,8 @@ def create_task_issue(
         parent = _fetch_issue_graphql(repo, owner, repo_name, parent_issue_number)
         _graphql_request(repo, _ADD_SUB_ISSUE_MUTATION, {"parentId": parent["id"], "childId": task_issue["id"]})
         out.info(f"  Linked #{task_issue['number']} as sub-issue of #{parent_issue_number}")
+    except GitHubMutationOutcomeUnknownError:
+        raise  # outcome unknown; a fallback here could repeat the mutation
     except BacklogError as e:
         out.warn(f"  WARNING: Created issue #{task_issue['number']} but could not link as sub-issue: {e}")
 
@@ -2537,6 +2549,8 @@ def update_task_status(repo: Repository, issue_number: int, new_status: str, out
         return False
     try:
         _update_issue_graphql(repo, issue_id, body=updated_body)
+    except GitHubMutationOutcomeUnknownError:
+        raise  # outcome unknown; a fallback here could repeat the mutation
     except BacklogError as e:
         out.warn(f"  WARNING: Could not update issue #{issue_number} body: {e}")
         return False

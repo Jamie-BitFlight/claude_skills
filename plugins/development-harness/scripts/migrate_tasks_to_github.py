@@ -67,7 +67,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 import dh_paths
 import typer
 from backlog_core.gh_client import create_task_issue, get_github
-from backlog_core.models import BacklogError, GitHubUnavailableError, SamTask
+from backlog_core.models import BacklogError, GitHubMutationOutcomeUnknownError, GitHubUnavailableError, SamTask
 from github import GithubException
 from ruamel.yaml import YAML, YAMLError
 from sam_schema.cli_output import err, output_json
@@ -592,6 +592,8 @@ def _migrate_task(
         issue = create_task_issue(
             repo, parent_issue, sam, description=task.title, acceptance_criteria=[], labels=labels
         )
+    except GitHubMutationOutcomeUnknownError:
+        raise  # outcome unknown; a fallback here could repeat the mutation
     except (BacklogError, KeyError, ValueError, RuntimeError) as exc:
         return None, str(exc)
     else:
