@@ -70,53 +70,28 @@ For agent-frontmatter decisions during agent creation, also load `/plugin-creato
 
 ## Phase 6 — Optimize
 
-Routing by concern (use when editing files in `plugins/`, `.claude/`, `AGENTS.md`, or `CLAUDE.md`):
+Semantic skill refinement is owned by Skill Lapidary, not Plugin Creator.
 
-- Establish what a skill exists to achieve, before judging any of its content → activate `plugin-creator:skill-goal-extractor`
-- Remove content that serves no goal (decides whether text exists) → activate `plugin-creator:evaluate-and-tighten-skills`
-- Optimize existing content (decides how surviving text reads — clarity, structure, Anthropic prompt engineering principles) → activate `plugin-creator:optimize-claude-md`, which measures, delegates to `ai-doc-optimizer`, verifies, and reports
-- Audit quality (read-only, no writes, score against completeness categories) → dispatch `plugin-creator:skill-auditor`
-- Sync content against upstream docs (add NEW/fix STALE from live sources) → dispatch `plugin-creator:skill-content-updater`
-- Write/rewrite description field only → `/plugin-creator:write-frontmatter-description` skill directly
-- Resolve prose duplicated across 2+ skills or agent files (shared reference material, not one skill's own bloat) → activate `plugin-creator:shared-content-references`
+Before Phase 6 skill optimization, check for the `skill-lapidary` skill. If unavailable and installation is permitted, install the repository:
 
-Dispatches run in this order. Goals are resolved first because every later step judges content
-against them, and tightening precedes both structural and content work: removing dead weight can
-drop a skill back under the split threshold, making structural work unnecessary, and stops content
-optimization from polishing prose that should have been deleted.
+```bash
+npx -y skills@latest add https://github.com/Jamie-BitFlight/skill-lapidary --all
+```
 
-1. For each skill directory lacking approved goals, separately activate `plugin-creator:skill-goal-extractor`.
-   - Context to include in each prompt: one skill directory
-   - Output: one approved goal block; write `SKILL-GOALS.md` only when the user requests persistence
+For a private repository, the environment must already have GitHub access. If installation/loading is unavailable, mark semantic refinement BLOCKED; do not substitute Plugin Creator goal extraction or tightening heuristics.
 
-2. Task is pre-optimization tightening with `plugin-creator:evaluate-and-tighten-skills`
-   - Context to include in the prompt: skill directory path, its resolved goals from dispatch 1
-   - Output: tightened skill with dead weight removed, plus its Tightening-complete report listing removals, relocations, and `Uncertain` items
+Routing by concern:
 
-3. Task is structural plugin improvement with `plugin-creator:refactor-plugin`
-   - Context to include in the prompt: plugin path, `assessment-REPORT.md` (if available from Phase 1)
-   - Output: improved plugin structure, updated SKILL.md files, better progressive disclosure
+1. **Skill semantic refinement** — activate Skill Lapidary's `skill-lapidary` entrypoint for each skill requiring goal recovery, authority resolution, semantic conservation, tightening, or instruction optimization. Preserve its native result/evidence. If it blocks on consequential intent/authority, stop dependent optimization for that skill and present the blocker.
+2. **Structural plugin improvement** — activate `plugin-creator:refactor-plugin` only after any required Lapidary refinement has completed or the structural work is demonstrably independent of the blocked semantic decision.
+3. **Prose quality** — activate `plugin-creator:optimize-claude-md` only for surviving content. For SKILL.md targets, pass the applicable Lapidary result/contract identity when available; do not independently rediscover goals.
+4. **Audit quality** — dispatch `plugin-creator:skill-auditor`.
+5. **Sync upstream docs** — dispatch `plugin-creator:skill-content-updater`.
+6. **Description-only rewrite** — activate `/plugin-creator:write-frontmatter-description`.
+7. **Shared duplicated prose** — activate `plugin-creator:shared-content-references`.
+8. **Agent prompt optimization** — activate `plugin-creator:subagent-refactoring-methodology`, then dispatch `plugin-creator:subagent-refactorer`.
 
-   After structural work, compare the resulting skill directories with the pre-refactor set. For
-   every skill that was created, renamed, split, merged, or materially changed, separately activate
-   `plugin-creator:skill-goal-extractor` and obtain approval for the resulting goals before dispatch
-   4. Reuse dispatch 1 goals only for unchanged skills. Never pass a pre-refactor goal set to a skill
-   whose behavior or ownership changed.
-
-4. Task is content quality optimization with `plugin-creator:optimize-claude-md`
-   - Context to include in the prompt: SKILL.md or CLAUDE.md files needing improvement, assessment findings, resolved goals from dispatch 1 or the post-refactor refresh
-   - Output: optimized documentation with better Claude comprehension, plus that skill's before/after metrics report
-
-   Enter through the skill, not by dispatching `ai-doc-optimizer` directly. The skill owns the
-   surrounding process — baseline token/completeness/index measurement, goal resolution, the
-   reference paths the agent needs, an independent second-agent verification pass, and the
-   before/after report. A direct agent dispatch skips all of it and produces an unverified,
-   unmeasured rewrite.
-
-5. Dispatch `plugin-creator:subagent-refactorer` for agent prompt optimization.
-   - Activate `plugin-creator:subagent-refactoring-methodology` first — that skill carries the analysis criteria, transformation patterns, output format, and validation checklist this agent is written to apply, and its own description requires loading it before the agent runs. It is reference knowledge, not an orchestrator, so the agent is still dispatched directly here.
-   - Context to include in the prompt: agent .md files needing improvement
-   - Output: optimized agent prompts using Anthropic best practices
+After structural work creates, splits, merges, renames, or materially changes a skill, rerun Skill Lapidary on the affected skill before prose optimization. Do not carry a pre-refactor semantic result across a changed target without the owning Lapidary process accepting that revision.
 
 ---
 
