@@ -109,6 +109,8 @@ iteration-1/
     ...
 ```
 
+Keep each execution's writable task and instruction environment separate. A fresh conversation alone does not exclude inherited repository instructions, installed skills, memory, user configuration, or another sample's artifacts. Record material exposure differences between arms; do not call contaminated runs a no-skill baseline. The synthetic description-trigger evaluator below is not a substitute for these task executions.
+
 ### Step 8b: While runs are in progress, draft assertions
 
 While waiting for runs to complete, write assertions for each test case. Good assertions test meaningful outcomes — they should be hard to satisfy without actually doing the work correctly.
@@ -137,7 +139,9 @@ Add assertions to `evals/evals.json`:
 
 ### Step 8c: As runs complete, capture timing data
 
-Record execution time and token usage for each run. Save to the eval directory as `metrics.json`.
+Save measured `total_duration_seconds` and `total_tokens` in that exact run's `timing.json`, beside `grading.json`, not in a shared eval-directory record. Record the observation boundary and model/environment with the run: executor-only duration and executor-plus-grader duration are not comparable measurements. Use `null` or omit an unavailable measurement; retain measured zero as zero. Character counts belong in `execution_metrics.output_chars`, never in `total_tokens`.
+
+The aggregator resolves each measurement independently from per-run `timing.json` and `grading.json` timing. It also accepts the legacy per-run `metrics.json` carrier. Conflicting values remain unavailable with their source references. Keep `outputs/metrics.json` for execution/tool metrics as described in `schemas.md`.
 
 ### Step 8d: Grade, aggregate, and launch the viewer
 
@@ -174,6 +178,8 @@ Record execution time and token usage for each run. Save to the eval directory a
    ```
 
    Open the HTML file so the user can see real examples before you attempt any improvements.
+
+Check the report's coverage and measurement gaps before interpreting an average. It counts observed run directories, including missing grader returns, but cannot detect expected directories never created. Reconcile against the caller's expected case/run inventory separately. A `COMPLETE` grading status means those observed returns have usable grading counts, not that every task succeeded or all expected experiments occurred. Missing data is displayed as unavailable, not zero-cost performance. Deltas require two complete matching observed case/run sets; their comparability still depends on the recorded environment and measurement boundaries.
 
 **IMPORTANT:** Generate the eval viewer BEFORE evaluating results yourself. Get examples in front of the user as soon as possible.
 
@@ -304,7 +310,7 @@ Create an eval set with positive (should trigger) and negative (should NOT trigg
 ]
 ```
 
-Aim for 15-20 queries minimum, roughly 60% positive and 40% negative. Include edge cases — queries that are close to the boundary.
+Aim for 15-20 queries minimum, roughly 60% positive and 40% negative. Include edge cases — queries that are close to the boundary. Query strings must be nonempty and unique, with actual boolean labels. Resolve duplicate or conflicting cases before partitioning; do not merge them after seeing results. Repetitions belong in `runs_per_query`, not duplicate query records.
 
 ### Step 10b: Review with user
 
@@ -313,7 +319,7 @@ Present the eval set to the user for review using the HTML template:
 1. Read the template from `assets/eval_review.html`
 2. Replace the placeholders:
    - `__EVAL_DATA_PLACEHOLDER__` with the JSON array of eval items
-   - `__SKILL_NAME_PLACEHOLDER__` with the skill's name
+   - `__SKILL_NAME_PLACEHOLDER__` with the skill's current description
    - `__SKILL_DESCRIPTION_PLACEHOLDER__` with the skill's current description
 3. Write to a temp file and open it
 4. The user can edit queries, toggle should-trigger, add/remove entries, then click "Export Eval Set"
@@ -322,28 +328,32 @@ This step matters — bad eval queries lead to bad descriptions.
 
 ### Step 10c: Run the optimization loop
 
-Tell the user: "This will take some time — I'll run the optimization loop in the background and check on it periodically."
+Tell the user what will run and retain its outputs. Use background execution only when the active harness supplies that capability and a way to retrieve completion.
 
-Save the eval set to the workspace, then run in the background:
+Save the eval set to the workspace, then run:
 
 ```bash
 uv run scripts/run_loop.py \
   --eval-set <path-to-trigger-eval.json> \
   --skill-path <path-to-skill> \
-  --model <model-id-powering-this-session> \
+  --model <supported-Claude-model-id> \
   --max-iterations 5 \
   --verbose
 ```
 
-Use the model ID from your system prompt (the one powering the current session) so the triggering test matches what the user actually experiences.
+These scripts use the Claude CLI and Anthropic SDK; select a model that those providers support, not an unrelated harness's session model identifier. Their existence does not require other process-evaluation methods to use this provider or harness.
 
-While it runs, periodically tail the output to give the user updates on which iteration it's on and what the scores look like.
+`run_eval.py` launches each synthetic description sample in a separate disposable project containing one temporary command. It does not copy the caller's project; queries requiring real project files need separately provisioned task evaluations. User-level settings, installed capabilities and authentication remain inherited and are reported as not isolated. This is a synthetic invocation-selection experiment, not clean-room model knowledge measurement or full installed-skill certification.
 
-This handles the full optimization loop automatically. It splits the eval set into 60% train and 40% held-out test, evaluates the current description (running each query 3 times to get a reliable trigger rate), then calls Claude with extended thinking to propose improvements based on what failed. It re-evaluates each new description on both train and test, iterating up to 5 times. When it's done, it opens an HTML report in the browser showing the results per iteration and returns JSON with `best_description` — selected by test score rather than train score to avoid overfitting.
+A positive observation is a matching invocation. A negative requires a successful terminal result and process exit without that invocation. Missing executables, malformed/unfinished streams, timeout, or failure remain `ERROR`; `pass: null` and the `inconclusive` count prevent them from passing negative cases. `valid_runs` is the behavioral denominator; `runs` is attempts. If any requested repetition is invalid, that case and the iteration remain inconclusive. The CLI exits 2 for missing evidence, and `run_eval.py` exits 1 for completed behavioral failures.
+
+The optimizer uses training and candidate-selection partitions. The default 40% holdout is used to select the best eligible candidate, so it is not an untouched final test. Legacy `test_*` output keys retain their names for consumers, with `holdout_role: candidate-selection` and `final_generalization_test: NOT_RUN`. Selection observations are withheld from the description-writing prompt. Duplicate cases or a split with an empty training/selection side are rejected; add cases or deliberately use `--holdout 0` for a training-only experiment.
+
+Repetition counts and iteration/time budgets are experiment settings, not proof of reliability. Incomplete evidence stops the loop without an actionable `best_description`; historical completed results remain visible. A claim about generalization needs separate untouched cases evaluated after candidate selection, when that claim is material.
 
 ### Step 10d: Apply the result
 
-Review the `best_description` from the optimization output. Update the SKILL.md frontmatter with the optimized description. Run `quick_validate.py` to confirm it's valid.
+Review the selected description against the approved trigger contract and the observed coverage. Never apply a null recommendation, an inconclusive iteration, or a supposedly better score caused by missing data. Selection proposes a candidate rather than granting acceptance; retain required negative cases and supported-environment behavior. Update SKILL.md only after the applicable checks support it, then run `quick_validate.py` to confirm structural validity.
 
 ## Reference Files
 
