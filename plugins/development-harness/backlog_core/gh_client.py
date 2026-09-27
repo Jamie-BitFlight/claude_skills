@@ -289,11 +289,7 @@ _ISSUE_TITLE_SEARCH_QUERY = """
 query IssueTitleSearch($searchQuery: String!, $first: Int!, $after: String) {
   search(query: $searchQuery, type: ISSUE, first: $first, after: $after) {
     nodes {
-      ... on Issue {
-        id number title state body updatedAt
-        labels(first: 50) { nodes { name id } }
-        milestone { id number title dueOn state }
-      }
+      ... on Issue { number title }
     }
     pageInfo { hasNextPage endCursor }
   }
@@ -925,23 +921,27 @@ def selector_fits_search(selector: str) -> bool:
     return '"' not in selector and len(selector) <= _SEARCH_SELECTOR_MAX_LENGTH
 
 
-def _search_issues_by_title_graphql(repo: Repository, owner: str, repo_name: str, selector: str) -> list[IssueNode]:
-    """Search issues (any state) whose title contains *selector*, any state.
+def _search_issues_by_title_graphql(
+    repo: Repository, owner: str, repo_name: str, selector: str
+) -> list[tuple[int, str]]:
+    """Search issues (any state) whose title contains *selector*.
 
     Uses GitHub's search index rather than a full repository list — see D5 in
     the request-shaped-reads design brief. Tokenizes rather than matching
     substrings, and the index can lag a just-created or just-edited issue
     (risk R-A); callers fall back to :func:`_fetch_issue_titles_graphql`
-    on an empty result.
+    when no result contains the selector. Only ``number`` and ``title`` are
+    requested: the caller compares titles, then reads the one match with a
+    targeted snapshot.
 
     Returns:
-        Every issue the search index returned, cursors followed to the end.
+        Every returned issue's number and title, cursors followed to the end.
 
     Raises:
         BacklogError: On GraphQL errors.
     """
     query_text = f'repo:{owner}/{repo_name} is:issue in:title "{selector}"'
-    all_issues: list[IssueNode] = []
+    all_issues: list[tuple[int, str]] = []
     cursor: str | None = None
     while True:
         data = _graphql_request(
@@ -951,7 +951,9 @@ def _search_issues_by_title_graphql(repo: Repository, owner: str, repo_name: str
         if not isinstance(search_conn, dict):
             break
         nodes = search_conn.get("nodes") or []
-        all_issues.extend(_parse_issue_node(raw) for raw in nodes if isinstance(raw, dict) and raw.get("number"))
+        all_issues.extend(
+            (int(raw["number"]), str(raw["title"])) for raw in nodes if isinstance(raw, dict) and raw.get("number")
+        )
         page_info = search_conn.get("pageInfo") or {}
         if not (isinstance(page_info, dict) and page_info.get("hasNextPage")):
             break

@@ -1195,3 +1195,17 @@ def test_liveness_probe_reads_no_work_item_content(fixture: FakeGitHubFixture) -
     list_calls = [entry for entry in fixture.requester.log if entry["operation"] == "ListIssues"]
     assert len(list_calls) == 1, fixture.requester.log
     assert list_calls[0]["variables"]["first"] == 1, list_calls
+
+
+def test_title_search_requests_only_title_identity(fixture: FakeGitHubFixture) -> None:
+    fixture.add_tracked_issue(1, "searchable title", state="OPEN")
+
+    context = WorkItemDecisionContext(fixture.backend, repo=f"{fixture.owner}/{fixture.name}")
+    selected = context.select("searchable title", purpose="read")
+
+    assert selected.provider is not None
+    assert selected.provider.issue == "#1", selected.provider
+    searches = [entry["query"] for entry in fixture.requester.log if entry["operation"] == "IssueTitleSearch"]
+    assert len(searches) == 1, fixture.requester.log
+    for field_name in ("body", "labels", "milestone"):
+        assert field_name not in searches[0], searches[0]

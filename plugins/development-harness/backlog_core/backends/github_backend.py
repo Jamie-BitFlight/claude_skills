@@ -433,7 +433,7 @@ class GitHubBackend:
             repo, owner, repo_name, states=states, labels=labels, first=first, after=after, light=light
         )
 
-    def search_issues_by_title(self, repo: str, selector: str) -> list[IssueNode]:
+    def search_issues_by_title(self, repo: str, selector: str) -> list[tuple[int, str]]:
         """Search issues (any state) whose title contains *selector* (D5).
 
         Resolves the repository and converts a transport failure to
@@ -443,7 +443,7 @@ class GitHubBackend:
         would.
 
         Returns:
-            Every issue the search index returned.
+            Every returned issue's number and title.
         """
         try:
             repository = self.get_github(repo)

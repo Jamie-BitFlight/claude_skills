@@ -145,22 +145,11 @@ class _LiveBackend(InMemoryBackend):
         """Unused by this double's own ``fetch_page`` -- present only to satisfy ``RequestShapedListing``."""
         raise NotImplementedError
 
-    def search_issues_by_title(self, repo: str, selector: str) -> list[object]:
-        """Return raw nodes for every live item whose title contains *selector*."""
+    def search_issues_by_title(self, repo: str, selector: str) -> list[tuple[int, str]]:
+        """Return ``(number, title)`` for every live item whose title contains *selector*."""
         del repo
         return [
-            {
-                "id": f"node-{item.issue}",
-                "number": int(item.issue.lstrip("#")),
-                "title": item.title,
-                "state": "OPEN",
-                "body": render_issue_body(item),
-                "createdAt": "2026-09-24T00:00:00Z",
-                "updatedAt": "2026-09-24T00:00:00Z",
-                "labels": [{"name": "status:groomed", "id": "status:groomed"}],
-                "milestone": None,
-                "assignees": [],
-            }
+            (int(item.issue.lstrip("#")), item.title)
             for item in self.live_items
             if selector.lower() in item.title.lower()
         ]

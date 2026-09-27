@@ -178,22 +178,11 @@ class ProviderMemoryBackend(InMemoryBackend):
         """Unused by this double's own ``fetch_page`` -- present only to satisfy ``RequestShapedListing``."""
         raise NotImplementedError
 
-    def search_issues_by_title(self, repo: str, selector: str) -> list[object]:
-        """Return raw nodes for every provider item whose title contains *selector*."""
+    def search_issues_by_title(self, repo: str, selector: str) -> list[tuple[int, str]]:
+        """Return ``(number, title)`` for every provider item whose title contains *selector*."""
         del repo
         return [
-            {
-                "id": item.issue or item.reference,
-                "number": int((item.issue or "#0").lstrip("#") or 0),
-                "title": item.title,
-                "state": "CLOSED" if item.status.casefold() in {"closed", "completed", "done", "resolved"} else "OPEN",
-                "body": render_issue_body(item),
-                "createdAt": "2026-09-24T00:00:00Z",
-                "updatedAt": "2026-09-24T00:00:00Z",
-                "labels": [{"name": name, "id": name} for name in item.metadata.labels],
-                "milestone": None,
-                "assignees": [],
-            }
+            (int(item.issue.lstrip("#")), item.title)
             for item in self.provider_items
             if item.issue and selector.lower() in item.title.lower()
         ]

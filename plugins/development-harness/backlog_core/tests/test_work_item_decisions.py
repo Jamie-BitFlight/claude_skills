@@ -53,22 +53,6 @@ def provider_item(reference: str, title: str, *, status: str = "status:groomed",
     )
 
 
-def _issue_node_from_provider(item: ProviderItem) -> IssueNode:
-    """Build a raw issue node a title search/scan would return for one provider item."""
-    return {
-        "id": item.provider_id,
-        "number": int(item.reference.lstrip("#")),
-        "title": item.title,
-        "state": item.state,
-        "body": item.body,
-        "createdAt": "2026-09-24T00:00:00Z",
-        "updatedAt": "2026-09-24T00:00:00Z",
-        "labels": [{"name": name, "id": name} for name in item.labels],
-        "milestone": None,
-        "assignees": [],
-    }
-
-
 class DecisionBackend(InMemoryBackend):
     """In-memory backend with an observable GitHub live-read seam."""
 
@@ -147,11 +131,15 @@ class DecisionBackend(InMemoryBackend):
         """Unused by this double's own ``fetch_page`` -- present only to satisfy ``RequestShapedListing``."""
         raise NotImplementedError
 
-    def search_issues_by_title(self, repo: str, selector: str) -> list[IssueNode]:
-        """Return raw nodes for every live item whose title contains *selector*."""
+    def search_issues_by_title(self, repo: str, selector: str) -> list[tuple[int, str]]:
+        """Return ``(number, title)`` for every live item whose title contains *selector*."""
         del repo
         self.search_requests.append(selector)
-        return [_issue_node_from_provider(item) for item in self.live_items if selector.lower() in item.title.lower()]
+        return [
+            (int(item.reference.lstrip("#")), item.title)
+            for item in self.live_items
+            if selector.lower() in item.title.lower()
+        ]
 
     def confirm_issues_reachable(self, repo: str) -> None:
         """Fail exactly when a live page read would."""

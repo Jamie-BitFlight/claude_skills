@@ -34,8 +34,6 @@ from .status_registry import STATUS_LABEL_PREFIX, pick_primary_status_label
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from .backend_types import IssueNode
-
 __all__ = ["CommandWorkItems", "DecisionTarget", "ListPage", "WorkItemDecisionContext"]
 
 
@@ -246,7 +244,7 @@ class WorkItemDecisionContext:
             candidates = (
                 self._pages.search_issues_by_title(self.repo, selector) if selector_fits_search(selector) else []
             )
-            found = [provider_item_to_backlog_item(_issue_node_to_provider_item(node)) for node in candidates]
+            found = [BacklogItem(title=title, issue=f"#{number}") for number, title in candidates]
             if purpose == "mutation":
                 found += [
                     BacklogItem(title=title, issue=f"#{number}")
@@ -423,25 +421,6 @@ def _blank_provider_item(item: BacklogItem) -> ProviderItem:
         state=item.metadata.status or "",
         labels=list(item.metadata.labels),
         revision="",
-    )
-
-
-def _issue_node_to_provider_item(node: IssueNode) -> ProviderItem:
-    """Build an unhydrated ``ProviderItem`` from a raw search/list issue node.
-
-    Returns:
-        The provider item, carrying the node's raw (unhydrated) body.
-    """
-    milestone = node["milestone"]
-    return ProviderItem(
-        provider_id=str(node["id"]),
-        reference=f"#{node['number']}",
-        title=str(node["title"]),
-        body=str(node.get("body", "")),
-        state=str(node["state"]),
-        labels=[label["name"] for label in node["labels"]],
-        revision="",
-        milestone=milestone["title"] if milestone else "",
     )
 
 
