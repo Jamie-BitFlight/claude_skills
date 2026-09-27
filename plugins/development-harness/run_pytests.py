@@ -43,6 +43,8 @@ TEST_PATHS = (
 )
 IMPORT_PATHS = (".", "scripts", "skills/implementation-manager/scripts")
 FAST_MARKER = "not e2e and not cross_backend and not integration and not research_vault"
+# CI lanes beyond the fast default, each run as this runner plus the lane's marker.
+LANES = {"integration": "integration and not research_vault", "cross_backend": "cross_backend"}
 PARALLEL_ARGS = ("-n", "2", "--dist", "loadgroup")
 
 

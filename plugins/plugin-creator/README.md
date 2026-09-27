@@ -37,7 +37,7 @@ This plugin gives Claude scoped references for those systems plus workflows for 
 uvx skilllint@latest check --fix ./plugins/my-plugin/skills/my-new-skill
 ```
 
-That's it. Version bumping is automatic on every `git commit`.
+That's it. Do not edit the plugin's `version`; CI bumps it after your change merges to `main`.
 
 ## What You Get
 
@@ -284,7 +284,8 @@ With this plugin installed, Claude will:
 
 ### Automatic Behaviors
 
-- **On every git commit**: The shared `agent-marketplace-versioner` hook detects plugin content changes, synchronizes applicable manifest entries, and bumps plugin versions (major for deletion, minor for addition, patch for modification). Marketplace membership is reconciled locally; its version bump is deferred to the post-merge repair flow described in [Marketplace versioning](https://github.com/Jamie-BitFlight/claude_skills/blob/main/docs/marketplace-versioning.md).
+- **On every git commit**: The `agent-marketplace-versioner` hook checks, without editing, that `plugin.json` component arrays and marketplace membership match the plugin directories. Versions are never changed on a branch.
+- **After merge to `main`**: CI patch-bumps each changed plugin and the marketplace version in one commit. See [Marketplace versioning](../../docs/marketplace-versioning.md).
 
 ## Installation
 
@@ -460,7 +461,7 @@ Routing summary:
 | `check_agent_auto_discovery.py` | Detect `plugin.json` agent or command arrays that silently mask auto-discovered components | `./plugins/plugin-creator/scripts/check_agent_auto_discovery.py` |
 | `validate-task-file.sh` | Validate refactoring task file format | `./plugins/plugin-creator/scripts/validate-task-file.sh <path>` |
 
-Plugin and marketplace manifest versions are managed by [agent-marketplace-versioner](https://github.com/Jamie-BitFlight/agent-marketplace-versioner), a separate pre-commit hook and GitHub Action.
+Plugin and marketplace manifest versions are managed by [agent-marketplace-versioner](https://github.com/Jamie-BitFlight/agent-marketplace-versioner): a check-only pre-commit hook on branches, and a GitHub Action that assigns versions on `main`.
 
 See [scripts/README.md](./scripts/README.md) for full documentation of each script.
 

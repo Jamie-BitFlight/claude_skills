@@ -14,11 +14,11 @@ The `quality-gate` summary job requires ALL of these to pass:
 | `lint-markdown` | markdownlint-cli2 |
 | `lint-shell` | shellcheck + shfmt |
 | `validate-plugins` | skilllint (plugin/skill structure) |
-| `manifest-sync` | Shared marketplace hook plus blocking PR version check; `bump-marketplace.yml` proposes historical collision repairs through a reviewed PR |
+| `manifest-sync` | Versioner hook in check-only mode (component arrays, marketplace membership) and its pinned integration test — `bump-marketplace.yml` assigns patch versions on `main` |
 | `file-hygiene` | trailing whitespace, line endings, large files, merge conflicts |
 | `test-python` | pytest fast suite (default addopts filter) |
-| `test-cross-backend` | development-harness cross-backend lane; shards from `dh_lanes()` in `.github/ci/plan.py` |
-| `test-integration` | Integration shards from `build_plan()` and `dh_lanes()` in `.github/ci/plan.py` |
+| `test-cross-backend` | `cross_backend` lane of each plugin runner's `LANES` table, via `.github/ci/plan.py` |
+| `test-integration` | `integration` lane of each plugin runner's `LANES` table, plus repository shards from `build_plan()` in `.github/ci/plan.py` |
 
 Advisory jobs outside the gate: `research-validation` (research-corpus template gaps) and
 `test-e2e` (live GitHub sandbox issues; main push / manual dispatch only).

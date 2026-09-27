@@ -1,6 +1,7 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
+#   "pydantic>=2.12.5",
 #   "pytest>=9.1.1",
 #   "pytest-asyncio>=1.4.0",
 # ]
@@ -20,6 +21,8 @@ PLUGIN_ROOT = Path(__file__).resolve().parent
 TEST_PATHS = ("tests",)
 IMPORT_PATHS = ("scripts",)
 FAST_MARKER = "not e2e and not cross_backend and not integration and not research_vault"
+# CI lanes beyond the fast default, each run as this runner plus the lane's marker.
+LANES = {"integration": "integration"}
 
 
 def main() -> int:

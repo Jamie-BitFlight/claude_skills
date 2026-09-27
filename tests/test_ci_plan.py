@@ -38,6 +38,10 @@ def repository(tmp_path: Path) -> Path:
         (tmp_path / path).mkdir(parents=True, exist_ok=True)
     for plugin in plugin_dirs:
         (tmp_path / plugin / "run_pytests.py").write_text("# runner\n", encoding="utf-8")
+    (tmp_path / "plugins/development-harness/run_pytests.py").write_text(
+        'LANES = {"integration": "integration and not research_vault", "cross_backend": "cross_backend"}\n',
+        encoding="utf-8",
+    )
     (tmp_path / "tests/test_rebase_publication_identity.py").write_text("", encoding="utf-8")
     (tmp_path / "pyproject.toml").write_text(
         f'[tool.pytest.ini_options]\ntestpaths = {json.dumps(paths)}\npythonpath = [".", ".agents/tool/scripts"]\n',
@@ -127,10 +131,31 @@ def test_plugin_import_root_in_root_pythonpath_is_an_error(repository: Path) -> 
         planner.build_plan(repository, ["README.md"])
 
 
+def test_runner_declared_lane_joins_its_matrix(repository: Path) -> None:
+    """A plugin gains a lane by declaring it in its runner; the planner holds no per-plugin table."""
+    (repository / "plugins/alpha/run_pytests.py").write_text('LANES = {"integration": "integration"}\n')
+    plan = planner.build_plan(repository, ["plugins/alpha/scripts/api.py"])
+    assert plan["integration_matrix"]["include"] == [
+        {"name": "alpha", "paths": [], "marker": "integration", "runner": "plugins/alpha/run_pytests.py"}
+    ]
+    assert plan["checks"]["test-integration"]
+    assert not plan["checks"]["test-cross-backend"]
+
+
+def test_runner_lane_without_a_ci_job_is_an_error(repository: Path) -> None:
+    """A lane no job runs would be declared and silently never executed."""
+    (repository / "plugins/alpha/run_pytests.py").write_text('LANES = {"nightly": "slow"}\n')
+    with pytest.raises(ValueError, match="declares lanes with no CI job"):
+        planner.build_plan(repository, ["plugins/alpha/SKILL.md"])
+
+
 def test_repository_configuration_plans() -> None:
     """The real root config satisfies every rule the planner enforces on its fixture."""
     plan = planner.build_plan(ROOT, None)
     assert names(plan, "cross_backend_matrix") == {"development-harness"}
+    assert names(plan, "integration_matrix") >= {"development-harness", "summarizer"}
+    summarizer = next(shard for shard in plan["integration_matrix"]["include"] if shard["name"] == "summarizer")
+    assert (summarizer["runner"], summarizer["marker"]) == ("plugins/summarizer/run_pytests.py", "integration")
 
 
 @pytest.mark.parametrize("path", ["plugins/alpha/scripts/test_cli.py", "plugins/alpha/model/tests/test_model.py"])
