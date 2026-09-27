@@ -31,10 +31,12 @@ from __future__ import annotations
 
 import html
 import re
+import string
 import subprocess
 from collections.abc import Iterator
+from html.parser import HTMLParser
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit
 
 import marko
 import pytest
@@ -51,7 +53,6 @@ _DESIGN_TIME_FILENAMES = {"MAINTENANCE.md", "SKILL-GOALS.md"}
 _MARKDOWN_SUFFIXES = (".md", ".markdown")
 # marko parses JSX-wrapped Markdown in `.mdx` as an opaque HTML block, so its links are invisible.
 _UNSUPPORTED_SUFFIXES = (".mdx",)
-_EXCLUDED_LINK_PREFIXES = ("http://", "https://", "mailto:", "#", "${", "//")
 # A link leaves the plugin only through `..`, a root-absolute `/`, or a `file:` URL. A file with
 # none of these in plain text, no link destination holding a `\`, `%` or `&` that could encode
 # them, and no HTML `href=`/`src=`, cannot hold an escaping link, so the link guard skips it.
@@ -59,8 +60,10 @@ _MAY_ESCAPE_PATTERN = re.compile(
     r"(?:^|[\s(<:/])\.\.(?:[/)#>\s]|$)|(?:\]\(|\]:)\s*<?(?:/|file:|[^\s)>]*[\\%&])|\b(?:href|src)\s*=",
     re.IGNORECASE | re.MULTILINE,
 )
-# `href`/`src` attribute values in raw HTML, double-quoted, single-quoted or unquoted.
-_HTML_URL_ATTR_PATTERN = re.compile(r"""\b(?:href|src)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))""", re.IGNORECASE)
+# RFC 3986 unreserved characters: the only ones a percent escape may decode to without changing
+# the URL's structure.
+_UNRESERVED = frozenset(string.ascii_letters + string.digits + "-._~")
+_PERCENT_ESCAPE_PATTERN = re.compile(r"%([0-9A-Fa-f]{2})")
 # CommonMark backslash escapes: a backslash before ASCII punctuation.
 _BACKSLASH_ESCAPE_PATTERN = re.compile(r"\\([!-/:-@\[-`{-~])")
 
@@ -180,69 +183,123 @@ def _line_at(content: str, needle: str, start: int) -> int:
     return content.count("\n", 0, start if idx == -1 else idx) + 1
 
 
-def _decode_destination(dest: str) -> str:
-    """Decode a Markdown link destination the way a renderer and browser will before resolving it.
+def _decode_markdown_destination(dest: str) -> str:
+    """Decode a Markdown link destination to the URL a renderer writes into the href.
 
-    marko 2.x unescapes backslashes in inline links only, and decodes neither HTML entities
-    nor percent-encoding, but a renderer decodes the first two and a browser resolves
-    `%2E%2E/` as `../`. A backslash left after unescaping is not a separator: a CommonMark
-    renderer percent-encodes it to `%5C` in the href, which a browser keeps as a filename
-    character.
+    marko 2.x unescapes backslashes in inline links only, and decodes no HTML entities, but a
+    CommonMark renderer does both. A backslash left after unescaping is not a separator: the
+    renderer percent-encodes it to `%5C`, which a browser keeps as a filename character.
 
     Args:
         dest: Link destination as marko returns it.
 
     Returns:
-        `dest` with backslash escapes, HTML entities and percent-encoding decoded.
+        `dest` with backslash escapes and HTML entities decoded.
     """
-    return unquote(html.unescape(_BACKSLASH_ESCAPE_PATTERN.sub(r"\1", dest)))
+    return html.unescape(_BACKSLASH_ESCAPE_PATTERN.sub(r"\1", dest.strip()))
 
 
-def _decode_html_url(value: str) -> str:
-    """Decode a raw-HTML `href`/`src` value the way a browser will before resolving it.
+class _HtmlUrlAttributes(HTMLParser):
+    """Collects `href`/`src` values from real start tags, with the line each tag starts on.
 
-    CommonMark passes raw HTML through untouched, so no backslash unescaping applies. A browser
-    decodes entities and then, following WHATWG URL parsing, reads each literal `\\` in a path
-    as `/`. A `%5C` stays a filename character, so separators are normalized before
-    percent-decoding.
-
-    Args:
-        value: Attribute value as written in the HTML.
-
-    Returns:
-        `value` with entities decoded, `\\` read as `/`, and percent-encoding decoded.
+    Comments, `data-href`-style names and text inside other attributes are not attributes, so
+    they are never collected. `HTMLParser` has already decoded entities in each value.
     """
-    return unquote(html.unescape(value).replace("\\", "/"))
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.found: list[tuple[str, int]] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        line, _offset = self.getpos()
+        self.found.extend((value or "", line) for name, value in attrs if name in {"href", "src"})
 
 
-def _link_targets(nodes: list[tuple[Element, int]]) -> list[tuple[str, str, int]]:
-    """Collect every link destination in a walked document, with its enclosing block's offset.
+def _html_url_attributes(raw: str) -> list[tuple[str, int]]:
+    """Return `(value, line)` for each `href`/`src` in `raw`, `line` counted from 1 within `raw`."""
+    parser = _HtmlUrlAttributes()
+    parser.feed(raw)
+    parser.close()
+    return parser.found
+
+
+def _link_targets(nodes: list[tuple[Element, int]], content: str) -> list[tuple[str, str, int]]:
+    """Collect every link destination in a walked document, as the URL a browser will follow.
 
     Args:
         nodes: `_walk_nodes` output for one document.
+        content: The document's text, to turn block offsets into line numbers.
 
     Returns:
-        `(destination, decoded, offset)` for each Markdown link, image, reference definition,
-        and HTML `href`/`src` attribute value, `decoded` as a browser will resolve it.
+        `(destination, url, line)` for each Markdown link, image, reference definition, and HTML
+        `href`/`src` attribute. `url` is what reaches the href. For HTML, a literal `\\` is read as
+        `/`, as WHATWG URL parsing does, because CommonMark passes raw HTML through untouched.
     """
     # A `[text][label]` usage carries its definition's destination (backslash-unescaped by
     # marko, unlike the definition's), so it is checked through its `LinkRefDef` alone.
-    defined = {_decode_destination(node.dest.strip()) for node, _start in nodes if isinstance(node, block.LinkRefDef)}
+    defined = {_decode_markdown_destination(node.dest) for node, _start in nodes if isinstance(node, block.LinkRefDef)}
     targets: list[tuple[str, str, int]] = []
     for node, start in nodes:
-        if isinstance(node, (inline.Link, inline.Image)):
-            decoded = _decode_destination(node.dest.strip())
-            if decoded not in defined:
-                targets.append((node.dest.strip(), decoded, start))
-        elif isinstance(node, block.LinkRefDef):
-            # Covers reference-style definitions (`[label]: url`), used or not.
-            targets.append((node.dest.strip(), _decode_destination(node.dest.strip()), start))
+        if isinstance(node, (inline.Link, inline.Image, block.LinkRefDef)):
+            url = _decode_markdown_destination(node.dest)
+            # `LinkRefDef` covers reference-style definitions (`[label]: url`), used or not.
+            if isinstance(node, block.LinkRefDef) or url not in defined:
+                targets.append((node.dest.strip(), url, _line_at(content, node.dest.strip(), start)))
         elif isinstance(node, (block.HTMLBlock, inline.InlineHTML)):
-            raw = str(node.body if isinstance(node, block.HTMLBlock) else node.children)
-            for match in _HTML_URL_ATTR_PATTERN.finditer(raw):
-                value = (match.group(1) or match.group(2) or match.group(3) or "").strip()
-                targets.append((value, _decode_html_url(value), start))
+            if isinstance(node, block.HTMLBlock):
+                raw = str(node.body)
+                first_line = content.count("\n", 0, start) + 1
+            else:
+                raw = str(node.children)
+                first_line = _line_at(content, raw, start)
+            targets.extend(
+                (value.strip(), value.strip().replace("\\", "/"), first_line + line - 1)
+                for value, line in _html_url_attributes(raw)
+            )
     return targets
+
+
+def _decode_unreserved(path: str) -> str:
+    """Percent-decode only unreserved characters, so `%2E` becomes `.` but `%2F` stays literal."""
+
+    def decode(match: re.Match[str]) -> str:
+        char = chr(int(match.group(1), 16))
+        return char if char in _UNRESERVED else match.group(0)
+
+    return _PERCENT_ESCAPE_PATTERN.sub(decode, path)
+
+
+def _escaping_path(url: str, md_file: Path, root: Path) -> Path | None:
+    """Resolve `url` from `md_file` as a browser would, and report it if it leaves `root`.
+
+    Scheme, host and fragment are read from the raw URL, so an encoded `%3A`, `%2F` or `%23`
+    never creates one. In the path, only unreserved characters are decoded. `%2E%2E` is then a
+    dot segment, as WHATWG URL parsing treats it, while `%2F` and `%5C` stay characters inside a
+    segment.
+
+    Args:
+        url: The URL as it reaches the href.
+        md_file: File holding the link.
+        root: Resolved plugin root.
+
+    Returns:
+        The resolved path of a `file:` URL, a root-absolute path, or a relative path that
+        climbs above `root`. `None` for a path inside `root`, an external URL (another scheme,
+        or a host), or a `${...}` substitution.
+    """
+    if url.startswith("${"):
+        return None
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        # Raised only for a malformed host (`//[x`), so the URL is external either way.
+        return None
+    if parts.scheme == "file":
+        return Path(unquote(parts.path))
+    if parts.scheme or parts.netloc:
+        return None
+    resolved = (md_file.parent / _decode_unreserved(parts.path)).resolve()
+    return None if resolved.is_relative_to(root) else resolved
 
 
 def find_self_containment_violations(
@@ -267,17 +324,10 @@ def find_self_containment_violations(
         if not _MAY_ESCAPE_PATTERN.search(content):
             continue
         doc, starts = _parse(content)
-        targets = _link_targets(list(_walk_nodes(doc, starts)))
-        for target, decoded, start in targets:
-            if decoded.startswith(_EXCLUDED_LINK_PREFIXES):
-                continue
-            if decoded.lower().startswith("file:"):
-                resolved = Path(decoded)
-            else:
-                resolved = (md_file.parent / decoded.split("#", 1)[0]).resolve()
-                if resolved.is_relative_to(resolved_root):
-                    continue
-            violations.append((md_file, _line_at(content, target, start), target, resolved))
+        for target, url, line in _link_targets(list(_walk_nodes(doc, starts)), content):
+            resolved = _escaping_path(url, md_file, resolved_root)
+            if resolved is not None:
+                violations.append((md_file, line, target, resolved))
     return violations
 
 
@@ -384,6 +434,67 @@ def test_link_guard_does_not_treat_encoded_backslash_as_separator(tmp_path: Path
     md_file.write_text(f"Intro.\n\n{text}\n")
 
     assert find_self_containment_violations(tmp_path, [md_file]) == []
+
+
+@pytest.mark.parametrize(
+    ("dest", "escapes"),
+    [
+        ("https%3A%2F%2Fexample.com/../../outside.md", True),
+        ("x%23/../../outside.md", True),
+        ("%2E%2E/outside.md", True),
+        ("%2Fetc/outside.md", False),
+        ("https://example.com/../../outside.md", False),
+        ("#section", False),
+        ("//[malformed-host/../../outside.md", False),
+    ],
+    ids=[
+        "encoded-scheme",
+        "encoded-fragment",
+        "encoded-dot-segment",
+        "encoded-slash",
+        "external",
+        "fragment",
+        "malformed-host",
+    ],
+)
+def test_link_guard_reads_url_structure_before_percent_decoding(tmp_path: Path, dest: str, escapes: bool) -> None:
+    """Scheme, host and fragment come from the raw URL; only unreserved path escapes are decoded."""
+    md_file = tmp_path / "doc.md"
+    md_file.write_text(f"Intro.\n\n[x]({dest})\n")
+
+    assert len(find_self_containment_violations(tmp_path, [md_file])) == int(escapes)
+
+
+@pytest.mark.parametrize(
+    "html",
+    [
+        '<!-- <a href="../../outside.md">x</a> -->',
+        '<div data-href="../../outside.md" data-src="../../outside.png">x</div>',
+        """<a title='href="../../outside.md"' href="./inside.md">x</a>""",
+    ],
+    ids=["comment", "data-attributes", "attribute-text"],
+)
+def test_link_guard_reads_only_real_html_href_and_src(tmp_path: Path, html: str) -> None:
+    """Commented tags, `data-*` attributes and text inside other attributes are not links."""
+    md_file = tmp_path / "doc.md"
+    md_file.write_text(f"Intro.\n\n{html}\n")
+
+    assert find_self_containment_violations(tmp_path, [md_file]) == []
+
+
+def test_link_guard_reports_the_start_line_of_a_multi_line_html_tag(tmp_path: Path) -> None:
+    """An HTML link's line is its tag's start line, counted from the enclosing HTML block."""
+    md_file = tmp_path / "doc.md"
+    md_file.write_text(
+        'Intro.\n\n<p>\n<a\n  href="../../outside.md">x</a>\n</p>\n\nText <a\nhref="../../other.md">y</a>\n'
+    )
+
+    found = find_self_containment_violations(tmp_path, [md_file])
+
+    assert [(line, target) for _path, line, target, _resolved in found] == [
+        (4, "../../outside.md"),
+        (8, "../../other.md"),
+    ]
 
 
 def test_link_guard_passes_html_links_inside_the_plugin(tmp_path: Path) -> None:
