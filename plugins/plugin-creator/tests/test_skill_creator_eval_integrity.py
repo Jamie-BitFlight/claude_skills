@@ -248,6 +248,22 @@ def test_observed_repetitions_and_missing_grading_are_reported(script_loader, tm
     json.dumps(report, allow_nan=False)
 
 
+def test_asymmetric_benchmark_arms_are_incomplete(script_loader, tmp_path):
+    module = script_loader("aggregate_benchmark")
+    for config in ("with_skill", "without_skill"):
+        run = tmp_path / "eval-1" / config / "run-1"
+        run.mkdir(parents=True)
+        (run / "grading.json").write_text(json.dumps(_grading()))
+    extra = tmp_path / "eval-2" / "with_skill" / "run-1"
+    extra.mkdir(parents=True)
+    (extra / "grading.json").write_text(json.dumps(_grading()))
+
+    report = module.generate_benchmark(tmp_path)
+
+    assert report["metadata"]["grading_status"] == "INCOMPLETE"
+    assert all(value is None for value in report["run_summary"]["delta"].values())
+
+
 def test_empty_benchmark_is_not_a_zero_cost_success(script_loader, tmp_path):
     module = script_loader("aggregate_benchmark")
     report = module.generate_benchmark(tmp_path)
