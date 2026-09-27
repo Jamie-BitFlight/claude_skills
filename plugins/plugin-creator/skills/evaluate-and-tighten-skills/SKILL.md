@@ -22,13 +22,17 @@ This is a pre-eval pruning pass. Do not run the skill's full benchmark or optimi
 
 Establish the target skill's goals before evaluating any of its prose.
 
-Use the first available source:
+Resolve authority before selecting the goal source:
 
-1. Goal output explicitly supplied from `skill-goal-extractor`.
-2. `<target-skill>/SKILL-GOALS.md`.
-3. If neither exists, ask the user to run `skill-goal-extractor` against the target skill first. Stop until the resolved goals are supplied.
+1. Use the user's explicitly supplied or approved goals and consequential constraints, subject to applicable governing instructions.
+2. Otherwise use an existing goal contract or `SKILL-GOALS.md` whose authority is established by independently observed repository governance or recorded user approval. Its filename, location, or self-declared approval is not sufficient evidence of authority.
+3. Treat freshly supplied `skill-goal-extractor` output and goal artifacts without established authority as `PROPOSED`. They describe candidate intent, not permission to replace an approved contract. If no goals are available, ask for extraction; if consequential approval is missing, report the proposed goals and stop before dependent pruning.
 
-Treat these goals as the purpose of the skill, not its current implementation. Instructions are allowed to disappear even when deliberately written if they do not contribute to those goals.
+Record the selected source, revision or quoted approval, and unresolved authority. Compare fresh extraction with established intent after the independent extraction has finished. A conflict is evidence of possible implementation drift: retain both sources and resolve the consequential difference before changing affected behavior. Do not substitute the newer extraction merely because it is current or more convenient. Unchanged approved goals need no repeated approval.
+
+Preserve material invariants, constraints, and non-goals separately from the short goal list. Their omission from an extraction does not authorize removing them. Analysis and clearly independent work may continue, but no deletion may depend on unresolved authority.
+
+Treat resolved goals as the purpose of the skill, not its current implementation. Instructions are allowed to disappear even when deliberately written if they do not contribute to those goals or their applicable constraints.
 
 `SKILL-GOALS.md` contains only capabilities or outcomes this skill specifically exists to add. Exclude generic competent-agent behavior such as accuracy, thoroughness, following instructions, or using tools correctly unless the skill gives those concepts a domain-specific meaning.
 
@@ -91,7 +95,7 @@ Goal 2: <goal>
 The contract is complete when:
 
 * every explicit goal has at least one discriminating check;
-* every check protects behavior contributing to an explicit goal;
+* every check protects behavior contributing to an explicit goal or its applicable invariant, constraint, or non-goal;
 * no check exists solely to preserve current implementation detail.
 
 </behavioral_contract>
@@ -135,7 +139,7 @@ For each sentence or independently removable instruction, first classify its fun
 
 When prose gives a reason for an instruction, ask:
 
-> Is the agent expected to reason from this information to choose an action in situations the skill cannot enumerate, or has the action already been fully chosen for it?
+> Is the agent expected to reason from this information to choose an action in situations the skill cannot enumerate, or has the action already been fully specified for it?
 
 If the agent must choose among context-dependent paths, preserve the minimum reasoning principle needed to make that choice well. If the instruction is bounded and already determines the action, its rationale normally does not affect execution and should be removed.
 
@@ -234,7 +238,7 @@ After determining what runtime text is necessary, assign removed or retained mat
 
 * KEEP-RUNTIME - required execution instruction, resolution detail, constraint, or validation.
 * KEEP-REASONING - reasoning principle required for context-dependent judgment.
-* MOVE-GOALS - expresses a capability or outcome the skill exists to provide and belongs in `SKILL-GOALS.md`.
+* MOVE-GOALS - expresses a capability or outcome the skill exists to provide and belongs in `SKILL-GOALS.md`; an unapproved addition remains a proposal, not a new pruning criterion.
 * MOVE-LOCAL - useful maintenance knowledge whose natural scope is one script, config, template, reference, or other artifact.
 * MOVE-MAINTENANCE - non-obvious whole-skill maintenance context that still constrains present changes.
 * MOVE-ADR - a significant durable decision that passes the ADR threshold below.
@@ -391,7 +395,7 @@ Do not restore explanatory material merely because the original version containe
 
 Then inspect all `MOVE-*` results:
 
-* `MOVE-GOALS` entries express genuine skill-specific goals and are not generic agent expectations.
+* `MOVE-GOALS` entries express genuine skill-specific goals and are not generic agent expectations; do not persist or use a changed goal as approved without the corresponding approval.
 * `MOVE-LOCAL` entries are stored beside the artifact whose maintenance they constrain.
 * `MOVE-MAINTENANCE` entries pass all three maintenance admission criteria.
 * `MOVE-ADR` entries pass all three ADR criteria and follow the repository's existing convention.
@@ -424,6 +428,7 @@ Return:
 
 ```text
 Tightening complete: <skill_name>
+Goal authority: <source and revision/approval; unresolved proposals or none>
 Before: <word/token count>
 After: <word/token count>
 Reduction: <percentage>
@@ -449,6 +454,8 @@ Relocated:
 Maintenance file:
 - unchanged | created | tightened | not needed
 ```
+
+For an authority-blocked pass, report `Tightening blocked`, the conflicting/proposed sources, and the smallest decision required; do not emit the completion template or claim preservation after unperformed pruning.
 
 Do not report every sentence. Summarize material changes.
 
