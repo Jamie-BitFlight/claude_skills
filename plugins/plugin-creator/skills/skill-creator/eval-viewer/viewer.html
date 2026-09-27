@@ -1121,7 +1121,12 @@
       const container = document.getElementById("benchmark-content");
       const summary = data.run_summary || {};
       const metadata = data.metadata || {};
-      const notes = data.notes || [];
+      const notes = [...(data.notes || [])];
+      for (const run of (data.runs || [])) {
+        for (const gap of (run.measurement_gaps || [])) {
+          notes.push("Eval " + run.eval_id + "/" + run.configuration + "/run-" + run.run_number + ": " + gap);
+        }
+      }
 
       let html = "";
 
@@ -1131,18 +1136,25 @@
       if (metadata.skill_name) html += "<strong>" + escapeHtml(metadata.skill_name) + "</strong> &mdash; ";
       if (metadata.timestamp) html += metadata.timestamp + " &mdash; ";
       if (metadata.evals_run) html += "Evals: " + metadata.evals_run.join(", ") + " &mdash; ";
-      html += (metadata.runs_per_configuration || "?") + " runs per configuration";
+      html += "Grading: " + escapeHtml(metadata.grading_status || "UNKNOWN") + " &mdash; ";
+      if (metadata.run_counts) {
+        html += metadata.run_counts.map(r => "Eval " + escapeHtml(String(r.eval_id)) + "/" + escapeHtml(r.configuration) + ": " + r.observed_runs + " observed run(s)").join("; ");
+      } else {
+        html += (metadata.runs_per_configuration ?? "?") + " recorded runs per configuration";
+      }
+      html += "<br>Coverage: " + escapeHtml(metadata.coverage || "not recorded");
       html += "</p>";
 
       // Summary table
       html += '<table class="benchmark-table">';
 
       function fmtStat(stat, pct) {
-        if (!stat) return "—";
+        if (!stat || !Number.isFinite(stat.mean)) return "N/A";
+        const coverage = stat.observed != null ? " (n=" + stat.observed + ", missing=" + stat.missing + ")" : "";
         const suffix = pct ? "%" : "";
         const m = pct ? (stat.mean * 100).toFixed(0) : stat.mean.toFixed(1);
         const s = pct ? (stat.stddev * 100).toFixed(0) : stat.stddev.toFixed(1);
-        return m + suffix + " ± " + s + suffix;
+        return m + suffix + " ± " + s + suffix + coverage;
       }
 
       function deltaClass(val) {
@@ -1223,26 +1235,26 @@
 
             for (const run of configRuns) {
               const r = run.result || {};
-              const prClass = r.pass_rate >= 0.8 ? "benchmark-delta-positive" : r.pass_rate < 0.5 ? "benchmark-delta-negative" : "";
+              const prClass = r.pass_rate == null ? "" : r.pass_rate >= 0.8 ? "benchmark-delta-positive" : r.pass_rate < 0.5 ? "benchmark-delta-negative" : "";
               html += '<tr class="' + rowClass + '">';
               html += "<td>" + configLabel + "</td>";
               html += "<td>" + run.run_number + "</td>";
-              html += '<td class="' + prClass + '">' + ((r.pass_rate || 0) * 100).toFixed(0) + "% (" + (r.passed || 0) + "/" + (r.total || 0) + ")</td>";
+              html += '<td class="' + prClass + '">' + (r.pass_rate == null ? "N/A" : (r.pass_rate * 100).toFixed(0) + "% (" + r.passed + "/" + r.total + ")") + "</td>";
               if (hasTime) html += "<td>" + (r.time_seconds != null ? r.time_seconds.toFixed(1) : "—") + "</td>";
-              if (hasErrors) html += "<td>" + (r.errors || 0) + "</td>";
+              if (hasErrors) html += "<td>" + (r.errors ?? "N/A") + "</td>";
               html += "</tr>";
             }
 
             // Average row
-            const rates = configRuns.map(r => (r.result || {}).pass_rate || 0);
-            const avgRate = rates.reduce((a, b) => a + b, 0) / rates.length;
-            const avgPrClass = avgRate >= 0.8 ? "benchmark-delta-positive" : avgRate < 0.5 ? "benchmark-delta-negative" : "";
+            const rates = configRuns.map(r => (r.result || {}).pass_rate).filter(Number.isFinite);
+            const avgRate = rates.length ? rates.reduce((a, b) => a + b, 0) / rates.length : null;
+            const avgPrClass = avgRate == null ? "" : avgRate >= 0.8 ? "benchmark-delta-positive" : avgRate < 0.5 ? "benchmark-delta-negative" : "";
             html += '<tr class="benchmark-row-avg ' + rowClass + '">';
             html += "<td>" + configLabel + "</td>";
             html += "<td>Avg</td>";
-            html += '<td class="' + avgPrClass + '">' + (avgRate * 100).toFixed(0) + "%</td>";
+            html += '<td class="' + avgPrClass + '">' + (avgRate == null ? "N/A" : (avgRate * 100).toFixed(0) + "%") + " (n=" + rates.length + ", missing=" + (configRuns.length - rates.length) + ")</td>";
             if (hasTime) {
-              const times = configRuns.map(r => (r.result || {}).time_seconds).filter(t => t != null);
+              const times = configRuns.map(r => (r.result || {}).time_seconds).filter(Number.isFinite);
               html += "<td>" + (times.length ? (times.reduce((a, b) => a + b, 0) / times.length).toFixed(1) : "—") + "</td>";
             }
             if (hasErrors) html += "<td></td>";
