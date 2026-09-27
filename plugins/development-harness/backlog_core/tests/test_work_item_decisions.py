@@ -618,3 +618,25 @@ def test_provider_pagination_failure_returns_no_partial_page(mocker: MockerFixtu
         _fetch_issues_graphql(mocker.Mock(), "owner", "repo")
 
     assert graphql.call_count == 2
+
+
+def test_cached_fallback_pages_over_distinct_issues() -> None:
+    """Duplicate cached rows for one issue must not shift offsets or inflate the total."""
+    backend = DecisionBackend(
+        live_items=[],
+        cached_items=[
+            BacklogItem(title="first copy", issue="#260"),
+            BacklogItem(title="second copy", issue="#260"),
+            BacklogItem(title="other issue", issue="#261"),
+        ],
+    )
+    backend.live_error = BackendUnavailableError("offline")
+    context = WorkItemDecisionContext(backend, allow_cached=True, output=Output())
+
+    first = context.page(ListPageRequest(offset=0, limit=1), match=lambda item, provider: True)
+    second = context.page(ListPageRequest(offset=1, limit=1), match=lambda item, provider: True)
+
+    assert [item.issue for item in first.provider_items] == ["#260"]
+    assert [item.issue for item in second.provider_items] == ["#261"]
+    assert first.total == 2
+    assert second.has_more is False

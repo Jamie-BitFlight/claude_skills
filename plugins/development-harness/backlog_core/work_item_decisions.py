@@ -126,7 +126,9 @@ class WorkItemDecisionContext:
                 raise
             self._warn_cached_fallback(exc)
             cached = self._cached_items()
-            matched = [item for item in cached.provider_items if match(item, _blank_provider_item(item))]
+            matched = _distinct_issues([
+                item for item in cached.provider_items if match(item, _blank_provider_item(item))
+            ])
             page_items, has_more = _slice(matched, request.offset, request.limit)
             return ListPage(
                 provider_items=page_items,
@@ -422,6 +424,27 @@ def _blank_provider_item(item: BacklogItem) -> ProviderItem:
         labels=list(item.metadata.labels),
         revision="",
     )
+
+
+def _distinct_issues(items: list[BacklogItem]) -> list[BacklogItem]:
+    """Keep the first cached row per numeric issue, as ``backlog_list`` does after paging.
+
+    The cache can hold more than one row for an issue. Deduplicating before
+    the slice keeps offsets, totals and page sizes on distinct issues.
+
+    Returns:
+        *items* in order, without later rows for an already-seen issue number.
+    """
+    seen: set[int] = set()
+    distinct: list[BacklogItem] = []
+    for item in items:
+        number = parse_issue_number(item.issue)
+        if number is not None:
+            if number in seen:
+                continue
+            seen.add(number)
+        distinct.append(item)
+    return distinct
 
 
 def _slice(matched: list[BacklogItem], offset: int, limit: int) -> tuple[list[BacklogItem], bool]:
