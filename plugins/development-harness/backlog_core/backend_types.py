@@ -5,7 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, Protocol, TypedDict, runtime_checkable
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
+from .models import ProviderItem
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -375,6 +377,89 @@ class RepositoryScopedCachedListing(Protocol):
     """Optional repository-aware listing over a provider-private cache."""
 
     def cached_work_items(self, repo: str = "") -> list[BacklogItem]: ...
+
+
+class ListPageRequest(BaseModel):
+    """One command-scoped, request-shaped live list page over GitHub issues.
+
+    See ``_GitHubWorkItemSync.fetch_page`` for the walk this shapes: a
+    forward cursor walk that stops as soon as it has ``offset + limit + 1``
+    matches (D3 in the request-shaped-reads design brief), rather than the
+    whole-history read every earlier live-list path performed.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    repo: str = ""
+    include_closed: bool = False
+    labels: list[str] = Field(default_factory=list)
+    """Pushed to GitHub's ``filterBy.labels`` (AND semantics) -- e.g. an
+    explicit ``label=`` filter and/or a ``status:<x>`` label derived from a
+    ``status=`` filter (D2). *match* still re-checks both locally: GitHub's
+    label AND semantics and this codebase's ``pick_primary_status_label``
+    can disagree when an issue carries more than one status label."""
+    offset: int = 0
+    limit: int = 0
+    """0 means unbounded — walk the whole requested state set to completion.
+    A positive value walks only far enough to find ``offset + limit + 1``
+    matches, per D3/D4."""
+
+
+class ListPageResult(BaseModel):
+    """One page of matched, fully hydrated rows plus honest pagination facts.
+
+    ``items`` always carries real head/comment content — see
+    ``_GitHubWorkItemSync.fetch_page``'s two-pass design: a candidate is
+    hydrated during the walk only when it has no ``priority:`` label or a
+    content-dependent predicate is active, but every row that ends up in this
+    result (the return slice) is (re-)hydrated before being returned, so a
+    caller never receives an empty ``body`` for a row it will display or
+    write through to the cache.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    items: list[ProviderItem]
+    has_more: bool
+    total: int | None
+    """Exact count when the walk reached the end of the matching state set,
+    ``issues.totalCount`` when every fetched row matched (no local predicate
+    removed any), otherwise ``None`` — an unknown total, not a guess."""
+    sync_started_at: str
+
+
+@runtime_checkable
+class RequestShapedListing(Protocol):
+    """Optional GitHub-only capability: bounded, offset/limit-shaped page reads.
+
+    Deliberately a separate Protocol from :class:`GitHubExtras`, for the same
+    reason :class:`SnapshotCheckpointProvider` and
+    :class:`SnapshotCompletenessProvider` are (see their docstrings): folding
+    these four methods into ``GitHubExtras`` would require every existing
+    ``isinstance(x, GitHubExtras)`` gate -- and every test double that already
+    satisfies ``GitHubExtras`` structurally -- to also implement them, which
+    would silently break an unrelated call path (e.g. an exact ``#N``
+    selector's targeted ``fetch_snapshot``) for any backend or double that
+    predates this capability. Gate via ``require_request_shaped_listing()`` in
+    ``_capability_gates.py``, exactly as ``GitHubExtras`` callers do.
+    """
+
+    def fetch_page(
+        self, request: ListPageRequest, *, match: Callable[[BacklogItem, ProviderItem], bool], force_hydration: bool
+    ) -> ListPageResult: ...
+    def _fetch_issues_page_graphql(
+        self,
+        repo: Repository,
+        owner: str,
+        repo_name: str,
+        *,
+        states: list[str],
+        labels: list[str] | None = None,
+        first: int = 100,
+        after: str | None = None,
+    ) -> object: ...
+    def search_issues_by_title(self, repo: str, selector: str) -> list[IssueNode]: ...
+    def fetch_open_issue_titles(self, repo: str) -> list[tuple[int, str]]: ...
 
 
 @runtime_checkable

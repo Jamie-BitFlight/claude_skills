@@ -25,6 +25,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from backlog_core import gh_client, rendering
+from backlog_core.backend_types import ListPageResult
 from backlog_core.backends._github_work_item_versions import (
     WorkItemHead,
     WorkItemVersion,
@@ -63,6 +64,7 @@ from backlog_core.reconciliation import (
     ReconcileExecution,
     ReconcileOutcome,
     finalize_reconciliation,
+    provider_item_to_backlog_item,
     reconcile_backlog,
 )
 
@@ -71,9 +73,15 @@ if TYPE_CHECKING:
 
     from github.Repository import Repository
 
-    from backlog_core.backend_types import AddedCommentNode, IssueCommentNode, IssueNode
+    from backlog_core.backend_types import AddedCommentNode, IssueCommentNode, IssueNode, ListPageRequest
     from backlog_core.file_cache import FileCache
     from backlog_core.file_cache_state import _PendingWorkItemMutation
+
+#: Prefix identifying a priority label on a raw GitHub issue node -- present
+#: whenever ``create_issue_for_item`` created the issue, and the sole signal
+#: :meth:`_GitHubWorkItemSync.fetch_page` can check without hydration to know
+#: a candidate's ``section`` (== ``metadata.priority``) is non-empty (D2').
+_PRIORITY_LABEL_PREFIX = "priority:"
 
 # Bounded aliased GraphQL batch size for issue-node and comment-node batches,
 # which carry small metadata fields rather than full content bodies.
@@ -112,6 +120,18 @@ class _IssueGateway(Protocol):
         first: int = 100,
         since: str | None = None,
     ) -> list[IssueNode]: ...
+
+    def _fetch_issues_page_graphql(
+        self,
+        repo: Repository,
+        owner: str,
+        repo_name: str,
+        *,
+        states: list[str],
+        labels: list[str] | None = None,
+        first: int = 100,
+        after: str | None = None,
+    ) -> gh_client.IssuesPage: ...
 
     def _fetch_targeted_issues(
         self, repo: Repository, owner: str, repo_name: str, references: list[str]
@@ -212,6 +232,131 @@ class _GitHubWorkItemSync:
         return ProviderSnapshot(
             items=list(items_by_identity.values()), sync_started_at=sync_started_at, pages_fetched=1
         )
+
+    def _classify_page_candidates(
+        self,
+        repo: Repository,
+        owner: str,
+        repo_name: str,
+        issues: list[IssueNode],
+        *,
+        match: Callable[[BacklogItem, ProviderItem], bool],
+        force_hydration: bool,
+    ) -> tuple[list[IssueNode], list[BacklogItem]]:
+        """Hydrate as needed (D2') and match one GraphQL page's issues.
+
+        Returns:
+            The matching raw nodes and their composed items, in page order.
+        """
+        needs_hydration = {
+            issue["number"]: force_hydration
+            or not any(label["name"].startswith(_PRIORITY_LABEL_PREFIX) for label in issue["labels"])
+            for issue in issues
+        }
+        hydrate_now = [issue for issue in issues if needs_hydration[issue["number"]]]
+        heads, comments = self._work_item_contexts(repo, hydrate_now) if hydrate_now else ({}, {})
+        matched_nodes: list[IssueNode] = []
+        matched_items: list[BacklogItem] = []
+        for issue in issues:
+            use_content = needs_hydration[issue["number"]]
+            candidate = self.provider_item_from_issue(
+                repo, owner, repo_name, issue, heads if use_content else {}, comments if use_content else {}
+            )
+            item = provider_item_to_backlog_item(candidate)
+            if match(item, candidate):
+                matched_nodes.append(issue)
+                matched_items.append(item)
+        return matched_nodes, matched_items
+
+    def fetch_page(
+        self, request: ListPageRequest, *, match: Callable[[BacklogItem, ProviderItem], bool], force_hydration: bool
+    ) -> ListPageResult:
+        """Walk issues in ``UPDATED_AT DESC`` order, stopping as soon as enough match.
+
+        Implements D3/D4 of the request-shaped-reads design brief: the page
+        size starts at ``min(100, offset + limit + 1)`` and doubles each round
+        (capped at 100) while matches stay short, and the walk stops the
+        moment it has found match number ``offset + limit + 1`` -- or, when
+        ``request.limit`` is 0, once the connection is exhausted.
+
+        A candidate is hydrated during the walk only when *force_hydration*
+        is set or it carries no ``priority:`` label (D2') -- an issue with
+        that label always has a non-empty ``section``, so *match* can decide
+        that part of the base "has a section" rule without reading its body.
+        Every row that survives into the returned slice is (re-)hydrated
+        regardless of how it was matched: a caller displaying or caching a
+        row needs its real, tracked content, not the raw issue body a
+        shortcut candidate used only to decide inclusion cheaply. Hydration
+        is batched per GraphQL page (one ``_work_item_contexts`` call per
+        page's candidates that need it), not per issue, so a broken head on
+        an unrelated issue never touched by this walk cannot abort it
+        (groom risk R1) and a whole-set force_hydration walk still costs one
+        batch per page rather than one per issue.
+
+        Returns:
+            The matched, fully hydrated page slice plus an honest
+            ``has_more``/``total`` (see :class:`ListPageResult`).
+        """
+        sync_started_at = datetime.now(UTC).isoformat()
+        repo = self._issues.get_github(request.repo)
+        owner, repo_name = repo.full_name.split("/", 1)
+        states = ["OPEN", "CLOSED"] if request.include_closed else ["OPEN"]
+        labels = request.labels or None
+        target = request.offset + request.limit + 1 if request.limit > 0 else None
+        page_size = min(100, target) if target else 100
+
+        matched_nodes: list[IssueNode] = []
+        matched_items: list[BacklogItem] = []
+        fetched_count = 0
+        total_count = 0
+        cursor: str | None = None
+        has_next_page = True
+        while True:
+            page = self._issues._fetch_issues_page_graphql(
+                repo, owner, repo_name, states=states, labels=labels, first=page_size, after=cursor
+            )
+            total_count = page["total_count"]
+            fetched_count += len(page["issues"])
+            page_nodes, page_items = self._classify_page_candidates(
+                repo, owner, repo_name, page["issues"], match=match, force_hydration=force_hydration
+            )
+            matched_nodes.extend(page_nodes)
+            matched_items.extend(page_items)
+            has_next_page = page["has_next_page"]
+            cursor = page["end_cursor"]
+            if target is not None and len(matched_items) >= target:
+                break
+            if not has_next_page:
+                break
+            page_size = min(100, page_size * 2)
+
+        after_offset_nodes = matched_nodes[request.offset :]
+        if request.limit > 0:
+            has_more = len(after_offset_nodes) > request.limit
+            slice_nodes = after_offset_nodes[: request.limit]
+        else:
+            has_more = False
+            slice_nodes = after_offset_nodes
+
+        # Final hydration pass: every returned row gets real content, even one
+        # a shortcut candidate built from the raw issue body during the walk.
+        heads, comments = self._work_item_contexts(repo, slice_nodes) if slice_nodes else ({}, {})
+        hydrated = [
+            self.provider_item_from_issue(repo, owner, repo_name, issue, heads, comments) for issue in slice_nodes
+        ]
+
+        total: int | None
+        if not has_next_page:
+            total = len(matched_items)
+        elif fetched_count == len(matched_items):
+            # Every fetched row matched -- no local predicate removed one --
+            # so the connection's own totalCount is exact even though the
+            # walk stopped short of the end (D4).
+            total = total_count
+        else:
+            total = None
+
+        return ListPageResult(items=hydrated, has_more=has_more, total=total, sync_started_at=sync_started_at)
 
     def apply_patches(self, patches: list[ProviderPatch], repo: str = "") -> list[PatchResult]:
         """Apply optimistic GitHub body patches and return one outcome per patch.

@@ -22,10 +22,15 @@ message distinguish them.
 
 from __future__ import annotations
 
-from .backend_types import BranchBackend, GitHubExtras, WorkItemBackend
+from .backend_types import BranchBackend, GitHubExtras, RequestShapedListing, WorkItemBackend
 from .models import UnsupportedBackendCapabilityError
 
-__all__ = ["require_branch_support", "require_github_extras", "require_milestone_support"]
+__all__ = [
+    "require_branch_support",
+    "require_github_extras",
+    "require_milestone_support",
+    "require_request_shaped_listing",
+]
 
 
 def require_github_extras(backend: WorkItemBackend, operation: str) -> GitHubExtras:
@@ -52,6 +57,36 @@ def require_github_extras(backend: WorkItemBackend, operation: str) -> GitHubExt
     if not getattr(backend, "supports_github_extras", False):
         raise UnsupportedBackendCapabilityError("github_extras", type(backend).__name__, operation)
     if not isinstance(backend, GitHubExtras):
+        raise UnsupportedBackendCapabilityError(
+            "github_extras", type(backend).__name__, operation, protocol_mismatch=True
+        )
+    return backend
+
+
+def require_request_shaped_listing(backend: WorkItemBackend, operation: str) -> RequestShapedListing:
+    """Return ``backend`` narrowed to ``RequestShapedListing``, or raise if unsupported.
+
+    Gates the same way :func:`require_github_extras` does, on the same
+    ``supports_github_extras`` flag: a request-shaped page read is a GitHub
+    capability like any other in ``GitHubExtras``, just declared on a
+    separate Protocol (see :class:`RequestShapedListing`'s docstring for why).
+
+    Args:
+        backend: The active backend instance to check.
+        operation: Name of the operation the caller is attempting, recorded
+            on the raised error for a specific remediation message.
+
+    Returns:
+        The same backend instance, statically narrowed to ``RequestShapedListing``.
+
+    Raises:
+        UnsupportedBackendCapabilityError: If ``backend.supports_github_extras``
+            is falsy, or the backend does not structurally satisfy
+            ``RequestShapedListing`` despite declaring the flag.
+    """
+    if not getattr(backend, "supports_github_extras", False):
+        raise UnsupportedBackendCapabilityError("github_extras", type(backend).__name__, operation)
+    if not isinstance(backend, RequestShapedListing):
         raise UnsupportedBackendCapabilityError(
             "github_extras", type(backend).__name__, operation, protocol_mismatch=True
         )

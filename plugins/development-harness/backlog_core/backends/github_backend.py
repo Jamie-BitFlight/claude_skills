@@ -33,7 +33,7 @@ from github import GithubException, GithubObject
 
 from backlog_core import gh_client, github_branches, github_sync, rendering
 from backlog_core.artifact_provider import ArtifactBackend, GitHubGistArtifactProvider
-from backlog_core.backend_types import MilestoneFullNode
+from backlog_core.backend_types import ListPageRequest, ListPageResult, MilestoneFullNode
 from backlog_core.backends.github_content_migration import (
     _GitHubContentCache,
     _GitHubContentMigration,
@@ -58,6 +58,7 @@ from backlog_core.models import (
     ContentUnavailableError,
     ContentWrite,
     PatchResult,
+    ProviderItem,
     ProviderPatch,
     ProviderSnapshot,
     ReconcileRequest,
@@ -312,6 +313,35 @@ class GitHubBackend:
             )
             raise BackendUnavailableError(f"GitHub snapshot unavailable: {exc}", retryable=retryable) from exc
 
+    def fetch_page(
+        self, request: ListPageRequest, *, match: Callable[[BacklogItem, ProviderItem], bool], force_hydration: bool
+    ) -> ListPageResult:
+        """Walk a request-shaped page of GitHub issues (see D3/D4 in the design brief).
+
+        Returns:
+            The matched, fully hydrated page slice plus an honest ``has_more``/``total``.
+        """
+        try:
+            return self._work_items.fetch_page(request, match=match, force_hydration=force_hydration)
+        except ContentNotFoundError:
+            raise
+        except BacklogError:
+            raise
+        except ContentUnavailableError as exc:
+            retryable = exc.retryable
+            kind = classify_github_failure(exc)
+            if retryable is False or (retryable is None and kind is SyncErrorKind.UNKNOWN):
+                raise
+            if retryable is None:
+                retryable = kind is SyncErrorKind.RETRYABLE
+            raise BackendUnavailableError(f"GitHub page fetch unavailable: {exc}", retryable=retryable) from exc
+        except (GithubException, *RETRYABLE_TRANSIENT_EXCEPTIONS) as exc:
+            kind = classify_sync_error(exc)
+            retryable = (
+                True if kind is SyncErrorKind.RETRYABLE else False if kind is SyncErrorKind.NON_RETRYABLE else None
+            )
+            raise BackendUnavailableError(f"GitHub page fetch unavailable: {exc}", retryable=retryable) from exc
+
     def pending_work_items(self, repo: str = "") -> list[BacklogItem]:
         """Return configured-repository intent only when that repository is selected."""
         return self._reconciliation.pending_work_items(repo)
@@ -381,6 +411,77 @@ class GitHubBackend:
             List of IssueNode TypedDicts.
         """
         return gh_client._fetch_issues_graphql(repo, owner, repo_name, state, labels, milestone_number, first, since)
+
+    def _fetch_issues_page_graphql(
+        self,
+        repo: Repository,
+        owner: str,
+        repo_name: str,
+        *,
+        states: list[str],
+        labels: list[str] | None = None,
+        first: int = 100,
+        after: str | None = None,
+    ) -> gh_client.IssuesPage:
+        """Fetch exactly one page of issues -- no cursor-following.
+
+        Returns:
+            This page's issues, continuation cursor, and connection total count.
+        """
+        return gh_client._fetch_issues_page_graphql(
+            repo, owner, repo_name, states=states, labels=labels, first=first, after=after
+        )
+
+    def search_issues_by_title(self, repo: str, selector: str) -> list[IssueNode]:
+        """Search issues (any state) whose title contains *selector* (D5).
+
+        Resolves the repository and converts a transport failure to
+        ``BackendUnavailableError`` itself -- see :meth:`fetch_page`'s
+        docstring for why this must not leak a raw ``GithubException`` past
+        an ``allow_cached`` caller the way an unwrapped ``get_github`` call
+        would.
+
+        Returns:
+            Every issue the search index returned.
+        """
+        try:
+            repository = self.get_github(repo)
+            owner, repo_name = repository.full_name.split("/", 1)
+            return gh_client._search_issues_by_title_graphql(repository, owner, repo_name, selector)
+        except ContentNotFoundError:
+            raise
+        except BacklogError:
+            raise
+        except (GithubException, *RETRYABLE_TRANSIENT_EXCEPTIONS) as exc:
+            kind = classify_sync_error(exc)
+            retryable = (
+                True if kind is SyncErrorKind.RETRYABLE else False if kind is SyncErrorKind.NON_RETRYABLE else None
+            )
+            raise BackendUnavailableError(f"GitHub title search unavailable: {exc}", retryable=retryable) from exc
+
+    def fetch_open_issue_titles(self, repo: str) -> list[tuple[int, str]]:
+        """Fetch every open issue's ``(number, title)`` with no body or hydration (D5 fallback).
+
+        Resolves the repository and converts a transport failure the same
+        way :meth:`search_issues_by_title` does.
+
+        Returns:
+            Every open issue's number and title.
+        """
+        try:
+            repository = self.get_github(repo)
+            owner, repo_name = repository.full_name.split("/", 1)
+            return gh_client._fetch_open_issue_titles_graphql(repository, owner, repo_name)
+        except ContentNotFoundError:
+            raise
+        except BacklogError:
+            raise
+        except (GithubException, *RETRYABLE_TRANSIENT_EXCEPTIONS) as exc:
+            kind = classify_sync_error(exc)
+            retryable = (
+                True if kind is SyncErrorKind.RETRYABLE else False if kind is SyncErrorKind.NON_RETRYABLE else None
+            )
+            raise BackendUnavailableError(f"GitHub open-issue titles unavailable: {exc}", retryable=retryable) from exc
 
     def _update_issue_graphql(
         self,

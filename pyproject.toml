@@ -349,7 +349,13 @@ max-complexity = 12
 "**/backlog_core/backends/github_contents.py" = ["private-member-access"]
 # Work-item collaborators extracted from GitHubBackend call the _-prefixed GitHub gateway, provider
 # snapshot/patch seams, and FileCache operations — SLF001 as above
-"**/backlog_core/backends/github_work_items.py" = ["private-member-access"]
+# PLR0914 — fetch_page's request-shaped walk (D3/D4 of the request-shaped-reads design) tracks
+# cursor/page-size/target/counter state across a growing-page-size loop; splitting further would
+# scatter that state across more call boundaries without reducing it
+"**/backlog_core/backends/github_work_items.py" = [
+    "private-member-access",
+    "too-many-locals",
+]
 # InMemoryBackend implements the full BacklogBackend Protocol surface — PLR0904 and DOC201 do not apply
 # DOC201 — single-line docstrings already state the return value; formal Returns sections add no information
 "**/backlog_core/backends/memory_backend.py" = [
@@ -373,9 +379,13 @@ max-complexity = 12
 # SLF001 — private-name access is intentional: protocol interface defines _-prefixed methods by design
 # I002 — PEP 563 stringifies annotations, so TypedDict cannot classify NotRequired at
 # class creation and __optional_keys__ comes back empty. This module defines TypedDicts.
+# PLR0914 — list_items composes ~15 independently-named filter/pagination parameters into one
+# public listing contract (D3/D4 of the request-shaped-reads design); splitting it into a
+# parameter object would ripple through every caller for a metric threshold, not a real defect
 "**/backlog_core/operations.py" = [
     "missing-required-import",
     "private-member-access",
+    "too-many-locals",
 ]
 # FastMCP lifespan hook requires async def + yield without await — RUF029 is a false positive
 # SLF001 — server.py calls _startup_sync_loop via module reference for test mockability;
@@ -384,9 +394,13 @@ max-complexity = 12
 # full, not maintainer prose. A Returns section there restates the outputSchema FastMCP
 # already derives from the return annotation, and tests/test_tool_docstring_surface.py
 # forbids one for that reason. The two rules cannot both hold; the shipped surface wins.
+# PLR0914 — backlog_list's MCP tool signature mirrors operations.list_items's parameter breadth
+# (same D3/D4 justification as operations.py above) plus response-shaping options (fields,
+# match_context, pagination) every MCP client depends on by name
 "**/backlog_core/server.py" = [
     "docstring-missing-returns",
     "private-member-access",
+    "too-many-locals",
     "unused-async",
 ]
 # PyGithub's Requester issues HTTP calls through requests (not httpx), so classify_sync_error

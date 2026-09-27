@@ -238,12 +238,44 @@ query ListIssues(
       filterBy: {states: $states, labels: $labels, milestoneNumber: $milestoneNumber, since: $since},
       orderBy: {field: UPDATED_AT, direction: DESC}
     ) {
+      totalCount
       nodes {
         id number title state body createdAt updatedAt
         labels(first: 50) { nodes { name id } }
         milestone { id number title dueOn state }
         assignees(first: 10) { nodes { login } }
       }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}
+"""
+
+_ISSUE_TITLE_SEARCH_QUERY = """
+query IssueTitleSearch($searchQuery: String!, $first: Int!, $after: String) {
+  search(query: $searchQuery, type: ISSUE, first: $first, after: $after) {
+    nodes {
+      ... on Issue {
+        id number title state body createdAt updatedAt
+        labels(first: 50) { nodes { name id } }
+        milestone { id number title dueOn state }
+        assignees(first: 10) { nodes { login } }
+      }
+    }
+    pageInfo { hasNextPage endCursor }
+  }
+}
+"""
+
+_OPEN_ISSUE_TITLES_QUERY = """
+query OpenIssueTitles($owner: String!, $repo: String!, $first: Int!, $after: String) {
+  repository(owner: $owner, name: $repo) {
+    issues(
+      first: $first, after: $after,
+      filterBy: {states: [OPEN]},
+      orderBy: {field: UPDATED_AT, direction: DESC}
+    ) {
+      nodes { number title }
       pageInfo { hasNextPage endCursor }
     }
   }
@@ -694,6 +726,75 @@ def _fetch_issue_graphql(repo: Repository, owner: str, repo_name: str, issue_num
     return _parse_issue_node(raw_issue)
 
 
+class IssuesPage(TypedDict):
+    """One raw GraphQL page of the ``ListIssues`` query, cursor and count intact.
+
+    ``total_count`` is ``issues.totalCount`` from the *same* query/variables as
+    this page — an unfiltered-by-any-local-predicate exact count of the whole
+    matching state/label set, not just this page's ``nodes``. A caller doing a
+    bounded request-shaped walk (see ``_GitHubWorkItemSync.fetch_page``) reads
+    it to report an honest ``total`` without paging to the end.
+    """
+
+    issues: list[IssueNode]
+    has_next_page: bool
+    end_cursor: str | None
+    total_count: int
+
+
+def _fetch_issues_page_graphql(
+    repo: Repository,
+    owner: str,
+    repo_name: str,
+    *,
+    states: list[str],
+    labels: list[str] | None = None,
+    milestone_number: int | None = None,
+    since: str | None = None,
+    first: int = 100,
+    after: str | None = None,
+) -> IssuesPage:
+    """Fetch exactly one ``ListIssues`` page — no cursor-following.
+
+    The bounded primitive underneath both :func:`_fetch_issues_graphql` (which
+    follows every page) and :meth:`_GitHubWorkItemSync.fetch_page` (which stops
+    as soon as it has enough matches — see that method's docstring for why a
+    request-shaped read must not delegate to the follow-everything loop).
+
+    Returns:
+        This page's issues, continuation cursor, and the connection's total count.
+
+    Raises:
+        BacklogError: On GraphQL errors.
+    """
+    variables: dict[str, object] = {
+        "owner": owner,
+        "repo": repo_name,
+        "states": states,
+        "labels": labels,
+        "milestoneNumber": str(milestone_number) if milestone_number is not None else None,
+        "since": since,
+        "first": first,
+        "after": after,
+    }
+    data = _graphql_request(repo, _ISSUES_LIST_QUERY, variables)
+    repo_data = data.get("repository") or {}
+    issues_conn = repo_data.get("issues") if isinstance(repo_data, dict) else None
+    if not isinstance(issues_conn, dict):
+        return IssuesPage(issues=[], has_next_page=False, end_cursor=None, total_count=0)
+    nodes = issues_conn.get("nodes") or []
+    issues = [_parse_issue_node(raw) for raw in nodes if isinstance(raw, dict)]
+    page_info = issues_conn.get("pageInfo") or {}
+    has_next_page = bool(isinstance(page_info, dict) and page_info.get("hasNextPage") and page_info.get("endCursor"))
+    end_cursor = page_info.get("endCursor") if isinstance(page_info, dict) else None
+    return IssuesPage(
+        issues=issues,
+        has_next_page=has_next_page,
+        end_cursor=end_cursor if has_next_page else None,
+        total_count=int(issues_conn.get("totalCount") or 0),
+    )
+
+
 def _fetch_issues_graphql(
     repo: Repository,
     owner: str,
@@ -706,7 +807,12 @@ def _fetch_issues_graphql(
 ) -> list[IssueNode]:
     """Fetch a list of issues via GraphQL with optional filters.
 
-    Handles pagination automatically (follows hasNextPage/endCursor).
+    Handles pagination automatically (follows hasNextPage/endCursor) by
+    repeating :func:`_fetch_issues_page_graphql` until the connection is
+    exhausted. Used by the whole-set reconcile scopes (INITIAL/INCREMENTAL),
+    which always need every matching issue; a caller that only needs a bounded
+    prefix wants :func:`_fetch_issues_page_graphql` or
+    :meth:`_GitHubWorkItemSync.fetch_page` instead.
 
     Args:
         repo: PyGithub Repository object.
@@ -732,32 +838,113 @@ def _fetch_issues_graphql(
     states: list[str] = [s.strip() for s in state.split(",")] if "," in state else [state]
 
     while True:
-        variables: dict[str, object] = {
-            "owner": owner,
-            "repo": repo_name,
-            "states": states,
-            "labels": labels,
-            "milestoneNumber": str(milestone_number) if milestone_number is not None else None,
-            "since": since,
-            "first": first,
-            "after": cursor,
-        }
-        data = _graphql_request(repo, _ISSUES_LIST_QUERY, variables)
+        page = _fetch_issues_page_graphql(
+            repo,
+            owner,
+            repo_name,
+            states=states,
+            labels=labels,
+            milestone_number=milestone_number,
+            since=since,
+            first=first,
+            after=cursor,
+        )
+        all_issues.extend(page["issues"])
+        if not page["has_next_page"]:
+            break
+        cursor = page["end_cursor"]
+
+    return all_issues
+
+
+#: GitHub's search endpoint caps query length; a selector near or over this
+#: (or one containing a double quote, which would break the quoted phrase
+#: search) skips straight to the titles-only fallback (D5 risk R-B) rather
+#: than sending a query GitHub would reject or mis-tokenize.
+_SEARCH_SELECTOR_MAX_LENGTH = 200
+
+
+def selector_fits_search(selector: str) -> bool:
+    """Report whether *selector* is safe to send to GitHub's search endpoint.
+
+    Returns:
+        ``False`` when the selector contains a double quote (would break the
+        quoted-phrase search) or exceeds the practical query-length budget.
+    """
+    return '"' not in selector and len(selector) <= _SEARCH_SELECTOR_MAX_LENGTH
+
+
+def _search_issues_by_title_graphql(repo: Repository, owner: str, repo_name: str, selector: str) -> list[IssueNode]:
+    """Search issues (any state) whose title contains *selector*, any state.
+
+    Uses GitHub's search index rather than a full repository list — see D5 in
+    the request-shaped-reads design brief. Tokenizes rather than matching
+    substrings, and the index can lag a just-created or just-edited issue
+    (risk R-A); callers fall back to :func:`_fetch_open_issue_titles_graphql`
+    on an empty result.
+
+    Returns:
+        Every issue the search index returned, cursors followed to the end.
+
+    Raises:
+        BacklogError: On GraphQL errors.
+    """
+    query_text = f'repo:{owner}/{repo_name} is:issue in:title "{selector}"'
+    all_issues: list[IssueNode] = []
+    cursor: str | None = None
+    while True:
+        data = _graphql_request(
+            repo, _ISSUE_TITLE_SEARCH_QUERY, {"searchQuery": query_text, "first": 50, "after": cursor}
+        )
+        search_conn = data.get("search")
+        if not isinstance(search_conn, dict):
+            break
+        nodes = search_conn.get("nodes") or []
+        all_issues.extend(_parse_issue_node(raw) for raw in nodes if isinstance(raw, dict) and raw.get("number"))
+        page_info = search_conn.get("pageInfo") or {}
+        if not (isinstance(page_info, dict) and page_info.get("hasNextPage")):
+            break
+        cursor = page_info.get("endCursor")
+        if not cursor:
+            break
+    return all_issues
+
+
+def _fetch_open_issue_titles_graphql(repo: Repository, owner: str, repo_name: str) -> list[tuple[int, str]]:
+    """Fetch every open issue's ``(number, title)`` with no body or hydration.
+
+    The D5 fallback for a title selector the search index missed (risk R-A):
+    a titles-only scan of the open set, cheap enough to run unconditionally
+    when search returns nothing. Never requests closed issues — a selector
+    that only matches a closed issue stays reachable through search alone.
+
+    Returns:
+        Every open issue's number and title, cursors followed to the end.
+
+    Raises:
+        BacklogError: On GraphQL errors.
+    """
+    all_titles: list[tuple[int, str]] = []
+    cursor: str | None = None
+    while True:
+        data = _graphql_request(
+            repo, _OPEN_ISSUE_TITLES_QUERY, {"owner": owner, "repo": repo_name, "first": 100, "after": cursor}
+        )
         repo_data = data.get("repository") or {}
         issues_conn = repo_data.get("issues") if isinstance(repo_data, dict) else None
         if not isinstance(issues_conn, dict):
             break
         nodes = issues_conn.get("nodes") or []
-        all_issues.extend(_parse_issue_node(raw) for raw in nodes if isinstance(raw, dict))
-
+        all_titles.extend(
+            (int(raw["number"]), str(raw["title"])) for raw in nodes if isinstance(raw, dict) and "number" in raw
+        )
         page_info = issues_conn.get("pageInfo") or {}
         if not (isinstance(page_info, dict) and page_info.get("hasNextPage")):
             break
         cursor = page_info.get("endCursor")
         if not cursor:
             break
-
-    return all_issues
+    return all_titles
 
 
 def sync_issues_graphql(
