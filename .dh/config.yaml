@@ -12,3 +12,7 @@ sam:
 
 gh:
   repo: Jamie-BitFlight/claude_skills
+
+backlog:
+  startup_sync:
+    enabled: false  # startup sync writes to every issue on a cold cache; off until it is read-only
