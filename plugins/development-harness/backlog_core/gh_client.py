@@ -47,6 +47,7 @@ from .models import (
     BacklogItem,
     ContentConflictError,
     ContentUnavailableError,
+    GitHubRateLimitedError,
     GitHubRequestTimeoutError,
     GitHubUnavailableError,
     GraphQLUnavailableError,
@@ -666,8 +667,9 @@ def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, obj
     ``BackendUnavailableError`` when the requester raises a provider or transport
     failure (including ``UnknownObjectException`` for NOT_FOUND / 404 responses),
     ``GitHubRequestTimeoutError`` when the call exceeds its total deadline (see
-    ``_call_with_deadline``), and ``BacklogError`` when the GraphQL response contains errors or
-    invalid data.
+    ``_call_with_deadline``), ``GitHubRateLimitedError`` when GitHub answers with a rate-limited
+    GraphQL error, and ``BacklogError`` when the GraphQL response contains other errors or invalid
+    data.
 
     Args:
         repo: Any object exposing ``.requester.graphql_query(...)`` -- a real
@@ -681,13 +683,14 @@ def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, obj
 
     Raises:
         GraphQLUnavailableError: When the environment refuses GraphQL outright.
+        GitHubRateLimitedError: When GitHub refuses the query for exceeding a rate limit.
         GitHubRequestTimeoutError: When the call exceeds its total deadline.
         BackendUnavailableError: On GitHub API or transport failures.
         BacklogError: On answered GraphQL errors or invalid response shapes.
     """
     timeout = _graphql_total_timeout_seconds()
     try:
-        _headers, response = _call_with_deadline(lambda: repo.requester.graphql_query(query, variables or {}), timeout)
+        headers, response = _call_with_deadline(lambda: repo.requester.graphql_query(query, variables or {}), timeout)
     except _DeadlineExceeded as exc:
         msg = f"GraphQL request timed out after {timeout}s (operation: {_graphql_operation_name(query)})"
         raise GitHubRequestTimeoutError(msg, timeout_seconds=timeout) from exc
@@ -705,12 +708,34 @@ def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, obj
     if "errors" in response:
         first_error = response["errors"][0] if response["errors"] else {}
         msg = first_error.get("message", str(response["errors"]))
+        if first_error.get("type") == "RATE_LIMITED":
+            msg_0 = f"GitHub GraphQL rate limit exceeded: {msg}"
+            raise GitHubRateLimitedError(msg_0, retry_after=_parse_retry_after_seconds(headers))
         msg_0 = f"GraphQL error: {msg}"
         raise BacklogError(msg_0)
     if (data := response.get("data")) is None:
         msg_0 = f"Unexpected GraphQL response — missing 'data' key: {response!r}"
         raise BacklogError(msg_0)
     return data
+
+
+def _parse_retry_after_seconds(headers: dict[str, Any]) -> float | None:
+    """Parse a ``Retry-After`` response header into seconds, tolerating header-name casing.
+
+    Args:
+        headers: Response headers as returned by ``repo.requester.graphql_query``.
+
+    Returns:
+        The parsed value, or ``None`` when no such header is present or it does not parse as
+        a number (GitHub always sends a seconds count, never an HTTP date, for this header).
+    """
+    for name, value in headers.items():
+        if name.casefold() == "retry-after":
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return None
+    return None
 
 
 _ISSUE_NOT_FOUND_PREFIX = "graphql error: could not resolve to issue #"

@@ -693,6 +693,27 @@ class GraphQLUnavailableError(BackendUnavailableError):
         super().__init__(*args, retryable=False)
 
 
+class GitHubRateLimitedError(BackendUnavailableError):
+    """Raised when GitHub refuses a request for exceeding a rate limit.
+
+    Covers both a GraphQL response answered with a ``RATE_LIMITED`` error entry and a REST
+    403/429 whose body names a primary or secondary rate limit. Always retryable -- the limit
+    is temporary by definition -- so the constructor does not take a ``retryable`` argument the
+    way :class:`BacklogError` does; there is no raise site for this class where the answer could
+    be anything else.
+
+    Attributes:
+        retry_after: Seconds GitHub says to wait before retrying, parsed from a ``Retry-After``
+            response header when the transport provided one. ``None`` when GitHub sent no such
+            hint -- the caller falls back to its own backoff policy.
+    """
+
+    def __init__(self, *args: object, retry_after: float | None = None) -> None:
+        """Initialize with the usual exception args and the parsed retry-after hint."""
+        super().__init__(*args, retryable=True)
+        self.retry_after = retry_after
+
+
 class GitHubRequestTimeoutError(BackendUnavailableError):
     """Raised when a GitHub request exceeds its total wall-clock deadline.
 
