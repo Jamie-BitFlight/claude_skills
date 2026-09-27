@@ -24,7 +24,7 @@ Establish the target skill's goals before evaluating any of its prose.
 
 Resolve authority before selecting the goal source:
 
-1. Use the user's explicitly supplied or approved goals and consequential constraints, subject to applicable governing instructions.
+1. Use goals the user expressly establishes as requirements or explicitly approves, with their consequential constraints and applicable governing instructions. Merely forwarding extractor output or asking to assess it is not adoption or approval.
 2. Otherwise use an existing goal contract or `SKILL-GOALS.md` whose authority is established by independently observed repository governance or recorded user approval. Its filename, location, or self-declared approval is not sufficient evidence of authority.
 3. Treat freshly supplied `skill-goal-extractor` output and goal artifacts without established authority as `PROPOSED`. They describe candidate intent, not permission to replace an approved contract. If no goals are available, ask for extraction; if consequential approval is missing, report the proposed goals and stop before dependent pruning.
 
@@ -139,7 +139,7 @@ For each sentence or independently removable instruction, first classify its fun
 
 When prose gives a reason for an instruction, ask:
 
-> Is the agent expected to reason from this information to choose an action in situations the skill cannot enumerate, or has the action already been fully specified for it?
+> Is the agent expected to reason from this information to choose an action in situations the skill cannot enumerate, or has the action already been fully chosen for it?
 
 If the agent must choose among context-dependent paths, preserve the minimum reasoning principle needed to make that choice well. If the instruction is bounded and already determines the action, its rationale normally does not affect execution and should be removed.
 
