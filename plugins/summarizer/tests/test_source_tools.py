@@ -225,3 +225,21 @@ def test_equivalent_source_path_spelling_matches_its_plan(tmp_path: Path, monkey
     source, plan_path, plan = store_plan(tmp_path, "alpha\nbeta\n")
     monkeypatch.chdir(tmp_path)
     assert read_plan(Path(source.name), plan_path) == plan
+    (tmp_path / "sub").mkdir()
+    monkeypatch.chdir(tmp_path / "sub")
+    assert read_plan(Path("..") / source.name, plan_path) == plan
+
+
+def test_plan_keeps_the_callers_source_path_spelling(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The recorded path is the caller's spelling, not a machine-specific absolute path."""
+    (tmp_path / "source.txt").write_text("alpha\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    assert build_plan(Path("source.txt"), 12).source_path == "source.txt"
+
+
+def test_plan_rejects_different_bytes_at_the_same_path(tmp_path: Path) -> None:
+    """Ignoring the path spelling must not weaken the content identity check."""
+    source, plan_path, _ = store_plan(tmp_path, "alpha\nbeta\n")
+    source.write_text("alpha\ngamma\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="does not match"):
+        read_plan(source, plan_path)

@@ -125,7 +125,7 @@ def build_plan(source: Path, max_chars: int) -> Plan:
         start = end
     return Plan(
         schema_version=1,
-        source_path=str(source.resolve()),
+        source_path=str(source),
         source_sha256=hashlib.sha256(raw).hexdigest(),
         max_chars=max_chars,
         char_count=len(text),
@@ -136,11 +136,14 @@ def build_plan(source: Path, max_chars: int) -> Plan:
 def read_plan(source: Path, path: Path) -> Plan:
     """Reject edited boundaries, lost chunks and stale or substituted source bytes.
 
+    The source digest and partition are the plan's identity. The recorded path is the caller's
+    spelling, kept for traceability, so a different spelling of the same bytes still matches.
+
     Returns:
         The plan matching the current complete source partition.
     """
     plan = Plan.model_validate(json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique_object))
-    expected = build_plan(source, plan.max_chars)
+    expected = build_plan(source, plan.max_chars).model_copy(update={"source_path": plan.source_path})
     if plan != expected:
         raise ValueError("Plan does not match the complete current source partition.")
     return plan
