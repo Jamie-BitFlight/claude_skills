@@ -2,11 +2,12 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
+#   "cryptography>=50.0.0",
 #   "typer>=0.21.2",
 #   "ruamel.yaml>=0.18.0",
 #   "pydantic>=2.12.3",
 #   "pygithub>=2.8.1",
-#   "gitpython>=3.1.0",
+#   "gitpython>=3.1.59",
 #   "marko>=2.0.0",
 # ]
 #

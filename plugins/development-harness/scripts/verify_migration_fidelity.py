@@ -2,10 +2,11 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
+#   "cryptography>=50.0.0",
 #   "ruamel.yaml>=0.18.0",
 #   "pydantic>=2.12.3",
 #   "typer>=0.21.2",
-#   "gitpython>=3.1.0",
+#   "gitpython>=3.1.59",
 #   "pygithub>=2.8.1",
 #   "fastmcp>=3.0.2",
 #   "tiktoken>=0.12.0",

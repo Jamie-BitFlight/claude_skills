@@ -1,9 +1,9 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#   "cryptography>=48.0.1",
+#   "cryptography>=50.0.0",
 #   "fastmcp[tasks]>=3.2.0",
-#   "gitpython>=3.1.0",
+#   "gitpython>=3.1.59",
 #   "httpx>=0.28.1",
 #   "hypothesis>=6.0.0",
 #   "markdown-it-py>=3.0.0",

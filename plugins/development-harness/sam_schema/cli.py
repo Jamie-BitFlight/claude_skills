@@ -2,7 +2,8 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#   "gitpython>=3.1.57",
+#   "cryptography>=50.0.0",
+#   "gitpython>=3.1.59",
 #   "httpx>=0.28.1",
 #   "markdown-it-py>=4.2.0",
 #   "marko>=2.2.3",

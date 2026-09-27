@@ -10,9 +10,9 @@ resolution-markers = [
 
 [manifest]
 requirements = [
-    { name = "cryptography", specifier = ">=48.0.1" },
+    { name = "cryptography", specifier = ">=50.0.0" },
     { name = "fastmcp", extras = ["tasks"], specifier = ">=3.2.0" },
-    { name = "gitpython", specifier = ">=3.1.0" },
+    { name = "gitpython", specifier = ">=3.1.59" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "hypothesis", specifier = ">=6.0.0" },
     { name = "markdown-it-py", specifier = ">=3.0.0" },
