@@ -915,3 +915,36 @@ def test_cached_normalize_does_not_reconcile_live_after_the_provider_failed(fixt
         reset_config()
 
     assert result["normalized"] == 3, result
+
+
+def _hydration_reads(fixture: FakeGitHubFixture) -> tuple[list[str], list[str]]:
+    """Return every head-record reference and audit-comment id this fixture served, with repeats."""
+    heads = [ref.namespace for call in fixture.contents.get_many_calls for ref in call]
+    comments = [
+        str(comment_id)
+        for entry in fixture.requester.log
+        if entry["operation"] == "AuditComments"
+        for comment_id in entry["variables"]["ids"]
+    ]
+    return heads, comments
+
+
+@pytest.mark.parametrize("force_hydration", [True, False])
+def test_each_returned_row_is_hydrated_exactly_once(fixture: FakeGitHubFixture, *, force_hydration: bool) -> None:
+    # Odd issues carry a priority label (the classification shortcut); even
+    # issues do not, so classification hydrates them. A forced walk
+    # hydrates every row during classification.
+    for number in range(1, 7):
+        labels = ["priority:p1"] if number % 2 else []
+        fixture.add_tracked_issue(number, f"issue {number}", state="OPEN", labels=labels, tracked_body="## P1\n")
+
+    result = fixture.backend.fetch_page(
+        _default_request(fixture), match=lambda item, provider: True, force_hydration=force_hydration
+    )
+
+    returned = sorted(item.reference for item in result.items)
+    assert returned == [f"#{n}" for n in range(1, 7)]
+    heads, comments = _hydration_reads(fixture)
+    assert sorted(heads) == returned, heads
+    assert sorted(comments) == sorted(f"IC_{n}" for n in range(1, 7)), comments
+    assert all(item.body for item in result.items), result.items

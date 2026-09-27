@@ -243,11 +243,12 @@ class _GitHubWorkItemSync:
         *,
         match: Callable[[BacklogItem, ProviderItem], bool],
         force_hydration: bool,
-    ) -> tuple[list[IssueNode], list[BacklogItem]]:
+    ) -> list[tuple[IssueNode, ProviderItem | None]]:
         """Hydrate as needed (D2') and match one GraphQL page's issues.
 
         Returns:
-            The matching raw nodes and their composed items, in page order.
+            Each matching raw node, in page order, with its hydrated provider
+            item, or ``None`` when it matched on the label shortcut unhydrated.
         """
         needs_hydration = {
             issue["number"]: force_hydration
@@ -256,18 +257,15 @@ class _GitHubWorkItemSync:
         }
         hydrate_now = [issue for issue in issues if needs_hydration[issue["number"]]]
         heads, comments = self._work_item_contexts(repo, hydrate_now) if hydrate_now else ({}, {})
-        matched_nodes: list[IssueNode] = []
-        matched_items: list[BacklogItem] = []
+        matched: list[tuple[IssueNode, ProviderItem | None]] = []
         for issue in issues:
             use_content = needs_hydration[issue["number"]]
             candidate = self.provider_item_from_issue(
                 repo, owner, repo_name, issue, heads if use_content else {}, comments if use_content else {}
             )
-            item = provider_item_to_backlog_item(candidate)
-            if match(item, candidate):
-                matched_nodes.append(issue)
-                matched_items.append(item)
-        return matched_nodes, matched_items
+            if match(provider_item_to_backlog_item(candidate), candidate):
+                matched.append((issue, candidate if use_content else None))
+        return matched
 
     def fetch_page(
         self, request: ListPageRequest, *, match: Callable[[BacklogItem, ProviderItem], bool], force_hydration: bool
@@ -284,10 +282,11 @@ class _GitHubWorkItemSync:
         is set or it carries no ``priority:`` label (D2') -- an issue with
         that label always has a non-empty ``section``, so *match* can decide
         that part of the base "has a section" rule without reading its body.
-        Every row that survives into the returned slice is (re-)hydrated
-        regardless of how it was matched: a caller displaying or caching a
-        row needs its real, tracked content, not the raw issue body a
-        shortcut candidate used only to decide inclusion cheaply. Hydration
+        A returned row that matched on that shortcut is hydrated once more
+        before return: a caller displaying or caching a row needs its real,
+        tracked content, not the raw issue body the shortcut used only to
+        decide inclusion cheaply. A row hydrated during the walk keeps that
+        provider item and is never read again. Hydration
         is batched per GraphQL page (one ``_work_item_contexts`` call per
         page's candidates that need it), not per issue, so a broken head on
         an unrelated issue never touched by this walk cannot abort it
@@ -306,46 +305,47 @@ class _GitHubWorkItemSync:
         target = request.offset + request.limit + 1 if request.limit > 0 else None
         page_size = min(100, target) if target else 100
 
-        matched_nodes: list[IssueNode] = []
-        matched_items: list[BacklogItem] = []
+        matched: list[tuple[IssueNode, ProviderItem | None]] = []
         cursor: str | None = None
         has_next_page = True
         while True:
             page = self._issues._fetch_issues_page_graphql(
                 repo, owner, repo_name, states=states, labels=labels, first=page_size, after=cursor, light=True
             )
-            page_nodes, page_items = self._classify_page_candidates(
-                repo, owner, repo_name, page["issues"], match=match, force_hydration=force_hydration
+            matched.extend(
+                self._classify_page_candidates(
+                    repo, owner, repo_name, page["issues"], match=match, force_hydration=force_hydration
+                )
             )
-            matched_nodes.extend(page_nodes)
-            matched_items.extend(page_items)
             has_next_page = page["has_next_page"]
             cursor = page["end_cursor"]
-            if target is not None and len(matched_items) >= target:
+            if target is not None and len(matched) >= target:
                 break
             if not has_next_page:
                 break
             page_size = min(100, page_size * 2)
 
-        after_offset_nodes = matched_nodes[request.offset :]
+        after_offset = matched[request.offset :]
         if request.limit > 0:
-            has_more = len(after_offset_nodes) > request.limit
-            slice_nodes = after_offset_nodes[: request.limit]
+            has_more = len(after_offset) > request.limit
+            page_slice = after_offset[: request.limit]
         else:
             has_more = False
-            slice_nodes = after_offset_nodes
+            page_slice = after_offset
 
-        # Final hydration pass: every returned row gets real content, even one
-        # a shortcut candidate built from the raw issue body during the walk.
-        heads, comments = self._work_item_contexts(repo, slice_nodes) if slice_nodes else ({}, {})
+        # Final hydration pass, only for returned rows that matched on the
+        # label shortcut and so still carry the raw issue body.
+        shortcut = [issue for issue, item in page_slice if item is None]
+        heads, comments = self._work_item_contexts(repo, shortcut) if shortcut else ({}, {})
         hydrated = [
-            self.provider_item_from_issue(repo, owner, repo_name, issue, heads, comments) for issue in slice_nodes
+            item or self.provider_item_from_issue(repo, owner, repo_name, issue, heads, comments)
+            for issue, item in page_slice
         ]
 
         # Only an exhausted walk knows the filtered total. totalCount counts
         # rows *match* would reject, and every list caller's *match* carries
         # the local "has a section" rule, so it is never the filtered total.
-        total = None if has_next_page else len(matched_items)
+        total = None if has_next_page else len(matched)
 
         return ListPageResult(items=hydrated, has_more=has_more, total=total, sync_started_at=sync_started_at)
 
