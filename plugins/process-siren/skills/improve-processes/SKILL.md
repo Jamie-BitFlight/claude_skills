@@ -38,19 +38,24 @@ ProcessModel
   uncertainties[] { classification; evidence; consequence }
   boundaries[] { caller_assumptions[]; callee_guarantees[]; state_crossing_boundary[]; partial_failure_behavior; recovery_owner }
   residual_risks[]
+  identity? { source; candidate; contract; method; material_dependencies[]; environment }
 ```
 
-Mermaid, tests, TLA+, Lean, and prose consume or project this model; do not build parallel interpretations for each representation.
+Mermaid, tests, TLA+, Lean, and prose consume or project this model; do not build parallel interpretations for each representation. Populate revision identities when a material change, reused evidence, or concurrent work makes identity consequential; use the material-change reference below rather than introducing a universal persistence format.
 
 ### Result Contract
 
-Return one overall status plus per-claim status:
+Return one overall process assessment plus per-claim status:
 
 - **READY** — usable at requested resolution; required claims have sufficient evidence.
-- **IMPROVED** — authorized corrections applied; affected claims revalidated sufficiently.
+- **IMPROVED** — authorized corrections applied; required claims in the reported improvement scope have sufficient current evidence.
 - **BLOCKED_INTENT** — progress requires a decision that creates/alters intent or policy.
-- **UNVALIDATED** — usable model, but required claims lack necessary tooling/evidence.
+- **UNVALIDATED** — required claims lack necessary tooling/evidence, including stale evidence or unresolved convergence.
 - **INVALID** — evidence shows a required claim fails and no intent-preserving correction has resolved it.
+
+Do not return READY or IMPROVED for a scope containing a required failed or unresolved claim. Report any safe partial improvement separately, retaining every failed claim, blocker, evidence gap, and excluded scope. When several conditions coexist, the overall assessment is the first present in the order INVALID, BLOCKED_INTENT, UNVALIDATED, IMPROVED, READY; name every other non-ready condition after it, for example `Assessment: INVALID; also BLOCKED_INTENT (release owner), UNVALIDATED (rollback)`.
+
+Task completion and process assessment are separate. A completed analysis can establish that its target is INVALID. Preserve the caller's exact status vocabulary, position, and return envelope; carry the assessment and evidence in its payload or referenced artifact. Without a caller envelope, use a first-line `STATUS: DONE | PARTIAL | BLOCKED` for the requested work, followed by `Assessment: <process assessment>`. DONE means that requested work completed, never automatic readiness, approval, or authority to execute the described process.
 
 Every result records evidence, assumptions, residual uncertainty, and validation boundaries.
 
@@ -62,13 +67,15 @@ Treat process improvement as recursive systems engineering, not diagram cleanup.
 
 Recursive analysis must descend in **system resolution**, not recursively reinvoke Process Siren on the same unchanged scope. Each descent must name a strictly narrower subsystem, boundary, claim, or unresolved dependency and inherit applicable parent goals/constraints. Track visited analysis targets by `(scope, resolution, claim/boundary)`; do not revisit an unchanged target unless new evidence or a process change invalidated prior results. Stop descending when finer resolution cannot materially change a correctness decision, when required evidence/tooling is unavailable, or when an intent-dependent decision is reached. Validation feedback returns to the nearest affected model level rather than restarting the whole analysis.
 
+Decomposition depth does not establish improvement-loop convergence. During candidate iteration, retain the contract identity, candidate's material behavior, relevant evidence, and unresolved claims. Detect revisiting an equivalent candidate under the same contract without decision-changing evidence, including A → B → A oscillation; cosmetic edits, new timestamps, or renamed nodes do not reset this check. Stop the affected loop when it repeats or cannot name an evidence-backed next step that can change the decision. Preserve the last known state and report the cycle/no-progress reason with INVALID or UNVALIDATED assessment as applicable. Continue unrelated independent work. A caller-supplied resource budget can also stop work, but exhaustion is not validation success and no universal iteration cap is required.
+
 ### Five Phases
 
 1. **UNDERSTAND** — establish purpose, scope, evidence, desired outcomes, constraints, and current resolution.
 2. **MODEL** — extract actors, state, actions, inputs, outputs, decisions, resources, assumptions, goals, invariants, failure paths, and terminal states.
 3. **CHALLENGE** — identify ambiguity, contradictions, missing transitions, undefined ownership, unreachable states, hidden assumptions, missing failure handling, and unverifiable claims. Ask what observation would falsify each important claim.
 4. **IMPROVE** — before material change, declare the change contract and preserve the smallest useful baseline; then correct gaps derivable from established intent. Escalate only changes that create or alter policy, goals, or other intent.
-5. **VALIDATE** — test the candidate against the predeclared contract, compare relevant before/after evidence, select the cheapest sufficient validator per claim, and feed counterexamples or regressions back into CHALLENGE. Stop when required claims are supported or remaining uncertainty requires an explicit human decision.
+5. **VALIDATE** — test the candidate against the predeclared contract, compare relevant before/after evidence, select the cheapest sufficient validator per claim, and feed counterexamples or regressions back into CHALLENGE. Stop when required claims are supported, the affected loop cannot progress, or remaining uncertainty requires an explicit human decision.
 
 ### Purpose at Any Resolution
 
@@ -98,7 +105,7 @@ Do not treat every unknown as blocking. Classify uncertainty:
 - **ASSUMED** — continuation requires an assumption; state it explicitly and do not present it as verified.
 - **OUT OF SCOPE** — deliberately excluded; record the boundary.
 
-Only UNKNOWN + INTENT-DEPENDENT gaps block autonomous improvement. UNKNOWN + RESOLVABLE gaps require investigation first; they are not grounds to stop and ask the user.
+UNKNOWN + RESOLVABLE gaps require investigation first; they are not grounds to stop and ask the user. Intent-dependent decisions require owner input. Missing evidence, stale identity, unsafe apply capability, or failed convergence blocks only mutations whose safety depends on that gap, not read-only analysis, faithful representation, or unrelated independent work.
 
 ### Evidence-Driven Improvement
 
@@ -112,6 +119,8 @@ Before a **material behavior change**, record a small change contract before exa
 - observable success criterion;
 - unacceptable regressions;
 - smallest useful baseline of current behavior, cost, friction, or counterexample.
+
+When changing material behavior, reusing earlier evidence, or working against concurrently mutable sources, load [material-change-lifecycle.md](./references/material-change-lifecycle.md) before creating the candidate. Bind observations to the source/candidate/contract/method they examined and condition application on current source/dependency identity. This is an environment-independent evidence and mutation contract, not a requirement for a new tool or database.
 
 Then improve and validate the **delta**, not merely whether the candidate appears reasonable. Reuse comparable scenarios/evidence against before and after states where practical. For substantial redesigns, include representative success, failure, boundary, and some held-out scenarios that did not drive the change.
 
@@ -162,7 +171,7 @@ Treat destructive, irreversible, interruptive, security/trust-boundary, external
 
 Expansion is local. Do not raise the resolution of surrounding routine nodes merely because one node needs detail. Parent nodes state contracts; child expansions state the higher-resolution procedure. A child inherits applicable parent goals, constraints, invariants, preconditions, and guarantees and must not silently weaken them.
 
-High risk does not mean "write more." It means choose the required resolution, make the critical behavior explicit, and validate it at that resolution. Conversely, trim detail that consumes attention without changing safe execution.
+High risk does not mean "write more." It means choose the required resolution, make the critical behavior explicit, and validate it at that resolution. Conversely, trim detail that consumes attention without changing safe execution. Rendering choices are subordinate to this review: do not split routine nodes, paths, or annotations merely to satisfy a visual convention. A diagram is an as-is description or proposal unless applicable authority establishes it as an approved procedure; syntax validity and model fidelity grant no approval.
 
 #### Optional Baseline Agent Behavior Sampling
 
@@ -240,7 +249,7 @@ Improve directly only when the correction follows from established purpose, goal
 
 ### Completion Record
 
-Finish only when required claims have sufficient evidence or remaining uncertainty is explicit. Return the Result Contract status plus purpose/scope, material ProcessModel elements, claim → validator → evidence mapping, addressed counterexamples, assumptions, residual risks, validation boundaries, and any useful representations. Mermaid is a projection of the model, not the model itself.
+Finish only when required claims have sufficient evidence or remaining uncertainty is explicit. Return the Result Contract assessment separately from task completion, plus purpose/scope, material ProcessModel elements, claim → validator → evidence mapping, addressed counterexamples, assumptions, residual risks, validation boundaries, and any useful representations. Include the applicable revision bindings and any cycle/no-progress or stale-state stop reason. Mermaid is a projection of the model, not the model itself.
 
 ## References
 
