@@ -82,8 +82,8 @@ The runner rejects empty/unsafe paths instead of falling back to unqualified pyt
 or repository-wide validation. It replaces its process with the child command,
 preserving every exit status, including pytest's no-tests-collected failure. The
 global shard retains the root marker, strictness, xdist and coverage configuration.
-Plugin shards run under the runner's own `--strict-config` and without coverage;
-the development-harness runner defaults to two xdist workers, the others run serially. Coverage
+Plugin shards run under the runner's own configuration and without coverage; each
+runner's arguments set its parallelism (see `plugins/<name>/run_pytests.py`). Coverage
 reports now describe individual shards; they are not an aggregated repository
 percentage, and no new aggregate coverage threshold is asserted.
 

@@ -12,7 +12,7 @@ uv run pytest -m research_vault tests/research_backlinks/test_graph_asymmetry.py
 uv run --script plugins/development-harness/run_pytests.py tests/test_migrate_tasks_to_github.py  # Specific plugin test file, relative to the plugin root
 ```
 
-Coverage (`--cov=scripts --cov=plugins`) is always on via root addopts — passing `--cov` again is redundant. Plugin runners read no root config, so they run without coverage unless you pass it. The development-harness runner defaults to `-n 2 --dist loadgroup`; pass `-n <N>` to change it or `-p no:xdist` to run serially. The other runners run serially.
+Coverage (`--cov=scripts --cov=plugins`) is always on via root addopts — passing `--cov` again is redundant. Plugin runners read no root config, so they run without coverage unless you pass it. Each runner's own arguments set its parallelism; read `plugins/<name>/run_pytests.py`.
 
 ## Failure investigation and test effectiveness
 
