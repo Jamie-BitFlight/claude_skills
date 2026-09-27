@@ -201,3 +201,27 @@ def test_unknown_chunk_does_not_return_arbitrary_content(tmp_path: Path) -> None
     source, path, _ = store_plan(tmp_path, "abc")
     with pytest.raises(ValueError, match="Unknown"):
         read_chunk(source, path, "not-planned")
+
+
+@pytest.mark.parametrize("cell", [" 5 ", "1_000", "١٢", "+"])
+def test_non_ascii_numeric_syntax_is_text_not_a_number(tmp_path: Path, cell: str) -> None:
+    """Padded, underscored or non-ASCII digits are text syntax and stay out of numeric ranges."""
+    source = tmp_path / "syntax.csv"
+    source.write_text(f'value\n"{cell}"\n', encoding="utf-8")
+    column = profile_delimited(source)["columns"][0]
+    assert column["observed_types"] == {"text": 1}
+    assert column["numeric_count"] == 0
+
+
+def test_physical_lines_count_only_line_breaks(tmp_path: Path) -> None:
+    """Form feeds and Unicode separators inside cells are not physical line breaks."""
+    source = tmp_path / "separators.csv"
+    source.write_text(f'a,b\n"x\x0cy","p{chr(0x2028)}q"\n', encoding="utf-8")
+    assert profile_delimited(source)["physical_lines"] == 2
+
+
+def test_equivalent_source_path_spelling_matches_its_plan(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A relative spelling of the planned file is the same source, not a stale partition."""
+    source, plan_path, plan = store_plan(tmp_path, "alpha\nbeta\n")
+    monkeypatch.chdir(tmp_path)
+    assert read_plan(Path(source.name), plan_path) == plan

@@ -20,7 +20,7 @@ import io
 import json
 import re
 from collections import Counter
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
@@ -30,6 +30,7 @@ from summary_record import Digest, Identity, RecordModel, Text, unique_object
 
 Positive = Annotated[int, Field(ge=1)]
 Offset = Annotated[int, Field(ge=0)]
+NUMBER = re.compile(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?", re.ASCII)
 
 
 class Versioned(RecordModel):
@@ -124,7 +125,7 @@ def build_plan(source: Path, max_chars: int) -> Plan:
         start = end
     return Plan(
         schema_version=1,
-        source_path=str(source),
+        source_path=str(source.resolve()),
         source_sha256=hashlib.sha256(raw).hexdigest(),
         max_chars=max_chars,
         char_count=len(text),
@@ -204,14 +205,10 @@ def classify_value(value: str) -> tuple[str, Decimal | None]:
         return "empty", None
     if value.lower() in {"true", "false"}:
         return "boolean", None
-    try:
-        number = Decimal(value)
-    except InvalidOperation:
+    if not NUMBER.fullmatch(value):
         return "text", None
-    if not number.is_finite():
-        return "text", None
-    kind = "integer" if re.fullmatch(r"[+-]?\d+", value) else "decimal"
-    return kind, number
+    kind = "integer" if re.fullmatch(r"[+-]?\d+", value, re.ASCII) else "decimal"
+    return kind, Decimal(value)
 
 
 def profile_column(values: list[str]) -> dict[str, Any]:
@@ -264,7 +261,7 @@ def profile_delimited(source: Path, delimiter: str | None = None) -> dict[str, A
         "source_path": str(source),
         "source_sha256": hashlib.sha256(raw).hexdigest(),
         "row_count": count,
-        "physical_lines": len(text.splitlines()),
+        "physical_lines": len(io.StringIO(text, newline=None).readlines()),
         "coverage": "complete",
         "columns": [{"name": name, **profile_column(values)} for name, values in zip(header, columns, strict=True)],
         "empty_definition": "zero-length parsed cells; literal null/NA and whitespace are not assumed missing",
