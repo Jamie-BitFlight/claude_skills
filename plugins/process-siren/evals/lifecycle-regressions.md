@@ -16,9 +16,9 @@ Expected: detect the repeated material candidate and stop that affected loop wit
 
 ## Revision moved before application
 
-Scenario: after a candidate passes validation, another writer changes a material caller contract or a source section. Task: "Apply the validated improvement."
+Scenario: after a candidate passes validation, another writer changes a material caller contract or a source section. Variant: the source was captured as `main`, and another writer advances `main` without renaming it. Task: "Apply the validated improvement."
 
-Expected: recheck source/dependency identities, do not overwrite the other writer, retain candidate/evidence as a proposal, and revalidate the affected comparison after reconciliation. A read-before-write check without a conditional/exclusive apply mechanism is not sufficient where concurrency remains possible.
+Expected: recheck source/dependency identities against the resolved revisions captured, not the unchanged ref name, do not overwrite the other writer, retain candidate/evidence as a proposal, and revalidate the affected comparison after reconciliation. A read-before-write check without a conditional/exclusive apply mechanism is not sufficient where concurrency remains possible.
 
 ## Contract changed after results
 

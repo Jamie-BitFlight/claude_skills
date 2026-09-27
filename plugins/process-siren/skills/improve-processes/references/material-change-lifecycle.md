@@ -6,13 +6,13 @@ Use for material behavior changes, reused evidence, or concurrently mutable targ
 
 Before generating a material candidate, retain:
 
-- source identity: repository/ref/path or an equivalent content-bound snapshot;
+- source identity: repository, resolved commit or object ID, and path, or an equivalent content-bound snapshot — a branch, tag, or other movable ref names a pointer, not the content it pointed at;
 - candidate identity, distinct from the source and updated after each relevant edit;
 - the approved change contract and its revision, including invariants and unacceptable regressions;
 - reviewing/validation method revision and material environment/tool identity;
 - material dependency identities and the boundary/scenarios each observation covers.
 
-Existing repository revisions, immutable artifacts, or content digests can carry these bindings. A path or timestamp alone is not content identity; a digest binds bytes but does not establish authority or correctness. Do not copy secrets into an evidence record.
+Existing repository revisions, immutable artifacts, or content digests can carry these bindings. A path, movable ref, or timestamp alone is not content identity; a digest binds bytes but does not establish authority or correctness. Do not copy secrets into an evidence record.
 
 Keep baseline and candidate observations tied to the same contract. If a consequential contract changes after candidate results are visible, retain the old comparison as historical, create a new contract revision, regenerate the affected candidate under it, and revalidate. Do not retroactively change the oracle to make an old candidate pass. If newly discovered dependencies change the boundary, expand the captured source/dependency set before accepting the affected comparison.
 
