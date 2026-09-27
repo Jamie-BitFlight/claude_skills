@@ -43,11 +43,11 @@ def test_gate_requires_planner_and_all_blocking_lanes(workflow: dict) -> None:
         assert not jobs[name].get("continue-on-error", False)
 
 
-def test_gate_enforces_every_cross_backend_matrix_leg(workflow: dict) -> None:
-    """The ruleset requires only Quality Gate, so the backend legs must vote through it."""
+def test_gate_enforces_the_cross_backend_lane(workflow: dict) -> None:
+    """The ruleset requires only Quality Gate; the tests parametrize backends, so no env selects one."""
     job = workflow["jobs"]["test-cross-backend"]
     assert "test-cross-backend" in workflow["jobs"]["quality-gate"]["needs"]
-    assert job["env"]["BACKLOG_BACKEND"] == "${{ matrix.backend }}"
+    assert "BACKLOG_BACKEND" not in job["env"]
 
 
 def test_selected_lanes_use_the_same_plan_and_exact_job_key(workflow: dict) -> None:

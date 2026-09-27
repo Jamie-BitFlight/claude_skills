@@ -17,7 +17,7 @@ The `quality-gate` summary job requires ALL of these to pass:
 | `manifest-sync` | Shared marketplace hook plus blocking PR version check; `bump-marketplace.yml` proposes historical collision repairs through a reviewed PR |
 | `file-hygiene` | trailing whitespace, line endings, large files, merge conflicts |
 | `test-python` | pytest fast suite (default addopts filter) |
-| `test-cross-backend` | development-harness runner `-m cross_backend` on a memory/sqlite matrix (`BACKLOG_BACKEND` env) |
+| `test-cross-backend` | development-harness runner `-m cross_backend`; the tests parametrize every backend |
 | `test-integration` | `-m "integration and not research_vault"` through the development-harness runner, plus root research-backlinks and rebase-publication shards |
 
 Advisory jobs outside the gate: `research-validation` (research-corpus template gaps) and

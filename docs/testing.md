@@ -7,7 +7,7 @@ uv run pytest                              # Repository-owned fast suite (parall
 uv run pytest -m "not e2e and not cross_backend and not integration and not research_vault and not slow"  # Same, also excluding slow tests
 uv run --locked --script plugins/<name>/run_pytests.py  # One plugin's fast suite, from its run_pytests.py.lock (the runner's default -m), from any cwd; -m "" selects every marker
 uv run --script plugins/development-harness/run_pytests.py -m "integration and not research_vault"  # development-harness integration tests, every test root
-BACKLOG_BACKEND=sqlite uv run --script plugins/development-harness/run_pytests.py -m cross_backend  # development-harness cross-backend lane (CI runs memory and sqlite)
+uv run --script plugins/development-harness/run_pytests.py -m cross_backend  # development-harness cross-backend lane; the tests parametrize every backend
 uv run pytest -m "integration and not research_vault" tests/research_backlinks/  # Repository integration tests (deselected by default)
 uv run pytest -m research_vault tests/research_backlinks/test_graph_asymmetry.py  # Advisory, read-only production-vault scan
 uv run --script plugins/development-harness/run_pytests.py tests/test_migrate_tasks_to_github.py  # Specific plugin test file, relative to the plugin root

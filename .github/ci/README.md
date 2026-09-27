@@ -12,7 +12,7 @@ The workflow is [Code quality](../workflows/code-quality.yml).
 | `plugins/<name>/...`, including its source and any `conftest.py` | That plugin's `run_pytests.py` and the global shard | Affected plugin validation, manifest checks, applicable file linters |
 | Root documentation, `docs/`, `rules/` documentation | Global shard | Applicable file linters |
 | `research/` documentation | Global shard | Research integration and advisory whole-vault validation |
-| Development-harness content | Its `run_pytests.py` and the global shard | Its integration and memory/SQLite backend lanes |
+| Development-harness content | Its `run_pytests.py` and the global shard | Its integration and cross-backend lanes |
 | Root/shared code, CI, dependencies, tool configuration, or unclassified inputs | All configured shards | Full checks |
 | Main push, manual dispatch, or unavailable PR comparison history | All configured shards | Full checks |
 
@@ -60,8 +60,7 @@ named language hooks use changed-file selection.
 
 Every development-harness lane is its runner plus a marker, never a list of
 test files: `integration and not research_vault` in the integration matrix,
-`cross_backend` once per `BACKLOG_BACKEND` (`memory`, `sqlite`) in
-`cross_backend_matrix`, and `e2e` in the live job. The runner owns the test roots,
+`cross_backend` in `cross_backend_matrix`, and `e2e` in the live job. The runner owns the test roots,
 so a test that gains a marker anywhere in the plugin joins its lane; `run.py`
 rejects a runner shard that names paths. The planner schedules these lanes only
 while the runner exists. The integration matrix also holds the research-backlinks

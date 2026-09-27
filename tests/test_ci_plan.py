@@ -103,7 +103,7 @@ def test_dh_lanes_are_its_runner_plus_a_marker(repository: Path) -> None:
         ("plugins/development-harness/run_pytests.py", "integration and not research_vault"),
         ("plugins/development-harness/run_pytests.py", "cross_backend"),
     }
-    assert [shard["backend"] for shard in plan["cross_backend_matrix"]["include"]] == ["memory", "sqlite"]
+    assert len(plan["cross_backend_matrix"]["include"]) == 1
 
 
 def test_deleted_dh_runner_schedules_no_dh_lane(repository: Path) -> None:

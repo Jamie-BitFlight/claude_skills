@@ -33,16 +33,10 @@ class Shard(TypedDict):
     runner: str
 
 
-class BackendShard(Shard):
-    """A cross-backend shard, run once per ``BACKLOG_BACKEND`` value."""
-
-    backend: str
-
-
 class Matrix(TypedDict):
     """GitHub Actions include-only matrix."""
 
-    include: list[Shard] | list[BackendShard]
+    include: list[Shard]
 
 
 class Plan(TypedDict):
@@ -233,11 +227,12 @@ def marketplace_version_only(root: Path, base: str, head: str) -> bool:
     return values[0] == values[1]
 
 
-def dh_lanes(suites: dict[str, list[str]], *, selected: bool) -> tuple[list[Shard], list[BackendShard]]:
+def dh_lanes(suites: dict[str, list[str]], *, selected: bool) -> tuple[list[Shard], list[Shard]]:
     """Select development-harness lanes as its runner plus a marker, never its test paths.
 
     Returns:
-        The integration shards and one cross-backend shard per backend; empty without a runner.
+        The integration and cross-backend shards; empty without a runner. The cross-backend
+        tests parametrize every backend themselves, so one shard covers them all.
     """
     if not selected or DH not in suites:
         return [], []
@@ -245,11 +240,8 @@ def dh_lanes(suites: dict[str, list[str]], *, selected: bool) -> tuple[list[Shar
     integration: list[Shard] = [
         {"name": DH, "paths": [], "marker": "integration and not research_vault", "runner": runner}
     ]
-    backends: list[BackendShard] = [
-        {"name": DH, "paths": [], "marker": "cross_backend", "runner": runner, "backend": backend}
-        for backend in ("memory", "sqlite")
-    ]
-    return integration, backends
+    cross_backend: list[Shard] = [{"name": DH, "paths": [], "marker": "cross_backend", "runner": runner}]
+    return integration, cross_backend
 
 
 def build_plan(
