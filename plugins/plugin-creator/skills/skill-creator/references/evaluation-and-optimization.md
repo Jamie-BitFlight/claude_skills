@@ -319,7 +319,7 @@ Present the eval set to the user for review using the HTML template:
 1. Read the template from `assets/eval_review.html`
 2. Replace the placeholders:
    - `__EVAL_DATA_PLACEHOLDER__` with the JSON array of eval items
-   - `__SKILL_NAME_PLACEHOLDER__` with the skill's current description
+   - `__SKILL_NAME_PLACEHOLDER__` with the skill's current name
    - `__SKILL_DESCRIPTION_PLACEHOLDER__` with the skill's current description
 3. Write to a temp file and open it
 4. The user can edit queries, toggle should-trigger, add/remove entries, then click "Export Eval Set"
