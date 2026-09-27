@@ -2483,13 +2483,15 @@ def _read_list_page(
     """Read one request-shaped GitHub list page and write it through the cache.
 
     Every successful live page writes exactly the rows it fetched through
-    :func:`_write_page_through`. A *count_only* page reads no work-item
-    content and so writes nothing through.
+    :func:`_write_page_through`. A *count_only* page without *refresh* reads
+    no work-item content and so writes nothing through; with *refresh* it
+    reads and reconciles its rows like any page, as *refresh* promises.
 
     Returns:
         The request-shaped page (matched rows plus honest pagination facts).
     """
     context = _decision_context(repo=repo, allow_cached=allow_cached, output=output)
+    metadata_only = count_only and not refresh
     pushed_labels = [value for value in (label, _status_push_label(status)) if value]
     request = ListPageRequest(
         repo=repo,
@@ -2497,7 +2499,7 @@ def _read_list_page(
         labels=pushed_labels,
         offset=offset,
         limit=limit,
-        hydrate=not count_only,
+        hydrate=not metadata_only,
     )
     page = context.page(
         request,
@@ -2518,7 +2520,7 @@ def _read_list_page(
             section=section, type_=type_, topic=topic, search=search, filter_by_key=filter_by_key
         ),
     )
-    if page.provider_snapshot is not None and not count_only:
+    if page.provider_snapshot is not None and not metadata_only:
         _write_page_through(backend, repo, page.provider_snapshot, refresh=refresh, output=output)
     return page
 
@@ -2839,9 +2841,10 @@ def list_items(
             collects at most this many matching rows past *offset* (0 = walk
             the whole requested state set). Ignored for other backends.
         count_only: For a GitHub-backed listing only, the caller reads the
-            count and discards the rows: the walk reads no work-item content
-            beyond what matching needs and writes nothing through to the
-            cache, so the returned rows may carry raw issue bodies.
+            count and discards the rows. Without *refresh*, the walk reads no
+            work-item content beyond what matching needs and writes nothing
+            through to the cache, so the returned rows may carry raw issue
+            bodies. With *refresh*, the page is read and reconciled in full.
 
     Returns:
         Dict with items list (each item a dict with section, title, issue, plan, type, topic,

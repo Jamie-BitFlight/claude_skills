@@ -1209,3 +1209,30 @@ def test_title_search_requests_only_title_identity(fixture: FakeGitHubFixture) -
     assert len(searches) == 1, fixture.requester.log
     for field_name in ("body", "labels", "milestone"):
         assert field_name not in searches[0], searches[0]
+
+
+def test_count_only_refresh_still_reconciles_the_page(fixture: FakeGitHubFixture) -> None:
+    from backlog_core import operations
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+    from backlog_core.models import ReconcileRequest, ReconcileScope
+
+    fixture.add_tracked_issue(1, "issue 1", state="OPEN")
+    requests: list[ReconcileRequest] = []
+    reconcile = fixture.backend.reconcile
+
+    def recording_reconcile(request: ReconcileRequest, snapshot: object = None) -> object:
+        requests.append(request)
+        return reconcile(request, snapshot=snapshot)  # ty: ignore[invalid-argument-type]
+
+    fixture.backend.reconcile = recording_reconcile  # ty: ignore[invalid-assignment]
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        result = operations.list_items(repo=f"{fixture.owner}/{fixture.name}", refresh=True, count_only=True)
+    finally:
+        reset_config()
+
+    assert result["count"] == 1, result
+    assert [(r.scope, r.apply_local_patches, r.references) for r in requests] == [
+        (ReconcileScope.TARGETED, True, ["#1"])
+    ], requests
