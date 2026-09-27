@@ -156,15 +156,13 @@ repos:
         types: [shell]
 
   - repo: https://github.com/Jamie-BitFlight/agent-marketplace-versioner
-    rev: 562755fd8f14ee76280130eb6db4612af72fdf45 # frozen: v0.1.2
+    rev: a31befb9003b4ca84e74317a5552f272045d4a71 # frozen: v1.1.1
     hooks:
-      # Check only: the hook never bumps versions. The stock `sync` entry
-      # bumps versions on every commit; .github/workflows/bump-marketplace.yml
-      # assigns them on main instead. `reconcile --dry-run` fails when plugin.json
-      # component arrays or marketplace membership disagree with plugins/.
-      - id: agent-marketplace-versioner
+      # Check only: the hook never bumps versions;
+      # .github/workflows/bump-marketplace.yml assigns them on main. It fails when
+      # plugin.json component arrays or marketplace membership disagree with plugins/.
+      - id: agent-marketplace-versioner-check
         name: Check plugin manifests and marketplace membership
-        entry: agent-marketplace-versioner reconcile --dry-run
         always_run: false
         files: ^(plugins/|\.claude-plugin/|\.agents/plugins/)
 

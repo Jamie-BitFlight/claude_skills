@@ -11,7 +11,7 @@ pinned to the same full commit SHA in [.pre-commit-config.yaml](../.pre-commit-c
 
 ## On a branch
 
-The `agent-marketplace-versioner` pre-commit hook runs `reconcile --dry-run`. It changes no files.
+The `agent-marketplace-versioner-check` pre-commit hook runs `reconcile --dry-run --staged`. It changes no files.
 It fails when a `plugin.json` that lists `skills`, `agents` or `commands` explicitly is missing one
 that exists on disk (or lists one that does not), or when a marketplace catalog
 (`.claude-plugin/marketplace.json`, `.agents/plugins/marketplace.json`) lacks an entry for a plugin
@@ -32,14 +32,14 @@ not refresh from branch work. To exercise a plugin from your working copy, load 
 
 [bump-marketplace.yml](../.github/workflows/bump-marketplace.yml) runs on every push to `main`:
 
-1. `repair` patch-bumps every plugin manifest (`.claude-plugin`, `.codex-plugin`, `.cursor-plugin`,
-   including eval fixture manifests nested inside a plugin) whose directory changed after the commit
+1. `repair` patch-bumps every plugin manifest (`.claude-plugin`, `.codex-plugin`, `.cursor-plugin`)
+   whose directory changed after the commit
    that last changed that manifest's version. Several PRs merged before a run are covered by one
    bump per plugin. A plugin added by a merge keeps the version it was added with.
-2. `sync --marketplace` bumps `.claude-plugin/marketplace.json`'s `metadata.version` once if any
-   plugin directory changed since the last version commit (or, before the first one exists, since
-   the triggering commit's parent), which includes a newly added plugin. Removing a plugin alone
-   does not bump it: the pinned versioner compares only plugins that still exist.
+2. `sync --marketplace` bumps `.claude-plugin/marketplace.json`'s `metadata.version` once for the
+   changes since the last version commit (or, before the first one exists, since the triggering
+   commit's parent): a major bump if a plugin was removed, a minor bump if one was added, and a
+   patch bump if only plugin contents changed.
 3. The result is pushed to `main` as one commit titled
    `chore(plugins): assign plugin versions`. If another merge landed meanwhile, the commit is
    rebased onto it and pushed again (three attempts).
