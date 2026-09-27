@@ -57,7 +57,7 @@ jobs:
           echo "base=${base:-$(git rev-parse HEAD^)}" >> "$GITHUB_OUTPUT"
 
       - name: Bump plugins changed since their last version bump
-        uses: Jamie-BitFlight/agent-marketplace-versioner@v1
+        uses: Jamie-BitFlight/agent-marketplace-versioner@4726d7c64b50e7d71ec3d7352afa54f9fd584a2d
         with:
           command: repair
 
@@ -74,7 +74,7 @@ jobs:
       # or when catalog membership drifted from plugins/. The pinned versioner
       # compares only plugins that still exist, so a removal alone does not bump it.
       - name: Synchronize marketplace
-        uses: Jamie-BitFlight/agent-marketplace-versioner@v1
+        uses: Jamie-BitFlight/agent-marketplace-versioner@4726d7c64b50e7d71ec3d7352afa54f9fd584a2d
         with:
           command: sync
           marketplace: 'true'
