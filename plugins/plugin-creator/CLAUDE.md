@@ -37,6 +37,10 @@ commands, hooks, MCP configuration, or plugin-facing AI documentation.
 - For marketplace versioning, read [Marketplace versioning](../../docs/marketplace-versioning.md)
   before changing version or manifest fields.
 
+## Project boundary
+
+For plugin directory ownership, test-runner boundaries, centralized development policy, and standalone extraction, read `skills/plugin-lifecycle/references/plugin-project-layout.md`. Do not infer that a plugin needs a local Python project merely because it contains Python.
+
 ## Validation
 
 Run `uvx skilllint@latest check <path>` for frontmatter, complexity, links, and plugin structure.

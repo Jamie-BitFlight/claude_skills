@@ -3,15 +3,16 @@
 ## Commands
 
 ```bash
-uv run pytest                              # Fast suite (parallel via xdist); e2e, cross_backend, integration, and research_vault are deselected by addopts
-uv run pytest -m "not e2e and not cross_backend and not integration and not research_vault and not slow"  # Fast suite, also excluding slow tests
-uv run pytest -m "integration and not research_vault" plugins/development-harness/tests/ tests/research_backlinks/  # Integration tests (deselected by default)
+uv run pytest                              # Repository-owned fast suite (parallel via xdist); e2e, cross_backend, integration, and research_vault are deselected by addopts
+uv run pytest -m "not e2e and not cross_backend and not integration and not research_vault and not slow"  # Same, also excluding slow tests
+uv run --locked --script plugins/<name>/run_pytests.py  # One plugin's fast suite, from its run_pytests.py.lock (the runner's default -m), from any cwd; -m "" selects every marker
+uv run --script plugins/development-harness/run_pytests.py -m "integration and not research_vault" tests  # development-harness integration tests
+uv run pytest -m "integration and not research_vault" tests/research_backlinks/  # Repository integration tests (deselected by default)
 uv run pytest -m research_vault tests/research_backlinks/test_graph_asymmetry.py  # Advisory, read-only production-vault scan
-uv run pytest plugins/development-harness/tests/  # Specific test directory
-uv run pytest plugins/development-harness/tests/test_migrate_tasks_to_github.py  # Specific test file
+uv run --script plugins/development-harness/run_pytests.py tests/test_migrate_tasks_to_github.py  # Specific plugin test file, relative to the plugin root
 ```
 
-Coverage (`--cov=scripts --cov=plugins`) is always on via addopts — passing `--cov` again is redundant.
+Coverage (`--cov=scripts --cov=plugins`) is always on via root addopts — passing `--cov` again is redundant. Plugin runners read no root config, so they run without coverage unless you pass it. Each runner's own arguments set its parallelism; read `plugins/<name>/run_pytests.py`.
 
 ## Failure investigation and test effectiveness
 
@@ -61,11 +62,7 @@ null until the validation runner records an observed result. It is not a passing
   one `research_vault` test reads the production corpus only in the advisory research-validation job;
   e2e tests need the explicit sandbox configuration above and run on main or manual dispatch.
 - **Async mode**: `asyncio_mode = "auto"` — tests auto-detect async
-- **Test discovery**: `pyproject.toml`'s `[tool.pytest.ini_options] testpaths` is the list — read it
-  there rather than trusting a summary here, which drifts. It covers plugin test directories,
-  module-local and skill-local ones, root `tests/`, and every scripts directory that hosts colocated
-  tests. A test file outside every entry never runs anywhere; the coverage guard below fails instead
-  of letting it rot silently.
+- **Test discovery**: root `pyproject.toml` `testpaths` owns repository tests only. Each pytest-owning plugin's root `run_pytests.py` owns that plugin's complete test topology and PEP 723 execution dependencies. CI discovers those runners rather than reconstructing plugin paths. `tests/test_testpaths_collection_coverage.py` derives coverage from both authorities and fails if a tracked test is owned by neither.
 - **Type checker exclusions**: Test files get relaxed rules in `pyproject.toml` per-file overrides
 - **Test file placement**: A test lives beside the code it exercises. Tests for code inside a
   plugin go in that plugin's own test directory (`plugins/{name}/tests/`, or the module-local
@@ -93,8 +90,7 @@ null until the validation runner records an observed result. It is not a passing
   `sys.path` claims generic module names (`server`, `models`) for the whole session, so the suite
   whose conftest ran last wins. Load the module by explicit path instead — see
   `plugins/frustration-analyzer/tests/_server.py` and `plugins/agentskill-kaizen/tests/conftest.py`.
-- **testpaths coverage guard**: `tests/test_testpaths_collection_coverage.py` fails when a tracked
-  test file sits outside every `testpaths` entry, since the default lane would never collect it.
+- **test-root coverage guard**: `tests/test_testpaths_collection_coverage.py` fails when a tracked test file sits outside both repository `testpaths` and every plugin runner's declared test roots.
 - **Validation warnings**: Warnings fail validation unless a versioned, scope-limited exception is
   recorded in the relevant plan with an expiry/review condition. Never disable pytest's strict
   configuration to make a warning non-fatal; a minimal runner must explicitly retain

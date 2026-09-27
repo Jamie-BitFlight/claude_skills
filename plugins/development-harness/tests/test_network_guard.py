@@ -14,40 +14,65 @@ import subprocess
 import sys
 import tempfile
 import textwrap
-import tomllib
 from collections.abc import Iterator
 from contextlib import contextmanager
+from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+from types import ModuleType
 
 import pytest
+import tiktoken
 
 from tests.network_blocked import NetworkBlocked
 
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
-_REPO_ROOT = _PLUGIN_ROOT.parent.parent
-_ROOT_PYPROJECT = _REPO_ROOT / "pyproject.toml"
-_PLUGIN_PREFIX = "plugins/development-harness/"
+
+
+def _load_runner() -> ModuleType:
+    """Load this plugin's ``run_pytests.py``, which ships with the plugin."""
+    spec = spec_from_file_location("dh_run_pytests", _PLUGIN_ROOT / "run_pytests.py")
+    assert spec is not None
+    assert spec.loader is not None
+    runner = module_from_spec(spec)
+    spec.loader.exec_module(runner)
+    return runner
+
+
+_RUNNER = _load_runner()
+
+# A hang guard for the subprocess probes, not a performance bound: each probe
+# starts a fresh interpreter that imports the plugin conftest, which takes
+# seconds on an idle machine and far longer on a loaded CI runner.
+_PROBE_TIMEOUT = 120
 
 
 def _configured_testpaths() -> list[str]:
-    """Return this plugin's root ``testpaths`` entries, relative to the plugin root.
+    """Return the test roots this plugin's ``run_pytests.py`` declares.
 
-    Reading the entries rather than listing them keeps the guard covering every
-    directory the default lane collects, including ones added after this test was
-    written. Empty for a standalone bundle, which ships no root ``pyproject.toml``.
+    Reading the runner rather than listing the roots keeps the guard covering every
+    directory the plugin's suite collects, including ones added after this test was
+    written.
     """
-    if not _ROOT_PYPROJECT.exists():
-        return []
-    testpaths = tomllib.loads(_ROOT_PYPROJECT.read_text(encoding="utf-8"))["tool"]["pytest"]["ini_options"]["testpaths"]
-    return [
-        path.removeprefix(_PLUGIN_PREFIX)
-        for path in testpaths
-        if path.startswith(_PLUGIN_PREFIX) and (_REPO_ROOT / path).is_dir()
-    ]
+    return list(_RUNNER.TEST_PATHS)
 
 
 def _probe_command(probe: Path, *args: str) -> list[str]:
-    return [sys.executable, "-m", "pytest", str(probe), "-q", "-o", "addopts=", "--rootdir", str(_PLUGIN_ROOT), *args]
+    """Build a probe run with the runner's own isolated options.
+
+    Returns:
+        The argv for a pytest subprocess that collects only *probe*.
+    """
+    return [
+        sys.executable,
+        "-m",
+        "pytest",
+        *_RUNNER.isolated_options(),
+        "-p",
+        "no:cacheprovider",
+        str(probe),
+        "-q",
+        *args,
+    ]
 
 
 def test_outbound_connection_is_blocked() -> None:
@@ -107,33 +132,17 @@ def test_unix_socket_is_still_allowed() -> None:
             server.close()
 
 
-def test_no_public_allow_network_fixture() -> None:
+def test_no_public_allow_network_fixture(request: pytest.FixtureRequest) -> None:
     """No public ``allow_network`` fixture exists in the fixture registry.
 
-    A subprocess test requests the fixture; the run must fail at fixture
-    resolution (``fixture 'allow_network' not found``) rather than silently
-    lifting the guard.
+    Requesting it must fail at fixture resolution rather than silently lifting
+    the guard.
     """
-    with plugin_root_probe(
-        """
-        def test_requests_allow_network(allow_network) -> None:  # pragma: no cover
-            pass
-        """
-    ) as probe:
-        result = subprocess.run(
-            _probe_command(probe),
-            capture_output=True,
-            text=True,
-            cwd=str(_PLUGIN_ROOT),
-            env={**os.environ, "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
-            timeout=15,
-            check=False,
-        )
-    assert result.returncode != 0, "allow_network fixture must not exist"
-    combined = result.stdout + result.stderr
-    assert "allow_network" in combined, combined
+    with pytest.raises(pytest.FixtureLookupError, match="allow_network"):
+        request.getfixturevalue("allow_network")
 
 
+@pytest.mark.integration
 def test_double_gate_requires_env_var() -> None:
     """An ``@pytest.mark.e2e`` test without the env var is still blocked.
 
@@ -156,8 +165,8 @@ def test_double_gate_requires_env_var() -> None:
             capture_output=True,
             text=True,
             cwd=str(_PLUGIN_ROOT),
-            env={**os.environ, "DH_ALLOW_TEST_NETWORK": "", "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
-            timeout=15,
+            env={**os.environ, "DH_ALLOW_TEST_NETWORK": ""},
+            timeout=_PROBE_TIMEOUT,
             check=False,
         )
     assert result.returncode != 0, result.stdout
@@ -166,6 +175,7 @@ def test_double_gate_requires_env_var() -> None:
     assert "Blocked DNS resolution" in combined, combined
 
 
+@pytest.mark.integration
 def test_double_gate_opens_with_env_var() -> None:
     """With both the marker and the env var, the policy gate opens.
 
@@ -188,13 +198,14 @@ def test_double_gate_opens_with_env_var() -> None:
             capture_output=True,
             text=True,
             cwd=str(_PLUGIN_ROOT),
-            env={**os.environ, "DH_ALLOW_TEST_NETWORK": "1", "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
-            timeout=15,
+            env={**os.environ, "DH_ALLOW_TEST_NETWORK": "1"},
+            timeout=_PROBE_TIMEOUT,
             check=False,
         )
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+@pytest.mark.integration
 def test_double_gate_stays_open_through_class_scoped_teardown() -> None:
     """The gate stays open while a class-scoped e2e fixture tears down.
 
@@ -230,44 +241,38 @@ def test_double_gate_stays_open_through_class_scoped_teardown() -> None:
             capture_output=True,
             text=True,
             cwd=str(_PLUGIN_ROOT),
-            env={**os.environ, "DH_ALLOW_TEST_NETWORK": "1", "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
-            timeout=15,
+            env={**os.environ, "DH_ALLOW_TEST_NETWORK": "1"},
+            timeout=_PROBE_TIMEOUT,
             check=False,
         )
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_guard_restores_sockets_after_session() -> None:
-    """After a pytest subprocess finishes, the parent process sockets are intact.
+def test_guard_restores_sockets_after_session(pytestconfig: pytest.Config) -> None:
+    """Removing the guard restores the real socket functions, and installing re-arms them.
 
-    Runs a trivial pytest session in a subprocess (which installs and tears
-    down the guard), then opens a loopback socket in this parent process to
-    prove teardown restored the real ``socket.connect``.
+    ``pytest_unconfigure`` removes the guard through ``remove_network_guard``. This
+    calls that function and ``install_network_guard`` in-process. The guard is per
+    process, so under xdist this touches only the current worker, and the
+    ``finally`` re-arms it for the tests after. The tiktoken fallback has its own
+    patch, so it must survive the round trip.
     """
-    with plugin_root_probe(
-        """
-        def test_noop() -> None:
-            pass
-        """
-    ) as probe:
-        subprocess.run(
-            _probe_command(probe),
-            capture_output=True,
-            text=True,
-            cwd=str(_PLUGIN_ROOT),
-            env={**os.environ, "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
-            timeout=15,
-            check=True,
-        )
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    guard = next(
+        plugin
+        for plugin in pytestconfig.pluginmanager.get_plugins()
+        if Path(getattr(plugin, "__file__", "") or "").resolve() == _PLUGIN_ROOT / "conftest.py"
+    )
+    armed = (socket.socket.connect, socket.socket.connect_ex, socket.getaddrinfo)
+    assert armed == (guard._guarded_connect, guard._guarded_connect_ex, guard._guarded_getaddrinfo)
+    get_encoding = tiktoken.get_encoding
+    guard.remove_network_guard()
     try:
-        server.bind(("127.0.0.1", 0))
-        server.listen(1)
-        client.connect(server.getsockname())  # parent process: real connect works
+        restored = (socket.socket.connect, socket.socket.connect_ex, socket.getaddrinfo)
+        assert restored == (guard._real_connect, guard._real_connect_ex, guard._real_getaddrinfo)
     finally:
-        client.close()
-        server.close()
+        guard.install_network_guard()
+    assert (socket.socket.connect, socket.socket.connect_ex, socket.getaddrinfo) == armed
+    assert tiktoken.get_encoding is get_encoding
 
 
 @pytest.mark.integration
@@ -302,8 +307,7 @@ def test_guard_covers_testpath(testpath: str) -> None:
             capture_output=True,
             text=True,
             cwd=str(_PLUGIN_ROOT),
-            env={**os.environ, "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
-            timeout=30,
+            timeout=_PROBE_TIMEOUT,
             check=False,
         )
     finally:

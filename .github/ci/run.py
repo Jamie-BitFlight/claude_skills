@@ -36,6 +36,33 @@ def paths_from(value: object) -> list[str]:
     return value
 
 
+def pytest_command(shard: dict[str, object]) -> list[str]:
+    """Build a pytest shard's command: its plugin runner, or root pytest for repository tests.
+
+    Returns:
+        The child executable and arguments, without shell quoting/interpolation.
+
+    Raises:
+        TypeError: If the runner or marker is not a string.
+        ValueError: If the runner or paths are not safe relative paths.
+    """
+    runner = shard.get("runner", "")
+    if not isinstance(runner, str):
+        raise TypeError("The pytest runner must be a string")
+    if runner:
+        paths_from([runner])
+    args = ["uv", "run", "--locked", "--script", runner] if runner else ["uv", "run", "--locked", "pytest"]
+    marker = shard.get("marker", "")
+    if not isinstance(marker, str):
+        raise TypeError("The pytest marker must be a string")
+    if marker:
+        args.extend(["-m", marker, "-v"])
+    paths = shard.get("paths", [])
+    if runner and paths == []:
+        return args
+    return [*args, *paths_from(paths)]
+
+
 def command(operation: str, plan: dict[str, object], shard: dict[str, object], hook: str | None = None) -> list[str]:
     """Build the exact child command, preserving pytest's configured defaults.
 
@@ -43,13 +70,7 @@ def command(operation: str, plan: dict[str, object], shard: dict[str, object], h
         The child executable and arguments, without shell quoting/interpolation.
     """
     if operation == "pytest":
-        args = ["uv", "run", "--locked", "pytest"]
-        marker = shard.get("marker", "")
-        if not isinstance(marker, str):
-            raise ValueError("The pytest marker must be a string")
-        if marker:
-            args.extend(["-m", marker, "-v"])
-        return [*args, *paths_from(shard.get("paths"))]
+        return pytest_command(shard)
     if operation == "skilllint":
         return ["uvx", "skilllint@latest", "check", *paths_from(plan.get("validation_paths"))]
     if operation != "prek" or (hook is not None and hook not in HOOKS):
