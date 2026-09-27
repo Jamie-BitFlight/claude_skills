@@ -21,7 +21,7 @@ Operate in one of three modes from user intent:
 
 Default optimize/improve requests to IMPROVE, audit/review/explain to ANALYZE, and convert/draw/diagram to REPRESENT unless ambiguity prevents faithful representation.
 
-In ANALYZE and IMPROVE, follow the authoritative UNDERSTAND → MODEL → CHALLENGE → IMPROVE → VALIDATE reasoning loop from `improve-processes` before choosing a representation. In ANALYZE, the IMPROVE phase may derive and assess candidate corrections but MUST NOT apply them; only IMPROVE mode mutates the target.
+In ANALYZE and IMPROVE, follow the authoritative UNDERSTAND → MODEL → CHALLENGE → IMPROVE → VALIDATE reasoning loop from `improve-processes` before choosing a representation. In ANALYZE, the IMPROVE phase may derive and assess candidate corrections but MUST NOT apply them; only IMPROVE mode changes process behavior. REPRESENT may update the requested representation without changing the represented behavior.
 
 ---
 
@@ -47,6 +47,10 @@ In ANALYZE and IMPROVE, follow the authoritative UNDERSTAND → MODEL → CHALLE
 
 Use Mermaid when explicit nodes, transitions, guards, actors, or state make the ProcessModel more concise and less ambiguous than prose. A diagram must preserve the relevant model semantics; syntax/fidelity validation does not prove behavioral correctness.
 
+Apply the semantic core's altitude/resolution decision before visual conventions. Keep routine parent steps concise. Expand a consequential node through a resolvable child-procedure callout carrying its preconditions, guarantees, safeguards and relevant failure handling; do not pull that detail into every surrounding node. Represent intentional nondeterminism without inventing a single mandatory ordering.
+
+A faithful diagram may describe an INVALID or UNVALIDATED process. Label whether it is an as-is description, a proposal, or an approved procedure, and keep consequential assessment limits adjacent to the diagram so they survive copying. Only independently established authority permits the approved-procedure label; neither rendering nor successful validation grants execution permission.
+
 ---
 
 ## Diagram Types
@@ -61,7 +65,7 @@ Use Mermaid when explicit nodes, transitions, guards, actors, or state make the 
 
 **`flowchart LR`** — for left-to-right pipelines and transformation chains
 
-Choose the type that best preserves the original structure. When uncertain, use `flowchart TD`.
+Choose the type that best preserves the relevant structure and selected resolution. When uncertain, use `flowchart TD` only when that preserves the modeled relationships.
 
 </diagram_types>
 
@@ -71,54 +75,41 @@ Choose the type that best preserves the original structure. When uncertain, use 
 
 <annotation_standards>
 
-Every diagram element must carry full context — not a label placeholder.
+Each diagram element must carry enough context for its contract at the selected resolution; it need not repeat routine knowledge or every implementation detail.
 
-**Nodes** — describe WHAT happens or WHAT the state means, not just name it:
+**Nodes** — describe WHAT happens or WHAT the state means. A concise action is sufficient when its target and purpose are already clear. Expand a label only when the distinction changes execution:
 
 ```mermaid
 flowchart TD
-    %% BAD: bare label — agent reads node as ambiguous
-    A[Read file]
-
-    %% GOOD: describes the specific action and its purpose
-    A["Read task file — extract acceptance criteria and context manifest"]
+    ReadTask["Read task file — extract acceptance criteria"]
+    ReadTask --> Publish["Publish using the release procedure"]
 ```
+
+A child-procedure reference must resolve from the delivered document and expose the material contract. A descriptive label does not replace that contract for a consequential action.
 
 **Decision diamonds** — state the QUESTION being evaluated and what observable fact answers it:
 
 ```mermaid
 flowchart TD
-    %% BAD: agent cannot evaluate this without interpretation
-    Q{Has plan?}
-
-    %% GOOD: agent evaluates an observable structural fact
     Q{"Does task file contain a '## Plan' section<br>with at least one step?"}
 ```
 
-**Branch labels** — state the OUTCOME of the condition, not just yes/no:
+**Branch labels** — state the OUTCOME of the condition. Brief yes/no labels are sufficient when the question already makes the branch unambiguous:
 
 ```mermaid
 flowchart TD
     Q{"Exit code from validator?"}
-    Q -->|"0 — validation passed, proceed"| Skip
-    Q -->|"non-zero — errors found, fix required"| Fix
+    Q -->|"0 — validation passed"| Continue
+    Q -->|"non-zero — validation failed"| Diagnose
 ```
 
-**Annotations via `%%` comments** — add reasoning, caveats, or source context above nodes:
+**Annotations via `%%` comments** — add only material caveats or source-fidelity context. Do not hide an execution-critical safeguard solely in a comment that disappears from the rendered diagram; keep it in the node contract or linked procedure.
+
+**Subgraphs** — group related steps when the grouping communicates the phase or boundary being represented:
 
 ```mermaid
 flowchart TD
-    %% Only delegate when file is > 5000 chars — smaller files read directly
-    Size{"File size > 5000 chars?"}
-    Size -->|"Yes — delegate to agent"| Delegate
-    Size -->|"No — read directly"| ReadFull
-```
-
-**Subgraphs** — group related steps with descriptive titles that explain the phase purpose:
-
-```mermaid
-flowchart TD
-    subgraph Phase1["Phase 1: Discovery — establish current state before planning"]
+    subgraph Discovery["Discovery — establish current state"]
         A --> B --> C
     end
 ```
@@ -153,11 +144,11 @@ flowchart TD
 
 1. **Select mode** — ANALYZE, IMPROVE, or REPRESENT from user intent; do not silently switch.
 2. **Discover context and model** — read relevant linked/referencing material and build the canonical ProcessModel from `improve-processes`. Inspect caller/callee assumptions, guarantees, state crossing boundaries, partial failure, and recovery ownership when relevant.
-3. **Challenge uncertainty** — investigate UNKNOWN + RESOLVABLE gaps before asking the user. Block only when continuing requires an intent/policy decision. Never invent intent.
-4. **Improve when authorized** — in IMPROVE, structure may change when established intent/evidence determines the correction; redundant, contradictory, or no-op steps may be removed, merged, or rewritten. ANALYZE reports candidates without mutation. REPRESENT preserves source semantics.
-5. **Validate claims and changes** — select the least-formal sufficient validator per important claim. Formal-tool absence produces a validation handoff and UNVALIDATED status. Diagnose process vs requirement vs model vs validator vs implementation defects before changing behavior. Revalidate claims/interfaces affected by each change.
-6. **Select representations** — choose outputs that communicate the model. Use Mermaid when a concise technical diagram reduces ambiguity. Validate Mermaid syntax and semantic fidelity against ProcessModel, not raw source-step count.
-7. **Return/apply** — ANALYZE returns findings/evidence; IMPROVE applies authorized changes plus validation status; REPRESENT returns/replaces the faithful Mermaid projection.
+3. **Challenge uncertainty** — investigate UNKNOWN + RESOLVABLE gaps before asking the user. Never invent intent. Missing evidence or capability blocks only dependent mutations, not useful read-only assessment.
+4. **Improve when authorized** — in IMPROVE, structure may change when established intent/evidence determines the correction; redundant, contradictory, or no-op steps may be removed, merged, or rewritten. ANALYZE reports candidates without mutation. REPRESENT preserves source semantics. Follow the core's material-change lifecycle when revisions or concurrent edits affect safety.
+5. **Validate claims and changes** — select the least-formal sufficient validator per important claim. Formal-tool absence produces a validation handoff and UNVALIDATED assessment. Diagnose process vs requirement vs model vs validator vs implementation defects before changing behavior. Revalidate affected claims/interfaces and stop repeated or non-progressing candidate loops rather than iterating until a favorable answer appears.
+6. **Select representations** — choose outputs that communicate the model at its selected resolution. Use Mermaid when a concise technical diagram reduces ambiguity. Validate syntax with available tooling and semantic fidelity against ProcessModel, not raw source-step count. Missing syntax execution remains explicit, not a fabricated pass.
+7. **Return/apply** — ANALYZE returns findings/evidence; IMPROVE applies only the authorized, revision-applicable change set; REPRESENT returns/replaces the faithful projection. Keep task completion, target assessment and representation authority separate in the caller's output contract.
 
 </workflow>
 
@@ -167,7 +158,7 @@ flowchart TD
 
 <table_conversion>
 
-Markdown tables that are decision matrices or routing tables — where rows are conditions and columns are outcomes — convert to `flowchart TD` with diamond nodes.
+Markdown tables that are decision matrices or routing tables — where rows are conditions and columns are outcomes — are candidates for `flowchart TD` with diamond nodes when this improves concision or unambiguous traversal at the selected resolution. Do not convert a clear table merely because it contains decisions.
 
 **Identify a decision table by:**
 
@@ -192,38 +183,38 @@ Tables that are **not** decision trees (lookup tables, comparison tables, pure d
 
 ## Failure Modes and Blocking Conditions
 
-Use the uncertainty taxonomy from `improve-processes`. UNKNOWN + RESOLVABLE triggers investigation, not a user question. UNKNOWN + INTENT-DEPENDENT blocks autonomous improvement. ASSUMED and OUT OF SCOPE are explicit validation boundaries. Do not invent structure or policy, and do not change a process merely to satisfy a bad model or validator.
+Use the uncertainty taxonomy and Result Contract from `improve-processes`. Investigate resolvable gaps; preserve intent decisions, missing evidence, stale revisions, cycle/no-progress reasons and other dependent apply blockers. ASSUMED and OUT OF SCOPE are explicit validation boundaries. Do not invent structure or policy, and do not change a process merely to satisfy a bad model or validator.
 
 ---
 
 ## Completion Status
 
-Every response ends with one explicit status line:
+Honor the caller's exact status envelope, vocabulary and position. Report whether the assigned work completed independently from the process assessment. Without a caller-defined envelope, begin with exactly one of `STATUS: DONE`, `STATUS: PARTIAL`, or `STATUS: BLOCKED`, then state `Assessment: READY | IMPROVED | BLOCKED_INTENT | UNVALIDATED | INVALID` and its scope/evidence. Do not append a conflicting alternative status line.
 
-- `STATUS: DONE — <what was analyzed, improved, represented, or verified>`
-- When analysis finds no material issues: `STATUS: DONE — no material process findings at the requested resolution`
-- When progress requires owner intent: `STATUS: BLOCKED_INTENT — <decision required>`
-- When required evidence/tooling is unavailable: `STATUS: UNVALIDATED — <claim/evidence gap>`
-- When a required claim is demonstrated false and unresolved: `STATUS: INVALID — <failed claim>`
+For example, a completed read-only review may return:
+
+```text
+STATUS: DONE
+Assessment: INVALID
+Scope: release publication
+Evidence: a reachable publish path bypasses required validation
+Target writes: NONE
+```
+
+DONE completes the review request; it does not certify the target. An unfinished improvement request preserves its remaining work and blockers rather than being promoted to DONE merely because a report was written. A no-findings result must name what was checked and its evidence limits.
 
 ## Output Format
 
-When returning a diagram as a standalone response:
+When returning a diagram, include concise adjacent context for:
 
-```markdown
-**Diagram type**: {flowchart TD | sequenceDiagram | stateDiagram-v2}
-**Original format**: {bullet steps | ASCII art | markdown table | prose}
-**Rationale**: {one sentence stating which structural property drove the diagram type choice}
-**Step inventory**: {N steps, M decision points, K terminal states — all present in diagram}
+- diagram type and the relevant source/model revision;
+- representation role: as-is description, proposal, or approved procedure with its authority reference;
+- assessment and any consequential unresolved claims;
+- represented scope/resolution and linked child procedures where needed.
 
-The following diagram is the authoritative procedure for {procedure name}. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
+Use an inventory of material steps, decisions and terminal states when needed to check fidelity; do not force all child details into the parent diagram or claim unrepresented internals were checked. Say "authoritative procedure" only when the identified governing contract establishes that authority. For an as-is diagram or proposal, explicitly avoid an instruction to execute it as approved behavior.
 
-\`\`\`mermaid
-{diagram source}
-\`\`\`
-```
-
-When replacing content inside a file, use Edit to perform a surgical replacement of the original section with the diagram, preserving surrounding content.
+When replacing content inside a file, use Edit to perform a surgical replacement of the original section with the diagram, preserving surrounding content. Recheck the source section before replacement and follow the core's conditional-apply rule when concurrent changes could be overwritten.
 
 ---
 
@@ -231,63 +222,30 @@ When replacing content inside a file, use Edit to perform a surgical replacement
 
 <context_sensitive_styling>
 
-The three rules in this section govern how node IDs, annotation edges, and classDef styling are applied based on the document context — AI-facing files vs. user-facing documents.
+These representation conventions remain subordinate to the selected resolution and semantic contract.
 
 ### Node ID vs. Node Label Discipline
 
-Node IDs and node labels are two distinct fields with two distinct purposes. Never put two levels of hierarchy into one node.
+Node IDs and node labels serve different purposes. Use short semantic role identifiers; labels contain the action, state, condition, or resource being displayed.
 
-Node ID — the Mermaid identifier used to reference the node in edges. It must be a short semantic role name: camelCase, no spaces, no filesystem punctuation.
-
-Node label — the text displayed inside the node shape. It must be the actual thing: the filesystem path, the step name, the condition text.
+For a directory-containment diagram, distinct hierarchy levels may need separate nodes and containment edges. For an action that consumes a path, keep the whole path as its target; do not explode every directory segment into a node when containment is irrelevant to the active question.
 
 ```mermaid
 flowchart TD
-    %% BAD: conflates two hierarchy levels into one node ID and label
-    Root["plugins/plugin-name/"]
-
-    %% GOOD: ID names the role; label names the thing; parent/child relationship expressed as edge
-    Root["plugins/"]
-    Root --> Plugin["plugin-name/"]
+    ReadGoals["Read plugins/example/skills/release/SKILL-GOALS.md"]
 ```
-
-Apply this rule whenever a node label would otherwise embed a path segment that belongs at a different hierarchy level. Each level of hierarchy gets its own node; the edge expresses containment.
 
 ### Annotation Edges for Descriptions
 
-When a node needs a textual description (not a child node, not a condition — just explanatory metadata), extract that description into a separate annotation node connected by a dashed arrow `-.->` .
+Use an annotation node with a dashed arrow `-.->` when separate explanatory metadata materially improves clarity. Do not add one solely because a label wraps with `<br>`. Keep guards and critical contract information on the execution node or its explicit child-procedure callout rather than turning them into optional-looking decoration.
 
-Trigger: A node label that would require `<br>` to append a description — extract the description to an annotation node instead.
-
-```mermaid
-flowchart TD
-    %% BAD: description crammed into node label with separator
-    Skills["skills/ — What Claude learns"]
-
-    %% GOOD: clean label; description in dedicated annotation node
-    Skills["skills/"]
-    Skills -.-> SkillsDesc["What Claude learns"]
-```
-
-Name annotation node IDs by appending `Desc` to the parent node ID (e.g., `Skills` → `SkillsDesc`, `Manifest` → `ManifestDesc`). This makes the relationship unambiguous when reading Mermaid source.
+Name annotation node IDs by appending `Desc` to the parent node ID when an annotation is used, for example `Skills` → `SkillsDesc`.
 
 ### classDef Styling — User-Facing Documents Only
 
-Apply `classDef` to visually distinguish node types when the diagram appears in a **user-facing document**. Do not apply classDef in AI-facing files.
+Apply `classDef` to visually distinguish node types when useful in a **user-facing document**. Do not apply classDef in AI-facing files.
 
-User-facing documents (apply classDef):
-
-- `README.md` at any level (repo root, plugin root, skills root)
-- Any file under `docs/`
-- Workshop materials
-- Plugin READMEs
-
-AI-facing files (do NOT apply classDef — keep minimal):
-
-- `SKILL.md`
-- Agent files (`.claude/agents/*.md`, `agents/*.md`)
-- `CLAUDE.md`
-- Rules files (`.claude/rules/*.md`)
+User-facing documents include `README.md`, files under `docs/`, workshop materials, and plugin READMEs. AI-facing files include `SKILL.md`, agent files, `CLAUDE.md`, and rules files.
 
 Standard classDef vocabulary for structural diagrams:
 
@@ -298,27 +256,7 @@ flowchart TD
     classDef note fill:#fff8dc,stroke:#aaa,stroke-dasharray: 3 3;
 ```
 
-Assign classes by node role:
-
-- `folder` — directory nodes (paths ending in `/`)
-- `file` — file nodes (paths with extensions, or named files like `README.md`)
-- `note` — annotation nodes (the `Desc` nodes connected by `-.->` )
-
-Apply classes with the `class` statement at the end of the diagram after all node and edge definitions:
-
-```mermaid
-flowchart TD
-    Root["plugins/"]
-    Root --> Plugin["plugin-name/"]
-    Plugin --> Skills["skills/"]
-    Skills -.-> SkillsDesc["What Claude learns"]
-
-    classDef folder fill:#eef,stroke:#66f,stroke-width:1px;
-    classDef note fill:#fff8dc,stroke:#aaa,stroke-dasharray: 3 3;
-
-    class Root,Plugin,Skills folder;
-    class SkillsDesc note;
-```
+Assign classes by the roles actually represented: `folder` for directory nodes, `file` for file nodes, and `note` for annotation nodes. Apply classes at the end after node and edge definitions. Styling must not introduce nodes or hierarchy irrelevant to the represented process.
 
 </context_sensitive_styling>
 
@@ -328,34 +266,31 @@ flowchart TD
 
 Before returning any diagram:
 
-Semantic fidelity (primary):
+Semantic fidelity and authority:
 
 - [ ] Diagram represents the relevant ProcessModel semantics without introducing behavior
 - [ ] REPRESENT preserves established source semantics
-- [ ] IMPROVE may change structure only when established intent/evidence justifies it
+- [ ] IMPROVE changes are justified by established intent/evidence and applicable revisions
 - [ ] Conditions are evaluable and terminal states explicit where relevant
-- [ ] Mermaid validation is not described as proof of behavioral correctness
+- [ ] Parent resolution is concise; consequential child procedures remain reachable
+- [ ] As-is/proposed/approved authority and unresolved assessment limits are preserved adjacent to the diagram
+- [ ] Mermaid validation is not described as proof of behavioral correctness or execution approval
 
-Node ID and annotation discipline:
+Node and annotation discipline:
 
-- [ ] Node IDs are semantic role names — node labels are the displayed content (never conflated)
-- [ ] Descriptions that would require `<br>` in a node label are extracted to `-.->` annotation nodes instead
-- [ ] Annotation node IDs follow the `{ParentId}Desc` naming convention
+- [ ] Node IDs identify roles; labels carry the displayed action/state/resource
+- [ ] Hierarchy and annotations appear only when they help the active question
+- [ ] Critical safeguards are visible in the node contract or linked procedure, not only comments
 
-Annotation completeness:
+Syntax and presentation:
 
-- [ ] Every node has a descriptive label — no placeholder text like "Process" or "Handle"
-- [ ] Every diamond states the evaluable question clearly
-- [ ] `%%` comments explain non-obvious choices or source fidelity decisions
-
-Syntax correctness:
-
-- [ ] Diagram validated via MCP tools — no syntax errors reported
-- [ ] `<br>` used for line breaks (not `\n`)
+- [ ] Actual syntax-tool evidence is recorded, or its absence is explicit
+- [ ] `<br>` is used for label line breaks, not `\n`
 - [ ] No bare colons inside quoted label strings
-- [ ] Table conversions only applied to decision tables, not data tables
+- [ ] Data tables remain tables; decision tables convert only when useful
+- [ ] classDef is omitted in AI-facing files and used only when it improves user-facing clarity
 
-Context-sensitive styling:
+Completion:
 
-- [ ] classDef styling applied when diagram is in a user-facing document (README.md, docs/, workshop files)
-- [ ] classDef omitted when diagram is in an AI-facing file (SKILL.md, agent files, CLAUDE.md, rules files)
+- [ ] The caller's exact envelope is preserved and task completion does not overwrite target assessment
+- [ ] Stale evidence, partial application and cycle/no-progress outcomes remain visible
