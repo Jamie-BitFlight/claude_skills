@@ -269,12 +269,9 @@ def main() -> int:
     except ValueError as exc:
         print(json.dumps({"status": "INVALID", "error": str(exc)}, separators=(",", ":")))
         return 1
-    complete = all(source.coverage.state == "complete" for source in record.sources)
-    result = {
-        "status": "RECORD_VALID",
-        "coverage": "complete" if complete else "partial",
-        "semantic_support": "UNVERIFIED",
-    }
+    states = {source.coverage.state for source in record.sources}
+    coverage = states.pop() if len(states) == 1 else "partial"
+    result = {"status": "RECORD_VALID", "coverage": coverage, "semantic_support": "UNVERIFIED"}
     print(json.dumps(result, separators=(",", ":")))
     return 0
 

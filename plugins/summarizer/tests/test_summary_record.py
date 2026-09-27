@@ -5,13 +5,14 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
 import pytest
 from pydantic import ValidationError
 
-from summary_record import SummaryRecord, unique_object, validate_record
+from summary_record import SummaryRecord, main, unique_object, validate_record
 
 
 def example() -> dict[str, Any]:
@@ -216,3 +217,54 @@ def test_rejects_empty_source_location() -> None:
     data["findings"][0]["support"][0]["locator"] = " "
     with pytest.raises(ValidationError):
         SummaryRecord.model_validate(data)
+
+
+@pytest.mark.parametrize(
+    ("states", "expected"),
+    [(["complete"], "complete"), (["complete", "unavailable"], "partial"), (["unavailable"], "unavailable")],
+)
+def test_cli_reports_total_acquisition_failure_as_unavailable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    states: list[str],
+    expected: str,
+) -> None:
+    """Nothing inspected must not be summarized as partial coverage."""
+    unavailable = {"state": "unavailable", "scope": "page", "inspected": [], "omitted": ["page"], "reason": "HTTP 403"}
+    data = example()
+    template = data["sources"][0]
+    data["sources"] = []
+    for index, state in enumerate(states):
+        source = copy.deepcopy(template)
+        source.update(id=f"S{index}", path=f"source-{index}")
+        if state == "unavailable":
+            source["coverage"] = dict(unavailable)
+        data["sources"].append(source)
+    if "complete" in states:
+        data["findings"][0]["support"][0]["source_id"] = "S0"
+    else:
+        data["findings"], data["selected_findings"] = [], []
+    record_path = tmp_path / "evidence.json"
+    output = tmp_path / "summary.md"
+    record_path.write_text(json.dumps(data), encoding="utf-8")
+    output.write_bytes(b"summary")
+    sources = [arg for index in range(len(states)) for arg in ("--source", f"source-{index}")]
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "summary_record.py",
+            "validate",
+            str(record_path),
+            "--request-id",
+            "request-1",
+            *sources,
+            "--output",
+            str(output),
+            "--format",
+            "tldr",
+        ],
+    )
+    assert main() == 0
+    assert json.loads(capsys.readouterr().out)["coverage"] == expected

@@ -59,8 +59,8 @@ uv run --script "<plugin-root>/scripts/summary_record.py" validate "<evidence-pa
 
 Repeat `--source` for each expected source, including failed sources. The validator never opens
 source paths from a record; it checks their inventory against the caller and reads only the explicit
-record/output arguments. Exit 0 means `RECORD_VALID`, with separate complete/partial coverage;
-exit 1 is invalid and exit 2 is unverified. This checks schema, references and output identity,
+record/output arguments. Exit 0 means `RECORD_VALID`, with separate coverage: `complete`, `partial`, or
+`unavailable` when no source was inspected; exit 1 is invalid and exit 2 is unverified. This checks schema, references and output identity,
 not that the source was actually read or that a claim is true. Review raw evidence independently
 where consequential. If the script/dependency is unavailable, report validation as unverified;
 do not install packages or claim success without the host's permission/capability.
