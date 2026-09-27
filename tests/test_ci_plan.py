@@ -358,7 +358,7 @@ def test_runner_propagates_actual_child_failure(tmp_path: Path, exit_code: int) 
     env = dict(
         os.environ,
         PATH=f"{tmp_path}{os.pathsep}{os.environ['PATH']}",
-        CI_PLAN='{"version":1}',
+        CI_PLAN='{"version":2}',
         CI_SHARD='{"paths":["tests"]}',
     )
     result = subprocess.run(
@@ -428,3 +428,19 @@ def test_runner_runs_a_plugin_shard_from_its_script_lockfile() -> None:
     """A plugin shard resolves from the runner's committed lockfile, never a fresh resolution."""
     shard = {"name": "alpha", "runner": "plugins/alpha/run_pytests.py", "paths": [], "marker": ""}
     assert runner.command("pytest", {}, shard) == ["uv", "run", "--locked", "--script", "plugins/alpha/run_pytests.py"]
+
+
+def test_runner_rejects_a_plan_from_another_schema_version(tmp_path: Path) -> None:
+    """A plan without cross_backend_matrix, or still carrying full_tests, is refused, not half-read."""
+    assert planner.build_plan(ROOT, None)["version"] == runner.PLAN_VERSION
+    env = dict(os.environ, CI_PLAN='{"version":1}', CI_SHARD="{}")
+    result = subprocess.run(
+        [sys.executable, str(ROOT / ".github/ci/run.py"), "pytest"],
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    assert result.returncode != 0
+    assert f"Expected CI plan version {runner.PLAN_VERSION}, received 1" in result.stderr

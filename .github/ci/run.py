@@ -12,6 +12,8 @@ import os
 import re
 from pathlib import PurePosixPath
 
+# The plan schema version this runner reads; .github/ci/plan.py emits the same value.
+PLAN_VERSION = 2
 HOOKS = ("ruff", "ruff-format", "biome-check", "markdownlint-cli2", "shellcheck", "shell-fmt-go")
 
 
@@ -101,8 +103,9 @@ def main() -> None:
     parser.add_argument("--hook", choices=HOOKS)
     args = parser.parse_args()
     plan = json.loads(os.environ["CI_PLAN"])
-    if not isinstance(plan, dict) or plan.get("version") != 1:
-        raise ValueError("Expected CI plan version 1")
+    version = plan.get("version") if isinstance(plan, dict) else None
+    if version != PLAN_VERSION:
+        raise ValueError(f"Expected CI plan version {PLAN_VERSION}, received {version}")
     shard = json.loads(os.environ.get("CI_SHARD", "{}"))
     if not isinstance(shard, dict):
         raise TypeError("Expected a matrix object")

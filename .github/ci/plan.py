@@ -89,6 +89,8 @@ LINT_CONFIG_NAMES = frozenset({
 # ponytail: the one plugin with lanes beyond its runner's fast default; a runner-declared
 # lane table replaces this once a second plugin needs one.
 DH = "development-harness"
+# Bump with every change to the Plan shape; .github/ci/run.py rejects any other version.
+PLAN_VERSION = 2
 DH_LANE_MARKERS = {"integration": "integration and not research_vault", "cross_backend": "cross_backend"}
 LANGUAGE_SUFFIXES = {
     "lint-python": {".py", ".pyi"},
@@ -317,7 +319,7 @@ def build_plan(
     allowed_skips = ",".join(sorted(job for job, selected_job in checks.items() if not selected_job))
     checks["research-validation"] = full_checks or any(under(path, "research") for path in changed)
     return {
-        "version": 1,
+        "version": PLAN_VERSION,
         "lint_all": full_checks,
         "reasons": reasons,
         "base": base,
