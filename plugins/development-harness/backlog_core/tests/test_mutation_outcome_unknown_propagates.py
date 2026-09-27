@@ -62,6 +62,7 @@ def test_add_item_fails_and_stores_no_local_item(tmp_path: Path, mocker: MockerF
 
     repository.requester.graphql_query.side_effect = graphql_query
     mocker.patch.object(backend, "try_get_github", return_value=repository)
+    mocker.patch.object(backend, "get_github", return_value=repository)  # add_item's liveness probe (#3969)
     mocker.patch.object(operations, "get_config", return_value=BacklogConfig(backend=backend))
 
     with pytest.raises(GitHubMutationOutcomeUnknownError) as excinfo:
