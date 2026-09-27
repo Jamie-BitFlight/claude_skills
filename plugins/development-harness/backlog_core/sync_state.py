@@ -21,12 +21,22 @@ import threading
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 import requests
 from github import GithubException
 from pydantic import BaseModel, ConfigDict
 
-from .models import BackendUnavailableError, BacklogError, ContentProviderError, UnsupportedBackendCapabilityError
+from .models import (
+    BackendUnavailableError,
+    BacklogError,
+    ContentProviderError,
+    GitHubRateLimitedError,
+    UnsupportedBackendCapabilityError,
+)
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 # Transient-network exceptions that are also OSError subclasses, so they must be
 # checked before the generic OSError branch: asyncio.TimeoutError (Python 3.11+
@@ -53,7 +63,9 @@ __all__ = [
     "classify_github_failure",
     "classify_sync_error",
     "get_sync_state",
+    "parse_retry_after_header",
     "reset_sync_state",
+    "retry_after_seconds",
 ]
 
 # HTTP status code constants used in error classification (avoids PLR2004 magic values).
@@ -116,6 +128,8 @@ class SyncState:
         last_error: Error message from the last failed sync attempt.
         last_success_at: UTC timestamp of the last *successful* sync.
         retry_count: Consecutive failed attempts in the current cycle.
+        retry_after: Seconds GitHub asked the last retryable failure to wait, or ``None`` when
+            it gave no hint (see ``retry_after_seconds``).
         offline_reason: Human-readable explanation for OFFLINE state entry.
         pending_mutations: Offline-queue depth as of the last completed sync.
         rejected_mutations: Dead-lettered mutation count as of the last
@@ -135,6 +149,7 @@ class SyncState:
     last_error: str = ""
     last_success_at: datetime | None = None
     retry_count: int = 0
+    retry_after: float | None = None
     offline_reason: str = ""
     pending_mutations: int = 0
     rejected_mutations: int = 0
@@ -313,8 +328,29 @@ def reset_sync_state() -> None:
 # ---------------------------------------------------------------------------
 
 
+#: Substring GitHub's own secondary-rate-limit message carries, checked case-insensitively.
+#: GitHub's docs say a `Retry-After` header *may* accompany this response; when it does not,
+#: the documented guidance is still to wait and retry, not to treat the refusal as permanent.
+_SECONDARY_RATE_LIMIT_MARKER = "secondary rate limit"
+
+
+def _github_exception_message_text(exc: GithubException) -> str:
+    """Return the human-readable message a GithubException carries, or its whole body.
+
+    Duplicates ``gh_client._github_exception_message``'s dict-unwrapping — a shared helper would
+    need a module either could import, and this file must not import ``gh_client`` (which already
+    imports this one). Four lines is cheaper than resolving that direction.
+    """
+    data = exc.data
+    if isinstance(data, dict):
+        message = data.get("message")
+        if isinstance(message, str):
+            return message
+    return str(data)
+
+
 def _classify_github_exception(exc: GithubException) -> SyncErrorKind:
-    """Classify a GithubException by HTTP status and headers.
+    """Classify a GithubException by HTTP status, headers, and message text.
 
     Args:
         exc: A PyGitHub exception with a numeric HTTP status code.  The PyGitHub
@@ -333,8 +369,11 @@ def _classify_github_exception(exc: GithubException) -> SyncErrorKind:
     if status in {_HTTP_UNAUTHORIZED, _HTTP_NOT_FOUND}:
         return SyncErrorKind.NON_RETRYABLE
     if status == _HTTP_FORBIDDEN:
-        headers: dict[str, str] = exc.headers or {}  # type: ignore[assignment]
-        return SyncErrorKind.RETRYABLE if "Retry-After" in headers else SyncErrorKind.NON_RETRYABLE
+        message = _github_exception_message_text(exc).casefold()
+        # PyGithub lowercases header names, so look the hint up case-insensitively.
+        has_retry_after = parse_retry_after_header(exc.headers) is not None
+        looks_retryable = has_retry_after or _SECONDARY_RATE_LIMIT_MARKER in message
+        return SyncErrorKind.RETRYABLE if looks_retryable else SyncErrorKind.NON_RETRYABLE
     if status == _HTTP_TOO_MANY_REQUESTS or status >= _HTTP_SERVER_ERROR_THRESHOLD:
         return SyncErrorKind.RETRYABLE
     return SyncErrorKind.UNKNOWN
@@ -369,6 +408,55 @@ def _find_wrapped_github_exception(exc: BaseException) -> GithubException | None
         if isinstance(cause, GithubException):
             return cause
         cause = cause.__cause__
+    return None
+
+
+def parse_retry_after_header(headers: Mapping[str, object] | None) -> float | None:
+    """Parse a ``Retry-After`` response header into seconds, tolerating header-name casing.
+
+    Args:
+        headers: Response headers, from ``requester.graphql_query`` or ``GithubException.headers``.
+
+    Returns:
+        The parsed value, or ``None`` when no such header is present or it does not parse as
+        a number (GitHub always sends a seconds count, never an HTTP date, for this header).
+    """
+    for name, value in (headers or {}).items():
+        if name.casefold() == "retry-after":
+            try:
+                return float(str(value))
+            except ValueError:
+                return None
+    return None
+
+
+def retry_after_seconds(exc: BaseException) -> float | None:
+    """Return the ``Retry-After`` hint GitHub attached to a rate-limit failure, if any.
+
+    Checks ``exc`` and then its ``__cause__`` chain, because backends wrap the original error in
+    a plain ``BackendUnavailableError`` (e.g. ``GitHubBackend.fetch_snapshot``). Reads a
+    GraphQL ``GitHubRateLimitedError.retry_after``, or the ``Retry-After`` header of a REST 403/429
+    ``GithubException``. The shared source for both the sync loop's retry delay and the MCP
+    error response's ``retry_after`` field.
+
+    Args:
+        exc: The outermost exception a caller caught.
+
+    Returns:
+        The first non-``None`` ``retry_after`` found within ``_MAX_CAUSE_CHAIN_DEPTH`` links, or
+        ``None`` when no rate-limit error in the chain carries one.
+    """
+    current: BaseException | None = exc
+    for _ in range(_MAX_CAUSE_CHAIN_DEPTH + 1):
+        if current is None:
+            return None
+        if isinstance(current, GitHubRateLimitedError) and current.retry_after is not None:
+            return current.retry_after
+        if isinstance(current, GithubException) and current.status in {_HTTP_FORBIDDEN, _HTTP_TOO_MANY_REQUESTS}:
+            hint = parse_retry_after_header(current.headers)
+            if hint is not None:
+                return hint
+        current = current.__cause__
     return None
 
 
@@ -436,8 +524,11 @@ def classify_sync_error(exc: BaseException) -> SyncErrorKind:
       here by accident. OFFLINE with the refusal named beats spending the retry budget on
       an environment that refuses the next attempt identically.
     - ``GithubException`` with status 401 or 404 — NON_RETRYABLE.
-    - ``GithubException`` with status 403 and no ``Retry-After`` header — NON_RETRYABLE.
-    - ``GithubException`` with status 403 and ``Retry-After`` header — RETRYABLE.
+    - ``GithubException`` with status 403 and a ``Retry-After`` header — RETRYABLE.
+    - ``GithubException`` with status 403, no ``Retry-After`` header, and a message naming a
+      "secondary rate limit" — RETRYABLE. GitHub's docs say the header is optional on this
+      response; its absence must not turn a temporary limit into a permanent-looking refusal.
+    - ``GithubException`` with status 403 and neither of the above — NON_RETRYABLE.
     - ``GithubException`` with status 429 — RETRYABLE (primary rate limit).
     - ``GithubException`` with status >= 500 — RETRYABLE.
     - ``asyncio.TimeoutError`` — RETRYABLE (transient network timeout; checked before

@@ -976,8 +976,10 @@ concurrency guarantees:
   A tagged Issue comment is an append-only-by-agent-convention audit and human projection record;
   its metadata names the head revision and content digest. The provider accepts a patch only after
   one head CAS succeeds and the referenced comment/digest validates. Concurrent writers may leave
-  both audit comments, but exactly one head advances and only that writer is checkpointed. Edited,
-  deleted, malformed, forged, or digest-mismatched projection comments fail closed.
+  both audit comments, but exactly one head advances and only that writer is checkpointed. Before
+  posting, a writer reuses an audit comment already on the issue for the same parent revision and
+  digest, so a retry after a timed-out comment post does not duplicate it. Edited, deleted,
+  malformed, forged, or digest-mismatched projection comments fail closed.
 
 GitHub deployments require repository Contents read/write and Issues read/write permissions. The
 provider rejects an encoded envelope above 1 MiB before network I/O; larger artifacts require a

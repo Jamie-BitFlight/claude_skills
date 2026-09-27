@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from backlog_core.backend_types import IssueCommentNode
 from backlog_core.models import ContentKind, ContentRef, ContentUnavailableError
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 _TAG_PREFIX = "<!-- dh-work-item-version "
 _TAG_SUFFIX = " -->"
@@ -103,6 +106,37 @@ def render_work_item_comment(parent_revision: str, body: str) -> str:
     )
 
 
+def _comment_metadata(comment: IssueCommentNode) -> tuple[_CommentMetadata, str] | None:
+    """Return an audit comment's metadata and body, or ``None`` when it is not a valid one."""
+    header, separator, body = comment.body.partition("\n")
+    if not separator or not header.startswith(_TAG_PREFIX) or not header.endswith(_TAG_SUFFIX):
+        return None
+    try:
+        metadata = _CommentMetadata.model_validate_json(header.removeprefix(_TAG_PREFIX).removesuffix(_TAG_SUFFIX))
+    except ValidationError:
+        return None
+    return metadata, body
+
+
+def find_work_item_comment(
+    comments: Sequence[IssueCommentNode], parent_revision: str, body: str
+) -> IssueCommentNode | None:
+    """Return an audit comment already posted for this exact parent revision and body.
+
+    A mutation whose outcome was unknown can post the comment without any head pointing at it;
+    reusing it keeps a retry from posting a duplicate.
+
+    Returns:
+        The matching comment, or ``None`` when there is none.
+    """
+    wanted = (parent_revision, _body_digest(body), body)
+    for comment in comments:
+        parsed = _comment_metadata(comment)
+        if parsed is not None and (parsed[0].parent_revision, parsed[0].digest, parsed[1]) == wanted:
+            return comment
+    return None
+
+
 def parse_work_item_comment(head: WorkItemHead, comment: IssueCommentNode | None) -> str:
     """Validate that the remote audit comment exactly projects an authoritative head.
 
@@ -113,13 +147,10 @@ def parse_work_item_comment(head: WorkItemHead, comment: IssueCommentNode | None
         raise ContentUnavailableError("GitHub work-item audit comment is missing")
     if comment.id != head.comment_id:
         raise ContentUnavailableError("GitHub work-item audit comment identity is invalid")
-    header, separator, body = comment.body.partition("\n")
-    if not separator or not header.startswith(_TAG_PREFIX) or not header.endswith(_TAG_SUFFIX):
+    parsed = _comment_metadata(comment)
+    if parsed is None:
         raise ContentUnavailableError("GitHub work-item audit comment is invalid")
-    try:
-        metadata = _CommentMetadata.model_validate_json(header.removeprefix(_TAG_PREFIX).removesuffix(_TAG_SUFFIX))
-    except ValidationError as exc:
-        raise ContentUnavailableError("GitHub work-item audit comment is invalid") from exc
+    metadata, body = parsed
     if metadata.parent_revision != head.parent_revision or metadata.digest != head.digest or body != head.body:
         raise ContentUnavailableError("GitHub work-item audit comment is invalid")
     return body

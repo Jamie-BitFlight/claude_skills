@@ -67,7 +67,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 import dh_paths
 import typer
 from backlog_core.gh_client import create_task_issue, get_github
-from backlog_core.models import BacklogError, GitHubUnavailableError, SamTask
+from backlog_core.models import BacklogError, GitHubMutationOutcomeUnknownError, GitHubUnavailableError, SamTask
 from github import GithubException
 from ruamel.yaml import YAML, YAMLError
 from sam_schema.cli_output import err, output_json
@@ -592,6 +592,12 @@ def _migrate_task(
         issue = create_task_issue(
             repo, parent_issue, sam, description=task.title, acceptance_criteria=[], labels=labels
         )
+    except GitHubMutationOutcomeUnknownError as exc:
+        # Record an issue that already exists before reporting, so a rerun skips this task
+        # instead of creating a second issue.
+        if exc.created_issue_number is not None:
+            _write_github_issue_field(task, exc.created_issue_number)
+        raise
     except (BacklogError, KeyError, ValueError, RuntimeError) as exc:
         return None, str(exc)
     else:
@@ -656,7 +662,19 @@ def migrate(
             continue
 
         assert repo is not None  # ruff: ignore[assert] — repo is None only when dry_run, handled above
-        issue, error = _migrate_task(task, slug, repo, parent_issue, labels)
+        try:
+            issue, error = _migrate_task(task, slug, repo, parent_issue, labels)
+        except GitHubMutationOutcomeUnknownError as exc:
+            # GitHub's state is uncertain until someone checks it, so stop instead of carrying on.
+            results.append({
+                **record,
+                "status": "outcome_unknown",
+                "issue": exc.created_issue_number,
+                "error": str(exc),
+            })
+            if exc.created_issue_number is not None:
+                created_pairs.append((task, exc.created_issue_number))
+            break
         if issue is None:
             results.append({**record, "status": "failed", "error": error})
             continue
@@ -683,6 +701,7 @@ def migrate(
         "created": sum(1 for r in results if r["status"] in {"created", "would_create"}),
         "skipped": sum(1 for r in results if r["status"] == "skipped"),
         "failed": sum(1 for r in results if r["status"] == "failed"),
+        "outcome_unknown": sum(1 for r in results if r["status"] == "outcome_unknown"),
     }
 
     output_json({

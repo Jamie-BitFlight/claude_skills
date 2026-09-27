@@ -246,7 +246,7 @@ def test_github_sync_provider_publishes_body_change_as_audit_comment() -> None:
         reference=work_item_head_ref("#1"), content="", revision="head-1"
     )
     comments: list[dict[str, str]] = []
-    backend._fetch_issue_comments_graphql = MagicMock(side_effect=lambda *_args: list(comments))
+    backend._fetch_issue_comments_graphql = MagicMock(side_effect=lambda *_args, **_kwargs: list(comments))
 
     def add_comment(_repo: object, _issue_id: str, body: str) -> AddedCommentNode:
         comments.append({
@@ -285,6 +285,7 @@ def test_reconcile_fetches_and_applies_patches_to_supplied_repository(tmp_path: 
     issue = _issue(1)
     issue["body"] = backend.render_issue_body(provider_item)
     backend.get_github = MagicMock(return_value=repository)
+    backend._fetch_issue_comments_graphql = MagicMock(return_value=[])  # no audit comment posted yet
     backend._fetch_issues_graphql = MagicMock(return_value=[issue])
     backend._fetch_targeted_issues = MagicMock(return_value={"#1": issue})
     backend._add_comment_graphql = MagicMock(return_value=AddedCommentNode(id="comment-1", database_id=None))
@@ -302,6 +303,7 @@ def test_github_sync_provider_continues_after_audit_comment_failure() -> None:
     backend = GitHubBackend(contents=_InMemoryContents())
     repository = MagicMock(full_name="owner/repo")
     backend.get_github = MagicMock(return_value=repository)
+    backend._fetch_issue_comments_graphql = MagicMock(return_value=[])  # no audit comment posted yet
     backend._fetch_targeted_issues = MagicMock(return_value={"#1": _issue(1), "#2": _issue(2)})
     backend._add_comment_graphql = MagicMock(
         side_effect=[BacklogError("comment unavailable"), AddedCommentNode(id="comment-2", database_id=None)]
@@ -322,6 +324,7 @@ def test_github_sync_provider_rejects_empty_audit_comment_identity() -> None:
     backend = GitHubBackend(contents=contents)
     repository = MagicMock(full_name="owner/repo")
     backend.get_github = MagicMock(return_value=repository)
+    backend._fetch_issue_comments_graphql = MagicMock(return_value=[])  # no audit comment posted yet
     backend._fetch_targeted_issues = MagicMock(return_value={"#1": _issue(1)})
     backend._add_comment_graphql = MagicMock(return_value=AddedCommentNode(id="", database_id=None))
     root = root_revision("#1", "node-1", "body")

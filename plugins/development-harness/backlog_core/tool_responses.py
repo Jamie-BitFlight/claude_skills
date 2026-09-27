@@ -121,6 +121,9 @@ class FallibleToolResponse(ToolResponse):
     Absent on success, and absent on a failure this server could not classify -- a missing
     value is "not known", never "no"."""
 
+    retry_after: float | None = None
+    """Seconds GitHub asked callers to wait before retrying; absent when it gave no hint."""
+
 
 # Mixes in RegisterResult's domain fields rather than redeclaring them, so
 # the wire shape and the domain result computed by artifact_register's
@@ -1024,6 +1027,8 @@ class BacklogViewResponse(BaseModel):
     """``True`` when the same call can succeed on a later attempt, ``False`` when it cannot.
     Absent on success, and absent on a failure this server could not classify -- a missing
     value is "not known", never "no"."""
+    retry_after: float | None = None
+    """Seconds GitHub asked callers to wait before retrying; absent when it gave no hint."""
     error_type: str | None = None
     """Exception class name (e.g. ``"ItemNotFoundError"``), set only on the
     generic ``BacklogError`` arm of ``_execute_disclosure_or_passthrough`` --
@@ -1057,6 +1062,8 @@ class MilestoneEchoError(BaseModel):
     """``True`` when the same call can succeed on a later attempt, ``False`` when it cannot.
     Absent on success, and absent on a failure this server could not classify -- a missing
     value is "not known", never "no"."""
+    retry_after: float | None = None
+    """Seconds GitHub asked callers to wait before retrying; absent when it gave no hint."""
 
     unsupported_capability: str | None = None
     """Missing capability flag name, set only on an ``UnsupportedBackendCapabilityError`` arm."""

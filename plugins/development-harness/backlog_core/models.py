@@ -693,6 +693,78 @@ class GraphQLUnavailableError(BackendUnavailableError):
         super().__init__(*args, retryable=False)
 
 
+class GitHubRateLimitedError(BackendUnavailableError):
+    """Raised when GitHub refuses a request for exceeding a rate limit.
+
+    Covers both a GraphQL response answered with a ``RATE_LIMITED`` error entry and a REST
+    403/429 whose body names a primary or secondary rate limit. Always retryable -- the limit
+    is temporary by definition -- so the constructor does not take a ``retryable`` argument the
+    way :class:`BacklogError` does; there is no raise site for this class where the answer could
+    be anything else.
+
+    Attributes:
+        retry_after: Seconds GitHub says to wait before retrying, parsed from a ``Retry-After``
+            response header when the transport provided one. ``None`` when GitHub sent no such
+            hint -- the caller falls back to its own backoff policy.
+    """
+
+    def __init__(self, *args: object, retry_after: float | None = None) -> None:
+        """Initialize with the usual exception args and the parsed retry-after hint."""
+        super().__init__(*args, retryable=True)
+        self.retry_after = retry_after
+
+
+class GitHubRequestTimeoutError(BackendUnavailableError):
+    """Raised when a GitHub request exceeds its total wall-clock deadline.
+
+    Distinct from the per-read/connect timeout ``requests``/``urllib3`` already enforce: that
+    timeout only bounds the gap between two consecutive bytes on the socket, so a response that
+    trickles data slowly enough to keep every individual read under it can still block for
+    arbitrarily long. This error marks the point where a caller-imposed *total* deadline gave up
+    waiting instead. Always retryable -- a slow response says nothing about whether the same
+    request would succeed faster on a later attempt.
+
+    Attributes:
+        timeout_seconds: The total deadline that elapsed.
+    """
+
+    def __init__(self, *args: object, timeout_seconds: float) -> None:
+        """Initialize with the usual exception args and the deadline that elapsed."""
+        super().__init__(*args, retryable=True)
+        self.timeout_seconds = timeout_seconds
+
+
+class GitHubMutationOutcomeUnknownError(BackendUnavailableError):
+    """Raised when a GitHub mutation exceeds its total wall-clock deadline.
+
+    The deadline abandons the request's worker thread rather than cancelling it, so the mutation
+    may still complete on GitHub after this is raised. Never retryable -- retrying a
+    ``createIssue`` or ``addComment`` whose first attempt later lands creates a duplicate. The
+    caller must check GitHub for the change before sending it again. Deliberately not a
+    :class:`GitHubRequestTimeoutError`, which is retryable and would let a handler for that type
+    treat this outcome as safe to repeat.
+
+    Attributes:
+        timeout_seconds: The total deadline that elapsed.
+        created_issue_number: An issue an earlier step of the same operation already created,
+            so a caller can record it instead of creating it again. ``None`` when none was.
+        created_comment_id: A comment an earlier step already posted, for the same reason.
+    """
+
+    def __init__(
+        self,
+        *args: object,
+        timeout_seconds: float,
+        created_issue_number: int | None = None,
+        created_comment_id: str | None = None,
+    ) -> None:
+        """Initialize with the usual exception args, the deadline, and what already exists."""
+        super().__init__(*args, retryable=False)
+        self.timeout_seconds = timeout_seconds
+        self.created_issue_number = created_issue_number
+        self.created_comment_id = created_comment_id
+
+
 # Maps a capability flag name to the runtime_checkable Protocol it gates, for use in
 # UnsupportedBackendCapabilityError's protocol_mismatch message — "github_extras" alone
 # doesn't tell a reader which Protocol class the backend failed to satisfy.
