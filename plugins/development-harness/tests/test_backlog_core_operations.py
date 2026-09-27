@@ -3629,7 +3629,9 @@ class TestRefreshClosedIssueReconciliation:
         backend = cast("Any", get_config().backend)
         _seed_items([BacklogItem(title="Done", section="P1", issue="#60", status="done", reference="#60")])
         refresh_local_cache_from_github()
-        assert backend.reconcile_requests[-1] == ReconcileRequest(scope=ReconcileScope.INCREMENTAL)
+        assert backend.reconcile_requests[-1] == ReconcileRequest(
+            scope=ReconcileScope.INCREMENTAL, apply_local_patches=False
+        )
 
     def test_refresh_open_takes_precedence(self) -> None:
         from backlog_core.backend_protocol import get_config
@@ -3684,7 +3686,7 @@ class TestRefreshLocalCacheIncrementalSync:
 
         backend = cast("Any", get_config().backend)
         refresh_local_cache_from_github(full_refresh=True)
-        assert backend.reconcile_requests == [ReconcileRequest(scope=ReconcileScope.INITIAL)]
+        assert backend.reconcile_requests == [ReconcileRequest(scope=ReconcileScope.INITIAL, apply_local_patches=False)]
 
 
 class TestSyncIncrementalParseBacklogCallCount:
@@ -3698,7 +3700,9 @@ class TestSyncIncrementalParseBacklogCallCount:
             BacklogItem(title="Three", section="P1", issue="#3", reference="#3"),
         ])
         refresh_local_cache_from_github()
-        assert backend.reconcile_requests == [ReconcileRequest(scope=ReconcileScope.INCREMENTAL)]
+        assert backend.reconcile_requests == [
+            ReconcileRequest(scope=ReconcileScope.INCREMENTAL, apply_local_patches=False)
+        ]
 
 
 class TestGroomItemMarkGroomed:

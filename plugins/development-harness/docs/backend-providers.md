@@ -143,8 +143,8 @@ completeness and listing provenance" in
 [ARCHITECTURE.md](../backlog_core/ARCHITECTURE.md)), and MCP no longer
 schedules a whole-history background fetch behind one (removed with the
 request-shaped-reads design, 2026-09 — that would contradict "the cache holds
-only what was requested"). Only a configured startup sync or an explicit
-`backlog_sync` performs whole-backlog maintenance.
+only what was requested"). Only an explicit `backlog_sync` or `sync_now`
+performs whole-backlog maintenance; the server runs no sync at startup.
 
 Provider requests are individually bounded to no more than 30 seconds. An
 ordinary command that performs several provider requests has no default

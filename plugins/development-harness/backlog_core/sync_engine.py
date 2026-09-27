@@ -1,8 +1,8 @@
 """Background sync engine for the backlog MCP server.
 
-Provides the startup sync loop that runs as a long-lived asyncio task for the
-life of the server process.  The loop is launched once via the FastMCP lifespan
-hook in ``server.py`` and cancelled on server shutdown.
+Provides the sync loop behind the ``sync_now`` tool. ``server.py`` launches it
+as an asyncio task only when a caller asks for a sync; the server never starts
+one on its own.
 
 Error policy (design doc section 5.3):
     - Non-retryable errors (auth, config, filesystem): set OFFLINE immediately, stop.
@@ -35,7 +35,7 @@ from .sync_state import SyncErrorKind, SyncState, SyncStatus, classify_sync_erro
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
-__all__ = ["_startup_sync_loop"]
+__all__ = ["_sync_loop"]
 
 _log = logging.getLogger(__name__)
 
@@ -123,8 +123,12 @@ async def _run_single_sync(state: SyncState, full_refresh: bool = False) -> None
             re-raised for the caller to classify.
     """
     callback = _make_progress_callback(state)
+    # A caller asked for this sync (sync_now), so it may push queued local patches.
     result = await asyncio.to_thread(
-        operations.refresh_local_cache_from_github, full_refresh=full_refresh, progress_callback=callback
+        operations.refresh_local_cache_from_github,
+        full_refresh=full_refresh,
+        progress_callback=callback,
+        apply_local_patches=True,
     )
     # The progress callback marshals mutations via loop.call_soon_threadsafe.
     # Yield once so those callbacks run before we mark the sync complete.
@@ -220,8 +224,8 @@ async def _attempt_sync(state: SyncState, attempt: int, full_refresh: bool) -> b
             return True  # success — loop terminates
 
 
-async def _startup_sync_loop(state: SyncState, full_refresh: bool = False) -> None:
-    """Background coroutine: run sync at startup with bounded retry on failure.
+async def _sync_loop(state: SyncState, full_refresh: bool = False) -> None:
+    """Background coroutine: run one requested sync with bounded retry on failure.
 
     Acquires ``state.lock`` for the duration of each sync attempt to prevent
     concurrent sync workers.  On non-retryable error, sets OFFLINE and returns.
