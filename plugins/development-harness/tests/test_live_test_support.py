@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from tests.live_test_support import Journal, LiveCalls, collect_items, issue_number, require_success, unscoped_e2e
+from tests.live_test_support import Journal, LiveCalls, collect_items, issue_number, require_success
 
 
 def page(offset: int, title: str, has_more: bool) -> dict[str, object]:
@@ -101,10 +101,3 @@ async def test_wire_response_survives_decode_or_operation_failure(tmp_path, wire
     events = [json.loads(line) for line in path.read_text().splitlines()]
     assert next(event["text"] for event in events if event["event"] == "response") == wire
     assert events[-1]["event"] == "failed"
-
-
-def test_only_e2e_tests_without_the_sandbox_fixture_are_unscoped() -> None:
-    """The live job selects by marker, so an e2e test outside the sandbox contract must be named."""
-    items = [("scoped", True, ("tmp_path", "live_sandbox")), ("unscoped", True, ("tmp_path",)), ("unit", False, ())]
-
-    assert unscoped_e2e(items) == ["unscoped"]

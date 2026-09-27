@@ -30,10 +30,11 @@ sandbox variable, and serializes live jobs using that target. Only preflight, te
 receive the sandbox secret. Missing or inconsistent configuration fails preflight; it never falls
 back to production or reports an all-skipped live pass. E2E remains advisory outside Quality Gate.
 
-The live job selects every `e2e`-marked test in the plugin, so each one must request the
-`live_sandbox` fixture (plugin-root `conftest.py`). That fixture validates the scope above and the
-sandbox marker before any live request. Collection fails, in every lane, when an `e2e` test does not
-request it.
+The live job selects every `e2e`-marked test in the plugin. An autouse fixture in the plugin-root
+`conftest.py` runs the `live_sandbox` check for each of them: it validates the scope above and the
+sandbox marker before the test body runs. A test that needs the validated scope or repository
+requests `live_sandbox` by name. Only probes that exercise e2e-marker mechanics without a sandbox
+(`e2e_mechanics_probe`) skip the check; such a probe must never make a live request.
 
 ## Run and diagnose
 

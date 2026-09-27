@@ -73,11 +73,6 @@ _CLASS_SCOPED_LIVE_BACKEND_PROBE = """
         '''Stands in for the live backend an e2e fixture installs.'''
 
 
-    @pytest.fixture(autouse=True)
-    def live_sandbox():
-        '''Stand in for the sandbox contract fixture, which needs live credentials.'''
-
-
     @pytest.fixture(scope="class")
     def live_backend():
         backend = SentinelBackend()
@@ -105,7 +100,9 @@ def test_e2e_test_keeps_the_backend_installed_by_its_own_fixture() -> None:
     reset it between tests in that class.
     """
     with _tests_dir_probe(
-        _CLASS_SCOPED_LIVE_BACKEND_PROBE.format(marker="pytestmark = pytest.mark.e2e", expected="SentinelBackend")
+        _CLASS_SCOPED_LIVE_BACKEND_PROBE.format(
+            marker="pytestmark = [pytest.mark.e2e, pytest.mark.e2e_mechanics_probe]", expected="SentinelBackend"
+        )
     ) as probe:
         result = _run_probe(probe, "-m", "e2e")
 

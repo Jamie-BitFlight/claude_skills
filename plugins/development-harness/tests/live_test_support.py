@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import time
 import traceback
-from collections.abc import Awaitable, Callable, Iterable, Iterator
+from collections.abc import Awaitable, Callable, Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
@@ -13,10 +13,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from fastmcp.client import Client
-
-#: The fixture that validates the sandbox scope (``LiveTestScope``) and preflight
-#: (``open_sandbox``) before any live request. Every e2e test must request it.
-LIVE_SANDBOX_FIXTURE = "live_sandbox"
 
 ToolCall = Callable[[str, dict[str, object]], Awaitable[dict[str, object]]]
 
@@ -116,18 +112,3 @@ def issue_number(result: dict[str, object]) -> int:
     if number <= 0:
         raise AssertionError(f"backlog_add returned an invalid issue number: {result!r}")
     return number
-
-
-def unscoped_e2e(items: Iterable[tuple[str, bool, Iterable[str]]]) -> list[str]:
-    """Name the e2e tests that bypass the sandbox scope and preflight contract.
-
-    The e2e lane selects by marker, so any test that gains the marker enters the
-    live job; only the sandbox fixture keeps its requests inside the sandbox.
-
-    Args:
-        items: ``(node ID, marked e2e, fixture names)`` for each collected test.
-
-    Returns:
-        Node IDs of e2e-marked items that do not request ``LIVE_SANDBOX_FIXTURE``.
-    """
-    return [nodeid for nodeid, e2e, fixtures in items if e2e and LIVE_SANDBOX_FIXTURE not in fixtures]

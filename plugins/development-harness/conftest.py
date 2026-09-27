@@ -122,7 +122,6 @@ def close_sqlite_connections(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
 
 import tiktoken
-from tests.live_test_support import unscoped_e2e
 from tests.network_blocked import NetworkBlocked
 
 # tiktoken downloads its BPE encoding from openaipublic.blob.core.windows.net
@@ -245,6 +244,11 @@ _MARKERS = (
     "critical: marks tests covering critical-path code requiring stronger correctness guarantees (e.g. round-trip property tests)",
     "cross_backend: marks tests that run only in the test-cross-backend CI matrix job",
     "e2e: marks tests as end-to-end tests",
+    (
+        "e2e_mechanics_probe: marks a pytester or subprocess probe that exercises e2e-marker mechanics "
+        "(network gate, fixture skips) without a sandbox; it skips the live_sandbox preflight, so never "
+        "put it on a test that makes a live request"
+    ),
     "integration: marks tests as integration tests",
     "slow: marks tests as slow",
     "unit: marks tests as unit tests",
@@ -287,27 +291,18 @@ def remove_network_guard() -> None:
     _network_patch.undo()
 
 
-def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Fail closed when an e2e test bypasses the sandbox scope and preflight contract.
+@pytest.fixture(autouse=True)
+def _live_sandbox_contract(request: pytest.FixtureRequest) -> None:
+    """Run the sandbox scope and preflight check before every e2e test.
 
-    The live job selects every e2e-marked test, so this check, not the job, is what
-    keeps its requests inside the sandbox. It runs on every collection, marker filter
-    or not.
-
-    Args:
-        config: The pytest config object (unused).
-        items: Every collected test item.
-
-    Raises:
-        pytest.UsageError: If an e2e test does not request the ``live_sandbox`` fixture.
+    The live job selects every e2e-marked test, so this default, not each test's
+    fixture list, keeps live requests inside the sandbox. A test that needs the
+    validated scope or repository requests ``live_sandbox`` too and gets the same
+    value.
     """
-    # Only a pytest.Function has fixturenames; any other e2e item cannot request the
-    # fixture, so it counts as unscoped.
-    collected = (
-        (item.nodeid, item.get_closest_marker("e2e") is not None, getattr(item, "fixturenames", ())) for item in items
-    )
-    if unscoped := unscoped_e2e(collected):
-        raise pytest.UsageError("e2e tests must request the live_sandbox fixture: " + ", ".join(unscoped))
+    node = request.node
+    if node.get_closest_marker("e2e") and not node.get_closest_marker("e2e_mechanics_probe"):
+        request.getfixturevalue("live_sandbox")
 
 
 @pytest.fixture

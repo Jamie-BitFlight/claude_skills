@@ -154,11 +154,7 @@ def test_double_gate_requires_env_var() -> None:
         import pytest
         import socket
 
-        pytestmark = pytest.mark.e2e
-
-        @pytest.fixture(autouse=True)
-        def live_sandbox():
-            '''Stand in for the sandbox contract fixture, which needs live credentials.'''
+        pytestmark = [pytest.mark.e2e, pytest.mark.e2e_mechanics_probe]
 
         def test_external_attempt() -> None:
             socket.getaddrinfo("example.invalid", 443)
@@ -191,11 +187,7 @@ def test_double_gate_opens_with_env_var() -> None:
         import pytest
         from conftest import _state
 
-        pytestmark = pytest.mark.e2e
-
-        @pytest.fixture(autouse=True)
-        def live_sandbox():
-            '''Stand in for the sandbox contract fixture, which needs live credentials.'''
+        pytestmark = [pytest.mark.e2e, pytest.mark.e2e_mechanics_probe]
 
         def test_gate_open() -> None:
             assert _state["allowed"] is True, "guard must be lifted under double gate"
@@ -228,11 +220,7 @@ def test_double_gate_stays_open_through_class_scoped_teardown() -> None:
         import pytest
         from conftest import _state
 
-        pytestmark = pytest.mark.e2e
-
-        @pytest.fixture(autouse=True)
-        def live_sandbox():
-            '''Stand in for the sandbox contract fixture, which needs live credentials.'''
+        pytestmark = [pytest.mark.e2e, pytest.mark.e2e_mechanics_probe]
 
         @pytest.fixture(scope="class")
         def class_fixture():
