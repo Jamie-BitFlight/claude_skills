@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import ast
 import re
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
 from ruamel.yaml import YAML
@@ -117,10 +118,70 @@ def test_live_e2e_retains_sandbox_and_cleanup_boundaries(workflow: dict) -> None
     assert any(step.get("uses") == "actions/upload-artifact@v7" and step.get("if") == "always()" for step in steps)
 
 
+def runner_test_paths(plugin: str) -> tuple[str, ...]:
+    """Read a plugin runner's ``TEST_PATHS`` literal without importing the runner."""
+    runner = ROOT / "plugins" / plugin / "run_pytests.py"
+    if not runner.is_file():
+        return ()
+    for node in ast.parse(runner.read_text(encoding="utf-8")).body:
+        if isinstance(node, ast.Assign):
+            target, value = node.targets[0], node.value
+        elif isinstance(node, ast.AnnAssign) and node.value is not None:
+            target, value = node.target, node.value
+        else:
+            continue
+        if isinstance(target, ast.Name) and target.id == "TEST_PATHS":
+            return tuple(ast.literal_eval(value))
+    return ()
+
+
+def plugin_test_paths(text: str) -> list[str]:
+    """Name each ``plugins/<name>/...`` token that points into a runner's tests or at a test file.
+
+    Returns:
+        The offending tokens: under one of the plugin runner's ``TEST_PATHS``, or a
+        ``test_*.py`` / ``*_test.py`` file anywhere in a plugin.
+    """
+    found = []
+    for token in re.findall(r"plugins/[\w.-]+/[^\s\"'`)]*", text):
+        path = PurePosixPath(token)
+        plugin, inner = path.parts[1], PurePosixPath(*path.parts[2:]) if len(path.parts) > 2 else PurePosixPath()
+        is_test_file = path.suffix == ".py" and (path.name.startswith("test_") or path.stem.endswith("_test"))
+        if is_test_file or any(inner.is_relative_to(root) for root in runner_test_paths(plugin)):
+            found.append(token)
+    return found
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "pytest plugins/development-harness/tests/test_live_validation.py",
+        "pytest plugins/development-harness/skills/kage-bunshin/tests/",
+        "pytest plugins/development-harness/skills/implementation-manager/scripts/test_task_parsing.py",
+        "pytest plugins/development-harness/scripts/test_helper.py",
+        "pytest plugins/development-harness/tests_sam",
+    ],
+)
+def test_plugin_test_path_guard_catches_every_layout(command: str) -> None:
+    """Hyphenated directories, runner roots outside tests/, and bare test files are all caught."""
+    assert plugin_test_paths(command) == [command.removeprefix("pytest ")]
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "uv run --locked --script plugins/development-harness/run_pytests.py -m e2e",
+        "uv run --locked python plugins/development-harness/scripts/close_test_issues.py --check-only",
+    ],
+)
+def test_plugin_test_path_guard_allows_runners_and_scripts(command: str) -> None:
+    """The runner entry point and a plugin's operational scripts are not test paths."""
+    assert plugin_test_paths(command) == []
+
+
 def test_workflow_names_no_plugin_test_path() -> None:
     """A plugin's runner owns its test roots; a workflow path drifts from the lane's marker."""
-    text = (ROOT / ".github/workflows/code-quality.yml").read_text(encoding="utf-8")
-    assert re.findall(r"plugins/[^/\s]+/(?:tests\w*|[\w/]*/tests)/", text) == []
+    assert plugin_test_paths((ROOT / ".github/workflows/code-quality.yml").read_text(encoding="utf-8")) == []
 
 
 def test_live_e2e_runs_through_the_plugin_runner(workflow: dict) -> None:
