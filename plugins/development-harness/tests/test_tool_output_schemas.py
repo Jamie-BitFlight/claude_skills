@@ -45,7 +45,11 @@ EXCLUDED_TOOLS = {"profile_list", "profile_load"}  # different ownership, out of
 # the same field: both refuse calls that repeat identically (a wave already recorded, a status
 # outside the three accepted, an issue no wave holds) and had no way to say so. The cap is
 # unchanged; 26 tokens per tool is the measured cost of each further tool that gains it.
-_MAX_TOTAL_SCHEMA_TOKENS = 14000
+# Raised 14000->15000 when every error arm that carries ``retryable`` gained ``retry_after``:
+# measured 13,865 -> 14,905, 26 tokens per tool across the same 40 tools. It carries GitHub's
+# Retry-After hint, which ``retryable: true`` alone cannot: without it a caller retries on its own
+# schedule and is refused again until the rate limit lifts.
+_MAX_TOTAL_SCHEMA_TOKENS = 15000
 _MAX_SINGLE_TOOL_SCHEMA_TOKENS = 700
 
 # backlog_view (#3368) is the deliberate multi-mode outlier: one tool

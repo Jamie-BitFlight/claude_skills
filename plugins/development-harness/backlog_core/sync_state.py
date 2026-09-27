@@ -26,7 +26,13 @@ import requests
 from github import GithubException
 from pydantic import BaseModel, ConfigDict
 
-from .models import BackendUnavailableError, BacklogError, ContentProviderError, UnsupportedBackendCapabilityError
+from .models import (
+    BackendUnavailableError,
+    BacklogError,
+    ContentProviderError,
+    GitHubRateLimitedError,
+    UnsupportedBackendCapabilityError,
+)
 
 # Transient-network exceptions that are also OSError subclasses, so they must be
 # checked before the generic OSError branch: asyncio.TimeoutError (Python 3.11+
@@ -54,6 +60,7 @@ __all__ = [
     "classify_sync_error",
     "get_sync_state",
     "reset_sync_state",
+    "retry_after_seconds",
 ]
 
 # HTTP status code constants used in error classification (avoids PLR2004 magic values).
@@ -116,6 +123,8 @@ class SyncState:
         last_error: Error message from the last failed sync attempt.
         last_success_at: UTC timestamp of the last *successful* sync.
         retry_count: Consecutive failed attempts in the current cycle.
+        retry_after: Seconds GitHub asked the last retryable failure to wait, or ``None`` when
+            it gave no hint (see ``retry_after_seconds``).
         offline_reason: Human-readable explanation for OFFLINE state entry.
         pending_mutations: Offline-queue depth as of the last completed sync.
         rejected_mutations: Dead-lettered mutation count as of the last
@@ -135,6 +144,7 @@ class SyncState:
     last_error: str = ""
     last_success_at: datetime | None = None
     retry_count: int = 0
+    retry_after: float | None = None
     offline_reason: str = ""
     pending_mutations: int = 0
     rejected_mutations: int = 0
@@ -392,6 +402,31 @@ def _find_wrapped_github_exception(exc: BaseException) -> GithubException | None
         if isinstance(cause, GithubException):
             return cause
         cause = cause.__cause__
+    return None
+
+
+def retry_after_seconds(exc: BaseException) -> float | None:
+    """Return the ``Retry-After`` hint GitHub attached to a rate-limit failure, if any.
+
+    Checks ``exc`` and then its ``__cause__`` chain, because backends wrap the original
+    ``GitHubRateLimitedError`` in a plain ``BackendUnavailableError`` (e.g.
+    ``GitHubBackend.fetch_snapshot``). The shared source for both the sync loop's retry delay
+    and the MCP error response's ``retry_after`` field.
+
+    Args:
+        exc: The outermost exception a caller caught.
+
+    Returns:
+        The first non-``None`` ``retry_after`` found within ``_MAX_CAUSE_CHAIN_DEPTH`` links, or
+        ``None`` when no rate-limit error in the chain carries one.
+    """
+    current: BaseException | None = exc
+    for _ in range(_MAX_CAUSE_CHAIN_DEPTH + 1):
+        if current is None:
+            return None
+        if isinstance(current, GitHubRateLimitedError) and current.retry_after is not None:
+            return current.retry_after
+        current = current.__cause__
     return None
 
 
