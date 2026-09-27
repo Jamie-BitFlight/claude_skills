@@ -19,7 +19,10 @@ directory under `plugins/`, has a local (`./`) entry for a directory that does n
 local entry differently from its `plugin.json`. Entries with an external source (`github`,
 `git-subdir`) are not checked; keep them. Fix the reported entry by hand. Do not edit
 `version` fields. The `Local / Manifest sync` CI job runs the same hook on every PR that touches
-plugins.
+plugins. It also runs [check_branch_version_fields.py](../scripts/check_branch_version_fields.py),
+which fails when the branch changed any plugin or marketplace `version` field since it forked from
+`main`. `repair` would treat such an edit, including a downgrade from a conflict resolution, as that
+plugin's last bump and never correct it. Restore the listed fields to the values the check prints.
 
 Branch commits no longer change a plugin's version, so the plugin cache keyed on that version does
 not refresh from branch work. To exercise a plugin from your working copy, load it directly:
