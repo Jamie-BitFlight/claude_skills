@@ -1,14 +1,17 @@
-"""Guard that ``testpaths`` and the test files on disk stay in agreement.
+"""Guard that the declared test roots and the test files on disk stay in agreement.
 
-CI's default lane is a bare ``uv run pytest``, which collects only the directories in
-``testpaths``. A test file outside every one of them never runs anywhere and reports no
-failure while it rots; a ``testpaths`` entry naming a directory that no longer exists
-collects nothing while looking like coverage. Both directions are checked here.
+Two authorities declare test roots. Root ``testpaths`` covers repository-owned tests,
+collected by a bare ``uv run pytest``. Each ``plugins/<name>/run_pytests.py`` declares
+its plugin's roots in a literal ``TEST_PATHS`` constant, collected by that runner. A test
+file outside every root never runs anywhere and reports no failure while it rots; a root
+naming a directory that no longer exists collects nothing while looking like coverage.
+Both directions are checked here.
 
-Every input is derived, never transcribed: ``testpaths`` and the filename patterns come
-from the live pytest config — the same values the run itself obeys, so an ``addopts``,
-``-o`` or competing-config override cannot move the runtime without moving the oracle —
-and the file set from ``git ls-files``.
+Every input is derived, never transcribed. Root ``testpaths`` and ``python_files`` come
+from the live pytest config, the values a bare run obeys. Runner roots come from each
+runner's ``TEST_PATHS``. A file inside a plugin that has a runner is classified with
+pytest's default ``python_files``, because runners pass ``-c os.devnull`` and set no
+``python_files`` of their own. The file set comes from ``git ls-files``.
 
 A marker-gated file (``e2e``, ``integration``, ``cross_backend``, ``research_vault``)
 needs no exclusion: it still lives inside a ``testpaths`` directory, and its dedicated CI
@@ -40,6 +43,11 @@ _THIS_FILE = "tests/test_testpaths_collection_coverage.py"
 # reason collecting it would be wrong. Keys are exact file paths, never directory
 # prefixes: a prefix would shelter every file later added beneath it, silently skipping
 # a genuine test someone drops into that tree.
+# pytest's own ``python_files`` default, which applies under every plugin runner: runners
+# pass ``-c os.devnull`` and no ``python_files`` override (the runner contract test checks
+# that no runner sets one).
+_RUNNER_PYTHON_FILES = ("test_*.py", "*_test.py")
+
 _NOT_OUR_TESTS = {
     "plugins/development-harness/skills/test-reviewer/evals/fixtures/review_project/test_app.py": (
         "deliberately flawed sample project that the test-reviewer eval reviews as data; "
@@ -71,30 +79,57 @@ def unreachable_test_files(
     return sorted(path for path in test_files if path not in excluded and not path.startswith(roots))
 
 
-def _tracked_test_files(patterns: Iterable[str]) -> set[str]:
-    """Return repository-relative tracked files whose name matches ``python_files``."""
+def _runner_plugins() -> tuple[str, ...]:
+    """Return the repository-relative directories of plugins that own a runner, with a trailing slash."""
+    return tuple(f"{runner.parent.relative_to(_REPO_ROOT).as_posix()}/" for runner in _runners())
+
+
+def _runners() -> list[Path]:
+    return sorted((_REPO_ROOT / "plugins").glob("*/run_pytests.py"))
+
+
+def _tracked_test_files(root_patterns: Iterable[str]) -> set[str]:
+    """Return tracked files that the collector owning their location would treat as tests.
+
+    Files inside a plugin with a runner match pytest's default ``python_files``; every
+    other file matches the root ``python_files``.
+    """
     tracked = subprocess.run(
         ["git", "ls-files", "-z", "*.py"], cwd=_REPO_ROOT, capture_output=True, text=True, check=True
     ).stdout.split("\0")
-    return {path for path in tracked if path and any(fnmatch.fnmatch(Path(path).name, pat) for pat in patterns)}
+    root_patterns = tuple(root_patterns)
+    plugins = _runner_plugins()
+
+    def is_test(path: str) -> bool:
+        patterns = _RUNNER_PYTHON_FILES if path.startswith(plugins) else root_patterns
+        return any(fnmatch.fnmatch(Path(path).name, pat) for pat in patterns)
+
+    return {path for path in tracked if path and is_test(path)}
 
 
 def _plugin_runner_testpaths() -> list[str]:
-    """Return plugin test roots declared by literal TEST_PATHS runner constants."""
+    """Return plugin test roots declared by each runner's module-level literal ``TEST_PATHS``."""
     roots: list[str] = []
-    for runner in sorted((_REPO_ROOT / "plugins").glob("*/run_pytests.py")):
+    for runner in _runners():
         tree = ast.parse(runner.read_text(encoding="utf-8"), filename=str(runner))
-        assignment = next(
+        value = next(
             (
-                node
+                node.value
                 for node in tree.body
-                if isinstance(node, ast.Assign)
-                and any(isinstance(t, ast.Name) and t.id in {"TEST_PATHS", "_DEFAULT_TEST_PATHS"} for t in node.targets)
+                if (
+                    isinstance(node, ast.Assign)
+                    and any(isinstance(t, ast.Name) and t.id == "TEST_PATHS" for t in node.targets)
+                )
+                or (
+                    isinstance(node, ast.AnnAssign)
+                    and isinstance(node.target, ast.Name)
+                    and node.target.id == "TEST_PATHS"
+                )
             ),
             None,
         )
-        assert assignment is not None, f"{runner.relative_to(_REPO_ROOT)} has no literal test-path contract"
-        values = ast.literal_eval(assignment.value)
+        assert value is not None, f"{runner.relative_to(_REPO_ROOT)} has no literal TEST_PATHS"
+        values = ast.literal_eval(value)
         assert isinstance(values, (list, tuple))
         assert values
         plugin = runner.parent.relative_to(_REPO_ROOT)

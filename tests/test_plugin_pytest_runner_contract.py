@@ -124,3 +124,4 @@ def test_runner_hands_pytest_its_own_isolated_configuration(runner: Path, monkey
     assert {"--strict-config", "--strict-markers", "--import-mode=importlib", "--asyncio-mode=auto"} <= set(args)
     assert f"testpaths={shlex.join(module.TEST_PATHS)}" in args
     assert args[args.index("-m") + 1] == root_fast_marker() == module.FAST_MARKER
+    assert not any(arg.startswith("python_files") for arg in args)
