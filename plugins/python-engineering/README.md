@@ -194,4 +194,4 @@ Repository validation is defined by the repository's hooks and CI. Follow [the r
 
 ## License
 
-MIT. See [LICENSE](https://github.com/Jamie-BitFlight/claude_skills/blob/main/LICENSE).
+MIT. See [LICENSE](./LICENSE).
