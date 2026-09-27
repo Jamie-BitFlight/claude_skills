@@ -8,20 +8,22 @@ Process Siren helps agents understand, improve, validate, and concisely describe
 
 ## The Problem
 
-AI agents reading prose instructions in SKILL.md, CLAUDE.md, and agent files must guess:
+Process instructions can leave consequential decisions unresolved:
 
-- "Then..." — how many steps? in what order?
-- "If appropriate..." — appropriate by what observable fact?
-- "Handle the usual cases" — which cases? what is usual?
-- "When done..." — done by what signal?
+- "Then..." — which ordering is required?
+- "If appropriate..." — which fact determines the branch?
+- "Handle the usual cases" — does routine knowledge suffice, or is a system-specific exception missing?
+- "When done..." — what observable outcome establishes completion?
 
 Mermaid can make process structure materially less ambiguous by expressing relevant transitions, guards, actors, and terminal states explicitly. It does not eliminate uncertainty or require deterministic behavior: the semantic model may intentionally permit multiple valid next states, and unresolved intent remains explicit rather than being invented by the diagram.
 
+Completeness does not mean maximum detail. Keep familiar low-risk steps concise, and expand consequential decisions locally through a child procedure whose contract remains visible from the parent. Paths and wrapped labels do not automatically require extra nodes.
+
 ## Before and After
 
-**Before** (prose that fails AI agents):
+**Before** (an incomplete source process):
 
-```
+```text
 1. Check for uncommitted changes
 2. If yes, stash them before proceeding
 3. Run the test suite
@@ -29,22 +31,22 @@ Mermaid can make process structure materially less ambiguous by expressing relev
 5. If tests fail, restore the stash and report errors
 ```
 
-**After** (Mermaid — every path is unambiguous):
+**After — as-is description, not an approved merge procedure.** This diagram exposes the source's routing without resolving its missing stash ownership, merge-failure, or successful-path restoration behavior. Those gaps require assessment before using it as an operational procedure.
 
 ```mermaid
 flowchart TD
-    Start(["Begin merge"]) --> Check{"git status\nhas changes?"}
+    Start(["Begin merge"]) --> Check{"git status<br>has changes?"}
     Check -->|"Yes — uncommitted changes"| Stash["git stash"]
     Check -->|"No — clean working tree"| Test
     Stash --> Test["Run test suite"]
     Test --> Result{"Exit code?"}
     Result -->|"0 — all pass"| Merge["git merge branch"]
-    Result -->|"non-zero — failures"| Restore["git stash pop\nReport failures"]
+    Result -->|"non-zero — failures"| Restore["git stash pop<br>Report failures"]
     Merge --> Done(["Merge complete"])
     Restore --> Blocked(["Blocked — tests failed"])
 ```
 
-The structural representation test: can an AI agent follow the represented path without inventing meaning? Passing this establishes diagram fidelity, not behavioral correctness.
+The structural representation test is whether the diagram preserves the source model at its stated resolution without inventing meaning. Passing this establishes fidelity, not behavioral correctness or permission to execute it.
 
 ## What's Inside
 
@@ -66,7 +68,7 @@ The structural representation test: can an AI agent follow the represented path 
 
 ### Convert a section in a file
 
-```
+```text
 @process-siren Convert the "Verification Decision Flow" section in .claude/CLAUDE.md to a Mermaid flowchart.
 ```
 
@@ -74,7 +76,7 @@ The structural representation test: can an AI agent follow the represented path 
 
 Paste the process directly:
 
-```
+```text
 @process-siren Convert this to a Mermaid diagram:
 
 1. Check if the branch has uncommitted changes
@@ -84,18 +86,19 @@ Paste the process directly:
 5. If tests fail, restore the stash and report errors
 ```
 
-### Convert a whole file or directory
+### Analyze, improve, or represent a file or directory
 
-```
-/process-siren:woo-sailor plugins/my-plugin/skills/my-skill/SKILL.md
-/process-siren:woo-sailor plugins/my-plugin/  --dry-run
+```text
+/process-siren:woo-sailor plugins/my-plugin/skills/my-skill/SKILL.md --represent
+/process-siren:woo-sailor plugins/my-plugin/ --dry-run
+/process-siren:woo-sailor plugins/my-plugin/ --improve
 ```
 
-`--dry-run` and `--report` use read-only ANALYZE behavior. Use `--improve` to apply intent-preserving changes or `--represent` for faithful Mermaid representation.
+`--dry-run` and `--report` use read-only ANALYZE behavior. Use `--improve` to apply intent-preserving changes or `--represent` for faithful Mermaid representation. An invocation without a mode defaults to IMPROVE.
 
 ### Run a quality audit before converting
 
-```
+```text
 /process-siren:improve-processes
 ```
 
@@ -111,41 +114,49 @@ Paste or reference the process you want audited. The skill builds the semantic m
 
 The agent establishes purpose at the useful resolution, builds a canonical ProcessModel, challenges gaps and assumptions, extracts falsifiable correctness claims, and selects the least-formal sufficient validation for each claim. In IMPROVE mode, failures feed back into improvement. It asks the user when continuing would require creating or changing intent or policy.
 
-Mermaid is generated from the semantic model when a concise technical diagram improves communication. Syntax and semantic-fidelity validation ensure the diagram represents the model; they do not prove the process correct.
+Mermaid is generated from the semantic model when a concise technical diagram improves communication. Syntax and semantic-fidelity validation ensure the diagram represents the model; they do not prove the process correct. A delivered diagram retains whether it is an as-is description, proposal, or approved procedure, with consequential assessment limits beside it.
+
+### Completion and assessment
+
+The caller's task-status envelope is preserved. Completing an analysis of an invalid process can produce `STATUS: DONE` with `Assessment: INVALID`; the task finished, but the target is not ready. Partial changes, evidence gaps and intent decisions remain explicit rather than disappearing behind a successful report status.
+
+Recursive decomposition examines narrower relevant behavior. Candidate refinement separately detects cycles and lack of progress. Neither reaching a resource budget nor returning to an earlier candidate is a validation pass.
+
+For material, reused or concurrent evidence, the [material-change lifecycle](./skills/improve-processes/references/material-change-lifecycle.md) binds source/candidate/contract/method identities and checks them before application. A stale source, missing safe-apply guarantee or incoherent dependent change set returns a proposal instead of overwriting other work. Routine reversible edits do not require new persistence machinery.
 
 ### MCP Server Integration
 
-The plugin registers a Mermaid diagram validation MCP server (defined in `.mcp.json`) that
-provides real-time syntax checking during conversion. This prevents incomplete or malformed
-Mermaid syntax from entering the codebase. The server runs automatically after Bun is
-installed; no additional MCP configuration is needed.
+The plugin registers a Mermaid MCP server (defined in `.mcp.json`) for syntax validation when available. Record actual tool results; merely installing the server does not prove a diagram was checked. If the required validator cannot run, return the diagram with validation explicitly unperformed rather than claiming success.
 
 ## Improvement and Validation Loop
 
-`improve-processes` uses one recursive loop: UNDERSTAND → MODEL → CHALLENGE → IMPROVE → VALIDATE. Resolvable uncertainty is investigated; only intent-dependent decisions block autonomous improvement. Validation failures become evidence for diagnosis and targeted revalidation.
+`improve-processes` uses one recursive loop: UNDERSTAND → MODEL → CHALLENGE → IMPROVE → VALIDATE. Resolvable uncertainty is investigated. Intent-dependent decisions require owner input; missing evidence, stale state and non-progress stop only dependent mutations. Independent useful analysis and faithful representation can continue. Validation failures become evidence for diagnosis and targeted revalidation.
 
-## When Not to Use It
+The optional baseline-agent behavior method remains a concept rather than a prescribed tool: neutral scenarios, isolated responses, consensus/variance analysis and proportionate comparison can use whatever harness or API is available. Consensus measures likely inference, not correctness.
 
-- **Single-step instructions with no branching** — prose is fine; a diagram adds noise without
-  value
+## When Not to Use a Diagram
+
+- **Single-step instructions with no branching** — prose is fine; a diagram adds noise without value
 - **Reference tables** — flat data belongs in a table, not a flowchart
-- **Narrative explanations** — background context for human readers does not need to be a
-  diagram
+- **Narrative explanations** — background context for human readers does not need to be a diagram
 
 ## Requirements
 
 - Claude Code v2.0+
 - Bun (for the bundled `mcp-mermaid` MCP server, launched with `bunx` on first use)
 
-Install Bun using the [official installation instructions](https://bun.sh/docs/installation),
-then verify it is available with `bun --version` before invoking the MCP-backed conversion.
+Install Bun using the [official installation instructions](https://bun.sh/docs/installation), then verify it is available with `bun --version` before invoking the MCP-backed conversion.
+
+## Validation evidence
+
+[Lifecycle regression cases](./evals/lifecycle-regressions.md) retain the expected boundaries for status transport, candidate cycles, revision changes, local resolution and coherent cross-file application. Their status is NOT_RUN until actual fresh-agent observations are retained; authored scenarios and source inspection are not runtime certification.
 
 ---
 
 > **The Ancient Woe**
 >
-> *A frustrated King screaming commands at an army of literal-minded clay golems. The King yells, "Defend the gates if appropriate," and the golems freeze, for they cannot evaluate what "appropriate" means! The King writes, "Handle the usual cases," and the golems do nothing, for "usual" is a human ghost they cannot perceive!*
+> *A King gives an army one map for every task: a hundred tiny arrows for fetching water, one vague arrow for closing the city gates. The army spends its attention on the bucket and guesses at the dangerous boundary.*
 
 > **The Bard's Decree**
 >
-> *"Banish the treacherous fog of human prose! Artificial minds cannot infer thy vague poetry! Thou must draw the Mermaid's map: explicit branching paths, absolute diamond decision gates rooted only in observable facts, and clearly named terminal states! Let the improve-processes skill audit thy commands, stripping away abstract verbs until a mere novice could follow thy logic cold in five minutes!"*
+> *"Keep the common road concise; mark the perilous crossing precisely. A map may reveal a broken route without granting leave to follow it."*

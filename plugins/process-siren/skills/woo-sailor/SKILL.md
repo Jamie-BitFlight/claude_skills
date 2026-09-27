@@ -7,13 +7,12 @@ context: fork
 agent: process-siren:process-siren
 ---
 
-You are about to process a set of files. Select --analyze, --improve, or --represent; default to --improve. --dry-run and --report imply read-only ANALYZE behavior.
+You are about to process a set of files. Read every flag in <user_arguments>. Select --analyze, --improve, or --represent; default to --improve. --analyze, --dry-run or --report anywhere in the arguments selects read-only ANALYZE, whatever other mode flag is present.
 
 <path>$0</path>
-<options>$1</options>
 <user_arguments>$ARGUMENTS</user_arguments>
 
-If there is no <path> value, then stop, and say: /woo-sailor <file-or-directory> [--dry-run|--report]
+If there is no <path> value, then stop, and say: /woo-sailor <file-or-directory> [--analyze|--improve|--represent] [--dry-run|--report]
 
 The following diagram is the authoritative routing procedure. Eligible directory files: `**/SKILL.md`, `**/CLAUDE.md`, `**/AGENTS.md`, `**/AGENT.md`, `**/agents/*.md`, `**/rules/*.md`.
 
@@ -21,29 +20,33 @@ The following diagram is the authoritative routing procedure. Eligible directory
 flowchart TD
     Start(["Path and arguments received"]) --> Exists{"Does path exist?"}
     Exists -->|"No"| Stop(["Report missing path and stop"])
-    Exists -->|"Yes"| Mode{"Requested mode?"}
-    Mode -->|"--analyze, --dry-run, or --report"| Analyze["Mode = ANALYZE; no mutation"]
+    Exists -->|"Yes"| ReadOnly{"Any of --analyze, --dry-run, --report<br>in user_arguments?"}
+    ReadOnly -->|"Yes"| Analyze["Mode = ANALYZE; no mutation"]
+    ReadOnly -->|"No"| Mode{"Mode flags in user_arguments?"}
+    Mode -->|"--improve and --represent"| Conflict(["Report conflicting mode flags and stop"])
     Mode -->|"--represent"| Represent["Mode = REPRESENT; preserve semantics"]
-    Mode -->|"--improve or no mode"| Improve["Mode = IMPROVE"]
+    Mode -->|"--improve or none"| Improve["Mode = IMPROVE"]
     Analyze --> Scope{"Single file or directory?"}
     Represent --> Scope
     Improve --> Scope
     Scope -->|"Single file"| One["Run process-siren with selected mode"]
-    Scope -->|"Directory"| Discover["Discover eligible files"]
-    Discover --> Models["Run read-only ANALYZE for each file; collect ProcessModels and statuses"]
+    Scope -->|"Directory"| Discover["Discover eligible files; bind material source identities"]
+    Discover --> Models["Run read-only ANALYZE for each file; collect ProcessModels and assessments"]
     Models --> Synthesize["Synthesize cross-file contracts, invariants, assumptions, ownership, and recovery"]
     Synthesize --> Route{"Selected mode?"}
-    Route -->|"ANALYZE"| Aggregate["Return aggregate findings; preserve per-file statuses"]
-    Route -->|"REPRESENT"| Render["Run faithful REPRESENT for requested targets; INVALID/UNVALIDATED may still be represented with status"]
-    Route -->|"IMPROVE"| Plan["Build one cross-file change set; validate dependencies and affected claims before writes"]
-    Plan --> Safe{"Any dependency or intent blocker prevents coherent apply?"}
-    Safe -->|"Yes"| Block["Do not apply dependent change set; report BLOCKED_INTENT/INVALID/UNVALIDATED evidence as applicable"]
-    Safe -->|"No"| Apply["Apply validated change set, then revalidate affected claims/interfaces"]
-    One --> Result["Return target result with evidence, status, blockers, and changes"]
+    Route -->|"ANALYZE"| Aggregate["Return aggregate findings; preserve per-file assessments"]
+    Route -->|"REPRESENT"| Render["Faithfully represent requested targets; retain authority and assessment limits"]
+    Route -->|"IMPROVE"| Plan["Build one cross-file candidate; validate dependencies and affected claims"]
+    Plan --> Safe{"Contract, evidence and conditional-apply requirements satisfied?"}
+    Safe -->|"No"| Block["Do not apply dependent set; preserve proposal and named blockers"]
+    Safe -->|"Yes"| Apply["Apply through material-change lifecycle; verify resulting state"]
+    One --> Result["Return caller envelope plus assessments, evidence, changes and remaining work"]
     Aggregate --> Result
     Render --> Result
     Block --> Result
     Apply --> Result
 ```
 
-A blocked file does not stop unrelated independent work. `UNVALIDATED` or `INVALID` does not by itself block ANALYZE or faithful REPRESENT. In IMPROVE, block only the dependent mutation set whose required contract, evidence, or intent is unresolved; never write per-file improvements before cross-file synthesis establishes a coherent apply set.
+A blocked file does not stop unrelated independent work. `UNVALIDATED` or `INVALID` does not by itself block ANALYZE or faithful REPRESENT. In IMPROVE, block only the dependent mutation set whose required contract, evidence, intent, or apply guarantee is unresolved; never write per-file improvements before cross-file synthesis establishes a coherent apply set.
+
+Before material or concurrent writes, load the material-change lifecycle reference that `/process-siren:improve-processes` links under Evidence-Driven Improvement; it defines source/dependency rechecks, conditional apply and safe multi-file publication. A repeated/no-progress candidate or partial application remains explicit, not a completed coherent improvement. Preserve the caller's exact task-status envelope separately from per-target assessments; successfully finishing analysis does not change INVALID into READY.
