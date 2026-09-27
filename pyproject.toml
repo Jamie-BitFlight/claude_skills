@@ -74,6 +74,7 @@ markers = [
     "cross_backend: marks tests that run only in the test-cross-backend CI matrix job",
     "demos: marks tests as demonstration tests",
     "e2e: marks tests as end-to-end tests",
+    "e2e_mechanics_probe: marks a pytester or subprocess probe that exercises e2e-marker mechanics (network gate, fixture skips) without a sandbox; it skips the live_sandbox preflight, so never put it on a test that makes a live request",
     "integration: marks tests as integration tests",
     "research_vault: marks the single read-only production research-vault scan, run only in advisory validation",
     "slow: marks tests as slow",
