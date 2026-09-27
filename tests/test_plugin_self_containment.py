@@ -29,10 +29,12 @@ results, though no plugin does so today.
 
 from __future__ import annotations
 
+import html
 import re
 import subprocess
 from collections.abc import Iterator
 from pathlib import Path
+from urllib.parse import unquote
 
 import marko
 import pytest
@@ -49,10 +51,13 @@ _DESIGN_TIME_FILENAMES = {"MAINTENANCE.md", "SKILL-GOALS.md"}
 _MARKDOWN_SUFFIXES = (".md", ".markdown", ".mdx")
 _EXCLUDED_LINK_PREFIXES = ("http://", "https://", "mailto:", "#", "${", "//")
 # A link leaves the plugin only through `..`, a root-absolute `/`, or a `file:` URL. A file with
-# none of these cannot hold an escaping link, so the link guard skips parsing it.
+# none of these in plain text, and no link destination holding a `\`, `%` or `&` that could encode
+# them, cannot hold an escaping link, so the link guard skips parsing it.
 _MAY_ESCAPE_PATTERN = re.compile(
-    r"(?:^|[\s(<:/])\.\.(?:[/)#>\s]|$)|(?:\]\(|\]:)\s*<?(?:/|file:)", re.IGNORECASE | re.MULTILINE
+    r"(?:^|[\s(<:/])\.\.(?:[/)#>\s]|$)|(?:\]\(|\]:)\s*<?(?:/|file:|[^\s)>]*[\\%&])", re.IGNORECASE | re.MULTILINE
 )
+# CommonMark backslash escapes: a backslash before ASCII punctuation.
+_BACKSLASH_ESCAPE_PATTERN = re.compile(r"\\([!-/:-@\[-`{-~])")
 
 
 def _tracked_files(root: Path) -> list[Path]:
@@ -158,6 +163,22 @@ def _line_at(content: str, needle: str, start: int) -> int:
     return content.count("\n", 0, start if idx == -1 else idx) + 1
 
 
+def _decode_destination(dest: str) -> str:
+    """Decode a link destination the way a renderer and browser will before resolving it.
+
+    marko 2.x unescapes backslashes in inline links only, and decodes neither HTML entities
+    nor percent-encoding, but a renderer decodes the first two and a browser resolves
+    `%2E%2E/` as `../`.
+
+    Args:
+        dest: Link destination as marko returns it.
+
+    Returns:
+        `dest` with backslash escapes, HTML entities and percent-encoding decoded.
+    """
+    return unquote(html.unescape(_BACKSLASH_ESCAPE_PATTERN.sub(r"\1", dest)))
+
+
 def find_self_containment_violations(
     plugin_dir: Path, md_files: list[Path] | None = None
 ) -> list[tuple[Path, int, str, Path]]:
@@ -180,24 +201,29 @@ def find_self_containment_violations(
         if not _MAY_ESCAPE_PATTERN.search(content):
             continue
         doc, starts = _parse(content)
-        for node, start in _walk_nodes(doc, starts):
+        nodes = list(_walk_nodes(doc, starts))
+        # A `[text][label]` usage carries its definition's destination (backslash-unescaped by
+        # marko, unlike the definition's), so it is checked through its `LinkRefDef` alone.
+        defined = {
+            _decode_destination(node.dest.strip()) for node, _start in nodes if isinstance(node, block.LinkRefDef)
+        }
+        for node, start in nodes:
             # `LinkRefDef` covers reference-style definitions (`[label]: url`), used or not.
             if not isinstance(node, (inline.Link, inline.Image, block.LinkRefDef)):
                 continue
             target = node.dest.strip()
-            if target.startswith(_EXCLUDED_LINK_PREFIXES):
+            decoded = _decode_destination(target)
+            if not isinstance(node, block.LinkRefDef) and decoded in defined:
                 continue
-            if target.lower().startswith("file:"):
-                resolved = Path(target)
+            if decoded.startswith(_EXCLUDED_LINK_PREFIXES):
+                continue
+            if decoded.lower().startswith("file:"):
+                resolved = Path(decoded)
             else:
-                resolved = (md_file.parent / target.split("#", 1)[0]).resolve()
+                resolved = (md_file.parent / decoded.split("#", 1)[0]).resolve()
                 if resolved.is_relative_to(resolved_root):
                     continue
-            found = (md_file, _line_at(content, target, start), target, resolved)
-            # A `[text][label]` usage carries its definition's dest, and both locate to the
-            # definition's line; report that link once.
-            if found not in violations:
-                violations.append(found)
+            violations.append((md_file, _line_at(content, target, start), target, resolved))
     return violations
 
 
@@ -231,6 +257,28 @@ def test_link_guard_flags_escaping_link_forms(tmp_path: Path, link: str) -> None
     """`file:` URLs, root-absolute paths and reference definitions that leave the plugin are flagged."""
     md_file = tmp_path / "doc.md"
     md_file.write_text(f"Intro.\n\n{link}\n")
+
+    assert len(find_self_containment_violations(tmp_path, [md_file])) == 1
+
+
+_ENCODED_ESCAPES = [
+    r"\.\./outside.md",
+    "%2E%2E/outside.md",
+    "%2e%2e/outside.md",
+    "&#46;&#46;/outside.md",
+    "&period;&period;/outside.md",
+    r"\/etc/outside.md",
+    "&#47;etc/outside.md",
+    "file&#58;///Users/me/outside.md",
+]
+
+
+@pytest.mark.parametrize("dest", _ENCODED_ESCAPES)
+@pytest.mark.parametrize("form", ["[x]({dest})", "[x][r]\n\n[r]: {dest}"], ids=["inline", "reference"])
+def test_link_guard_flags_escaped_and_encoded_destinations(tmp_path: Path, form: str, dest: str) -> None:
+    """Backslash-escaped, entity- and percent-encoded destinations that decode to an escape are flagged."""
+    md_file = tmp_path / "doc.md"
+    md_file.write_text(f"Intro.\n\n{form.format(dest=dest)}\n")
 
     assert len(find_self_containment_violations(tmp_path, [md_file])) == 1
 
