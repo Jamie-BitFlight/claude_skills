@@ -181,11 +181,13 @@ def _line_at(content: str, needle: str, start: int) -> int:
 
 
 def _decode_destination(dest: str) -> str:
-    """Decode a link destination the way a renderer and browser will before resolving it.
+    """Decode a Markdown link destination the way a renderer and browser will before resolving it.
 
     marko 2.x unescapes backslashes in inline links only, and decodes neither HTML entities
     nor percent-encoding, but a renderer decodes the first two and a browser resolves
-    `%2E%2E/` as `../`.
+    `%2E%2E/` as `../`. A backslash left after unescaping is not a separator: a CommonMark
+    renderer percent-encodes it to `%5C` in the href, which a browser keeps as a filename
+    character.
 
     Args:
         dest: Link destination as marko returns it.
@@ -196,33 +198,50 @@ def _decode_destination(dest: str) -> str:
     return unquote(html.unescape(_BACKSLASH_ESCAPE_PATTERN.sub(r"\1", dest)))
 
 
-def _link_targets(nodes: list[tuple[Element, int]]) -> list[tuple[str, int]]:
+def _decode_html_url(value: str) -> str:
+    """Decode a raw-HTML `href`/`src` value the way a browser will before resolving it.
+
+    CommonMark passes raw HTML through untouched, so no backslash unescaping applies. A browser
+    decodes entities and then, following WHATWG URL parsing, reads each literal `\\` in a path
+    as `/`. A `%5C` stays a filename character, so separators are normalized before
+    percent-decoding.
+
+    Args:
+        value: Attribute value as written in the HTML.
+
+    Returns:
+        `value` with entities decoded, `\\` read as `/`, and percent-encoding decoded.
+    """
+    return unquote(html.unescape(value).replace("\\", "/"))
+
+
+def _link_targets(nodes: list[tuple[Element, int]]) -> list[tuple[str, str, int]]:
     """Collect every link destination in a walked document, with its enclosing block's offset.
 
     Args:
         nodes: `_walk_nodes` output for one document.
 
     Returns:
-        `(destination, offset)` for each Markdown link, image, reference definition, and HTML
-        `href`/`src` attribute value.
+        `(destination, decoded, offset)` for each Markdown link, image, reference definition,
+        and HTML `href`/`src` attribute value, `decoded` as a browser will resolve it.
     """
     # A `[text][label]` usage carries its definition's destination (backslash-unescaped by
     # marko, unlike the definition's), so it is checked through its `LinkRefDef` alone.
     defined = {_decode_destination(node.dest.strip()) for node, _start in nodes if isinstance(node, block.LinkRefDef)}
-    targets: list[tuple[str, int]] = []
+    targets: list[tuple[str, str, int]] = []
     for node, start in nodes:
         if isinstance(node, (inline.Link, inline.Image)):
-            if _decode_destination(node.dest.strip()) not in defined:
-                targets.append((node.dest, start))
+            decoded = _decode_destination(node.dest.strip())
+            if decoded not in defined:
+                targets.append((node.dest.strip(), decoded, start))
         elif isinstance(node, block.LinkRefDef):
             # Covers reference-style definitions (`[label]: url`), used or not.
-            targets.append((node.dest, start))
+            targets.append((node.dest.strip(), _decode_destination(node.dest.strip()), start))
         elif isinstance(node, (block.HTMLBlock, inline.InlineHTML)):
             raw = str(node.body if isinstance(node, block.HTMLBlock) else node.children)
-            targets.extend(
-                (match.group(1) or match.group(2) or match.group(3) or "", start)
-                for match in _HTML_URL_ATTR_PATTERN.finditer(raw)
-            )
+            for match in _HTML_URL_ATTR_PATTERN.finditer(raw):
+                value = (match.group(1) or match.group(2) or match.group(3) or "").strip()
+                targets.append((value, _decode_html_url(value), start))
     return targets
 
 
@@ -249,9 +268,7 @@ def find_self_containment_violations(
             continue
         doc, starts = _parse(content)
         targets = _link_targets(list(_walk_nodes(doc, starts)))
-        for raw_target, start in targets:
-            target = raw_target.strip()
-            decoded = _decode_destination(target)
+        for target, decoded, start in targets:
             if decoded.startswith(_EXCLUDED_LINK_PREFIXES):
                 continue
             if decoded.lower().startswith("file:"):
@@ -337,6 +354,36 @@ def test_link_guard_flags_escaping_html_href_and_src(tmp_path: Path, html: str) 
     md_file.write_text(f"Intro.\n\n{html}\n")
 
     assert len(find_self_containment_violations(tmp_path, [md_file])) == 1
+
+
+@pytest.mark.parametrize(
+    "html",
+    ['<a href="..\\..\\outside.md">x</a>', '<img src="..&#92;..&#92;outside.png">'],
+    ids=["literal-backslash", "entity-backslash"],
+)
+def test_link_guard_treats_html_backslash_as_path_separator(tmp_path: Path, html: str) -> None:
+    """A browser reads `\\` in an `href`/`src` path as `/`, so `..\\..\\` leaves the plugin."""
+    md_file = tmp_path / "doc.md"
+    md_file.write_text(f"Intro.\n\n{html}\n")
+
+    assert len(find_self_containment_violations(tmp_path, [md_file])) == 1
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["[x](..\\..\\outside.md)", "[x](..\\\\..\\\\outside.md)", '<a href="..%5C..%5Coutside.md">x</a>'],
+    ids=["markdown-escaped-dots", "markdown-literal-backslash", "html-percent-encoded-backslash"],
+)
+def test_link_guard_does_not_treat_encoded_backslash_as_separator(tmp_path: Path, text: str) -> None:
+    """A backslash that reaches the href as `%5C` is a filename character, not a separator.
+
+    A CommonMark renderer percent-encodes a backslash left in a destination after unescaping,
+    and a browser splits paths on a literal `\\` only.
+    """
+    md_file = tmp_path / "doc.md"
+    md_file.write_text(f"Intro.\n\n{text}\n")
+
+    assert find_self_containment_violations(tmp_path, [md_file]) == []
 
 
 def test_link_guard_passes_html_links_inside_the_plugin(tmp_path: Path) -> None:
