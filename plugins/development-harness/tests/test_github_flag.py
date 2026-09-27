@@ -42,10 +42,9 @@ import dh_paths
 from backlog_core import gh_client
 from backlog_core.models import GitHubUnavailableError
 
-# The real backlog_core package (as opposed to im._BACKLOG_CORE's legacy
-# ``.claude/skills/backlog/backlog_core`` path, which does not exist in this
-# checkout) — used to make fetch_tasks_from_github's ``_BACKLOG_CORE.exists()``
-# guard pass so tests can exercise its internal try_get_github() call.
+# The plugin's backlog_core package, which im._BACKLOG_CORE also names — set
+# explicitly so fetch_tasks_from_github's ``_BACKLOG_CORE.exists()`` guard passes
+# regardless of other tests' monkeypatching, and its try_get_github() call runs.
 _REAL_BACKLOG_CORE = Path(__file__).resolve().parents[1] / "backlog_core"
 
 # ---------------------------------------------------------------------------

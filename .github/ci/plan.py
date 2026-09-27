@@ -22,7 +22,10 @@ from typing import TypedDict
 
 
 class Shard(TypedDict):
-    """One pytest invocation, with an optional marker override."""
+    """One pytest invocation, with an optional marker override.
+
+    A shard with a runner carries no paths: the runner owns its plugin's test roots.
+    """
 
     name: str
     paths: list[str]
@@ -40,13 +43,13 @@ class Plan(TypedDict):
     """Versioned, JSON-serializable selection shared by jobs and their runner."""
 
     version: int
-    full_tests: bool
     lint_all: bool
     reasons: list[str]
     base: str
     head: str
     unit_matrix: Matrix
     integration_matrix: Matrix
+    cross_backend_matrix: Matrix
     validation_paths: list[str]
     checks: dict[str, bool]
     allowed_skips: str
@@ -83,6 +86,12 @@ LINT_CONFIG_NAMES = frozenset({
     ".gitignore",
     ".gitattributes",
 })
+# ponytail: the one plugin with lanes beyond its runner's fast default; a runner-declared
+# lane table replaces this once a second plugin needs one.
+DH = "development-harness"
+# Bump with every change to the Plan shape; .github/ci/run.py rejects any other version.
+PLAN_VERSION = 2
+DH_LANE_MARKERS = {"integration": "integration and not research_vault", "cross_backend": "cross_backend"}
 LANGUAGE_SUFFIXES = {
     "lint-python": {".py", ".pyi"},
     "lint-js": {".js", ".jsx", ".cjs", ".mjs", ".ts", ".tsx", ".mts", ".cts", ".json", ".jsonc", ".css"},
@@ -122,17 +131,20 @@ def valid_path(value: str) -> str:
     return path.as_posix()
 
 
-def read_pytest_config(root: Path) -> tuple[dict[str, list[str]], list[str]]:
+def read_pytest_config(root: Path) -> dict[str, list[str]]:
     """Discover plugin runners and repository-owned test roots.
 
     Returns:
-        Suite roots grouped by owner, and shared plugin import roots.
+        Suite roots grouped by owner.
     """
     config = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
     options = config["tool"]["pytest"]["ini_options"]
     testpaths = options["testpaths"]
     if not isinstance(testpaths, list) or not testpaths:
         raise ValueError("repository pytest testpaths must be a non-empty list")
+    for value in options.get("pythonpath", []):
+        if plugin_owner(value):
+            raise ValueError(f"plugin imports belong in run_pytests.py, not root pythonpath: {value}")
     suites: dict[str, list[str]] = {"global": []}
     for value in testpaths:
         path = valid_path(value)
@@ -143,8 +155,7 @@ def read_pytest_config(root: Path) -> tuple[dict[str, list[str]], list[str]]:
         suites["global"].append(path)
     for runner in sorted((root / "plugins").glob("*/run_pytests.py")):
         suites[runner.parent.name] = [runner.relative_to(root).as_posix()]
-    imports = [valid_path(path) for path in options.get("pythonpath", []) if plugin_owner(path)]
-    return suites, imports
+    return suites
 
 
 def git(root: Path, *args: str) -> bytes:
@@ -195,23 +206,6 @@ def local_input(path: str) -> bool:
     )
 
 
-def shared_source(path: str, imports: list[str]) -> bool:
-    """Recognize Python providers visible to other suites via global pythonpath.
-
-    Returns:
-        Whether the change requires testing shared Python consumers.
-    """
-    name = PurePosixPath(path).name
-    if name == "conftest.py":
-        return True
-    is_test = name.startswith("test_") or name.endswith("_test.py")
-    return (
-        not is_test
-        and PurePosixPath(path).suffix in {".py", ".pyi"}
-        and any(under(path, directory) for directory in imports)
-    )
-
-
 def marketplace_version_only(root: Path, base: str, head: str) -> bool:
     """Check that only marketplace metadata.version changed, not its registry.
 
@@ -235,6 +229,21 @@ def marketplace_version_only(root: Path, base: str, head: str) -> bool:
     return values[0] == values[1]
 
 
+def dh_lanes(runner: str) -> dict[str, list[Shard]]:
+    """Build one development-harness shard per lane: its runner plus that lane's marker.
+
+    The runner owns the test paths, so no shard names any. The cross-backend tests
+    parametrize every backend themselves, so one shard covers them all.
+
+    Returns:
+        Shards keyed by lane name from ``DH_LANE_MARKERS``.
+    """
+    return {
+        lane: [{"name": DH, "paths": [], "marker": marker, "runner": runner}]
+        for lane, marker in DH_LANE_MARKERS.items()
+    }
+
+
 def build_plan(
     root: Path, paths: list[str] | None, base: str = "", head: str = "", reason: str = "Explicit selection"
 ) -> Plan:
@@ -243,7 +252,7 @@ def build_plan(
     Returns:
         The versioned selection, including exact matrix roots and permitted skips.
     """
-    suites, imports = read_pytest_config(root)
+    suites = read_pytest_config(root)
     changed = paths or []
     owners = {owner for path in changed if (owner := plugin_owner(path))}
     version_only = ".claude-plugin/marketplace.json" in changed and marketplace_version_only(root, base, head)
@@ -254,12 +263,10 @@ def build_plan(
         and not (version_only and path == ".claude-plugin/marketplace.json")
     ]
     full_checks = paths is None or bool(shared)
-    full_tests = full_checks or any(shared_source(path, imports) for path in changed)
     reasons = [reason]
     if version_only:
         reasons.append("Marketplace metadata.version-only change: retain targeted selection")
     reasons.extend(f"Shared/configuration input: {path}" for path in shared)
-    reasons.extend(f"Shared Python import/fixture input: {path}" for path in changed if shared_source(path, imports))
     unit: list[Shard] = [
         {
             "name": owner,
@@ -268,24 +275,20 @@ def build_plan(
             "runner": (targets[0] if owner != "global" else ""),
         }
         for owner, targets in sorted(suites.items())
-        if full_tests or owner == "global" or owner in owners
+        # A runner sees only its own imports and conftests, so plugin content selects
+        # only that plugin's shard; the global shard runs in every plan.
+        if full_checks or owner == "global" or owner in owners
     ]
-    integration: list[Shard] = []
-    if full_tests or "development-harness" in owners:
-        integration.append({
-            "name": "development-harness",
-            "paths": ["tests"],
-            "marker": "integration and not research_vault",
-            "runner": "plugins/development-harness/run_pytests.py",
-        })
-    if full_tests or any(under(path, "research") for path in changed):
+    lanes = dh_lanes(suites[DH][0]) if DH in suites and (full_checks or DH in owners) else {}
+    integration = lanes.get("integration", [])
+    if full_checks or any(under(path, "research") for path in changed):
         integration.append({
             "name": "research-backlinks",
             "paths": ["tests/research_backlinks"],
             "marker": "integration and not research_vault",
             "runner": "",
         })
-    if full_tests:
+    if full_checks:
         integration.append({
             "name": "rebase-publication",
             "paths": ["tests/test_rebase_publication_identity.py"],
@@ -310,20 +313,20 @@ def build_plan(
         "manifest-sync": full_checks or bool(owners) or ".claude-plugin/marketplace.json" in changed,
         "file-hygiene": True,
         "test-python": bool(unit),
-        "test-cross-backend": full_tests or "development-harness" in owners,
+        "test-cross-backend": "cross_backend" in lanes,
         "test-integration": bool(integration),
     })
     allowed_skips = ",".join(sorted(job for job, selected_job in checks.items() if not selected_job))
-    checks["research-validation"] = full_tests or any(under(path, "research") for path in changed)
+    checks["research-validation"] = full_checks or any(under(path, "research") for path in changed)
     return {
-        "version": 1,
-        "full_tests": full_tests,
+        "version": PLAN_VERSION,
         "lint_all": full_checks,
         "reasons": reasons,
         "base": base,
         "head": head,
         "unit_matrix": {"include": unit},
         "integration_matrix": {"include": integration},
+        "cross_backend_matrix": {"include": lanes.get("cross_backend", [])},
         "validation_paths": validation,
         "checks": checks,
         "allowed_skips": allowed_skips,

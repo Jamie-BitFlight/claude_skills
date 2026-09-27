@@ -30,6 +30,12 @@ sandbox variable, and serializes live jobs using that target. Only preflight, te
 receive the sandbox secret. Missing or inconsistent configuration fails preflight; it never falls
 back to production or reports an all-skipped live pass. E2E remains advisory outside Quality Gate.
 
+The live job selects every `e2e`-marked test in the plugin. An autouse fixture in the plugin-root
+`conftest.py` runs the `live_sandbox` check for each of them: it validates the scope above and the
+sandbox marker before the test body runs. A test that needs the validated scope or repository
+requests `live_sandbox` by name. Only probes that exercise e2e-marker mechanics without a sandbox
+(`e2e_mechanics_probe`) skip the check; such a probe must never make a live request.
+
 ## Run and diagnose
 
 After exporting `DH_E2E_REPOSITORY`, a unique `DH_E2E_RUN_ID`, `DH_ALLOW_TEST_NETWORK=1`, and the
@@ -38,8 +44,8 @@ sandbox credential as `GITHUB_TOKEN`, validate the scope before executing tests:
 ```bash
 uv run --locked python plugins/development-harness/scripts/close_test_issues.py --check-only
 uv run --locked python scripts/run_bounded.py --timeout-seconds 480 -- \
-  uv run --locked pytest -m e2e -n 0 -x -v --tb=long --capture=tee-sys \
-    -o faulthandler_timeout=60 plugins/development-harness/tests/test_live_validation.py
+  uv run --locked --script plugins/development-harness/run_pytests.py -m e2e -n 0 -v --tb=long \
+    --capture=tee-sys -o faulthandler_timeout=60
 uv run --locked python plugins/development-harness/scripts/close_test_issues.py
 ```
 
@@ -58,8 +64,10 @@ journal's last started phase and the thread dump.
 Client request/initialization timeouts remain distinct from the whole-process deadline. The
 existing `scripts/run_bounded.py` kills the isolated process tree before the outer CI step timeout,
 including blocked executor threads and descendants. The deadline is a CI execution budget, not a
-new product latency guarantee. `-x` stops after a reported failure; immediate journals retain its
-context even if client teardown subsequently blocks. No retries hide failures.
+new product latency guarantee. The run does not stop at the first failure: every scenario owns its
+setup and cleanup, so an unrelated e2e failure cannot skip a sandbox lifecycle scenario. A
+collection error still fails the run. Immediate journals retain each failure's context even if
+client teardown subsequently blocks. No retries hide failures.
 
 Cleanup revalidates the sandbox, requires both the exact run-title prefix and body marker, excludes
 pull requests, rechecks ownership before closing, and reads back the resulting state. A denied

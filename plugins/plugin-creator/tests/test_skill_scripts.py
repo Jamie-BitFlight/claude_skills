@@ -2,8 +2,8 @@
 and quick-validator (quick_validate.py).
 
 Tests: End-to-end execution of each script's public API against a tmpdir.
-How: Import the module-level functions directly (pythonpath includes the scripts
-     directory), call them with fresh pytest tmp_path fixtures, and assert outputs.
+How: Import the module-level functions directly (the plugin runner's IMPORT_PATHS
+     include the scripts directory), call them with fresh pytest tmp_path fixtures, and assert outputs.
 Why: CI previously ran only linters — a regression in scaffolding path resolution,
      template rendering, ZIP construction, or validation rule firing would be
      invisible until a developer hit it manually.

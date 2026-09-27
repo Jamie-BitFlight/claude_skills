@@ -28,8 +28,8 @@ import pytest
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-# task_status_hook is on pythonpath via pyproject.toml:
-#   ./plugins/development-harness/skills/implementation-manager/scripts
+# task_status_hook is on pythonpath via the plugin runner's IMPORT_PATHS
+# (run_pytests.py): skills/implementation-manager/scripts
 # No sys.path manipulation required here.
 import task_status_hook as hook
 from task_status_hook import HOOK_ID_SUBAGENT_STOP, parse_disabled_hooks, should_skip_hook
