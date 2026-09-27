@@ -44,10 +44,11 @@ _ADVICE = (
 # statement. Read by the guarded functions and flipped by ``_network_policy``.
 _state = {"allowed": False}
 
-# Single module-level MonkeyPatch installs the guard at session start and
-# undoes it at session end, restoring the real socket functions reliably and
-# without inline type-suppression comments.
+# Module-level MonkeyPatches, undone at session end, restore the real functions
+# reliably and without inline type-suppression comments. The socket guard and
+# the tiktoken fallback each own one, so removing the guard leaves the fallback.
 _network_patch = pytest.MonkeyPatch()
+_tiktoken_patch = pytest.MonkeyPatch()
 _P = ParamSpec("_P")
 
 
@@ -111,7 +112,7 @@ except OSError:
         """
         return _mock_enc
 
-    _network_patch.setattr(tiktoken, "get_encoding", _mock_get_encoding)
+    _tiktoken_patch.setattr(tiktoken, "get_encoding", _mock_get_encoding)
 
 
 def _is_local(address: _Address) -> bool:
@@ -221,17 +222,28 @@ def pytest_configure(config: pytest.Config) -> None:
     """
     for marker in _MARKERS:
         config.addinivalue_line("markers", marker)
+    install_network_guard()
+
+
+def pytest_unconfigure(config: pytest.Config) -> None:
+    """Restore the real socket and tiktoken functions at session teardown.
+
+    Args:
+        config: The pytest config object (unused).
+    """
+    remove_network_guard()
+    _tiktoken_patch.undo()
+
+
+def install_network_guard() -> None:
+    """Replace the socket connect and DNS functions with their guarded versions."""
     _network_patch.setattr(socket.socket, "connect", _guarded_connect)
     _network_patch.setattr(socket.socket, "connect_ex", _guarded_connect_ex)
     _network_patch.setattr(socket, "getaddrinfo", _guarded_getaddrinfo)
 
 
-def pytest_unconfigure(config: pytest.Config) -> None:
-    """Restore the real socket functions at session teardown.
-
-    Args:
-        config: The pytest config object (unused).
-    """
+def remove_network_guard() -> None:
+    """Restore the real socket connect and DNS functions."""
     _network_patch.undo()
 
 

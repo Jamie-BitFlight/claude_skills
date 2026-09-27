@@ -18,29 +18,27 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+from types import ModuleType
 
 import pytest
+import tiktoken
 
 from tests.network_blocked import NetworkBlocked
 
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 
 
-def _configured_testpaths() -> list[str]:
-    """Return the test roots this plugin's ``run_pytests.py`` declares.
-
-    Reading the runner rather than listing the roots keeps the guard covering every
-    directory the plugin's suite collects, including ones added after this test was
-    written. The runner ships with the plugin, so the list is the same inside the
-    monorepo and in a standalone bundle.
-    """
+def _load_runner() -> ModuleType:
+    """Load this plugin's ``run_pytests.py``, which ships with the plugin."""
     spec = spec_from_file_location("dh_run_pytests", _PLUGIN_ROOT / "run_pytests.py")
     assert spec is not None
     assert spec.loader is not None
     runner = module_from_spec(spec)
     spec.loader.exec_module(runner)
-    return list(runner.TEST_PATHS)
+    return runner
 
+
+_RUNNER = _load_runner()
 
 # A hang guard for the subprocess probes, not a performance bound: each probe
 # starts a fresh interpreter that imports the plugin conftest, which takes
@@ -48,8 +46,18 @@ def _configured_testpaths() -> list[str]:
 _PROBE_TIMEOUT = 120
 
 
+def _configured_testpaths() -> list[str]:
+    """Return the test roots this plugin's ``run_pytests.py`` declares.
+
+    Reading the runner rather than listing the roots keeps the guard covering every
+    directory the plugin's suite collects, including ones added after this test was
+    written.
+    """
+    return list(_RUNNER.TEST_PATHS)
+
+
 def _probe_command(probe: Path, *args: str) -> list[str]:
-    """Build a probe run that, like ``run_pytests.py``, reads no parent pytest config or conftest.
+    """Build a probe run with the runner's own isolated options.
 
     Returns:
         The argv for a pytest subprocess that collects only *probe*.
@@ -58,18 +66,11 @@ def _probe_command(probe: Path, *args: str) -> list[str]:
         sys.executable,
         "-m",
         "pytest",
-        str(probe),
-        "-q",
-        "-c",
-        os.devnull,
-        "--rootdir",
-        str(_PLUGIN_ROOT),
-        "--confcutdir",
-        str(_PLUGIN_ROOT),
-        "--strict-config",
-        "--strict-markers",
+        *_RUNNER.isolated_options(),
         "-p",
         "no:cacheprovider",
+        str(probe),
+        "-q",
         *args,
     ]
 
@@ -164,7 +165,7 @@ def test_double_gate_requires_env_var() -> None:
             capture_output=True,
             text=True,
             cwd=str(_PLUGIN_ROOT),
-            env={**os.environ, "DH_ALLOW_TEST_NETWORK": "", "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
+            env={**os.environ, "DH_ALLOW_TEST_NETWORK": ""},
             timeout=_PROBE_TIMEOUT,
             check=False,
         )
@@ -197,7 +198,7 @@ def test_double_gate_opens_with_env_var() -> None:
             capture_output=True,
             text=True,
             cwd=str(_PLUGIN_ROOT),
-            env={**os.environ, "DH_ALLOW_TEST_NETWORK": "1", "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
+            env={**os.environ, "DH_ALLOW_TEST_NETWORK": "1"},
             timeout=_PROBE_TIMEOUT,
             check=False,
         )
@@ -240,7 +241,7 @@ def test_double_gate_stays_open_through_class_scoped_teardown() -> None:
             capture_output=True,
             text=True,
             cwd=str(_PLUGIN_ROOT),
-            env={**os.environ, "DH_ALLOW_TEST_NETWORK": "1", "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
+            env={**os.environ, "DH_ALLOW_TEST_NETWORK": "1"},
             timeout=_PROBE_TIMEOUT,
             check=False,
         )
@@ -248,23 +249,30 @@ def test_double_gate_stays_open_through_class_scoped_teardown() -> None:
 
 
 def test_guard_restores_sockets_after_session(pytestconfig: pytest.Config) -> None:
-    """Session teardown restores the real socket functions, and configure re-arms them.
+    """Removing the guard restores the real socket functions, and installing re-arms them.
 
-    Calls the plugin conftest's own ``pytest_unconfigure`` and ``pytest_configure``
-    hooks in this process. The guard is per process, so under xdist this touches
-    only the current worker, and the ``finally`` re-arms it for the tests after.
+    ``pytest_unconfigure`` removes the guard through ``remove_network_guard``. This
+    calls that function and ``install_network_guard`` in-process. The guard is per
+    process, so under xdist this touches only the current worker, and the
+    ``finally`` re-arms it for the tests after. The tiktoken fallback has its own
+    patch, so it must survive the round trip.
     """
-    guard = pytestconfig.pluginmanager.get_plugin(str(_PLUGIN_ROOT / "conftest.py"))
-    assert guard is not None
+    guard = next(
+        plugin
+        for plugin in pytestconfig.pluginmanager.get_plugins()
+        if Path(getattr(plugin, "__file__", "") or "").resolve() == _PLUGIN_ROOT / "conftest.py"
+    )
     armed = (socket.socket.connect, socket.socket.connect_ex, socket.getaddrinfo)
     assert armed == (guard._guarded_connect, guard._guarded_connect_ex, guard._guarded_getaddrinfo)
-    guard.pytest_unconfigure(pytestconfig)
+    get_encoding = tiktoken.get_encoding
+    guard.remove_network_guard()
     try:
         restored = (socket.socket.connect, socket.socket.connect_ex, socket.getaddrinfo)
         assert restored == (guard._real_connect, guard._real_connect_ex, guard._real_getaddrinfo)
     finally:
-        guard.pytest_configure(pytestconfig)
+        guard.install_network_guard()
     assert (socket.socket.connect, socket.socket.connect_ex, socket.getaddrinfo) == armed
+    assert tiktoken.get_encoding is get_encoding
 
 
 @pytest.mark.integration
@@ -299,7 +307,6 @@ def test_guard_covers_testpath(testpath: str) -> None:
             capture_output=True,
             text=True,
             cwd=str(_PLUGIN_ROOT),
-            env={**os.environ, "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
             timeout=_PROBE_TIMEOUT,
             check=False,
         )
