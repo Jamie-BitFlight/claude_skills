@@ -1,7 +1,17 @@
-# Repository task guide
+# Rust Token Killer (RTK)
 
-This file holds repository-local task guidance. Follow a section only when its `When:` trigger applies. Root and more-specific `AGENTS.md`, task requirements, and the documents they name retain their stated authority.
+RTK filters shell-command output for agent context. It is optional project tooling, not a requirement for repository work.
 
-## Extension contract
+## Availability
 
-Add a section only when it states `When:`, a non-duplicated directive, an observable completion condition, and its owner or source.
+Before the first RTK-wrapped command in a task, run `command -v rtk && rtk --version`.
+
+If that check does not succeed, run the original commands without an `rtk` prefix and state that RTK filtering was unavailable. Do not report token savings or command rewriting in that state.
+
+## When RTK is available
+
+Prefix shell commands with `rtk`, for example `rtk git status`, `rtk pytest -q`, and `rtk uv run pytest`. Keep the prefix on each command in a shell chain.
+
+Use `rtk proxy <command>` only when filtered output is unusable. Use `rtk gain` or `rtk gain --history` only after RTK commands have run.
+
+The upstream project-scoped Codex integration is installed separately with `rtk init --codex`; it can add a Codex hook and replace this file with RTK-managed awareness content. Do not run that installer from a repository task unless the user explicitly authorizes RTK installation and hook registration.

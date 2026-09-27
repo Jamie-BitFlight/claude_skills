@@ -5,8 +5,7 @@ this file and adds nothing beyond what Claude Code's own harness cannot already 
 project fact, behaviour, rule, and index below applies regardless of which agent or harness is
 running it.
 
-For task-level guidance, read `RTK.md` before substantive work. This is a file-read instruction,
-not a native include directive.
+Before running shell commands, read `RTK.md` for this repository’s Rust Token Killer guidance.
 
 ## Identity and Working Norms
 
