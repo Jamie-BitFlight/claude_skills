@@ -422,3 +422,37 @@ def test_verified_fallback_persists_queued_status_intent(
     assert result["verified"] is True
     queued = backend.pending_work_items(repo)
     assert queued[-1].metadata.status == "verified"
+
+
+def test_add_item_reports_refused_github_creation_and_keeps_the_item(tmp_path: Path, mocker: MockerFixture) -> None:
+    """GitHub answering ``createIssue`` with a null issue is a reported creation failure, not a crash.
+
+    GitHub returns ``{"createIssue": {"issue": null}}`` with no ``errors`` when it refuses content
+    creation (observed 2026-09-27 while the account was under a secondary rate limit; REST returned
+    403 for the same request). Only the GraphQL transport is faked; the backend, cache and
+    ``gh_client`` creation path are real.
+    """
+    repo = "owner/repository"
+    backend = GitHubBackend(repo=repo, cache=FileCache(tmp_path))
+    mocker.patch.object(
+        backend, "fetch_snapshot", return_value=ProviderSnapshot(items=[], sync_started_at="2026-09-27T00:00:00+00:00")
+    )
+    repository = mocker.Mock(full_name=repo, node_id="R_node")
+
+    def graphql_query(query: str, _variables: dict[str, object]) -> tuple[dict[str, str], dict[str, object]]:
+        if "createIssue" in query:
+            return {}, {"data": {"createIssue": {"issue": None}}}
+        return {}, {"data": {"repository": {}}}
+
+    repository.requester.graphql_query.side_effect = graphql_query
+    mocker.patch.object(backend, "try_get_github", return_value=repository)
+    mocker.patch.object(operations, "get_config", return_value=BacklogConfig(backend=backend))
+
+    result = operations.add_item("new item", "new description", "P1", type_="Bug", force=True)
+
+    assert result["item_ref"] == ""
+    errors = result["errors"]
+    assert isinstance(errors, list)
+    assert len(errors) == 1
+    assert "createIssue" in errors[0]
+    assert [item.title for item in backend.list_work_items()] == ["new item"]
