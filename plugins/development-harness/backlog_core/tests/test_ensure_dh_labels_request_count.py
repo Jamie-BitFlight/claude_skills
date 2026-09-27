@@ -87,3 +87,14 @@ class TestEnsureDhLabelsRequestCount:
 
         assert repo_a.get_labels.call_count == 1
         assert repo_b.get_labels.call_count == 1
+
+
+class TestLabelNamesMatchCaseInsensitively:
+    """GitHub label names are case-insensitive, so a case-only variant is the same label."""
+
+    def test_a_label_differing_only_in_case_counts_as_present(self, mocker: Any) -> None:
+        repo = _make_repo(mocker, "o/r-case-variants", [name.upper() for name in DH_LABELS])
+
+        ensure_dh_labels(repo)
+
+        assert repo.create_label.call_count == 0

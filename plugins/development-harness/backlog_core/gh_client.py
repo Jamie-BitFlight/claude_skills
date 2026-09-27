@@ -164,9 +164,11 @@ def ensure_dh_labels(repo: Repository, output: Output | None = None) -> None:
     if repo.full_name in _labels_ensured_for_repo:
         return
     out = output or Output()
-    existing_names = {label.name for label in repo.get_labels()}
+    # GitHub label names are case-insensitive: a case-only variant is the same label, and
+    # creating it would be rejected as a duplicate.
+    existing_names = {label.name.casefold() for label in repo.get_labels()}
     for name, color in DH_LABELS.items():
-        if name not in existing_names:
+        if name.casefold() not in existing_names:
             repo.create_label(name=name, color=color)
             out.info(f"  Created label '{name}'")
     _labels_ensured_for_repo.add(repo.full_name)
