@@ -734,6 +734,26 @@ class GitHubRequestTimeoutError(BackendUnavailableError):
         self.timeout_seconds = timeout_seconds
 
 
+class GitHubMutationOutcomeUnknownError(BackendUnavailableError):
+    """Raised when a GitHub mutation exceeds its total wall-clock deadline.
+
+    The deadline abandons the request's worker thread rather than cancelling it, so the mutation
+    may still complete on GitHub after this is raised. Never retryable -- retrying a
+    ``createIssue`` or ``addComment`` whose first attempt later lands creates a duplicate. The
+    caller must check GitHub for the change before sending it again. Deliberately not a
+    :class:`GitHubRequestTimeoutError`, which is retryable and would let a handler for that type
+    treat this outcome as safe to repeat.
+
+    Attributes:
+        timeout_seconds: The total deadline that elapsed.
+    """
+
+    def __init__(self, *args: object, timeout_seconds: float) -> None:
+        """Initialize with the usual exception args and the deadline that elapsed."""
+        super().__init__(*args, retryable=False)
+        self.timeout_seconds = timeout_seconds
+
+
 # Maps a capability flag name to the runtime_checkable Protocol it gates, for use in
 # UnsupportedBackendCapabilityError's protocol_mismatch message — "github_extras" alone
 # doesn't tell a reader which Protocol class the backend failed to satisfy.

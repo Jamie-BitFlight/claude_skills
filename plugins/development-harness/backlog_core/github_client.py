@@ -189,6 +189,8 @@ from __future__ import annotations
 
 import base64
 import binascii
+import logging
+import math
 import os
 import pathlib
 import re
@@ -228,6 +230,8 @@ __all__ = [
     "resolve_token",
 ]
 
+_log = logging.getLogger(__name__)
+
 DEFAULT_TIMEOUT: Final = 30
 """Seconds before a GitHub request gives up, when a caller states no preference."""
 
@@ -257,16 +261,26 @@ def graphql_total_timeout_seconds() -> float:
     ``CA_BUNDLE_ENV_VARS``, ``GITHUB_API_URL``).
 
     Returns:
-        The configured value, or ``GRAPHQL_TOTAL_TIMEOUT_DEFAULT`` when the env var is unset or
-        not a number.
+        The configured value, or ``GRAPHQL_TOTAL_TIMEOUT_DEFAULT`` when the env var is unset, or
+        is not a finite number above zero (logged as a warning). ``thread.join`` raises on
+        ``nan``/``inf``, and zero or a negative value would time out every request at once.
     """
     raw = os.environ.get(_GRAPHQL_TOTAL_TIMEOUT_ENV_VAR)
     if raw is None:
         return GRAPHQL_TOTAL_TIMEOUT_DEFAULT
     try:
-        return float(raw)
+        value = float(raw)
     except ValueError:
+        value = math.nan
+    if not math.isfinite(value) or value <= 0:
+        _log.warning(
+            "Ignoring %s=%r: not a finite number of seconds above zero; using the default of %ss",
+            _GRAPHQL_TOTAL_TIMEOUT_ENV_VAR,
+            raw,
+            GRAPHQL_TOTAL_TIMEOUT_DEFAULT,
+        )
         return GRAPHQL_TOTAL_TIMEOUT_DEFAULT
+    return value
 
 
 CA_BUNDLE_ENV_VARS: Final[Sequence[str]] = ("GITHUB_CA_BUNDLE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE", "SSL_CERT_FILE")

@@ -35,6 +35,7 @@ from backlog_core.models import (
     ContentProviderError,
     ContentUnavailableError,
     EntryNotFoundError,
+    GitHubMutationOutcomeUnknownError,
     GitHubRateLimitedError,
     GitHubRequestTimeoutError,
     GitHubUnavailableError,
@@ -270,6 +271,10 @@ _TRANSPORT_SUBCLASS_SAMPLES: dict[type, tuple[BacklogError | ContentProviderErro
     GitHubUnavailableError: (GitHubUnavailableError("credentials are unavailable"), True),
     GraphQLUnavailableError: (GraphQLUnavailableError("the environment refuses GraphQL"), False),
     GitHubRequestTimeoutError: (GitHubRequestTimeoutError("timed out", timeout_seconds=60), True),
+    GitHubMutationOutcomeUnknownError: (
+        GitHubMutationOutcomeUnknownError("outcome unknown", timeout_seconds=60),
+        False,
+    ),
     GitHubRateLimitedError: (GitHubRateLimitedError("rate limited"), True),
     BdNotInstalledError: (BdNotInstalledError("bd is not installed; see https://beads.sh/docs/install"), False),
     BdInvocationError: (BdInvocationError("bd exited 2", ["bd", "list"], 2, "", ""), False),

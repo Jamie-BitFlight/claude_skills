@@ -47,6 +47,7 @@ from .models import (
     BacklogItem,
     ContentConflictError,
     ContentUnavailableError,
+    GitHubMutationOutcomeUnknownError,
     GitHubRateLimitedError,
     GitHubRequestTimeoutError,
     GitHubUnavailableError,
@@ -591,6 +592,10 @@ def _graphql_total_timeout_seconds() -> float:
 
 _GRAPHQL_OPERATION_NAME_PATTERN = re.compile(r"(?:query|mutation)\s+(\w+)")
 
+#: A document that opens with ``query`` or the ``{`` shorthand is a read. Anything else is treated
+#: as a mutation, so an unrecognised document fails safe to "not retryable" on timeout.
+_GRAPHQL_READ_PATTERN = re.compile(r"\s*(?:query\b|\{)")
+
 
 def _graphql_operation_name(query: str) -> str:
     """Extract the named operation from a GraphQL query/mutation string, for error messages.
@@ -666,8 +671,9 @@ def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, obj
     Follows the same pattern as ``_resolve_labels_graphql``.  Raises
     ``BackendUnavailableError`` when the requester raises a provider or transport
     failure (including ``UnknownObjectException`` for NOT_FOUND / 404 responses),
-    ``GitHubRequestTimeoutError`` when the call exceeds its total deadline (see
-    ``_call_with_deadline``), ``GitHubRateLimitedError`` when GitHub answers with a rate-limited
+    ``GitHubRequestTimeoutError`` when a query exceeds its total deadline (see
+    ``_call_with_deadline``), ``GitHubMutationOutcomeUnknownError`` when a mutation does,
+    ``GitHubRateLimitedError`` when GitHub answers with a rate-limited
     GraphQL error, and ``BacklogError`` when the GraphQL response contains other errors or invalid
     data.
 
@@ -684,7 +690,8 @@ def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, obj
     Raises:
         GraphQLUnavailableError: When the environment refuses GraphQL outright.
         GitHubRateLimitedError: When GitHub refuses the query for exceeding a rate limit.
-        GitHubRequestTimeoutError: When the call exceeds its total deadline.
+        GitHubRequestTimeoutError: When a query exceeds its total deadline.
+        GitHubMutationOutcomeUnknownError: When a mutation exceeds its total deadline.
         BackendUnavailableError: On GitHub API or transport failures.
         BacklogError: On answered GraphQL errors or invalid response shapes.
     """
@@ -692,7 +699,15 @@ def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, obj
     try:
         headers, response = _call_with_deadline(lambda: repo.requester.graphql_query(query, variables or {}), timeout)
     except _DeadlineExceeded as exc:
-        msg = f"GraphQL request timed out after {timeout}s (operation: {_graphql_operation_name(query)})"
+        operation = _graphql_operation_name(query)
+        if _GRAPHQL_READ_PATTERN.match(query) is None:
+            # The abandoned worker thread may still land the mutation, so a retry could duplicate it.
+            msg = (
+                f"GraphQL mutation timed out after {timeout}s (operation: {operation}); its outcome is "
+                "unknown and it may still complete on GitHub. Check GitHub for the change before retrying."
+            )
+            raise GitHubMutationOutcomeUnknownError(msg, timeout_seconds=timeout) from exc
+        msg = f"GraphQL request timed out after {timeout}s (operation: {operation})"
         raise GitHubRequestTimeoutError(msg, timeout_seconds=timeout) from exc
     except GithubException as exc:
         if is_graphql_unavailable(exc):
@@ -978,7 +993,7 @@ def _create_issue_graphql(
 
 
 def _update_issue_graphql(
-    repo: Repository,
+    repo: _GraphQLCapable,
     issue_node_id: str,
     *,
     state: str | None = None,
@@ -1021,7 +1036,7 @@ def _update_issue_graphql(
 _BATCH_CHUNK_SIZE = 25
 
 
-def _update_issues_graphql_batch(repo: Repository, updates: list[tuple[str, str]]) -> None:
+def _update_issues_graphql_batch(repo: _GraphQLCapable, updates: list[tuple[str, str]]) -> None:
     """Update issue bodies in bulk using aliased GraphQL mutations.
 
     Sends up to ``_BATCH_CHUNK_SIZE`` ``updateIssue`` mutations per request
@@ -1030,13 +1045,15 @@ def _update_issues_graphql_batch(repo: Repository, updates: list[tuple[str, str]
     issue node IDs and body content are never embedded in the query string.
 
     Per-chunk failures fall back to per-item ``_update_issue_graphql`` calls
-    so a single bad payload does not abort the whole batch.
+    so a single bad payload does not abort the whole batch. A chunk that timed
+    out does not fall back: it may still be running on GitHub.
 
     Args:
         repo: PyGithub Repository object (provides requester transport).
         updates: List of ``(issue_node_id, body)`` pairs to apply.
 
     Raises:
+        GitHubMutationOutcomeUnknownError: When a chunk's mutation times out.
         BacklogError: On GraphQL transport failure that also causes the per-item
             fallback to fail for every item in a chunk.
     """
@@ -1058,6 +1075,8 @@ def _update_issues_graphql_batch(repo: Repository, updates: list[tuple[str, str]
             variables[f"body{i}"] = body
         try:
             _graphql_request(repo, query, variables)
+        except GitHubMutationOutcomeUnknownError:
+            raise
         except BacklogError:
             # Chunk failed — fall back to per-item updates for this chunk
             for node_id, body in chunk:

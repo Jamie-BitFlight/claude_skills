@@ -19,14 +19,18 @@ letting the calling thread hang. No network is touched.
 
 from __future__ import annotations
 
+import logging
+import math
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
 
-from backlog_core.gh_client import _graphql_request
-from backlog_core.models import GitHubRequestTimeoutError
+from backlog_core.gh_client import _graphql_request, _update_issues_graphql_batch
+from backlog_core.github_client import GRAPHQL_TOTAL_TIMEOUT_DEFAULT, graphql_total_timeout_seconds
+from backlog_core.models import GitHubMutationOutcomeUnknownError, GitHubRequestTimeoutError
+from backlog_core.sync_state import SyncErrorKind, classify_sync_error
 
 #: Deliberately far longer than any deadline these tests configure -- if the deadline mechanism
 #: is missing or broken, the test itself would hang for this long instead of failing fast.
@@ -108,3 +112,88 @@ class TestTotalTimeoutBoundsATricklingResponse:
         data = _graphql_request(repo, "query ListIssues { viewer { login } }")
 
         assert data == {"viewer": {"login": "octocat"}}
+
+
+@dataclass
+class _RecordingSlowRequester:
+    """Blocks past the deadline on every call and records each query it was sent."""
+
+    queries: list[str] = field(default_factory=list)
+
+    def graphql_query(self, query: str, variables: dict[str, object]) -> tuple[dict, dict]:
+        """Record the query, then sleep well past the configured deadline."""
+        self.queries.append(query)
+        time.sleep(_FAKE_SLOW_RESPONSE_SECONDS)
+        return {}, {"data": {}}
+
+
+class TestATimedOutMutationIsNeverReportedRetryable:
+    """The abandoned worker thread may still complete the mutation, so a retry could duplicate it."""
+
+    def test_a_timed_out_mutation_reports_an_unknown_outcome_and_is_not_retryable(self) -> None:
+        repo = _FakeRepo(_SlowRequester())
+
+        with pytest.raises(GitHubMutationOutcomeUnknownError) as excinfo:
+            _graphql_request(repo, "mutation AddComment($subjectId: ID!) { addComment { clientMutationId } }")
+
+        assert excinfo.value.retryable is False
+        assert not isinstance(excinfo.value, GitHubRequestTimeoutError)
+        assert excinfo.value.timeout_seconds == _TEST_DEADLINE_SECONDS
+        message = str(excinfo.value)
+        assert "AddComment" in message
+        assert "unknown" in message
+        assert "before retrying" in message
+        assert classify_sync_error(excinfo.value) is SyncErrorKind.NON_RETRYABLE
+
+    def test_an_unrecognised_operation_is_treated_as_a_mutation(self) -> None:
+        """Fail safe: only a document that is plainly a query stays retryable on timeout."""
+        repo = _FakeRepo(_SlowRequester())
+
+        with pytest.raises(GitHubMutationOutcomeUnknownError):
+            _graphql_request(repo, "subscription Watch { viewer { login } }")
+
+    def test_an_anonymous_shorthand_query_stays_retryable(self) -> None:
+        repo = _FakeRepo(_SlowRequester())
+
+        with pytest.raises(GitHubRequestTimeoutError) as excinfo:
+            _graphql_request(repo, "{ viewer { login } }")
+
+        assert excinfo.value.retryable is True
+
+    def test_a_timed_out_batch_update_does_not_fall_back_to_per_item_mutations(self) -> None:
+        requester = _RecordingSlowRequester()
+
+        with pytest.raises(GitHubMutationOutcomeUnknownError):
+            _update_issues_graphql_batch(_FakeRepo(requester), [("I_1", "body one"), ("I_2", "body two")])
+
+        assert len(requester.queries) == 1, f"expected only the batch mutation, got {requester.queries}"
+        assert requester.queries[0].startswith("mutation BatchUpdate")
+
+
+class TestTotalTimeoutEnvValueIsValidated:
+    """``thread.join`` raises on nan/inf, and zero/negative values time out every request at once."""
+
+    @pytest.mark.parametrize("raw", ["nan", "inf", "-inf", "0", "-5", "not-a-number"])
+    def test_an_unusable_value_falls_back_to_the_default_with_a_warning(
+        self, raw: str, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        monkeypatch.setenv("DH_GRAPHQL_TOTAL_TIMEOUT_SECONDS", raw)
+
+        with caplog.at_level(logging.WARNING, logger="backlog_core.github_client"):
+            value = graphql_total_timeout_seconds()
+
+        assert value == GRAPHQL_TOTAL_TIMEOUT_DEFAULT
+        assert any(
+            "DH_GRAPHQL_TOTAL_TIMEOUT_SECONDS" in r.getMessage() and raw in r.getMessage() for r in caplog.records
+        )
+
+    def test_a_finite_positive_value_is_used_without_a_warning(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        monkeypatch.setenv("DH_GRAPHQL_TOTAL_TIMEOUT_SECONDS", "12.5")
+
+        with caplog.at_level(logging.WARNING, logger="backlog_core.github_client"):
+            value = graphql_total_timeout_seconds()
+
+        assert math.isclose(value, 12.5)
+        assert not caplog.records
