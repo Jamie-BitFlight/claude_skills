@@ -96,6 +96,24 @@ def test_renamed_manifest_version_change_fails(tmp_path: Path) -> None:
     assert f"{renamed}: version '1.0.0' -> '9.9.9'" in result.stderr
 
 
+def test_rewritten_move_version_change_fails(tmp_path: Path) -> None:
+    """A move rewritten past git's rename threshold (a delete plus an add) is still paired and checked."""
+    repo = fixture(tmp_path)
+    git(repo, "rm", "-q", PLUGIN)
+    moved = "plugins/renamed/.claude-plugin/plugin.json"
+    write(repo, moved, {"name": "renamed", "version": "9.9.9", "description": "rewritten", "agents": ["./a.md"]})
+    commit(repo, "move and rewrite")
+    assert set(git(repo, "diff", "--name-status", "-M", "main", "branch").splitlines()) == {
+        f"D\t{PLUGIN}",
+        f"A\t{moved}",
+    }
+
+    result = check(repo)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert f"{moved}: version '1.0.0' -> '9.9.9'" in result.stderr
+
+
 def test_branch_behind_main_bump_and_new_plugin_pass(tmp_path: Path) -> None:
     """Non-version edits pass, as do new manifests, even when main bumped versions after the fork."""
     repo = fixture(tmp_path)
