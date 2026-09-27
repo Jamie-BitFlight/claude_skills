@@ -34,8 +34,8 @@ commands, hooks, MCP configuration, or plugin-facing AI documentation.
 - For hook configuration, activate `/plugin-creator:hooks-guide`.
 - For portable Agent Skills requirements, activate `/plugin-creator:agentskills` rather than
   applying Claude Code extensions to another host.
-- For marketplace versioning, read the authoring monorepo's `docs/marketplace-versioning.md`
-  (not shipped with this plugin) before changing version or manifest fields.
+- For marketplace versioning, read [Marketplace versioning](https://github.com/Jamie-BitFlight/claude_skills/blob/main/docs/marketplace-versioning.md)
+  before changing version or manifest fields.
 
 ## Project boundary
 
