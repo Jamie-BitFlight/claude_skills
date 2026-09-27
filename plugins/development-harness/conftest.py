@@ -25,9 +25,11 @@ import socket
 import sqlite3
 import threading
 from collections.abc import Callable, Iterator
+from pathlib import Path
 from socket import AddressFamily, SocketKind
 from typing import TYPE_CHECKING, Literal, ParamSpec
 
+import git
 import pytest
 
 if TYPE_CHECKING:
@@ -68,6 +70,39 @@ def track_sqlite_connections(
         return connection
 
     return tracked_connect
+
+
+@pytest.fixture(scope="session")
+def _hermetic_project_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Create one throwaway git repository whose ``.dh/config.yaml`` declares nothing.
+
+    Returns:
+        The repository root.
+    """
+    project = tmp_path_factory.mktemp("dh-project")
+    git.Repo.init(project)
+    (project / ".dh").mkdir()
+    (project / ".dh" / "config.yaml").write_text("{}\n", encoding="utf-8")
+    return project
+
+
+@pytest.fixture(autouse=True)
+def _hermetic_dh_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) -> None:
+    """Keep every non-e2e test off the host's project config and the user's dh state.
+
+    ``dh_paths.infer_project_root`` honours ``DH_PROJECT_ROOT`` before the IDE
+    variables and the cwd's repository, and ``dh_paths.state_root`` and the config
+    loaders honour ``DH_STATE_HOME`` before ``~/.dh``. Without this, a test reads
+    whichever ``.dh/config.yaml`` the host repository has (for example its
+    ``sam.plan_index_issue``) and writes under the real ``~/.dh/projects/``. A
+    test that depends on a config value declares it in its own config file.
+    Skips for tests marked ``@pytest.mark.e2e``, which set up their own state to
+    exercise the real runtime path.
+    """
+    if request.node.get_closest_marker("e2e"):
+        return
+    monkeypatch.setenv("DH_PROJECT_ROOT", str(request.getfixturevalue("_hermetic_project_root")))
+    monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh_state"))
 
 
 @pytest.fixture(autouse=True)

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Protocol
 from unittest.mock import MagicMock
 
 import backlog_core.backends.github_backend as github_backend_module
-import git
 import pytest
 from backlog_core.backend_types import AddedCommentNode
 from backlog_core.backends._github_work_item_versions import render_work_item_comment, root_revision, work_item_head_ref
@@ -69,19 +69,16 @@ def _isolated_contents_store(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
-def _declared_plan_index_issue(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def _declared_plan_index_issue() -> None:
     """Declare the sentinel issue these tests' fake remotes use as ``_PLAN_INDEX_ISSUE``.
 
-    The backend reads ``sam.plan_index_issue`` from the project's ``.dh/config.yaml``
-    through the real loader. Pointing ``DH_PROJECT_ROOT`` at a throwaway repository
-    stops the tests from reading whichever project and user config the host has.
+    The backend reads ``sam.plan_index_issue`` through the real config loader. The
+    plugin conftest points the project root at an empty config and ``DH_STATE_HOME``
+    at a per-test directory, so the value is written to the user-level config there.
     """
-    project = tmp_path / "project"
-    git.Repo.init(project)
-    (project / ".dh").mkdir()
-    (project / ".dh" / "config.yaml").write_text(f"sam:\n  plan_index_issue: {_PLAN_INDEX_ISSUE}\n", encoding="utf-8")
-    monkeypatch.setenv("DH_PROJECT_ROOT", str(project))
-    monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh_state"))
+    state_home = Path(os.environ["DH_STATE_HOME"])
+    state_home.mkdir(parents=True, exist_ok=True)
+    (state_home / "config.yaml").write_text(f"sam:\n  plan_index_issue: {_PLAN_INDEX_ISSUE}\n", encoding="utf-8")
 
 
 def _issue(number: int, revision: str = "rev-1") -> dict[str, object]:
