@@ -357,6 +357,11 @@ class FakeContentsStore:
     def __init__(self) -> None:
         self._store: dict[tuple[str, str, str, str], dict[str, str]] = {}
         self._next_revision = 1
+        self._put_failures: list[Exception] = []
+
+    def fail_put_once(self, exc: Exception) -> None:
+        """Make the next ``put`` call raise *exc* exactly once (card 5's CAS-retry case)."""
+        self._put_failures.append(exc)
 
     @staticmethod
     def _key(reference: ContentRef) -> tuple[str, str, str, str]:
@@ -401,6 +406,8 @@ class FakeContentsStore:
         return records[query.offset : query.offset + query.limit]
 
     def put(self, request: ContentWrite) -> ContentRecord:
+        if self._put_failures:
+            raise self._put_failures.pop(0)
         key = self._key(request.reference)
         current = self._store.get(key)
         if request.create_only and current is not None:

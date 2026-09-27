@@ -29,7 +29,14 @@ from backlog_core.backends.github_work_items import (
     NO_HEAD,
     check_work_item_compliance,
 )
-from backlog_core.models import HEAD_FIELDS, Output, ReconcileRequest, ReconcileScope
+from backlog_core.models import (
+    HEAD_FIELDS,
+    BacklogError,
+    ContentConflictError,
+    Output,
+    ReconcileRequest,
+    ReconcileScope,
+)
 
 from ._fake_github import FakeGitHubHarness, make_harness
 
@@ -496,3 +503,132 @@ def test_upgrade_work_item_brings_a_legacy_issue_to_compliance(
     issue_after = harness.network.issues[601].as_node(harness.network.labels)
     after = writer._work_items.check_compliance_for_issue(repository, "owner", "repo", issue_after)
     assert after.compliant is True
+
+
+# ---------------------------------------------------------------------------
+# Card 5: label ordering and failure
+# ---------------------------------------------------------------------------
+
+
+def test_label_write_failure_leaves_head_untouched_and_mutation_pending(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, harness
+) -> None:
+    """A label-mirror failure never reaches the head, and the retry publishes both.
+
+    Catches the head-before-labels ordering bug D3 exists to prevent: if the
+    head advanced first and the label write then failed, labels-win-over-head
+    (D2) would make the next read show the stale label, and the next
+    reconcile would see head fields already matching the candidate and
+    acknowledge the mutation without ever repairing the label.
+    """
+    writer = harness.new_backend(tmp_path / "writer-cache")
+    _use_backend(monkeypatch, writer)
+    added = operations.add_item(title="Label failure retry", description="desc", priority="P1")
+    issue_ref = _issue_ref(added)
+    number = int(issue_ref.removeprefix("#"))
+    head_before = harness.contents.get(work_item_head_ref(issue_ref))
+
+    harness.network.fail_once("_update_issue_graphql", BacklogError("label write boom"))
+    operations.update_item(issue_ref, status="in-progress", output=Output())
+
+    assert writer.has_pending_writes()
+    assert "status:in-progress" not in harness.network.issues[number].labels
+    assert harness.contents.get(work_item_head_ref(issue_ref)).content == head_before.content
+
+    writer.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, references=[issue_ref]))
+
+    assert not writer.has_pending_writes()
+    assert "status:in-progress" in harness.network.issues[number].labels
+    reader = harness.new_backend(tmp_path / "reader-cache")
+    reader.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, references=[issue_ref]))
+    assert reader.get_work_item(issue_ref).metadata.status == "in-progress"
+
+
+def test_head_write_conflict_after_labels_succeed_converges_on_retry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, harness
+) -> None:
+    """Labels already show the new value when the head CAS write hits one conflict; the retry converges."""
+    writer = harness.new_backend(tmp_path / "writer-cache")
+    _use_backend(monkeypatch, writer)
+    added = operations.add_item(title="Head conflict retry", description="desc", priority="P1")
+    issue_ref = _issue_ref(added)
+    number = int(issue_ref.removeprefix("#"))
+
+    harness.contents.fail_put_once(ContentConflictError("stale head"))
+    operations.update_item(issue_ref, status="in-progress", output=Output())
+
+    assert writer.has_pending_writes()
+    assert "status:in-progress" in harness.network.issues[number].labels
+
+    writer.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, references=[issue_ref]))
+
+    assert not writer.has_pending_writes()
+    reader = harness.new_backend(tmp_path / "reader-cache")
+    reader.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, references=[issue_ref]))
+    assert reader.get_work_item(issue_ref).metadata.status == "in-progress"
+
+
+# ---------------------------------------------------------------------------
+# Card 11: one publish per command
+# ---------------------------------------------------------------------------
+
+
+def test_update_item_with_multiple_fields_publishes_exactly_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, harness
+) -> None:
+    """description + plan + status in one update_item call advance the head exactly once, with no conflict."""
+    writer = harness.new_backend(tmp_path / "writer-cache")
+    _use_backend(monkeypatch, writer)
+    added = operations.add_item(title="Single publish", description="original", priority="P1")
+    issue_ref = _issue_ref(added)
+    number = int(issue_ref.removeprefix("#"))
+
+    reconcile_calls: list[object] = []
+    original_reconcile = writer.reconcile
+
+    def _counting_reconcile(*args: object, **kwargs: object) -> object:
+        reconcile_calls.append((args, kwargs))
+        return original_reconcile(*args, **kwargs)
+
+    monkeypatch.setattr(writer, "reconcile", _counting_reconcile)
+
+    result = operations.update_item(
+        issue_ref, description="new description", plan="P9/T1", status="in-progress", output=Output()
+    )
+
+    assert len(reconcile_calls) == 1
+    assert "error" not in result
+    reader = harness.new_backend(tmp_path / "reader-cache")
+    _use_backend(monkeypatch, reader)
+    view = operations.view_item(issue_ref)
+    assert view.description == "new description"
+    assert view.plan == "P9/T1"
+    assert "status:in-progress" in harness.network.issues[number].labels
+
+
+# ---------------------------------------------------------------------------
+# Card 12: no mass publish on sync
+# ---------------------------------------------------------------------------
+
+
+def test_sync_does_not_publish_unrelated_checkpointed_items(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, harness
+) -> None:
+    """sync_items posts zero comments and writes zero heads for items with no pending local change."""
+    writer = harness.new_backend(tmp_path / "writer-cache")
+    _use_backend(monkeypatch, writer)
+    refs = []
+    for i in range(3):
+        added = operations.add_item(
+            title=f"Untouched item {i}", description=f"distinct description {i}", priority="P1", force=True
+        )
+        refs.append(_issue_ref(added))
+    comment_counts_before = {ref: len(harness.network.issues[int(ref.removeprefix("#"))].comment_ids) for ref in refs}
+    head_contents_before = {ref: harness.contents.get(work_item_head_ref(ref)).content for ref in refs}
+
+    operations.sync_items()
+
+    for ref in refs:
+        number = int(ref.removeprefix("#"))
+        assert len(harness.network.issues[number].comment_ids) == comment_counts_before[ref]
+        assert harness.contents.get(work_item_head_ref(ref)).content == head_contents_before[ref]
