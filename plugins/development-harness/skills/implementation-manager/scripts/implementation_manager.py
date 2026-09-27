@@ -46,26 +46,13 @@ from ruamel.yaml import YAML, YAMLError
 # Ensure the script directory is on sys.path for direct execution.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-# backlog_core is at <repo_root>/.claude/skills/backlog/backlog_core.
-# parents[5] from this script is the repo root (verified against actual filesystem).
-_BACKLOG_CORE = Path(__file__).resolve().parents[5] / ".claude" / "skills" / "backlog" / "backlog_core"
-if _BACKLOG_CORE.exists():
-    sys.path.insert(0, str(_BACKLOG_CORE.parent))
-
-# sam_schema is the canonical task/plan schema package.
-# Installed as a workspace dependency in the project venv.
-# Fallback: add packages/ to sys.path for direct-script execution outside the venv.
-_REPO_ROOT = Path(__file__).resolve().parents[5]
-_SAM_PACKAGES_DIR = str(_REPO_ROOT / "packages")
-if _SAM_PACKAGES_DIR not in sys.path:
-    sys.path.insert(0, _SAM_PACKAGES_DIR)
-
-# dh_paths, dh_core and sam_schema live in the plugin root, three levels above this
-# scripts/ directory. Resolving it from this file holds in the monorepo and in an
-# installed plugin copy; the repo-root paths above do not (#3426).
+# dh_paths, dh_core, sam_schema and backlog_core live in the plugin root, three
+# levels above this scripts/ directory. Resolving it from this file holds in the
+# monorepo and in an installed plugin copy.
 _PLUGIN_DIR = str(Path(__file__).resolve().parents[3])
 if _PLUGIN_DIR not in sys.path:
     sys.path.insert(0, _PLUGIN_DIR)
+_BACKLOG_CORE = Path(_PLUGIN_DIR) / "backlog_core"
 
 # Import directly from submodules so static type checkers resolve concrete types
 # instead of the lazy ``object`` returned by sam_schema.__getattr__.
