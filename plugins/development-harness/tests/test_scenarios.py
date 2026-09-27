@@ -133,7 +133,11 @@ class TestWorkBacklogItem:
         assert isinstance(result["items"], list)
         assert result["count"] >= 0
         provider_state.assert_called_once()
-        assert provider_state.call_args.args == (ReconcileRequest(scope=ReconcileScope.INCREMENTAL),)
+        # An empty backlog's request-shaped page has no rows to write through
+        # (D6/D7): TARGETED with no references, never the whole-backlog scope.
+        assert provider_state.call_args.args == (
+            ReconcileRequest(scope=ReconcileScope.TARGETED, references=[], apply_local_patches=True),
+        )
         assert provider_state.call_args.kwargs["snapshot"].items == []
 
     # Scenario 4: list with label filter (does not error without GitHub)
@@ -1562,7 +1566,11 @@ class TestResolveVerifiedGate:
 
         assert isinstance(result["items"], list)
         provider_state.assert_called_once()
-        assert provider_state.call_args.args == (ReconcileRequest(scope=ReconcileScope.INCREMENTAL),)
+        # Refresh reconciles exactly the listed row (D6): TARGETED with that
+        # one reference, never the whole-backlog INCREMENTAL scope.
+        assert provider_state.call_args.args == (
+            ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#206"], apply_local_patches=True),
+        )
         assert provider_state.call_args.kwargs["snapshot"].items[0].reference == "#206"
         stored = _stored_item("Premature Close Test")
         assert stored.reference == "#206"

@@ -237,11 +237,11 @@ async def test_live_crud_persists_changes_and_preserves_other_sections(
                 assert (await native_issue(env, companion)).state == "closed"
 
 
-async def test_live_cold_cache_recovers_open_and_closed_items(live_environment: LiveEnvironment) -> None:
+async def test_live_cold_cache_holds_what_was_requested(live_environment: LiveEnvironment) -> None:
     env = live_environment
     async with Client(backlog_server.mcp, timeout=30, init_timeout=30) as client:
         calls = LiveCalls(client, env.journal)
-        with env.journal.phase("cold-cache recovery"):
+        with env.journal.phase("request-shaped cache fill"):
             opened, _ = await create_item(calls, env, "cold-open")
             closed, _ = await create_item(calls, env, "cold-closed")
             remote = await native_issue(env, closed)
@@ -249,12 +249,28 @@ async def test_live_cold_cache_recovers_open_and_closed_items(live_environment: 
             assert (await native_issue(env, closed)).state == "closed"
             with env.fresh_reader() as backend:
                 assert not backend.has_synced_snapshot()
+
                 items = await collect_items(calls.call, {"limit": 1})
                 assert f"#{opened}" in listed_references(items), items
-                # Recovery completeness is a provider-cache contract, independent of
-                # the MCP listing's open-item presentation/filtering policy.
+                assert f"#{closed}" not in listed_references(items), items
+
+                # The cache holds exactly what this list fetched -- the open
+                # fixture it listed, and nothing it never asked for. Request-shaped
+                # reads write through only the rows they hydrate (D7); the list
+                # never touched the closed fixture, so it must not appear here
+                # either, and the checkpoint must still be absent.
+                records = backend.list_work_items()
+                assert {item.issue for item in records} == listed_references(items), records
+                assert not backend.has_synced_snapshot()
+
+                # A targeted view of the closed fixture is a separate request; it
+                # adds exactly that row, live, with its real closed state.
+                view = await calls.call("backlog_view", {"selector": f"#{closed}", "summary": False})
+                assert view["status_source"] == "live", view
                 records = backend.list_work_items()
                 recovered = [item for item in records if item.issue == f"#{closed}"]
                 assert len(recovered) == 1, records
                 assert recovered[0].status == "closed", recovered
-                assert backend.has_synced_snapshot()
+                # A TARGETED view never advances the whole-backlog checkpoint --
+                # only an explicit sync does.
+                assert not backend.has_synced_snapshot()

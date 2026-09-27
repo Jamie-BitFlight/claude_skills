@@ -3,16 +3,18 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from types import SimpleNamespace
+from typing import TYPE_CHECKING, cast
 
 import pytest
 from github import GithubException
 
+from backlog_core.backend_types import IssueNode, ListPageRequest, ListPageResult
 from backlog_core.backends.github_backend import GitHubBackend
 from backlog_core.backends.github_contents import _GitHubContentIntegrityError
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.file_cache import FileCache
-from backlog_core.gh_client import _fetch_issues_graphql
+from backlog_core.gh_client import IssuesPage, _fetch_issues_graphql
 from backlog_core.models import (
     BackendUnavailableError,
     BacklogError,
@@ -26,24 +28,45 @@ from backlog_core.models import (
     ReconcileScope,
     ValidationError,
 )
+from backlog_core.parsing import AmbiguousSelectorError
+from backlog_core.reconciliation import provider_item_to_backlog_item
 from backlog_core.work_item_decisions import WorkItemDecisionContext
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from github.Repository import Repository
     from pytest_mock import MockerFixture
 
 
-def provider_item(reference: str, title: str, *, status: str = "status:groomed") -> ProviderItem:
+def provider_item(reference: str, title: str, *, status: str = "status:groomed", state: str = "OPEN") -> ProviderItem:
     """Build one live provider item."""
     return ProviderItem(
         provider_id=f"node-{reference}",
         reference=reference,
         title=title,
         body="",
-        state="OPEN",
+        state=state,
         labels=[status],
         revision=f"revision-{reference}",
         milestone="M1",
     )
+
+
+def _issue_node_from_provider(item: ProviderItem) -> IssueNode:
+    """Build a raw issue node a title search/scan would return for one provider item."""
+    return {
+        "id": item.provider_id,
+        "number": int(item.reference.lstrip("#")),
+        "title": item.title,
+        "state": item.state,
+        "body": item.body,
+        "createdAt": "2026-09-24T00:00:00Z",
+        "updatedAt": "2026-09-24T00:00:00Z",
+        "labels": [{"name": name, "id": name} for name in item.labels],
+        "milestone": None,
+        "assignees": [],
+    }
 
 
 class DecisionBackend(InMemoryBackend):
@@ -63,6 +86,8 @@ class DecisionBackend(InMemoryBackend):
         self.cached_items = cached_items or []
         self.pending_items = pending_items or []
         self.snapshot_requests: list[ReconcileRequest] = []
+        self.page_requests: list[ListPageRequest] = []
+        self.search_requests: list[str] = []
         self.cached_list_calls = 0
         self.live_error: Exception | None = None
 
@@ -93,6 +118,46 @@ class DecisionBackend(InMemoryBackend):
             items = self.live_items
         return ProviderSnapshot(items=items, sync_started_at="2026-09-24T00:00:00+00:00")
 
+    def get_github(self, repo: str = "", timeout: int = 15) -> Repository:
+        """Return a structural repository stand-in carrying only ``full_name``."""
+        del timeout
+        return cast("Repository", SimpleNamespace(full_name=repo or "owner/repository"))
+
+    def fetch_page(
+        self, request: ListPageRequest, *, match: Callable[[BacklogItem, ProviderItem], bool], force_hydration: bool
+    ) -> ListPageResult:
+        """Apply *match* directly over ``live_items`` and record the request."""
+        del force_hydration
+        self.page_requests.append(request)
+        if self.live_error is not None:
+            raise self.live_error
+        matched = [item for item in self.live_items if match(provider_item_to_backlog_item(item), item)]
+        after_offset = matched[request.offset :]
+        if request.limit > 0:
+            has_more = len(after_offset) > request.limit
+            page_items = after_offset[: request.limit]
+        else:
+            has_more = False
+            page_items = after_offset
+        return ListPageResult(
+            items=page_items, has_more=has_more, total=len(matched), sync_started_at="2026-09-24T00:00:00+00:00"
+        )
+
+    def _fetch_issues_page_graphql(self, repo: object, owner: str, repo_name: str, **kwargs: object) -> object:
+        """Unused by this double's own ``fetch_page`` -- present only to satisfy ``RequestShapedListing``."""
+        raise NotImplementedError
+
+    def search_issues_by_title(self, repo: str, selector: str) -> list[IssueNode]:
+        """Return raw nodes for every live item whose title contains *selector*."""
+        del repo
+        self.search_requests.append(selector)
+        return [_issue_node_from_provider(item) for item in self.live_items if selector.lower() in item.title.lower()]
+
+    def fetch_open_issue_titles(self, repo: str) -> list[tuple[int, str]]:
+        """Return every live open item's ``(number, title)``."""
+        del repo
+        return [(int(item.reference.lstrip("#")), item.title) for item in self.live_items if item.state == "OPEN"]
+
     def pending_work_items(self, repo: str = "") -> list[BacklogItem]:
         """Return queued local intent independently from provider observations."""
         del repo
@@ -109,20 +174,18 @@ class DecisionBackend(InMemoryBackend):
         return self.list_work_items()
 
 
-def test_all_memoizes_one_bulk_snapshot_and_never_uses_cached_provider_rows() -> None:
+def test_page_reads_live_and_never_uses_cached_provider_rows() -> None:
     backend = DecisionBackend(
         live_items=[provider_item("#7", "live title")], cached_items=[BacklogItem(title="stale title", issue="#7")]
     )
     context = WorkItemDecisionContext(backend)
 
-    first = context.all()
-    second = context.all()
+    page = context.page(ListPageRequest(), match=lambda item, provider: True, force_hydration=False)
 
-    assert [item.title for item in first.provider_items] == ["live title"]
-    assert first.status_map[7].status == "status:groomed"
-    assert first.status_map[7].milestone == "M1"
-    assert second is first
-    assert [request.scope for request in backend.snapshot_requests] == [ReconcileScope.INCREMENTAL]
+    assert [item.title for item in page.provider_items] == ["live title"]
+    assert page.status_map[7].status == "status:groomed"
+    assert page.status_map[7].milestone == "M1"
+    assert len(backend.page_requests) == 1
     assert backend.cached_list_calls == 0
 
 
@@ -132,19 +195,23 @@ def test_explicit_cached_fallback_attempts_live_first_and_reads_cache_once() -> 
     output = Output()
     context = WorkItemDecisionContext(backend, allow_cached=True, output=output)
 
-    first = context.all()
-    second = context.all()
+    first = context.page(ListPageRequest(), match=lambda item, provider: True, force_hydration=False)
+    second = context.page(ListPageRequest(), match=lambda item, provider: True, force_hydration=False)
     target = context.select("#7", purpose="read")
 
     assert [item.title for item in first.provider_items] == ["cached title"]
     assert first.from_cache is True
-    assert second is first
-    assert len(backend.snapshot_requests) == 1
+    assert [item.title for item in second.provider_items] == ["cached title"]
+    assert len(backend.page_requests) == 2
+    # _cached_items() memoizes -- two cache-fallback reads cost one real list.
     assert backend.cached_list_calls == 1
     assert target.provider is not None
     assert target.provider.title == "cached title"
     assert target.provider_snapshot is None
-    assert output.warnings == ["Live provider read failed; using cached work items: offline"]
+    # Three warned fallbacks: the two page() calls plus select()'s own
+    # targeted attempt -- page() is no longer memoized like all() was, so
+    # each call that falls back warns independently.
+    assert output.warnings == ["Live provider read failed; using cached work items: offline"] * 3
 
 
 @pytest.mark.parametrize(
@@ -173,30 +240,42 @@ def test_explicit_cached_fallback_handles_real_provider_failures(
     if failure_path == "repository":
         client.get_repo.side_effect = GithubException(503, {"message": expected_message})
     else:
-        issue = {"number": 7}
+        issue: IssueNode = {
+            "id": "node-7",
+            "number": 7,
+            "title": "cached title",
+            "state": "OPEN",
+            "body": "",
+            "createdAt": "2026-09-24T00:00:00Z",
+            "updatedAt": "2026-09-24T00:00:00Z",
+            "labels": [],
+            "milestone": None,
+            "assignees": [],
+        }
         repository = mocker.Mock(full_name=repo)
         repository.get_branch.side_effect = GithubException(503, {"message": expected_message})
         client.get_repo.return_value = repository
-        backend._fetch_issues_graphql = mocker.Mock(return_value=[issue])
+        backend._fetch_issues_page_graphql = mocker.Mock(
+            return_value=IssuesPage(issues=[issue], has_next_page=False, end_cursor=None, total_count=1)
+        )
         backend._fetch_targeted_issues = mocker.Mock(return_value={"#7": issue})
-    live_fetch = mocker.spy(backend, "fetch_snapshot")
     output = Output()
     context = WorkItemDecisionContext(backend, repo=repo, allow_cached=True, output=output)
 
     if read_kind == "bulk":
-        read = context.all()
+        live_fetch = mocker.spy(backend, "fetch_page")
+        read = context.page(ListPageRequest(repo=repo), match=lambda item, provider: True, force_hydration=False)
         assert [item.title for item in read.provider_items] == ["cached title"]
         assert read.from_cache is True
-        expected_scope = ReconcileScope.INCREMENTAL
+        live_fetch.assert_called_once()
     else:
+        live_fetch = mocker.spy(backend, "fetch_snapshot")
         target = context.select("#7", purpose="read")
         assert target.provider is not None
         assert target.provider.title == "cached title"
         assert target.provider_snapshot is None
-        expected_scope = ReconcileScope.TARGETED
-
-    live_fetch.assert_called_once()
-    assert live_fetch.call_args.args[0].scope is expected_scope
+        live_fetch.assert_called_once()
+        assert live_fetch.call_args.args[0].scope is ReconcileScope.TARGETED
     assert len(output.warnings) == 1
     assert expected_message in output.warnings[0]
 
@@ -211,20 +290,38 @@ def test_content_integrity_failure_never_reads_cache(tmp_path: Path, mocker: Moc
             items=[provider_item("#7", "cached title")], sync_started_at="2026-09-24T00:00:00+00:00"
         ),
     )
-    issue = {"number": 7}
+    issue: IssueNode = {
+        "id": "node-7",
+        "number": 7,
+        "title": "cached title",
+        "state": "OPEN",
+        "body": "",
+        "createdAt": "2026-09-24T00:00:00Z",
+        "updatedAt": "2026-09-24T00:00:00Z",
+        "labels": [],
+        "milestone": None,
+        "assignees": [],
+    }
     repository = mocker.Mock(full_name=repo)
     repository.get_git_tree.return_value = mocker.Mock(truncated=True)
     client = mocker.Mock()
     client.get_repo.return_value = repository
     mocker.patch("backlog_core.gh_client.make_github_client", return_value=client)
-    backend._fetch_issues_graphql = mocker.Mock(return_value=[issue])
+    backend._fetch_issues_page_graphql = mocker.Mock(
+        return_value=IssuesPage(issues=[issue], has_next_page=False, end_cursor=None, total_count=1)
+    )
     backend._fetch_targeted_issues = mocker.Mock(return_value={"#7": issue})
     cached_work_items = mocker.spy(backend, "cached_work_items")
     output = Output()
     context = WorkItemDecisionContext(backend, repo=repo, allow_cached=True, output=output)
 
+    def read() -> object:
+        if read_kind == "bulk":
+            return context.page(ListPageRequest(repo=repo), match=lambda item, provider: True, force_hydration=False)
+        return context.select("#7", purpose="read")
+
     with pytest.raises(_GitHubContentIntegrityError) as raised:
-        context.all() if read_kind == "bulk" else context.select("#7", purpose="read")
+        read()
 
     assert (type(raised.value), cached_work_items.call_count, output.warnings) == (_GitHubContentIntegrityError, 0, [])
 
@@ -268,7 +365,7 @@ def test_explicit_cached_fallback_does_not_hide_semantic_or_programming_errors(e
     context = WorkItemDecisionContext(backend, allow_cached=True, output=output)
 
     with pytest.raises(type(error)) as raised:
-        context.all()
+        context.page(ListPageRequest(), match=lambda item, provider: True, force_hydration=False)
 
     assert raised.value is error
     assert backend.cached_list_calls == 0
@@ -283,10 +380,11 @@ def test_cached_fallback_withholds_rows_overlaid_by_the_pending_journal(tmp_path
     backend.reconcile(ReconcileRequest(scope=ReconcileScope.INITIAL, apply_local_patches=False), snapshot=snapshot)
     backend.put_work_item(BacklogItem(title="queued title", description="queued edit", issue="#7"))
     assert [item.title for item in backend.list_work_items()] == ["queued title"]
+    mocker.patch.object(backend, "fetch_page", side_effect=BackendUnavailableError("offline"))
     mocker.patch.object(backend, "fetch_snapshot", side_effect=BackendUnavailableError("offline"))
     context = WorkItemDecisionContext(backend, allow_cached=True)
 
-    read = context.all()
+    read = context.page(ListPageRequest(), match=lambda item, provider: True, force_hydration=False)
     target = context.select("#7", purpose="mutation")
 
     assert read.provider_items == []
@@ -375,18 +473,15 @@ def test_pending_is_repository_scoped_and_memoized(mocker: MockerFixture) -> Non
     pending_work_items.assert_called_once_with("owner/repository")
 
 
-def test_targeted_then_global_reads_each_live_scope_once() -> None:
+def test_exact_selector_and_page_use_distinct_live_scopes() -> None:
     backend = DecisionBackend(live_items=[provider_item("#7", "live title")])
     context = WorkItemDecisionContext(backend)
 
     context.select("#7", purpose="read")
-    context.all()
-    context.all()
+    context.page(ListPageRequest(), match=lambda item, provider: True, force_hydration=False)
 
-    assert [request.scope for request in backend.snapshot_requests] == [
-        ReconcileScope.TARGETED,
-        ReconcileScope.INCREMENTAL,
-    ]
+    assert [request.scope for request in backend.snapshot_requests] == [ReconcileScope.TARGETED]
+    assert len(backend.page_requests) == 1
 
 
 def test_journal_entries_remain_separate_from_live_reads_and_supply_mutation_content() -> None:
@@ -397,7 +492,7 @@ def test_journal_entries_remain_separate_from_live_reads_and_supply_mutation_con
     )
     context = WorkItemDecisionContext(backend)
 
-    read = context.all()
+    read = context.page(ListPageRequest(), match=lambda item, provider: True, force_hydration=False)
     target = context.select("#7", purpose="mutation")
 
     assert [item.issue for item in read.provider_items] == ["#7"]
@@ -430,21 +525,44 @@ def test_supplied_repository_excludes_default_repository_pending_intent(tmp_path
     assert target.mutation_base == target.provider
 
 
-def test_title_selection_joins_pending_intent_by_selected_provider_reference() -> None:
+def test_title_selection_resolves_through_search_and_joins_pending_by_reference() -> None:
     selected_pending = BacklogItem(title="renamed queued title", description="selected edit", issue="#7")
     wrong_pending = BacklogItem(title="live title duplicate", description="wrong edit", issue="#8")
     backend = DecisionBackend(
-        live_items=[provider_item("#7", "live title")], pending_items=[selected_pending, wrong_pending]
+        live_items=[provider_item("#7", "a wholly unique live title")], pending_items=[selected_pending, wrong_pending]
     )
     context = WorkItemDecisionContext(backend)
 
-    target = context.select("live title", purpose="mutation")
+    target = context.select("wholly unique live title", purpose="mutation")
 
     assert target.provider is not None
     assert target.provider.issue == "#7"
+    assert backend.search_requests == ["wholly unique live title"]
     assert target.pending is not None
     assert target.pending.issue == "#7"
     assert target.mutation_base == selected_pending
+
+
+def test_title_selection_matching_pending_intent_only_skips_search() -> None:
+    pending_only = BacklogItem(title="never created yet", issue="")
+    backend = DecisionBackend(live_items=[], pending_items=[pending_only])
+    context = WorkItemDecisionContext(backend)
+
+    target = context.select("never created yet", purpose="mutation")
+
+    assert target.provider is None
+    assert target.pending == pending_only
+    assert backend.search_requests == []
+
+
+def test_title_ambiguity_from_search_raises() -> None:
+    backend = DecisionBackend(
+        live_items=[provider_item("#7", "shared phrase one"), provider_item("#8", "shared phrase two")]
+    )
+    context = WorkItemDecisionContext(backend)
+
+    with pytest.raises(AmbiguousSelectorError):
+        context.select("shared phrase", purpose="read")
 
 
 def test_live_read_failure_returns_no_partial_or_cached_result() -> None:
@@ -455,26 +573,27 @@ def test_live_read_failure_returns_no_partial_or_cached_result() -> None:
     context = WorkItemDecisionContext(backend)
 
     with pytest.raises(RuntimeError, match="second provider page failed"):
-        context.all()
+        context.page(ListPageRequest(), match=lambda item, provider: True, force_hydration=False)
 
     assert backend.cached_list_calls == 0
 
 
-def test_snapshot_for_slices_memoized_bulk_snapshot_and_adds_absent_tombstones() -> None:
+def test_snapshot_for_targeted_slices_and_adds_absent_tombstones() -> None:
     backend = DecisionBackend(live_items=[provider_item("#7", "live title")])
     context = WorkItemDecisionContext(backend)
-    context.all()
 
     snapshot = context.snapshot_for(ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#7", "#8"]))
 
     assert [(item.reference, item.exists) for item in snapshot.items] == [("#7", True), ("#8", False)]
     assert len(backend.snapshot_requests) == 1
+    assert backend.snapshot_requests[0].scope is ReconcileScope.TARGETED
 
 
 def test_provider_pagination_failure_returns_no_partial_page(mocker: MockerFixture) -> None:
     page_one = {
         "repository": {
             "issues": {
+                "totalCount": 2,
                 "nodes": [
                     {
                         "id": "node-7",

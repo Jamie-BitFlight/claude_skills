@@ -930,7 +930,15 @@ class TestCheckForDuplicatesFreshness:
             ],
             sync_started_at="2026-09-24T00:00:00+00:00",
         )
-        fetch = mocker.patch.object(backend, "fetch_snapshot", return_value=snapshot)
+        from backlog_core.backend_types import ListPageResult
+
+        fetch = mocker.patch.object(
+            backend,
+            "fetch_page",
+            return_value=ListPageResult(
+                items=snapshot.items, has_more=False, total=1, sync_started_at=snapshot.sync_started_at
+            ),
+        )
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
 
         with pytest.raises(DuplicateItemError):
@@ -938,9 +946,9 @@ class TestCheckForDuplicatesFreshness:
                 title="Retryable network error handling in sync", description=_DUPLICATE_DESCRIPTION, priority="P1"
             )
 
-        fetch.assert_called_once_with(
-            ReconcileRequest(scope=ReconcileScope.INCREMENTAL, since="", apply_local_patches=False)
-        )
+        # add_item's duplicate check now scans the OPEN state set through the
+        # request-shaped page fetch (O3), not a bulk fetch_snapshot.
+        fetch.assert_called_once()
 
     def test_sync_provider_refresh_failure_reports_could_not_verify_but_still_creates(
         self, mocker: MockerFixture
@@ -950,7 +958,7 @@ class TestCheckForDuplicatesFreshness:
 
         backend = get_config().backend
         assert isinstance(backend, SyncProvider)
-        mocker.patch.object(backend, "fetch_snapshot", side_effect=BackendUnavailableError("offline"))
+        mocker.patch.object(backend, "fetch_page", side_effect=BackendUnavailableError("offline"))
         out = Output()
 
         with pytest.raises(BackendUnavailableError, match="offline"):
@@ -1075,7 +1083,7 @@ class TestCheckForDuplicatesFreshness:
 
         backend = get_config().backend
         assert isinstance(backend, SyncProvider)
-        mocker.patch.object(backend, "fetch_snapshot", side_effect=BackendUnavailableError("offline"))
+        mocker.patch.object(backend, "fetch_page", side_effect=BackendUnavailableError("offline"))
         mocker.patch("backlog_core.operations.try_get_github", return_value=mocker.MagicMock())
         mocker.patch("backlog_core.operations.create_issue_for_item", return_value=42)
         out = Output()
@@ -1203,13 +1211,13 @@ class TestListItemsFiltering:
         _seed_items([item_with_issue])
         _seed_provider_items([item_with_issue])
         backend = get_config().backend
-        fetch = mocker.spy(backend, "fetch_snapshot")
+        fetch = mocker.spy(backend, "fetch_page")
 
         result = list_items(refresh=False, status="status:in-progress")
 
-        fetch.assert_called_once_with(
-            ReconcileRequest(scope=ReconcileScope.INCREMENTAL, since="", apply_local_patches=False)
-        )
+        # A request-shaped listing walks the request-shaped page fetch, not a
+        # bulk fetch_snapshot -- see WorkItemDecisionContext.page().
+        fetch.assert_called_once()
         items = cast("list[dict[str, str | bool]]", result["items"])
         assert len(items) == 1
         assert items[0]["status"] == "status:in-progress"
@@ -1221,32 +1229,38 @@ class TestListItemsFiltering:
         from backlog_core.backend_protocol import get_config
 
         fake_dir: Path = models.get_backlog_dir()
-        _write_item(fake_dir, title="No Status Item", priority="P2", topic="no-status-item", issue="#1")
+        path = _write_item(fake_dir, title="No Status Item", priority="P2", topic="no-status-item", issue="#1")
+        _seed_provider_items([_stored_item(path)])
         backend = get_config().backend
-        fetch = mocker.spy(backend, "fetch_snapshot")
+        fetch = mocker.spy(backend, "fetch_page")
 
         list_items(refresh=False)
 
-        fetch.assert_called_once_with(
-            ReconcileRequest(scope=ReconcileScope.INCREMENTAL, since="", apply_local_patches=False)
-        )
+        fetch.assert_called_once()
 
     def test_list_items_refresh_reconciles_command_snapshot(self, mocker: MockerFixture) -> None:
-        """Verify refresh reconciles the same snapshot already read for the command."""
+        """Verify refresh reconciles exactly the rows the page just listed (D6)."""
+        import backlog_core.models as models
         from backlog_core.backend_protocol import get_config
 
+        fake_dir: Path = models.get_backlog_dir()
+        path = _write_item(fake_dir, title="Refresh Target Item", priority="P2", topic="refresh-target", issue="#3")
+        _seed_provider_items([_stored_item(path)])
         backend = get_config().backend
-        fetch = mocker.spy(backend, "fetch_snapshot")
+        fetch = mocker.spy(backend, "fetch_page")
         reconcile = mocker.spy(backend, "reconcile")
 
         list_items(refresh=True)
 
-        fetch.assert_called_once_with(
-            ReconcileRequest(scope=ReconcileScope.INCREMENTAL, since="", apply_local_patches=False)
-        )
-        reconcile.assert_called_once_with(
-            ReconcileRequest(scope=ReconcileScope.INCREMENTAL, apply_local_patches=True), snapshot=fetch.spy_return
-        )
+        fetch.assert_called_once()
+        # TARGETED, never a bulk INCREMENTAL scope (D6): refresh pushes local
+        # intent only for the rows this page actually listed, and TARGETED
+        # never advances the whole-backlog checkpoint.
+        reconcile.assert_called_once()
+        reconcile_request = reconcile.call_args.args[0]
+        assert reconcile_request.scope is ReconcileScope.TARGETED
+        assert reconcile_request.references == ["#3"]
+        assert reconcile_request.apply_local_patches is True
 
 
 # ---------------------------------------------------------------------------
@@ -1876,8 +1890,8 @@ class TestViewItem:
     # it, so this class covers only the remaining five refresh scenarios.
     # -----------------------------------------------------------------
 
-    def test_view_item_title_selector_refresh_true_uses_bulk_snapshot(self, mocker: MockerFixture) -> None:
-        """A title selector resolves from one bulk snapshot without legacy enrichment."""
+    def test_view_item_title_selector_refresh_true_uses_search_then_targeted(self, mocker: MockerFixture) -> None:
+        """A title selector resolves through search, then one targeted snapshot (D5)."""
         import backlog_core.models as models
         from backlog_core.backend_protocol import get_config
 
@@ -1894,12 +1908,12 @@ class TestViewItem:
 
         assert result.title == "Refreshable Title Item"
         fetch.assert_called_once_with(
-            ReconcileRequest(scope=ReconcileScope.INCREMENTAL, since="", apply_local_patches=False)
+            ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#77"], since="", apply_local_patches=False)
         )
         mock_enrich.assert_not_called()
 
     def test_view_item_title_selector_refresh_false_skips_live_check(self, mocker: MockerFixture) -> None:
-        """The default title-selector path also uses one bulk snapshot."""
+        """The default title-selector path also resolves through search then one targeted snapshot."""
         import backlog_core.models as models
         from backlog_core.backend_protocol import get_config
 
@@ -1913,7 +1927,7 @@ class TestViewItem:
         view_item("Cached Title Item")
 
         fetch.assert_called_once_with(
-            ReconcileRequest(scope=ReconcileScope.INCREMENTAL, since="", apply_local_patches=False)
+            ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#88"], since="", apply_local_patches=False)
         )
         mock_enrich.assert_not_called()
 
