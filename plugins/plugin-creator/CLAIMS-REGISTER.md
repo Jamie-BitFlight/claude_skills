@@ -15,7 +15,7 @@ skill's Technique 1 and 2 forms; `rules/skill-substitution.md`.
 **Warrant**: canary-tested in this repo on 2026-08-06, run twice, once with the plugin fully
 reloaded, against a no-variable control line. Record:
 [the verification record](./skills/shared-content-references/references/verification.md) step 1,
-summarised in [SKILL.md String Substitution](https://github.com/Jamie-BitFlight/claude_skills/blob/main/rules/skill-substitution.md). Re-measured
+summarised in [SKILL.md String Substitution](../../rules/skill-substitution.md). Re-measured
 2026-09-20: invoking
 `/plugin-creator:shared-content-references` rendered `${CLAUDE_PLUGIN_ROOT}` and
 `${CLAUDE_SKILL_DIR}` as absolute paths in its `SKILL.md` body, and a `Read` of
