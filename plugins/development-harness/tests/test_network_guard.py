@@ -42,8 +42,36 @@ def _configured_testpaths() -> list[str]:
     return list(runner.TEST_PATHS)
 
 
+# A hang guard for the subprocess probes, not a performance bound: each probe
+# starts a fresh interpreter that imports the plugin conftest, which takes
+# seconds on an idle machine and far longer on a loaded CI runner.
+_PROBE_TIMEOUT = 120
+
+
 def _probe_command(probe: Path, *args: str) -> list[str]:
-    return [sys.executable, "-m", "pytest", str(probe), "-q", "-o", "addopts=", "--rootdir", str(_PLUGIN_ROOT), *args]
+    """Build a probe run that, like ``run_pytests.py``, reads no parent pytest config or conftest.
+
+    Returns:
+        The argv for a pytest subprocess that collects only *probe*.
+    """
+    return [
+        sys.executable,
+        "-m",
+        "pytest",
+        str(probe),
+        "-q",
+        "-c",
+        os.devnull,
+        "--rootdir",
+        str(_PLUGIN_ROOT),
+        "--confcutdir",
+        str(_PLUGIN_ROOT),
+        "--strict-config",
+        "--strict-markers",
+        "-p",
+        "no:cacheprovider",
+        *args,
+    ]
 
 
 def test_outbound_connection_is_blocked() -> None:
@@ -103,33 +131,17 @@ def test_unix_socket_is_still_allowed() -> None:
             server.close()
 
 
-def test_no_public_allow_network_fixture() -> None:
+def test_no_public_allow_network_fixture(request: pytest.FixtureRequest) -> None:
     """No public ``allow_network`` fixture exists in the fixture registry.
 
-    A subprocess test requests the fixture; the run must fail at fixture
-    resolution (``fixture 'allow_network' not found``) rather than silently
-    lifting the guard.
+    Requesting it must fail at fixture resolution rather than silently lifting
+    the guard.
     """
-    with plugin_root_probe(
-        """
-        def test_requests_allow_network(allow_network) -> None:  # pragma: no cover
-            pass
-        """
-    ) as probe:
-        result = subprocess.run(
-            _probe_command(probe),
-            capture_output=True,
-            text=True,
-            cwd=str(_PLUGIN_ROOT),
-            env={**os.environ, "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
-            timeout=15,
-            check=False,
-        )
-    assert result.returncode != 0, "allow_network fixture must not exist"
-    combined = result.stdout + result.stderr
-    assert "allow_network" in combined, combined
+    with pytest.raises(pytest.FixtureLookupError, match="allow_network"):
+        request.getfixturevalue("allow_network")
 
 
+@pytest.mark.integration
 def test_double_gate_requires_env_var() -> None:
     """An ``@pytest.mark.e2e`` test without the env var is still blocked.
 
@@ -153,7 +165,7 @@ def test_double_gate_requires_env_var() -> None:
             text=True,
             cwd=str(_PLUGIN_ROOT),
             env={**os.environ, "DH_ALLOW_TEST_NETWORK": "", "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
-            timeout=15,
+            timeout=_PROBE_TIMEOUT,
             check=False,
         )
     assert result.returncode != 0, result.stdout
@@ -162,6 +174,7 @@ def test_double_gate_requires_env_var() -> None:
     assert "Blocked DNS resolution" in combined, combined
 
 
+@pytest.mark.integration
 def test_double_gate_opens_with_env_var() -> None:
     """With both the marker and the env var, the policy gate opens.
 
@@ -185,12 +198,13 @@ def test_double_gate_opens_with_env_var() -> None:
             text=True,
             cwd=str(_PLUGIN_ROOT),
             env={**os.environ, "DH_ALLOW_TEST_NETWORK": "1", "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
-            timeout=15,
+            timeout=_PROBE_TIMEOUT,
             check=False,
         )
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+@pytest.mark.integration
 def test_double_gate_stays_open_through_class_scoped_teardown() -> None:
     """The gate stays open while a class-scoped e2e fixture tears down.
 
@@ -227,43 +241,30 @@ def test_double_gate_stays_open_through_class_scoped_teardown() -> None:
             text=True,
             cwd=str(_PLUGIN_ROOT),
             env={**os.environ, "DH_ALLOW_TEST_NETWORK": "1", "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
-            timeout=15,
+            timeout=_PROBE_TIMEOUT,
             check=False,
         )
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_guard_restores_sockets_after_session() -> None:
-    """After a pytest subprocess finishes, the parent process sockets are intact.
+def test_guard_restores_sockets_after_session(pytestconfig: pytest.Config) -> None:
+    """Session teardown restores the real socket functions, and configure re-arms them.
 
-    Runs a trivial pytest session in a subprocess (which installs and tears
-    down the guard), then opens a loopback socket in this parent process to
-    prove teardown restored the real ``socket.connect``.
+    Calls the plugin conftest's own ``pytest_unconfigure`` and ``pytest_configure``
+    hooks in this process. The guard is per process, so under xdist this touches
+    only the current worker, and the ``finally`` re-arms it for the tests after.
     """
-    with plugin_root_probe(
-        """
-        def test_noop() -> None:
-            pass
-        """
-    ) as probe:
-        subprocess.run(
-            _probe_command(probe),
-            capture_output=True,
-            text=True,
-            cwd=str(_PLUGIN_ROOT),
-            env={**os.environ, "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
-            timeout=15,
-            check=True,
-        )
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    guard = pytestconfig.pluginmanager.get_plugin(str(_PLUGIN_ROOT / "conftest.py"))
+    assert guard is not None
+    armed = (socket.socket.connect, socket.socket.connect_ex, socket.getaddrinfo)
+    assert armed == (guard._guarded_connect, guard._guarded_connect_ex, guard._guarded_getaddrinfo)
+    guard.pytest_unconfigure(pytestconfig)
     try:
-        server.bind(("127.0.0.1", 0))
-        server.listen(1)
-        client.connect(server.getsockname())  # parent process: real connect works
+        restored = (socket.socket.connect, socket.socket.connect_ex, socket.getaddrinfo)
+        assert restored == (guard._real_connect, guard._real_connect_ex, guard._real_getaddrinfo)
     finally:
-        client.close()
-        server.close()
+        guard.pytest_configure(pytestconfig)
+    assert (socket.socket.connect, socket.socket.connect_ex, socket.getaddrinfo) == armed
 
 
 @pytest.mark.integration
@@ -299,7 +300,7 @@ def test_guard_covers_testpath(testpath: str) -> None:
             text=True,
             cwd=str(_PLUGIN_ROOT),
             env={**os.environ, "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
-            timeout=30,
+            timeout=_PROBE_TIMEOUT,
             check=False,
         )
     finally:
