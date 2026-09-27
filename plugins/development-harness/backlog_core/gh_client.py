@@ -103,6 +103,9 @@ class _GraphQLCapable(Protocol):
 logger = logging.getLogger(__name__)
 
 _HTTP_FORBIDDEN = 403
+#: Statuses on which an exhausted ``x-ratelimit-remaining`` means a rate-limit refusal: PyGithub's
+#: GraphQL-errors 400, a 403 and a 429. On a 401 or 404 the header is incidental.
+_RATE_LIMIT_REFUSAL_STATUSES: Final = frozenset({400, 403, 429})
 _HTTP_NOT_FOUND = 404
 
 _REQUEST_TRANSPORT_ERRORS = (
@@ -733,7 +736,7 @@ def _is_rate_limited(exc: GithubException) -> bool:
 
     Returns:
         ``True`` for a ``RATE_LIMITED`` errors entry, an exhausted ``x-ratelimit-remaining``
-        header, or PyGithub's own rate-limit exception.
+        header on a 400/403/429 (never a 401 or 404), or PyGithub's own rate-limit exception.
     """
     if isinstance(exc, RateLimitExceededException):
         return True
@@ -741,6 +744,8 @@ def _is_rate_limited(exc: GithubException) -> bool:
     errors = data.get("errors")
     if isinstance(errors, list) and any(isinstance(e, dict) and e.get("type") == "RATE_LIMITED" for e in errors):
         return True
+    if exc.status not in _RATE_LIMIT_REFUSAL_STATUSES:
+        return False
     remaining = {str(k).casefold(): v for k, v in (exc.headers or {}).items()}.get("x-ratelimit-remaining")
     return str(remaining) == "0"
 

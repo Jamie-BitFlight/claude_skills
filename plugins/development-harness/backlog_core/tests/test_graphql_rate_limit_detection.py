@@ -138,3 +138,19 @@ class TestGraphQLRateLimitIsClassified:
             _graphql_request(repo, _QUERY)
 
         assert not isinstance(excinfo.value, GitHubRateLimitedError)
+
+
+class TestAnExhaustedQuotaHeaderDoesNotOverrideTheStatus:
+    """``x-ratelimit-remaining: 0`` marks a rate limit only on a refusal status, never on 401/404."""
+
+    @pytest.mark.parametrize(("status", "message"), [(401, "Bad credentials"), (404, "Not Found")], ids=["401", "404"])
+    def test_a_non_refusal_status_with_an_exhausted_quota_is_not_a_rate_limit(
+        self, github_answering: Callable[..., SimpleNamespace], status: int, message: str
+    ) -> None:
+        repo = github_answering(status, {"message": message}, {"x-ratelimit-remaining": "0"})
+
+        with pytest.raises(BackendUnavailableError) as excinfo:
+            _graphql_request(repo, _QUERY)
+
+        assert not isinstance(excinfo.value, GitHubRateLimitedError)
+        assert excinfo.value.retryable is False
