@@ -140,7 +140,110 @@ DH_LABELS: dict[str, str] = {
     StatusLabel.NEEDS_GROOMING.value: "f59e0b",
     StatusLabel.IN_PROGRESS.value: "3b82f6",
     StatusLabel.VERIFIED.value: "10b981",
+    StatusLabel.GROOMED.value: "0075ca",
+    StatusLabel.BLOCKED.value: "d93f0b",
 }
+
+#: Case-insensitive priority values that have a label form. Every other
+#: priority value (``"completed"``, unknown strings, ``""``) has none --
+#: mirror_work_item_labels leaves the existing priority:* label untouched
+#: for those (design D3).
+_PRIORITY_LABEL_VALUES: Final[frozenset[str]] = frozenset({"p0", "p1", "p2", "ideas"})
+
+#: status: (label to add, labels to remove) for each status value that has a
+#: label form. A status not in this table (open, done, closed, resolved, an
+#: unrecognized value, or "") has no label form -- the issue's existing
+#: status:* labels are left exactly as they are (design D3). Single source
+#: of truth for this mapping, replacing the four ``removes`` tuples
+#: previously spread across apply_status_in_progress/_verified/_groomed/_blocked.
+_STATUS_LABEL_TABLE: Final[dict[str, tuple[StatusLabel, tuple[StatusLabel, ...]]]] = {
+    "in-progress": (StatusLabel.IN_PROGRESS, (StatusLabel.NEEDS_GROOMING,)),
+    "groomed": (StatusLabel.GROOMED, (StatusLabel.NEEDS_GROOMING,)),
+    "verified": (StatusLabel.VERIFIED, (StatusLabel.IN_PROGRESS,)),
+    "blocked": (StatusLabel.BLOCKED, ()),
+    "needs-grooming": (StatusLabel.NEEDS_GROOMING, ()),
+}
+
+
+def _desired_label_set(current_names: list[str], priority: str, item_type: str, status: str) -> list[str]:
+    """Return the full desired label set mirroring priority/item_type/status onto labels.
+
+    Every label unrelated to the three mirrored namespaces (``priority:``,
+    ``type:``, ``status:``) passes through unchanged. Within each namespace,
+    a recognized value replaces every existing label in that namespace; an
+    unrecognized or empty value leaves that namespace exactly as it is (see
+    the design's per-field mirroring rules -- ``completed`` and an unknown
+    type both fall in this "leave unchanged" case).
+
+    Returns:
+        The desired label name list, order-preserving and de-duplicated.
+    """
+    desired = list(current_names)
+    priority_key = priority.strip().lower()
+    if priority_key in _PRIORITY_LABEL_VALUES:
+        desired = [name for name in desired if not name.startswith("priority:")]
+        desired.append(f"priority:{priority_key}")
+    type_label = TYPE_TO_LABEL.get(item_type.strip().lower())
+    if type_label is not None:
+        desired = [name for name in desired if not name.startswith("type:")]
+        desired.append(type_label)
+    status_entry = _STATUS_LABEL_TABLE.get(status.strip().lower())
+    if status_entry is not None:
+        add_label, remove_labels = status_entry
+        remove_names = {label.value for label in remove_labels}
+        desired = [name for name in desired if name not in remove_names]
+        if add_label.value not in desired:
+            desired.append(add_label.value)
+    seen: set[str] = set()
+    deduplicated: list[str] = []
+    for name in desired:
+        if name not in seen:
+            seen.add(name)
+            deduplicated.append(name)
+    return deduplicated
+
+
+def mirror_work_item_labels(
+    repository: Repository, owner: str, repo_name: str, issue: IssueNode, *, priority: str, item_type: str, status: str
+) -> None:
+    """Write the issue's priority:/type:/status: labels to match one head-field write.
+
+    Design D3's "labels first" step: called from ``apply_patches`` before the
+    audit comment or head record are touched, for every patch regardless of
+    whether it turns out to change anything -- a no-op desired set (the
+    common case once labels and the head are in step) costs one already-fetched
+    label read and no write.
+
+    Args:
+        repository: PyGithub Repository to operate on.
+        owner: Repository owner login.
+        repo_name: Repository name.
+        issue: The issue's current IssueNode (already fetched by the caller).
+        priority: The write's head priority value (``""`` when unset/unknown).
+        item_type: The write's head item_type value (``""`` when unset/unknown).
+        status: The write's head status value (``""`` when unset/unknown).
+
+    Raises:
+        GithubException: On a REST failure creating a missing label.
+        BacklogError: On a GraphQL failure resolving label ids or updating the issue.
+    """
+    current_names = [label["name"] for label in issue["labels"]]
+    desired = _desired_label_set(current_names, priority, item_type, status)
+    if set(desired) == set(current_names):
+        return
+    for name in set(desired) - set(current_names):
+        colour = DH_LABELS.get(name)
+        if colour is None:
+            continue
+        try:
+            repository.get_label(name)
+        except GithubException as exc:
+            if exc.status != _HTTP_NOT_FOUND:
+                raise
+            repository.create_label(name=name, color=colour)
+    id_map = _resolve_label_ids_graphql(repository, owner, repo_name, desired)
+    desired_ids = [id_map[name] for name in desired if name in id_map]
+    _update_issue_graphql(repository, issue["id"], label_ids=desired_ids)
 
 
 #: Repos already checked this process — keyed by `repo.full_name`. Labels don't change mid-
