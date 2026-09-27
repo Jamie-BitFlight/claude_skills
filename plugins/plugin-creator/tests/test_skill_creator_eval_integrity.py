@@ -10,8 +10,13 @@ import json
 import sys
 import types
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import create_autospec
 
+import anthropic
 import pytest
+from anthropic.resources import Messages
+from anthropic.types import TextBlock
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "skills" / "skill-creator" / "scripts"
 
@@ -391,13 +396,60 @@ def test_partial_sample_population_cannot_pass(script_loader, monkeypatch, tmp_p
     assert output["results"][0]["pass"] is None
 
 
-def test_direct_improvement_rejects_missing_evidence_before_provider_call(script_loader, monkeypatch):
-    sdk = types.ModuleType("anthropic")
-    sdk_types = types.ModuleType("anthropic.types")
-    vars(sdk_types).update(TextBlock=type("TextBlock", (), {}), ThinkingBlock=type("ThinkingBlock", (), {}))
-    monkeypatch.setitem(sys.modules, "anthropic", sdk)
-    monkeypatch.setitem(sys.modules, "anthropic.types", sdk_types)
+def _evidence(*, complete: bool):
+    """Build a fully shaped eval record; only pass/errors differ, so a missing guard reaches the provider."""
+    row: dict[str, object] = {"query": "q", "should_trigger": True, "runs": 1, "valid_runs": 1, "triggers": 1}
+    if complete:
+        row |= {"pass": True, "errors": 0}
+    else:
+        row |= {"pass": None, "errors": 1, "valid_runs": 0, "triggers": 0}
+    return {"results": [row], "summary": {"passed": int(complete), "total": 1}}
+
+
+def _provider_client(**create_behavior):
+    """Autospec the real SDK client so call signatures stay checked against anthropic."""
+    client = create_autospec(anthropic.Anthropic, instance=True)
+    client.messages = create_autospec(Messages, instance=True)
+    client.messages.create.configure_mock(**create_behavior)
+    return client
+
+
+def _improve(module, client, eval_results, history):
+    return module.improve_description(
+        client=client,
+        skill_name="name",
+        skill_content="body",
+        current_description="description",
+        eval_results=eval_results,
+        history=history,
+        model="test-model",
+    )
+
+
+def test_complete_evidence_reaches_provider_once(script_loader):
     module = script_loader("improve_description")
-    incomplete = {"results": [{"pass": None, "errors": 1}], "summary": {"passed": 0, "total": 1}}
-    with pytest.raises(ValueError, match="complete behavioral"):
-        module._build_prompt("name", "body", "description", incomplete, [], None)
+    reply = SimpleNamespace(content=[TextBlock(type="text", text="<new_description>improved</new_description>")])
+    client = _provider_client(return_value=reply)
+    assert _improve(module, client, _evidence(complete=True), []) == "improved"
+    client.messages.create.assert_called_once()
+    assert client.messages.create.call_args.kwargs["model"] == "test-model"
+
+
+@pytest.mark.parametrize(
+    ("eval_results", "history", "message"),
+    [
+        (_evidence(complete=False), [], "requires complete behavioral observations"),
+        (
+            _evidence(complete=True),
+            [{"description": "earlier", **_evidence(complete=False)}],
+            "history contains incomplete",
+        ),
+    ],
+    ids=["incomplete-results", "incomplete-history"],
+)
+def test_incomplete_evidence_is_rejected_before_provider_call(script_loader, eval_results, history, message):
+    module = script_loader("improve_description")
+    client = _provider_client(side_effect=AssertionError("provider called with incomplete evidence"))
+    with pytest.raises(ValueError, match=message):
+        _improve(module, client, eval_results, history)
+    client.messages.create.assert_not_called()
