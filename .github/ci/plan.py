@@ -89,6 +89,7 @@ LINT_CONFIG_NAMES = frozenset({
 # ponytail: the one plugin with lanes beyond its runner's fast default; a runner-declared
 # lane table replaces this once a second plugin needs one.
 DH = "development-harness"
+DH_LANE_MARKERS = {"integration": "integration and not research_vault", "cross_backend": "cross_backend"}
 LANGUAGE_SUFFIXES = {
     "lint-python": {".py", ".pyi"},
     "lint-js": {".js", ".jsx", ".cjs", ".mjs", ".ts", ".tsx", ".mts", ".cts", ".json", ".jsonc", ".css"},
@@ -226,21 +227,19 @@ def marketplace_version_only(root: Path, base: str, head: str) -> bool:
     return values[0] == values[1]
 
 
-def dh_lanes(suites: dict[str, list[str]], *, selected: bool) -> tuple[list[Shard], list[Shard]]:
-    """Select development-harness lanes as its runner plus a marker, never its test paths.
+def dh_lanes(runner: str) -> dict[str, list[Shard]]:
+    """Build one development-harness shard per lane: its runner plus that lane's marker.
+
+    The runner owns the test paths, so no shard names any. The cross-backend tests
+    parametrize every backend themselves, so one shard covers them all.
 
     Returns:
-        The integration and cross-backend shards; empty without a runner. The cross-backend
-        tests parametrize every backend themselves, so one shard covers them all.
+        Shards keyed by lane name from ``DH_LANE_MARKERS``.
     """
-    if not selected or DH not in suites:
-        return [], []
-    runner = suites[DH][0]
-    integration: list[Shard] = [
-        {"name": DH, "paths": [], "marker": "integration and not research_vault", "runner": runner}
-    ]
-    cross_backend: list[Shard] = [{"name": DH, "paths": [], "marker": "cross_backend", "runner": runner}]
-    return integration, cross_backend
+    return {
+        lane: [{"name": DH, "paths": [], "marker": marker, "runner": runner}]
+        for lane, marker in DH_LANE_MARKERS.items()
+    }
 
 
 def build_plan(
@@ -278,7 +277,8 @@ def build_plan(
         # only that plugin's shard; the global shard runs in every plan.
         if full_checks or owner == "global" or owner in owners
     ]
-    integration, cross_backend = dh_lanes(suites, selected=full_checks or DH in owners)
+    lanes = dh_lanes(suites[DH][0]) if DH in suites and (full_checks or DH in owners) else {}
+    integration = lanes.get("integration", [])
     if full_checks or any(under(path, "research") for path in changed):
         integration.append({
             "name": "research-backlinks",
@@ -311,7 +311,7 @@ def build_plan(
         "manifest-sync": full_checks or bool(owners) or ".claude-plugin/marketplace.json" in changed,
         "file-hygiene": True,
         "test-python": bool(unit),
-        "test-cross-backend": bool(cross_backend),
+        "test-cross-backend": "cross_backend" in lanes,
         "test-integration": bool(integration),
     })
     allowed_skips = ",".join(sorted(job for job, selected_job in checks.items() if not selected_job))
@@ -324,7 +324,7 @@ def build_plan(
         "head": head,
         "unit_matrix": {"include": unit},
         "integration_matrix": {"include": integration},
-        "cross_backend_matrix": {"include": cross_backend},
+        "cross_backend_matrix": {"include": lanes.get("cross_backend", [])},
         "validation_paths": validation,
         "checks": checks,
         "allowed_skips": allowed_skips,
