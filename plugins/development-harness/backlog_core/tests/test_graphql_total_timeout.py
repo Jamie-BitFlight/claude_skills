@@ -21,16 +21,21 @@ from __future__ import annotations
 
 import logging
 import math
+import threading
 import time
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
+from backlog_core import gh_client
 from backlog_core.gh_client import _graphql_request, _update_issues_graphql_batch
 from backlog_core.github_client import GRAPHQL_TOTAL_TIMEOUT_DEFAULT, graphql_total_timeout_seconds
-from backlog_core.models import GitHubMutationOutcomeUnknownError, GitHubRequestTimeoutError
+from backlog_core.models import BackendUnavailableError, GitHubMutationOutcomeUnknownError, GitHubRequestTimeoutError
 from backlog_core.sync_state import SyncErrorKind, classify_sync_error
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 #: Deliberately far longer than any deadline these tests configure -- if the deadline mechanism
 #: is missing or broken, the test itself would hang for this long instead of failing fast.
@@ -43,13 +48,18 @@ _TEST_DEADLINE_SECONDS = 0.2
 #: _FAKE_SLOW_RESPONSE_SECONDS or a broken deadline would pass by accident.
 _MAX_ACCEPTABLE_ELAPSED_SECONDS = 2.0
 
+#: Slow fakes block on this rather than sleeping, so each test's teardown can release the workers
+#: its timeouts abandoned. Left running, they would count against the process-wide cap on
+#: abandoned workers and refuse requests in whichever test ran next.
+_RELEASE = threading.Event()
+
 
 class _SlowRequester:
     """Stands in for PyGithub's requester; blocks past any timeout under test."""
 
     def graphql_query(self, query: str, variables: dict[str, object]) -> tuple[dict, dict]:
         """Sleep well past the configured deadline, then answer as GitHub normally would."""
-        time.sleep(_FAKE_SLOW_RESPONSE_SECONDS)
+        _RELEASE.wait(_FAKE_SLOW_RESPONSE_SECONDS)
         return {}, {"data": {"viewer": {"login": "octocat"}}}
 
 
@@ -76,6 +86,20 @@ def _small_total_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
     waits out the real (much larger) configured value.
     """
     monkeypatch.setattr("backlog_core.gh_client._graphql_total_timeout_seconds", lambda: _TEST_DEADLINE_SECONDS)
+
+
+def _graphql_workers() -> list[threading.Thread]:
+    return [t for t in threading.enumerate() if t.name == "gh-graphql-request"]
+
+
+@pytest.fixture(autouse=True)
+def _release_abandoned_workers() -> Iterator[None]:
+    """Let every worker a test abandoned finish before the next test starts."""
+    _RELEASE.clear()
+    yield
+    _RELEASE.set()
+    for worker in _graphql_workers():
+        worker.join(_FAKE_SLOW_RESPONSE_SECONDS)
 
 
 class TestTotalTimeoutBoundsATricklingResponse:
@@ -123,7 +147,7 @@ class _RecordingSlowRequester:
     def graphql_query(self, query: str, variables: dict[str, object]) -> tuple[dict, dict]:
         """Record the query, then sleep well past the configured deadline."""
         self.queries.append(query)
-        time.sleep(_FAKE_SLOW_RESPONSE_SECONDS)
+        _RELEASE.wait(_FAKE_SLOW_RESPONSE_SECONDS)
         return {}, {"data": {}}
 
 
@@ -197,3 +221,41 @@ class TestTotalTimeoutEnvValueIsValidated:
 
         assert math.isclose(value, 12.5)
         assert not caplog.records
+
+
+class TestAbandonedWorkersAreBounded:
+    """A request that never returns leaves its worker alive; the count of those must stay bounded."""
+
+    @pytest.fixture(autouse=True)
+    def _cap_of_two(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(gh_client, "_MAX_ABANDONED_GRAPHQL_WORKERS", 2, raising=False)
+
+    def test_a_request_past_the_cap_is_refused_without_starting_a_worker(self) -> None:
+        requester = _RecordingSlowRequester()
+        repo = _FakeRepo(requester)
+        for _ in range(2):
+            with pytest.raises(GitHubRequestTimeoutError):
+                _graphql_request(repo, "query ListIssues { viewer { login } }")
+
+        with pytest.raises(BackendUnavailableError) as excinfo:
+            _graphql_request(repo, "query ListIssues { viewer { login } }")
+
+        assert not isinstance(excinfo.value, GitHubRequestTimeoutError)
+        assert excinfo.value.retryable is True
+        assert "still running" in str(excinfo.value)
+        assert len(requester.queries) == 2, "the refused request must not reach the transport"
+        assert len(_graphql_workers()) == 2
+
+    def test_a_worker_that_finishes_leaves_the_count(self) -> None:
+        repo = _FakeRepo(_RecordingSlowRequester())
+        for _ in range(2):
+            with pytest.raises(GitHubRequestTimeoutError):
+                _graphql_request(repo, "query ListIssues { viewer { login } }")
+
+        _RELEASE.set()
+        for worker in _graphql_workers():
+            worker.join(_FAKE_SLOW_RESPONSE_SECONDS)
+
+        assert _graphql_request(_FakeRepo(_FastRequester()), "query ListIssues { viewer { login } }") == {
+            "viewer": {"login": "octocat"}
+        }
