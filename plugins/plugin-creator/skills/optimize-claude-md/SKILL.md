@@ -51,8 +51,8 @@ Recognize these file types: `CLAUDE.md`, `AGENTS.md`, `SKILL.md`, agent definiti
 
 - Run completeness score evaluation (8-category assessment from /plugin-creator:audit-skill-completeness)
 - Record baseline completeness score (format: X/24)
-- Resolve the skill's goals — use `<target-skill>/SKILL-GOALS.md` if present, otherwise activate the `/plugin-creator:skill-goal-extractor` skill against the skill directory. Record the goals; they are passed into delegation and are the standard every later phase judges changes against.
-- Offer a `/plugin-creator:evaluate-and-tighten-skills` pass before optimizing. Tightening decides what content earns its place; optimization decides how the survivors read. Running them in that order avoids polishing prose that a tightening pass would delete. Skip the offer only when the skill was tightened against these same goals already.
+- Require semantic refinement by Skill Lapidary before optimizing content whose existence, goal alignment, or semantic conservation is in question. Use an applicable Lapidary result/contract supplied by the caller when available; do not independently derive an authoritative goal set from the target prose or `SKILL-GOALS.md`.
+- If Skill Lapidary is unavailable, direct the caller to install `https://github.com/Jamie-BitFlight/skill-lapidary` with `npx -y skills@latest add https://github.com/Jamie-BitFlight/skill-lapidary --all`. If it still cannot be loaded, block semantic optimization rather than recreating its refinement logic. Pure wording optimization may continue only when the surviving content boundary is already established independently.
 
 **For CLAUDE.md and AGENTS.md files** — run index discipline audit (6 binary checks):
 
