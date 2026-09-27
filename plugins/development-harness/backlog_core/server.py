@@ -1983,6 +1983,9 @@ async def backlog_list(
     # of the caller's limit -- a bounded request-shaped page would leave `total`
     # honestly unknown (None) whenever a local predicate removed a row.
     operations_limit = 0 if count_only else limit
+    # An unbounded walk returns every match and the slicing below applies the
+    # offset; forwarding it too would apply it twice.
+    operations_offset = offset if operations_limit > 0 else 0
     try:
         _assert_config()
         result, backend_status = await asyncio.gather(
@@ -1999,8 +2002,9 @@ async def backlog_list(
                 include_closed=include_closed,
                 filter_by_key=filter_by_key,
                 search=search,
-                offset=offset,
+                offset=operations_offset,
                 limit=operations_limit,
+                count_only=count_only,
                 output=out,
             ),
             asyncio.to_thread(_probe_backend_status),

@@ -403,6 +403,10 @@ class ListPageRequest(BaseModel):
     """0 means unbounded — walk the whole requested state set to completion.
     A positive value walks only far enough to find ``offset + limit + 1``
     matches, per D3/D4."""
+    hydrate: bool = True
+    """False when the caller only counts the rows: the walk skips the final
+    content read, so a row matched on the ``priority:`` label shortcut keeps
+    its raw issue body and must not be displayed or cached."""
 
 
 class ListPageResult(BaseModel):
@@ -459,7 +463,7 @@ class RequestShapedListing(Protocol):
         light: bool = False,
     ) -> object: ...
     def search_issues_by_title(self, repo: str, selector: str) -> list[IssueNode]: ...
-    def fetch_issue_titles(self, repo: str, *, include_closed: bool = False) -> list[tuple[int, str]]: ...
+    def fetch_issue_titles(self, repo: str) -> list[tuple[int, str]]: ...
 
 
 @runtime_checkable

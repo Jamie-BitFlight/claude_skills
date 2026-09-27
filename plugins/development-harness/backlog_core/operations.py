@@ -2433,6 +2433,7 @@ def _read_list_page(
     search: str | None,
     offset: int,
     limit: int,
+    count_only: bool,
 ) -> ListPage:
     """Read one request-shaped GitHub list page and write it through the cache.
 
@@ -2441,7 +2442,8 @@ def _read_list_page(
     plain list acknowledges nothing while ``refresh=True`` also pushes local
     intent for the listed rows only (D6). The checkpoint never moves: TARGETED
     never advances it. A failed write-through is warned, not raised — the
-    read it is attached to has already succeeded.
+    read it is attached to has already succeeded. A *count_only* page reads
+    no work-item content and so writes nothing through.
 
     Returns:
         The request-shaped page (matched rows plus honest pagination facts).
@@ -2449,7 +2451,12 @@ def _read_list_page(
     context = _decision_context(repo=repo, allow_cached=allow_cached, output=output)
     pushed_labels = [value for value in (label, _status_push_label(status)) if value]
     request = ListPageRequest(
-        repo=repo, include_closed=include_closed, labels=pushed_labels, offset=offset, limit=limit
+        repo=repo,
+        include_closed=include_closed,
+        labels=pushed_labels,
+        offset=offset,
+        limit=limit,
+        hydrate=not count_only,
     )
     page = context.page(
         request,
@@ -2469,7 +2476,7 @@ def _read_list_page(
         force_hydration=_page_needs_hydration(type_=type_, topic=topic, search=search, filter_by_key=filter_by_key),
     )
     snapshot = page.provider_snapshot
-    if snapshot is not None and isinstance(backend, SyncProvider):
+    if snapshot is not None and not count_only and isinstance(backend, SyncProvider):
         references = [item.reference for item in snapshot.items]
         try:
             result = backend.reconcile(
@@ -2481,7 +2488,10 @@ def _read_list_page(
         except (BackendUnavailableError, BacklogError) as exc:
             output.warn(f"  WARNING: Could not write this page through to the local cache: {exc}")
         else:
-            if refresh:
+            # A plain list reports only failures: its write-through is part of
+            # the documented contract, and a silent failure leaves later
+            # allow_cached reads stale.
+            if refresh or result.failures:
                 summary = (
                     f"Reconciled {result.fetched_items} provider item(s): {result.local_updates} local updates, "
                     f"{result.provider_patches} patches, {result.no_ops} no-ops, {result.conflicts} conflicts, "
@@ -2766,6 +2776,7 @@ def list_items(
     search: str | None = None,
     offset: int = 0,
     limit: int = 0,
+    count_only: bool = False,
 ) -> dict[str, int | bool | str | list[str] | list[dict[str, str | bool]] | None]:
     """List backlog items from one live provider observation when supported.
 
@@ -2809,6 +2820,10 @@ def list_items(
         limit: For a GitHub-backed listing only, the request-shaped walk
             collects at most this many matching rows past *offset* (0 = walk
             the whole requested state set). Ignored for other backends.
+        count_only: For a GitHub-backed listing only, the caller reads the
+            count and discards the rows: the walk reads no work-item content
+            beyond what matching needs and writes nothing through to the
+            cache, so the returned rows may carry raw issue bodies.
 
     Returns:
         Dict with items list (each item a dict with section, title, issue, plan, type, topic,
@@ -2841,6 +2856,7 @@ def list_items(
             search=search,
             offset=offset,
             limit=limit,
+            count_only=count_only,
         )
         read: CommandWorkItems = page
     else:

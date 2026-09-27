@@ -243,12 +243,13 @@ class _GitHubWorkItemSync:
         *,
         match: Callable[[BacklogItem, ProviderItem], bool],
         force_hydration: bool,
-    ) -> list[tuple[IssueNode, ProviderItem | None]]:
+    ) -> list[tuple[IssueNode, ProviderItem, bool]]:
         """Hydrate as needed (D2') and match one GraphQL page's issues.
 
         Returns:
-            Each matching raw node, in page order, with its hydrated provider
-            item, or ``None`` when it matched on the label shortcut unhydrated.
+            Each matching raw node, in page order, with its provider item and
+            whether that item was hydrated (``False`` for a row matched on the
+            label shortcut, whose item carries the raw issue body).
         """
         needs_hydration = {
             issue["number"]: force_hydration
@@ -257,14 +258,14 @@ class _GitHubWorkItemSync:
         }
         hydrate_now = [issue for issue in issues if needs_hydration[issue["number"]]]
         heads, comments = self._work_item_contexts(repo, hydrate_now) if hydrate_now else ({}, {})
-        matched: list[tuple[IssueNode, ProviderItem | None]] = []
+        matched: list[tuple[IssueNode, ProviderItem, bool]] = []
         for issue in issues:
             use_content = needs_hydration[issue["number"]]
             candidate = self.provider_item_from_issue(
                 repo, owner, repo_name, issue, heads if use_content else {}, comments if use_content else {}
             )
             if match(provider_item_to_backlog_item(candidate), candidate):
-                matched.append((issue, candidate if use_content else None))
+                matched.append((issue, candidate, use_content))
         return matched
 
     def fetch_page(
@@ -286,7 +287,8 @@ class _GitHubWorkItemSync:
         before return: a caller displaying or caching a row needs its real,
         tracked content, not the raw issue body the shortcut used only to
         decide inclusion cheaply. A row hydrated during the walk keeps that
-        provider item and is never read again. Hydration
+        provider item and is never read again. A count-only request
+        (``request.hydrate`` false) skips that final pass. Hydration
         is batched per GraphQL page (one ``_work_item_contexts`` call per
         page's candidates that need it), not per issue, so a broken head on
         an unrelated issue never touched by this walk cannot abort it
@@ -305,7 +307,7 @@ class _GitHubWorkItemSync:
         target = request.offset + request.limit + 1 if request.limit > 0 else None
         page_size = min(100, target) if target else 100
 
-        matched: list[tuple[IssueNode, ProviderItem | None]] = []
+        matched: list[tuple[IssueNode, ProviderItem, bool]] = []
         cursor: str | None = None
         has_next_page = True
         while True:
@@ -335,11 +337,13 @@ class _GitHubWorkItemSync:
 
         # Final hydration pass, only for returned rows that matched on the
         # label shortcut and so still carry the raw issue body.
-        shortcut = [issue for issue, item in page_slice if item is None]
+        shortcut = [issue for issue, _, hydrated in page_slice if not hydrated] if request.hydrate else []
         heads, comments = self._work_item_contexts(repo, shortcut) if shortcut else ({}, {})
-        hydrated = [
-            item or self.provider_item_from_issue(repo, owner, repo_name, issue, heads, comments)
-            for issue, item in page_slice
+        items = [
+            item
+            if hydrated or not request.hydrate
+            else self.provider_item_from_issue(repo, owner, repo_name, issue, heads, comments)
+            for issue, item, hydrated in page_slice
         ]
 
         # Only an exhausted walk knows the filtered total. totalCount counts
@@ -347,7 +351,7 @@ class _GitHubWorkItemSync:
         # the local "has a section" rule, so it is never the filtered total.
         total = None if has_next_page else len(matched)
 
-        return ListPageResult(items=hydrated, has_more=has_more, total=total, sync_started_at=sync_started_at)
+        return ListPageResult(items=items, has_more=has_more, total=total, sync_started_at=sync_started_at)
 
     def apply_patches(self, patches: list[ProviderPatch], repo: str = "") -> list[PatchResult]:
         """Apply optimistic GitHub body patches and return one outcome per patch.

@@ -255,12 +255,8 @@ class FakeRequester:
         return {"addComment": {"commentEdge": {"node": {"id": new_id, "fullDatabaseId": database_id}}}}
 
     def _issue_titles(self, variables: dict[str, object]) -> dict[str, object]:
-        states = cast("list[str]", variables["states"])
-        issues = sorted(
-            (issue for issue in self._fixture.issues.values() if issue.state in states),
-            key=lambda issue: issue.updated_at,
-            reverse=True,
-        )
+        del variables
+        issues = sorted(self._fixture.issues.values(), key=lambda issue: issue.updated_at, reverse=True)
         return {
             "repository": {
                 "issues": {
@@ -680,17 +676,17 @@ def test_t8_title_ambiguity_is_preserved(fixture: FakeGitHubFixture) -> None:
 
 
 # ---------------------------------------------------------------------------
-# T9 — a search miss falls back to the open-issue titles scan.
+# T9 — a search miss falls back to the titles scan.
 # ---------------------------------------------------------------------------
 
 
-def test_t9_search_miss_falls_back_to_open_titles(fixture: FakeGitHubFixture) -> None:
+def test_t9_search_miss_falls_back_to_titles_scan(fixture: FakeGitHubFixture) -> None:
     fixture.add_tracked_issue(1, "an issue search will not find", state="OPEN")
 
     context = WorkItemDecisionContext(fixture.backend, repo=f"{fixture.owner}/{fixture.name}")
     # The fake search index only ever returns issues whose title contains the
     # selector -- simulate a genuine miss (tokenization/lag) with a selector
-    # that matches nothing in search but everything in the open titles scan.
+    # that matches nothing in search but everything in the titles scan.
     original_title_search = fixture.requester._title_search
     fixture.requester._title_search = lambda variables: {  # ty: ignore[invalid-assignment]
         "search": {"nodes": [], "pageInfo": {"hasNextPage": False, "endCursor": None}}
@@ -704,7 +700,6 @@ def test_t9_search_miss_falls_back_to_open_titles(fixture: FakeGitHubFixture) ->
     assert target.provider.issue == "#1", target.provider
     log = fixture.requester.log
     assert log.count_operation("IssueTitles") == 1, log
-    assert all(entry["variables"]["states"] == ["OPEN"] for entry in log if entry["operation"] == "IssueTitles")
     assert all(
         entry["variables"].get("states") != ["OPEN", "CLOSED"] for entry in log if entry["operation"] == "ListIssues"
     )
@@ -948,3 +943,126 @@ def test_each_returned_row_is_hydrated_exactly_once(fixture: FakeGitHubFixture, 
     assert sorted(heads) == returned, heads
     assert sorted(comments) == sorted(f"IC_{n}" for n in range(1, 7)), comments
     assert all(item.body for item in result.items), result.items
+
+
+# ---------------------------------------------------------------------------
+# PR #3969 re-review (Codex, ff26523) regressions.
+# ---------------------------------------------------------------------------
+
+
+async def _call_backlog_list(fixture: FakeGitHubFixture, params: dict[str, object]) -> dict[str, Any]:
+    """Call the real ``backlog_list`` MCP tool against this fixture's backend."""
+    from unittest.mock import patch
+
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+    from backlog_core.models import BackendAvailability, BackendStatus
+    from backlog_core.server import mcp
+
+    from tests.helpers import call_mcp_tool
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        with patch(
+            "backlog_core.server._probe_backend_status",
+            return_value=BackendStatus(availability=BackendAvailability.NOT_CHECKED),
+        ):
+            return await call_mcp_tool(mcp, "backlog_list", params)
+    finally:
+        reset_config()
+
+
+async def test_unbounded_list_applies_offset_once(fixture: FakeGitHubFixture) -> None:
+    for number in range(1, 7):
+        fixture.add_tracked_issue(number, f"issue {number}", state="OPEN")
+
+    response = await _call_backlog_list(fixture, {"offset": 2})
+
+    assert [item["issue"] for item in response["items"]] == ["#4", "#3", "#2", "#1"], response
+    assert response["pagination"]["total"] == 6, response["pagination"]
+
+
+async def test_count_only_list_reads_no_work_item_content(fixture: FakeGitHubFixture) -> None:
+    for number in range(1, 7):
+        fixture.add_tracked_issue(number, f"issue {number}", state="OPEN")
+
+    response = await _call_backlog_list(fixture, {"count_only": True})
+
+    assert response["count"] == 6, response
+    heads, comments = _hydration_reads(fixture)
+    assert heads == [], heads
+    assert comments == [], comments
+
+
+def test_title_selector_falls_back_to_cache_when_the_targeted_read_fails(fixture: FakeGitHubFixture) -> None:
+    from backlog_core import operations
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+    from github import GithubException
+
+    fixture.add_tracked_issue(1, "cached title item", state="OPEN")
+    repo = f"{fixture.owner}/{fixture.name}"
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        operations.list_items(repo=repo)
+        serve = fixture.requester.graphql_query
+
+        def fail_targeted(query: str, variables: dict[str, object]) -> tuple[dict[str, object], dict[str, object]]:
+            if "query TargetedIssues(" in query:
+                raise GithubException(503, {"message": "offline"}, {})
+            return serve(query, variables)
+
+        fixture.repository.requester.graphql_query = fail_targeted  # ty: ignore[invalid-assignment]
+        context = WorkItemDecisionContext(fixture.backend, repo=repo, allow_cached=True)
+        target = context.select("cached title", purpose="read")
+    finally:
+        reset_config()
+
+    assert target.provider is not None
+    assert target.provider.issue == "#1", target.provider
+
+
+def test_title_selector_scans_titles_when_search_returns_only_false_positives(fixture: FakeGitHubFixture) -> None:
+    fixture.add_tracked_issue(1, "parser rewrite", state="OPEN")
+    decoy = fixture.add_tracked_issue(2, "rewrite the parser", state="OPEN")
+    fixture.requester._title_search = lambda variables: {  # ty: ignore[invalid-assignment]
+        "search": {"nodes": [decoy.as_node()], "pageInfo": {"hasNextPage": False, "endCursor": None}}
+    }
+
+    context = WorkItemDecisionContext(fixture.backend, repo=f"{fixture.owner}/{fixture.name}")
+    target = context.select("parser rewrite", purpose="read")
+
+    assert target.provider is not None
+    assert target.provider.issue == "#1", target.provider
+
+
+def test_search_miss_finds_a_closed_issue(fixture: FakeGitHubFixture) -> None:
+    fixture.add_tracked_issue(1, "closed and not yet indexed", state="CLOSED")
+    fixture.requester._title_search = lambda variables: {  # ty: ignore[invalid-assignment]
+        "search": {"nodes": [], "pageInfo": {"hasNextPage": False, "endCursor": None}}
+    }
+
+    context = WorkItemDecisionContext(fixture.backend, repo=f"{fixture.owner}/{fixture.name}")
+    target = context.select("not yet indexed", purpose="read")
+
+    assert target.provider is not None
+    assert target.provider.issue == "#1", target.provider
+
+
+def test_plain_list_warns_when_its_write_through_fails(fixture: FakeGitHubFixture) -> None:
+    from backlog_core import operations
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+    from backlog_core.models import ReconcileResult
+
+    fixture.add_tracked_issue(1, "issue 1", state="OPEN")
+    fixture.backend.reconcile = lambda request, snapshot=None: ReconcileResult(fetched_items=1, failures=1)  # ty: ignore[invalid-assignment]
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        result = operations.list_items(repo=f"{fixture.owner}/{fixture.name}")
+    finally:
+        reset_config()
+
+    warnings = cast("list[str]", result.get("warnings", []))
+    assert any("1 failures" in warning for warning in warnings), warnings

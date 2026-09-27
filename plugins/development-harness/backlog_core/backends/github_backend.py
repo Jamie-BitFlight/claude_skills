@@ -460,19 +460,19 @@ class GitHubBackend:
             )
             raise BackendUnavailableError(f"GitHub title search unavailable: {exc}", retryable=retryable) from exc
 
-    def fetch_issue_titles(self, repo: str, *, include_closed: bool = False) -> list[tuple[int, str]]:
+    def fetch_issue_titles(self, repo: str) -> list[tuple[int, str]]:
         """Fetch every issue's ``(number, title)`` with no body or hydration (D5 fallback).
 
         Resolves the repository and converts a transport failure the same
         way :meth:`search_issues_by_title` does.
 
         Returns:
-            Every open issue's number and title, plus closed ones when *include_closed* is set.
+            Every open and closed issue's number and title.
         """
         try:
             repository = self.get_github(repo)
             owner, repo_name = repository.full_name.split("/", 1)
-            return gh_client._fetch_issue_titles_graphql(repository, owner, repo_name, include_closed=include_closed)
+            return gh_client._fetch_issue_titles_graphql(repository, owner, repo_name)
         except ContentNotFoundError:
             raise
         except BacklogError:

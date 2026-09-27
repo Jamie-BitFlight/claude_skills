@@ -199,12 +199,13 @@ class WorkItemDecisionContext:
 
         Pending (not-yet-created) items are checked first -- a slug or
         string-id selector matching queued intent skips the live search
-        entirely (D5 point 4). A selector unsafe for GitHub's search endpoint
-        (too long, or carrying a quote -- risk R-B) goes straight to a
-        titles-only scan of open and closed issues, since nothing else can
-        reach a closed one. An empty search result falls back to an open-only
-        titles scan (risk R-A: search tokenizes and can lag a just-created or
-        just-edited issue).
+        entirely (D5 point 4). When search finds no title containing the
+        selector -- it was skipped as unsafe (too long, or carrying a quote --
+        risk R-B), returned nothing, or returned only tokenized near-misses
+        (risk R-A: it can also lag a just-created or just-edited issue) -- a
+        titles-only scan of open and closed issues decides. With
+        ``allow_cached``, a provider failure anywhere in the lookup, including
+        the targeted read of the matched issue, falls back to the cache.
 
         Returns:
             The matched item and its targeted snapshot (``None`` for a
@@ -217,27 +218,27 @@ class WorkItemDecisionContext:
             # match as target.pending/mutation_base; skip the search entirely.
             return None, None
         try:
-            searchable = selector_fits_search(selector)
-            candidates = self._pages.search_issues_by_title(self.repo, selector) if searchable else []
-            if not candidates:
-                titles = self._pages.fetch_issue_titles(self.repo, include_closed=not searchable)
+            candidates = (
+                self._pages.search_issues_by_title(self.repo, selector) if selector_fits_search(selector) else []
+            )
+            match = _find_by_title_substring(
+                [provider_item_to_backlog_item(_issue_node_to_provider_item(node)) for node in candidates], selector
+            )
+            if match is None:
+                titles = self._pages.fetch_issue_titles(self.repo)
+                match = _find_by_title_substring(
+                    [BacklogItem(title=title, issue=f"#{number}") for number, title in titles], selector
+                )
+            if match is None:
+                return None, None
+            reference = match.issue
+            snapshot = self._targeted_snapshot(reference)
         except BackendUnavailableError as exc:
             if not self.allow_cached:
                 raise
             self._warn_cached_fallback(exc)
             read = self._cached_items()
             return find_item(read.provider_items, selector), None
-        if not candidates:
-            candidates_items = [BacklogItem(title=title, issue=f"#{number}") for number, title in titles]
-        else:
-            candidates_items = [
-                provider_item_to_backlog_item(_issue_node_to_provider_item(node)) for node in candidates
-            ]
-        match = _find_by_title_substring(candidates_items, selector)
-        if match is None:
-            return None, None
-        reference = match.issue
-        snapshot = self._targeted_snapshot(reference)
         provider = next(
             (
                 provider_item_to_backlog_item(item)
