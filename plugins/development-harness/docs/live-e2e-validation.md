@@ -44,7 +44,7 @@ sandbox credential as `GITHUB_TOKEN`, validate the scope before executing tests:
 ```bash
 uv run --locked python plugins/development-harness/scripts/close_test_issues.py --check-only
 uv run --locked python scripts/run_bounded.py --timeout-seconds 480 -- \
-  uv run --locked --script plugins/development-harness/run_pytests.py -m e2e -n 0 -x -v --tb=long \
+  uv run --locked --script plugins/development-harness/run_pytests.py -m e2e -n 0 -v --tb=long \
     --capture=tee-sys -o faulthandler_timeout=60
 uv run --locked python plugins/development-harness/scripts/close_test_issues.py
 ```
@@ -64,8 +64,10 @@ journal's last started phase and the thread dump.
 Client request/initialization timeouts remain distinct from the whole-process deadline. The
 existing `scripts/run_bounded.py` kills the isolated process tree before the outer CI step timeout,
 including blocked executor threads and descendants. The deadline is a CI execution budget, not a
-new product latency guarantee. `-x` stops after a reported failure; immediate journals retain its
-context even if client teardown subsequently blocks. No retries hide failures.
+new product latency guarantee. The run does not stop at the first failure: every scenario owns its
+setup and cleanup, so an unrelated e2e failure cannot skip a sandbox lifecycle scenario. A
+collection error still fails the run. Immediate journals retain each failure's context even if
+client teardown subsequently blocks. No retries hide failures.
 
 Cleanup revalidates the sandbox, requires both the exact run-title prefix and body marker, excludes
 pull requests, rechecks ownership before closing, and reads back the resulting state. A denied

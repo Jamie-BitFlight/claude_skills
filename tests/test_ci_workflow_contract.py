@@ -185,9 +185,14 @@ def test_workflow_names_no_plugin_test_path() -> None:
 
 
 def test_live_e2e_runs_through_the_plugin_runner(workflow: dict) -> None:
-    """The e2e lane is the dh runner plus its marker, so every e2e test it owns is collected."""
+    """The e2e lane is the dh runner plus its marker, so every e2e test it owns is collected.
+
+    It does not stop at the first failure: an unrelated e2e failure must not skip a sandbox
+    lifecycle scenario. A collection error still fails the run.
+    """
     step = next(step for step in workflow["jobs"]["test-e2e"]["steps"] if step.get("name") == "Run e2e tests")
-    assert "uv run --locked --script plugins/development-harness/run_pytests.py -m e2e -n 0 -x" in step["run"]
+    assert "uv run --locked --script plugins/development-harness/run_pytests.py -m e2e -n 0 -v" in step["run"]
+    assert " -x " not in step["run"]
 
 
 def test_dependency_cache_key_includes_runner_lockfiles() -> None:

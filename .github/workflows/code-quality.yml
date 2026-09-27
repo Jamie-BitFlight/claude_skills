@@ -440,7 +440,7 @@ jobs:
         run: |
           set -o pipefail
           uv run --locked python scripts/run_bounded.py --timeout-seconds 480 -- \
-            uv run --locked --script plugins/development-harness/run_pytests.py -m e2e -n 0 -x -v --tb=long \
+            uv run --locked --script plugins/development-harness/run_pytests.py -m e2e -n 0 -v --tb=long \
               --capture=tee-sys -o faulthandler_timeout=60 --junitxml="$DH_E2E_REPORT_DIR/junit.xml" \
             2>&1 | tee "$DH_E2E_REPORT_DIR/pytest.log"
 
