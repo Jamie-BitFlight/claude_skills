@@ -438,6 +438,7 @@ def test_add_item_reports_refused_github_creation_and_keeps_the_item(tmp_path: P
         backend, "fetch_snapshot", return_value=ProviderSnapshot(items=[], sync_started_at="2026-09-27T00:00:00+00:00")
     )
     repository = mocker.Mock(full_name=repo, node_id="R_node")
+    repository.get_labels.return_value = []  # ensure_dh_labels lists labels before creating any missing ones
 
     def graphql_query(query: str, _variables: dict[str, object]) -> tuple[dict[str, str], dict[str, object]]:
         if "createIssue" in query:
