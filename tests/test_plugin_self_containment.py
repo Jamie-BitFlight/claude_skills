@@ -4,16 +4,18 @@ A plugin distributed standalone into another repo (installed via the marketplace
 checkout) has no sibling `rules/`, `docs/`, or other plugin directories to resolve against. A
 relative markdown link that walks upward past the plugin root — e.g.
 `[x](../../../../rules/foo.md)` — silently 404s for that installer even though it resolves fine
-inside this monorepo. The link guard runs over every plugin's git-tracked `.md` and `.markdown`
-files, including `href`/`src` in raw HTML, and fails on any `.mdx` file. It is a stopgap until
+inside this monorepo. The link guard runs over the git-tracked `.md` and `.markdown` files under
+each plugin's `agents/`, `skills/` and `commands/` directories, the Markdown an agent reads from an
+installed copy, including `href`/`src` in raw HTML, and fails on any `.mdx` file. READMEs,
+`CLAUDE.md`, `AGENTS.md`, `docs/` and ADRs are repository documents, read only in this checkout,
+so their repo-relative links resolve correctly and the guard skips them. It is a stopgap until
 skilllint's own rule (bitflight-devops/skilllint#291) replaces it (#3971).
 
 plugin-creator's `skills/lint/scripts/audit_runtime_escapes.py` also reports escaping links, and
 neither check can replace the other. The audit ships inside the plugin for consumers to run, so it
 cannot depend on this repo's tests. It scans only runtime roots (`skills/`, `agents/`,
 `commands/`) and reports wider escape classes that still have open findings, so it cannot gate CI.
-This guard is the CI gate for one class across every plugin Markdown file, `README.md` and
-`docs/` included.
+This guard is the CI gate for one class across those same runtime roots in every plugin.
 
 A second guard catches leakage that isn't a markdown link at all: a runtime file (anything but
 `MAINTENANCE.md`/`SKILL-GOALS.md`, which are design-time and never load at runtime) naming this
@@ -51,6 +53,8 @@ _ABS_PATH_PATTERN = re.compile(r"(?<![\w/{])/(?:Users|home|root)/[\w./-]*")
 _AUTHORING_DIR_TOKENS = ("rules/", ".claude/hooks/", "docs/")
 _DESIGN_TIME_FILENAMES = {"MAINTENANCE.md", "SKILL-GOALS.md"}
 _MARKDOWN_SUFFIXES = (".md", ".markdown")
+# Plugin subdirectories whose Markdown agents read from an installed copy at runtime.
+_RUNTIME_DIRS = ("agents", "skills", "commands")
 # marko parses JSX-wrapped Markdown in `.mdx` as an opaque HTML block, so its links are invisible.
 _UNSUPPORTED_SUFFIXES = (".mdx",)
 # A link leaves the plugin only through `..`, a root-absolute `/`, or a `file:` URL. A file with
@@ -114,6 +118,21 @@ def _markdown_files(plugin_dir: Path, files: list[Path]) -> list[Path]:
         The `.md` and `.markdown` files inside `plugin_dir`.
     """
     return [path for path in files if path.suffix in _MARKDOWN_SUFFIXES and path.is_relative_to(plugin_dir)]
+
+
+def _runtime_markdown_files(plugin_dir: Path, files: list[Path]) -> list[Path]:
+    """Select the Markdown files under `plugin_dir`'s `agents/`, `skills/` and `commands/`.
+
+    Args:
+        plugin_dir: Root directory of the plugin.
+        files: Candidate file paths, normally `_TRACKED_PLUGIN_FILES`.
+
+    Returns:
+        The `.md` and `.markdown` files inside one of the plugin's runtime directories.
+    """
+    return [
+        path for path in _markdown_files(plugin_dir, files) if path.relative_to(plugin_dir).parts[0] in _RUNTIME_DIRS
+    ]
 
 
 class _PositionedParser(marko.Parser):
@@ -309,14 +328,15 @@ def find_self_containment_violations(
 
     Args:
         plugin_dir: Root directory of the plugin to scan.
-        md_files: Files to scan. Defaults to the plugin's git-tracked Markdown files.
+        md_files: Files to scan. Defaults to the plugin's git-tracked Markdown files under
+            `agents/`, `skills/` and `commands/`.
 
     Returns:
         One `(file, line_number, link_target, resolved_path)` tuple per offending link. A
         `file:` URL always counts as leaving the plugin.
     """
     if md_files is None:
-        md_files = _markdown_files(plugin_dir, _TRACKED_PLUGIN_FILES)
+        md_files = _runtime_markdown_files(plugin_dir, _TRACKED_PLUGIN_FILES)
     violations: list[tuple[Path, int, str, Path]] = []
     resolved_root = plugin_dir.resolve()
     for md_file in md_files:
@@ -333,7 +353,7 @@ def find_self_containment_violations(
 
 @pytest.mark.parametrize("plugin_dir", _PLUGIN_DIRS, ids=lambda p: p.name)
 def test_plugin_has_no_links_outside_plugin(plugin_dir: Path) -> None:
-    """Every markdown link under each `plugins/<name>/` resolves inside that plugin."""
+    """Every markdown link in each plugin's `agents/`, `skills/` and `commands/` stays inside it."""
     violations = find_self_containment_violations(plugin_dir)
 
     assert not violations, "\n".join(
@@ -526,6 +546,14 @@ def test_markdown_file_selection_covers_markdown(tmp_path: Path) -> None:
     files = [tmp_path / "a.md", tmp_path / "b.markdown", tmp_path / "c.mdx", tmp_path / "d.txt", Path("/other/e.md")]
 
     assert _markdown_files(tmp_path, files) == files[:2]
+
+
+def test_link_guard_selects_only_runtime_directories(tmp_path: Path) -> None:
+    """Runtime Markdown is scanned; READMEs, `CLAUDE.md`, `docs/` and ADRs are repository documents."""
+    runtime = [tmp_path / "agents/a.md", tmp_path / "skills/s/SKILL.md", tmp_path / "commands/c.markdown"]
+    repo_docs = [tmp_path / "README.md", tmp_path / "CLAUDE.md", tmp_path / "docs/adrs/ADR-1.md"]
+
+    assert _runtime_markdown_files(tmp_path, runtime + repo_docs) == runtime
 
 
 def find_authoring_repo_leakage(plugin_dir: Path) -> list[tuple[Path, int, str, str]]:
