@@ -27,6 +27,7 @@ is overridden per-instance instead (see ``new_backend``).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
@@ -201,6 +202,42 @@ class FakeGitHubNetwork:
             results = [issue for issue in results if set(labels).issubset(issue.labels)]
         return [issue.as_node(self.labels) for issue in sorted(results, key=lambda issue: issue.number)]
 
+    def _fetch_issues_page_graphql(
+        self,
+        repo: Repository,
+        owner: str,
+        repo_name: str,
+        *,
+        states: list[str],
+        labels: list[str] | None = None,
+        milestone_number: int | None = None,
+        since: str | None = None,
+        first: int = 100,
+        after: str | None = None,
+        light: bool = False,
+    ) -> gh_client.IssuesPage:
+        """Fake for the one-page ``ListIssues`` read the request-shaped list path uses (#3969)."""
+        self._maybe_raise("_fetch_issues_page_graphql")
+        matching = self._fetch_issues_graphql(repo, owner, repo_name, ",".join(states), labels=labels)
+        start = int(after) if after else 0
+        page = matching[start : start + first]
+        has_next = start + first < len(matching)
+        return gh_client.IssuesPage(
+            issues=page,
+            has_next_page=has_next,
+            end_cursor=str(start + first) if has_next else None,
+            total_count=len(matching),
+        )
+
+    def _fetch_issue_comments_graphql(
+        self, repo: Repository, owner: str, repo_name: str, issue_number: int, *, latest: int | None = None
+    ) -> list[IssueCommentNode]:
+        """Fake for the issue-comment read (the audit-comment reuse check reads the newest page)."""
+        self._maybe_raise("_fetch_issue_comments_graphql")
+        issue = self.issues[issue_number]
+        comments = [gh_client._parse_comment_node(self.comments[comment_id]) for comment_id in issue.comment_ids]
+        return comments[-latest:] if latest is not None else comments
+
     def fetch_targeted_issues(
         self, repo: Repository, owner: str, repo_name: str, references: list[str]
     ) -> dict[str, IssueNode | None]:
@@ -337,6 +374,10 @@ class FakeRepo:
             raise GithubException(_HTTP_NOT_FOUND, {"message": "Not Found"}, None)
         return {"name": name}
 
+    def get_labels(self) -> list[SimpleNamespace]:
+        """List every label, as ``ensure_dh_labels`` reads it (one REST listing, ``.name`` only)."""
+        return [SimpleNamespace(name=name) for name in self._network.labels]
+
     def create_label(self, name: str, color: str = "", description: str = "") -> object:
         self._network._label_id(name)
         return {"name": name, "color": color}
@@ -462,6 +503,8 @@ def install_fake_network(monkeypatch: pytest.MonkeyPatch, network: FakeGitHubNet
         "try_get_github",
         "_fetch_issue_graphql",
         "_fetch_issues_graphql",
+        "_fetch_issues_page_graphql",
+        "_fetch_issue_comments_graphql",
         "_add_comment_graphql",
         "_fetch_comment_by_id_graphql",
         "_graphql_request",
