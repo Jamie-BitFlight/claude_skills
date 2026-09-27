@@ -8,7 +8,7 @@ Before the first RTK-wrapped command in a task, run `command -v rtk && rtk --ver
 
 If that check does not succeed, tell the user exactly: `RTK is not installed on this machine. I can install it from https://github.com/rtk-ai/rtk. Shall I proceed? [y/n]` Stop for the answer; do not install RTK automatically.
 
-If the answer is no, run the original commands without an `rtk` prefix and state that RTK filtering was unavailable. Do not report token savings or command rewriting in that state. If the answer is yes, follow the official RTK installation instructions and verify the correct Rust Token Killer binary with `command -v rtk && rtk --version` before using it.
+If the answer is no, run the original commands without an `rtk` prefix and state that RTK filtering was unavailable. Do not report token savings or command rewriting in that state. If the answer is yes, install RTK using the official instructions, then validate the correct Rust Token Killer binary with `command -v rtk` (the resolved executable path), `rtk --version`, and `rtk gain`. Immediately prefix supported shell commands with `rtk` after those checks pass. If installation or any validation fails, do not use RTK; report the exact failure and continue with raw commands unless the user directs otherwise.
 
 ## When RTK is available
 
