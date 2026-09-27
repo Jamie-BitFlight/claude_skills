@@ -377,8 +377,8 @@ max-complexity = 12
     "private-member-access",
     "too-many-locals",
 ]
-# FastMCP lifespan hook requires async def + yield without await — RUF029 is a false positive
-# SLF001 — server.py calls _startup_sync_loop via module reference for test mockability;
+# RUF029 — some async MCP tools await nothing; FastMCP requires async def for them
+# SLF001 — server.py calls _sync_loop via module reference for test mockability;
 # underscore prefix marks it as a background-task entry point, not a user-facing tool
 # DOC201 — an @mcp.tool docstring is the tool description every connecting session loads in
 # full, not maintainer prose. A Returns section there restates the outputSchema FastMCP

@@ -12,14 +12,21 @@ from __future__ import annotations
 
 import logging
 import re
+import threading
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Final, Protocol
 
 import requests
-from github import GithubException
+from github import GithubException, RateLimitExceededException
 from typing_extensions import TypedDict
 
-from backlog_core.github_client import TOKEN_ENV_VARS, MissingGitHubTokenError, make_github_client, resolve_token
+from backlog_core.github_client import (
+    TOKEN_ENV_VARS,
+    MissingGitHubTokenError,
+    graphql_total_timeout_seconds,
+    make_github_client,
+    resolve_token,
+)
 
 from .backend_types import (
     AddedCommentNode,
@@ -40,6 +47,9 @@ from .models import (
     BacklogItem,
     ContentConflictError,
     ContentUnavailableError,
+    GitHubMutationOutcomeUnknownError,
+    GitHubRateLimitedError,
+    GitHubRequestTimeoutError,
     GitHubUnavailableError,
     GraphQLUnavailableError,
     IssueLocalFields,
@@ -63,7 +73,7 @@ from .parsing import (
     today,
 )
 from .status_registry import STATUS_LABEL_PREFIX, StatusLabel, pick_primary_status_label
-from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS, SyncErrorKind, classify_sync_error
+from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS, SyncErrorKind, classify_sync_error, parse_retry_after_header
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -93,6 +103,9 @@ class _GraphQLCapable(Protocol):
 logger = logging.getLogger(__name__)
 
 _HTTP_FORBIDDEN = 403
+#: Statuses on which an exhausted ``x-ratelimit-remaining`` means a rate-limit refusal: PyGithub's
+#: GraphQL-errors 400, a 403 and a 429. On a 401 or 404 the header is incidental.
+_RATE_LIMIT_REFUSAL_STATUSES: Final = frozenset({400, 403, 429})
 _HTTP_NOT_FOUND = 404
 
 _REQUEST_TRANSPORT_ERRORS = (
@@ -130,26 +143,39 @@ DH_LABELS: dict[str, str] = {
 }
 
 
+#: Repos already checked this process — keyed by `repo.full_name`. Labels don't change mid-
+#: session, so a second `ensure_dh_labels` call for the same repo has nothing new to find.
+# ponytail: process-lifetime cache with no invalidation — if a repo's dh labels are deleted by
+# something else mid-process, restart the process to re-check; not worth a TTL for this.
+_labels_ensured_for_repo: set[str] = set()
+
+
 def ensure_dh_labels(repo: Repository, output: Output | None = None) -> None:
     """Create any missing dh labels on the repository.
 
-    Iterates ``DH_LABELS`` and creates each label that does not yet exist.
-    Idempotent — existing labels are left unchanged.  Label creation uses
-    REST — there is no GraphQL createLabel mutation.
+    Costs ceil(n/30) REST requests on the first call per process, none after, where n is the
+    repository's label count: ``repo.get_labels()`` pages 30 labels per request, and a repeat call
+    for the same repo is skipped (see ``_labels_ensured_for_repo``). Add one ``create_label()`` per
+    label actually missing. This replaced a per-label ``get_label()`` probe that cost one REST
+    request per entry in ``DH_LABELS`` on every call. Idempotent — existing labels are left
+    unchanged.
+    Label creation uses REST — there is no GraphQL createLabel mutation.
 
     Args:
         repo: PyGithub Repository object.
         output: Optional Output collector for status/warning messages.
     """
+    if repo.full_name in _labels_ensured_for_repo:
+        return
     out = output or Output()
+    # GitHub label names are case-insensitive: a case-only variant is the same label, and
+    # creating it would be rejected as a duplicate.
+    existing_names = {label.name.casefold() for label in repo.get_labels()}
     for name, color in DH_LABELS.items():
-        try:
-            repo.get_label(name)
-        except GithubException as exc:
-            if exc.status != _HTTP_NOT_FOUND:
-                raise
+        if name.casefold() not in existing_names:
             repo.create_label(name=name, color=color)
             out.info(f"  Created label '{name}'")
+    _labels_ensured_for_repo.add(repo.full_name)
 
 
 # ---------------------------------------------------------------------------
@@ -406,10 +432,10 @@ mutation AddSubIssue($parentId: ID!, $childId: ID!) {
 """
 
 _ISSUE_COMMENTS_QUERY = """
-query GetIssueComments($owner: String!, $repo: String!, $number: Int!, $first: Int!, $after: String) {
+query GetIssueComments($owner: String!, $repo: String!, $number: Int!, $first: Int, $last: Int, $after: String) {
   repository(owner: $owner, name: $repo) {
     issue(number: $number) {
-      comments(first: $first, after: $after) {
+      comments(first: $first, last: $last, after: $after) {
         nodes {
           id
           fullDatabaseId
@@ -619,13 +645,183 @@ def is_graphql_unavailable(exc: GithubException) -> bool:
     return any(marker in message for marker in GRAPHQL_UNAVAILABLE_MARKERS)
 
 
+def _graphql_total_timeout_seconds() -> float:
+    """Return the configured total deadline for one ``_graphql_request`` call, in seconds.
+
+    Delegates to ``github_client.graphql_total_timeout_seconds`` rather than reading
+    ``.dh/config.yaml`` here directly: gh_client.py's own module boundary
+    (backlog_core/ARCHITECTURE.md's "Module: gh_client.py" entry) limits its imports to
+    ``.models``, ``.parsing``, and ``.github_client``, and timeout configuration is
+    ``github_client.py``'s stated responsibility, not this module's.
+    """
+    return graphql_total_timeout_seconds()
+
+
+_GRAPHQL_OPERATION_NAME_PATTERN = re.compile(r"(?:query|mutation)\s+(\w+)")
+
+#: A document that opens with ``query`` or the ``{`` shorthand is a read. Anything else is treated
+#: as a mutation, so an unrecognised document fails safe to "not retryable" on timeout.
+_GRAPHQL_READ_PATTERN = re.compile(r"\s*(?:query\b|\{)")
+
+
+def _graphql_operation_name(query: str) -> str:
+    """Extract the named operation from a GraphQL query/mutation string, for error messages.
+
+    Returns:
+        The operation name (e.g. ``"ListIssues"``), or ``"unnamed operation"`` when the query
+        string names none.
+    """
+    match = _GRAPHQL_OPERATION_NAME_PATTERN.search(query)
+    return match.group(1) if match else "unnamed operation"
+
+
+class _DeadlineExceeded(Exception):
+    """Raised only by ``_call_with_deadline`` itself when its thread does not finish in time.
+
+    A dedicated type rather than the builtin ``TimeoutError`` — ``asyncio.TimeoutError`` is a
+    ``TimeoutError`` alias since Python 3.11 and is one of the transport exceptions ``fn`` may
+    legitimately raise; catching the builtin type in ``_graphql_request`` would misclassify that
+    genuine transport failure as this wrapper's own deadline expiry.
+    """
+
+
+# ponytail: fixed process-wide ceiling of 4 live workers (running or abandoned); raise it if
+# legitimate concurrency or a slow but healthy GitHub keeps tripping the refusal, or cancel the
+# transport if it ever becomes cancellable.
+_MAX_LIVE_GRAPHQL_WORKERS: Final = 4
+"""``gh-graphql-request`` threads allowed alive at once. A slot is reserved before the thread starts,
+because any running request may go on to time out; an abandoned one holds a socket and can never be
+killed, so bounding only the abandoned ones would let concurrent callers overshoot."""
+
+_live_graphql_workers: set[threading.Thread] = set()
+_abandoned_graphql_workers: set[threading.Thread] = set()
+#: The subset of abandoned workers sending a mutation. While any is alive, every new mutation is
+#: refused: the abandoned one may still land, so a second write (a retry above all) could duplicate it.
+_abandoned_mutation_workers: set[threading.Thread] = set()
+_graphql_workers_lock = threading.Lock()
+
+
+def _call_with_deadline(
+    fn: Callable[[], tuple[dict[str, Any], dict[str, Any]]], timeout: float, *, is_mutation: bool = False
+) -> tuple[dict, dict]:
+    """Run ``fn`` under a hard wall-clock deadline that ``requests``/``urllib3`` cannot enforce.
+
+    ``Github(timeout=...)`` only bounds the gap between two consecutive reads on the socket (see
+    ``make_github_client``) — a response that trickles bytes slowly enough to keep every
+    individual read under that bound can still block for arbitrarily long, because nothing
+    downstream of ``requests.Session.request`` ever measures the *total* elapsed time. Running
+    ``fn`` on a background thread and joining it with a real deadline is the only way to bound
+    that total duration.
+
+    The thread is started as a daemon and is not killed on timeout — Python has no safe way to
+    kill a running thread. On timeout it is abandoned; being a daemon, it does not block process
+    exit, and its eventual (possibly very late) result is discarded. Every thread holds a slot
+    from before it starts until it finishes; at ``_MAX_LIVE_GRAPHQL_WORKERS`` a new call is
+    refused without starting one.
+
+    Args:
+        fn: Zero-argument callable to run — the caller closes over its own arguments.
+        timeout: Seconds to wait before giving up.
+        is_mutation: Whether ``fn`` sends a mutation. A timed-out mutation blocks every later
+            mutation until its worker finishes, and a mutation is refused while one is blocked.
+
+    Returns:
+        Whatever ``fn`` returned, once it returns within the deadline.
+
+    Raises:
+        The exception ``fn`` raised, when it raised one within the deadline.
+        _DeadlineExceeded: When ``timeout`` seconds elapsed with no result. The caller is
+            expected to convert this into a typed, retryable error naming the operation and the
+            timeout.
+        BackendUnavailableError: Retryable, without starting a thread, when every worker slot
+            is taken, or when ``is_mutation`` and an earlier mutation's worker is still running.
+    """
+    outcome: list[tuple[dict, dict]] = []
+    failure: list[BaseException] = []
+
+    def _run() -> None:
+        try:
+            outcome.append(fn())
+        except BaseException as exc:  # ruff: ignore[blind-except] — re-raised on the caller's thread below
+            failure.append(exc)
+        finally:
+            with _graphql_workers_lock:
+                _live_graphql_workers.discard(threading.current_thread())
+                _abandoned_graphql_workers.discard(threading.current_thread())
+                _abandoned_mutation_workers.discard(threading.current_thread())
+
+    thread = threading.Thread(target=_run, daemon=True, name="gh-graphql-request")
+    with _graphql_workers_lock:
+        if is_mutation and _abandoned_mutation_workers:
+            msg = (
+                "An earlier GitHub write timed out and is still running; refusing new writes so they "
+                "cannot duplicate it. Retry after it finishes."
+            )
+            raise BackendUnavailableError(msg, retryable=True)
+        if len(_live_graphql_workers) >= _MAX_LIVE_GRAPHQL_WORKERS:
+            msg = (
+                f"{len(_live_graphql_workers)} GitHub GraphQL requests are still running "
+                f"({len(_abandoned_graphql_workers)} of them past their deadline); refusing new requests "
+                "until one of them finishes"
+            )
+            raise BackendUnavailableError(msg, retryable=True)
+        _live_graphql_workers.add(thread)
+    try:
+        thread.start()
+    except BaseException:
+        with _graphql_workers_lock:
+            _live_graphql_workers.discard(thread)
+        raise
+    thread.join(timeout)
+    with _graphql_workers_lock:
+        # Still live means the worker has not reached its ``finally``; it removes itself later.
+        if thread in _live_graphql_workers:
+            _abandoned_graphql_workers.add(thread)
+            if is_mutation:
+                _abandoned_mutation_workers.add(thread)
+            msg = f"total timeout of {timeout}s elapsed"
+            raise _DeadlineExceeded(msg)
+    if failure:
+        raise failure[0]
+    return outcome[0]
+
+
+def _is_rate_limited(exc: GithubException) -> bool:
+    """Report whether a GraphQL ``GithubException`` is GitHub refusing for a rate limit.
+
+    PyGithub's ``Requester.graphql_query`` never returns a body with ``errors``: anything but a
+    single ``NOT_FOUND`` becomes ``createException(400, headers, data)``. So a ``RATE_LIMITED``
+    answer arrives here with the ``errors`` list in ``exc.data`` and the quota headers in
+    ``exc.headers``. A secondary limit is a real HTTP 403 that PyGithub itself raises as
+    ``RateLimitExceededException``.
+
+    Returns:
+        ``True`` for a ``RATE_LIMITED`` errors entry, an exhausted ``x-ratelimit-remaining``
+        header on a 400/403/429 (never a 401 or 404), or PyGithub's own rate-limit exception.
+    """
+    if isinstance(exc, RateLimitExceededException):
+        return True
+    data = exc.data if isinstance(exc.data, dict) else {}
+    errors = data.get("errors")
+    if isinstance(errors, list) and any(isinstance(e, dict) and e.get("type") == "RATE_LIMITED" for e in errors):
+        return True
+    if exc.status not in _RATE_LIMIT_REFUSAL_STATUSES:
+        return False
+    remaining = {str(k).casefold(): v for k, v in (exc.headers or {}).items()}.get("x-ratelimit-remaining")
+    return str(remaining) == "0"
+
+
 def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, object] | None = None) -> dict[str, Any]:
     """Execute a raw GraphQL query using PyGithub's requester.
 
     Follows the same pattern as ``_resolve_labels_graphql``.  Raises
     ``BackendUnavailableError`` when the requester raises a provider or transport
     failure (including ``UnknownObjectException`` for NOT_FOUND / 404 responses),
-    and ``BacklogError`` when the GraphQL response contains errors or invalid data.
+    ``GitHubRequestTimeoutError`` when a query exceeds its total deadline (see
+    ``_call_with_deadline``), ``GitHubMutationOutcomeUnknownError`` when a mutation does,
+    ``GitHubRateLimitedError`` when GitHub answers with a rate-limited
+    GraphQL error, and ``BacklogError`` when the GraphQL response contains other errors or invalid
+    data.
 
     Args:
         repo: Any object exposing ``.requester.graphql_query(...)`` -- a real
@@ -639,12 +835,33 @@ def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, obj
 
     Raises:
         GraphQLUnavailableError: When the environment refuses GraphQL outright.
+        GitHubRateLimitedError: When GitHub refuses the query for exceeding a rate limit.
+        GitHubRequestTimeoutError: When a query exceeds its total deadline.
+        GitHubMutationOutcomeUnknownError: When a mutation exceeds its total deadline.
         BackendUnavailableError: On GitHub API or transport failures.
         BacklogError: On answered GraphQL errors or invalid response shapes.
     """
+    timeout = _graphql_total_timeout_seconds()
+    is_mutation = _GRAPHQL_READ_PATTERN.match(query) is None
     try:
-        _headers, response = repo.requester.graphql_query(query, variables or {})
+        _headers, response = _call_with_deadline(
+            lambda: repo.requester.graphql_query(query, variables or {}), timeout, is_mutation=is_mutation
+        )
+    except _DeadlineExceeded as exc:
+        operation = _graphql_operation_name(query)
+        if is_mutation:
+            # The abandoned worker thread may still land the mutation, so a retry could duplicate it.
+            msg = (
+                f"GraphQL mutation timed out after {timeout}s (operation: {operation}); its outcome is "
+                "unknown and it may still complete on GitHub. Check GitHub for the change before retrying."
+            )
+            raise GitHubMutationOutcomeUnknownError(msg, timeout_seconds=timeout) from exc
+        msg = f"GraphQL request timed out after {timeout}s (operation: {operation})"
+        raise GitHubRequestTimeoutError(msg, timeout_seconds=timeout) from exc
     except GithubException as exc:
+        if _is_rate_limited(exc):
+            msg = f"GitHub GraphQL rate limit exceeded: {_github_exception_message(exc)}"
+            raise GitHubRateLimitedError(msg, retry_after=parse_retry_after_header(exc.headers)) from exc
         if is_graphql_unavailable(exc):
             msg = f"GraphQL is unavailable in this environment: {_github_exception_message(exc)}"
             raise GraphQLUnavailableError(msg) from exc
@@ -1121,7 +1338,7 @@ def _create_issue_graphql(
 
 
 def _update_issue_graphql(
-    repo: Repository,
+    repo: _GraphQLCapable,
     issue_node_id: str,
     *,
     state: str | None = None,
@@ -1164,7 +1381,7 @@ def _update_issue_graphql(
 _BATCH_CHUNK_SIZE = 25
 
 
-def _update_issues_graphql_batch(repo: Repository, updates: list[tuple[str, str]]) -> None:
+def _update_issues_graphql_batch(repo: _GraphQLCapable, updates: list[tuple[str, str]]) -> None:
     """Update issue bodies in bulk using aliased GraphQL mutations.
 
     Sends up to ``_BATCH_CHUNK_SIZE`` ``updateIssue`` mutations per request
@@ -1173,13 +1390,15 @@ def _update_issues_graphql_batch(repo: Repository, updates: list[tuple[str, str]
     issue node IDs and body content are never embedded in the query string.
 
     Per-chunk failures fall back to per-item ``_update_issue_graphql`` calls
-    so a single bad payload does not abort the whole batch.
+    so a single bad payload does not abort the whole batch. A chunk that timed
+    out does not fall back: it may still be running on GitHub.
 
     Args:
         repo: PyGithub Repository object (provides requester transport).
         updates: List of ``(issue_node_id, body)`` pairs to apply.
 
     Raises:
+        GitHubMutationOutcomeUnknownError: When a chunk's mutation times out.
         BacklogError: On GraphQL transport failure that also causes the per-item
             fallback to fail for every item in a chunk.
     """
@@ -1201,6 +1420,8 @@ def _update_issues_graphql_batch(repo: Repository, updates: list[tuple[str, str]
             variables[f"body{i}"] = body
         try:
             _graphql_request(repo, query, variables)
+        except GitHubMutationOutcomeUnknownError:
+            raise
         except BacklogError:
             # Chunk failed — fall back to per-item updates for this chunk
             for node_id, body in chunk:
@@ -1275,7 +1496,7 @@ def _parse_comment_node(node: dict[str, object]) -> IssueCommentNode:
 
 
 def _fetch_issue_comments_graphql(
-    repo: Repository, owner: str, repo_name: str, issue_number: int
+    repo: Repository, owner: str, repo_name: str, issue_number: int, *, latest: int | None = None
 ) -> list[IssueCommentNode]:
     """Fetch all comments for an issue via GraphQL, handling pagination.
 
@@ -1284,6 +1505,8 @@ def _fetch_issue_comments_graphql(
         owner: GitHub owner name.
         repo_name: GitHub repository name.
         issue_number: Issue number (positive integer).
+        latest: When set, fetch only the newest ``latest`` comments (at most 100) in one request
+            instead of the whole history.
 
     Returns:
         List of ``IssueCommentNode`` dicts with ``id``, ``body``, ``url``,
@@ -1299,7 +1522,8 @@ def _fetch_issue_comments_graphql(
             "owner": owner,
             "repo": repo_name,
             "number": issue_number,
-            "first": 100,
+            "first": None if latest is not None else 100,
+            "last": latest,
             "after": cursor,
         }
         data = _graphql_request(repo, _ISSUE_COMMENTS_QUERY, variables)
@@ -1308,7 +1532,7 @@ def _fetch_issue_comments_graphql(
         nodes: list[dict[str, object]] = list(comments_data.get("nodes") or [])
         comments.extend(_parse_comment_node(node) for node in nodes)
         page_info: dict[str, object] = comments_data.get("pageInfo") or {}
-        if not page_info.get("hasNextPage"):
+        if latest is not None or not page_info.get("hasNextPage"):
             break
         raw_cursor = page_info.get("endCursor")
         if not isinstance(raw_cursor, str):
@@ -1778,6 +2002,39 @@ def create_issue_for_item(
     return created["number"]
 
 
+#: Newest issue comments searched for a comment an earlier write may already have posted (GitHub's
+#: page maximum, so the search is always one request).
+# ponytail: only this window is searched; a write whose comment landed and was then buried under
+# more than 100 newer comments before the retry posts it again. Page backward if that ever happens.
+RECENT_COMMENT_WINDOW: Final = 100
+
+
+def _comment_then_close(
+    repository: Repository, owner: str, repo_name: str, issue: IssueNode, num: int, body: str
+) -> None:
+    """Post the closing comment unless it is already there, then close the issue.
+
+    A retry after an earlier close timed out finds the comment that attempt posted among the
+    newest comments and only closes, instead of posting it a second time.
+
+    Raises:
+        GitHubMutationOutcomeUnknownError: When the close times out; it names the comment, so a
+            retry does not post it a second time.
+    """
+    recent = _fetch_issue_comments_graphql(repository, owner, repo_name, num, latest=RECENT_COMMENT_WINDOW)
+    wanted = body.replace("\r\n", "\n")
+    comment_id = next((c.id for c in recent if c.body.replace("\r\n", "\n") == wanted), None)
+    if comment_id is None:
+        comment_id = _add_comment_graphql(repository, issue["id"], body).id
+    try:
+        _update_issue_graphql(repository, issue["id"], state="CLOSED")
+    except GitHubMutationOutcomeUnknownError as exc:
+        msg = f"Posted the closing comment {comment_id} on issue #{num}, but closing the issue: {exc}"
+        raise GitHubMutationOutcomeUnknownError(
+            msg, timeout_seconds=exc.timeout_seconds, created_comment_id=comment_id
+        ) from exc
+
+
 def close_github_issue(
     issue_ref: str, reason: str, *, reference: str = "", comment: str = "", repo: str = "", output: Output | None = None
 ) -> None:
@@ -1795,9 +2052,10 @@ def close_github_issue(
             parts.append(f"**Reference**: {reference}")
         if comment:
             parts.append(f"\n{comment}")
-        _add_comment_graphql(repository, issue["id"], " ".join(parts))
-        _update_issue_graphql(repository, issue["id"], state="CLOSED")
+        _comment_then_close(repository, owner, repo_name, issue, num, " ".join(parts))
         out.info(f"  GitHub issue #{num} closed ({reason}).")
+    except GitHubMutationOutcomeUnknownError:
+        raise  # outcome unknown; a fallback here could repeat the mutation
     except BacklogError as e:
         out.warn(f"  WARNING: Could not close issue: {e}")
 
@@ -1831,9 +2089,10 @@ def resolve_github_issue(
             body_parts.append(f"\n### Follow-ups\n\n{follow_ups}")
         if findings:
             body_parts.append(f"\n### Findings\n\n{findings}")
-        _add_comment_graphql(repository, issue["id"], "\n".join(body_parts))
-        _update_issue_graphql(repository, issue["id"], state="CLOSED")
+        _comment_then_close(repository, owner, repo_name, issue, num, "\n".join(body_parts))
         out.info(f"  GitHub issue #{num} resolved.")
+    except GitHubMutationOutcomeUnknownError:
+        raise  # outcome unknown; a fallback here could repeat the mutation
     except BacklogError as e:
         out.warn(f"  WARNING: Could not close issue: {e}")
 
@@ -2039,6 +2298,8 @@ def _apply_status_label(
         desired_ids = [id_map[n] for n in desired_names if n in id_map]
         _update_issue_graphql(repository, issue["id"], label_ids=desired_ids)
         output.info(applied_message)
+    except GitHubMutationOutcomeUnknownError:
+        raise  # outcome unknown; a fallback here could repeat the mutation
     except BacklogError as e:
         output.warn(f"  WARNING: Could not set status: {e}")
 
@@ -2069,6 +2330,8 @@ def apply_status_in_progress(item: BacklogItem, repo: str = "", output: Output |
             applied_message="  Status: in-progress",
             output=out,
         )
+    except GitHubMutationOutcomeUnknownError:
+        raise  # outcome unknown; reporting it as a warning would let the caller claim in-progress
     except BacklogError as e:
         out.warn(f"  WARNING: Could not set status: {e}")
 
@@ -2453,6 +2716,8 @@ def sync_groomed_to_github_issue(
         if new_body == body:
             return False
         _update_issue_graphql(repo_obj, issue["id"], body=new_body)
+    except GitHubMutationOutcomeUnknownError:
+        raise  # outcome unknown; a fallback here could repeat the mutation
     except BacklogError as e:
         out.warn(f"  WARNING: Could not sync to GitHub issue: {e}")
         return False
@@ -2552,6 +2817,8 @@ def create_task_issue(
     try:
         task_issue = _create_issue_graphql(repo, repo_node_id, title, body, label_ids)
         out.info(f"  Created task issue #{task_issue['number']}: {title[:70]}")
+    except GitHubMutationOutcomeUnknownError:
+        raise  # outcome unknown; a fallback here could repeat the mutation
     except BacklogError as e:
         out.warn(f"  WARNING: Could not create task issue: {e}")
         return None
@@ -2561,6 +2828,12 @@ def create_task_issue(
         parent = _fetch_issue_graphql(repo, owner, repo_name, parent_issue_number)
         _graphql_request(repo, _ADD_SUB_ISSUE_MUTATION, {"parentId": parent["id"], "childId": task_issue["id"]})
         out.info(f"  Linked #{task_issue['number']} as sub-issue of #{parent_issue_number}")
+    except GitHubMutationOutcomeUnknownError as exc:
+        # The issue exists either way; name it so the caller records it instead of creating another.
+        msg = f"Created task issue #{task_issue['number']}, but linking it as a sub-issue of #{parent_issue_number}: {exc}"
+        raise GitHubMutationOutcomeUnknownError(
+            msg, timeout_seconds=exc.timeout_seconds, created_issue_number=task_issue["number"]
+        ) from exc
     except BacklogError as e:
         out.warn(f"  WARNING: Created issue #{task_issue['number']} but could not link as sub-issue: {e}")
 
@@ -2654,6 +2927,8 @@ def update_task_status(repo: Repository, issue_number: int, new_status: str, out
         return False
     try:
         _update_issue_graphql(repo, issue_id, body=updated_body)
+    except GitHubMutationOutcomeUnknownError:
+        raise  # outcome unknown; a fallback here could repeat the mutation
     except BacklogError as e:
         out.warn(f"  WARNING: Could not update issue #{issue_number} body: {e}")
         return False

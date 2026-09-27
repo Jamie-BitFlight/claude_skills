@@ -29,6 +29,7 @@ from backlog_core.backend_types import ListPageResult
 from backlog_core.backends._github_work_item_versions import (
     WorkItemHead,
     WorkItemVersion,
+    find_work_item_comment,
     is_work_item_head_ref,
     parse_work_item_comment,
     parse_work_item_head,
@@ -49,6 +50,7 @@ from backlog_core.models import (
     ContentRef,
     ContentUnavailableError,
     ContentWrite,
+    GitHubMutationOutcomeUnknownError,
     PatchResult,
     ProviderItem,
     ProviderPatch,
@@ -141,6 +143,10 @@ class _IssueGateway(Protocol):
     def _add_comment_graphql(self, repo: Repository, issue_node_id: str, body: str) -> AddedCommentNode: ...
 
     def _fetch_comment_by_id_graphql(self, repo: Repository, comment_node_id: str) -> IssueCommentNode: ...
+
+    def _fetch_issue_comments_graphql(
+        self, repo: Repository, owner: str, repo_name: str, issue_number: int, *, latest: int | None = None
+    ) -> list[IssueCommentNode]: ...
 
 
 class _ReconcileProvider(Protocol):
@@ -426,52 +432,77 @@ class _GitHubWorkItemSync:
                     )
                 )
                 continue
-            try:
-                added_comment = self._issues._add_comment_graphql(
-                    repository, issue["id"], render_work_item_comment(current.revision, patch.body)
-                )
-                if not added_comment.id:
-                    results.append(
-                        PatchResult(
-                            provider_id=patch.provider_id,
-                            reference=patch.reference,
-                            status="error",
-                            message="GitHub work-item audit comment response was invalid",
-                        )
-                    )
-                    continue
-                head = WorkItemHead.create(patch.reference, current.revision, root, patch.body, added_comment.id)
-                written = self._contents().put(
-                    ContentWrite(
-                        reference=work_item_head_ref(patch.reference),
-                        content=head.model_dump_json(),
-                        expected_revision=head_record.revision if head_record is not None else "",
-                        create_only=head_record is None,
-                    )
-                )
-            except ContentConflictError as exc:
-                results.append(
-                    PatchResult(
-                        provider_id=patch.provider_id, reference=patch.reference, status="conflict", message=str(exc)
-                    )
-                )
-                continue
-            except (BacklogError, ContentUnavailableError) as exc:
-                results.append(
-                    PatchResult(
-                        provider_id=patch.provider_id, reference=patch.reference, status="error", message=str(exc)
-                    )
-                )
-                continue
-            results.append(
-                PatchResult(
+            results.append(self._write_patch(repository, issue, patch, current.revision, head_record, root))
+        return results
+
+    def _audit_comment_id(self, repository: Repository, issue: IssueNode, revision: str, body: str) -> str:
+        """Return the audit comment for this revision and body, posting one only if none exists.
+
+        A comment from an earlier write whose outcome was unknown may already be on the issue with
+        no head pointing at it; reusing it keeps a retried reconcile from posting a duplicate.
+
+        Returns:
+            The audit comment's node id (empty when GitHub answered the post with none).
+        """
+        owner, repo_name = repository.full_name.split("/", 1)
+        # Only the newest gh_client.RECENT_COMMENT_WINDOW comments are searched; see its ceiling note.
+        recent = self._issues._fetch_issue_comments_graphql(
+            repository, owner, repo_name, issue["number"], latest=gh_client.RECENT_COMMENT_WINDOW
+        )
+        if (existing := find_work_item_comment(recent, revision, body)) is not None:
+            return existing.id
+        return self._issues._add_comment_graphql(repository, issue["id"], render_work_item_comment(revision, body)).id
+
+    def _write_patch(
+        self,
+        repository: Repository,
+        issue: IssueNode,
+        patch: ProviderPatch,
+        revision: str,
+        head_record: ContentRecord | None,
+        root: str,
+    ) -> PatchResult:
+        """Post one patch's audit comment and advance its head record.
+
+        Returns:
+            The patch outcome: ``applied`` with the new head revision, ``conflict`` when the head
+            moved, or ``error`` for any other recorded failure.
+
+        Raises:
+            GitHubMutationOutcomeUnknownError: When the audit comment timed out. Recording an
+                error instead would let a later reconcile post the same comment again.
+        """
+        try:
+            comment_id = self._audit_comment_id(repository, issue, revision, patch.body)
+            if not comment_id:
+                return PatchResult(
                     provider_id=patch.provider_id,
                     reference=patch.reference,
-                    status="applied",
-                    revision=written.revision,
+                    status="error",
+                    message="GitHub work-item audit comment response was invalid",
+                )
+            head = WorkItemHead.create(patch.reference, revision, root, patch.body, comment_id)
+            written = self._contents().put(
+                ContentWrite(
+                    reference=work_item_head_ref(patch.reference),
+                    content=head.model_dump_json(),
+                    expected_revision=head_record.revision if head_record is not None else "",
+                    create_only=head_record is None,
                 )
             )
-        return results
+        except GitHubMutationOutcomeUnknownError:
+            raise
+        except ContentConflictError as exc:
+            return PatchResult(
+                provider_id=patch.provider_id, reference=patch.reference, status="conflict", message=str(exc)
+            )
+        except (BacklogError, ContentUnavailableError) as exc:
+            return PatchResult(
+                provider_id=patch.provider_id, reference=patch.reference, status="error", message=str(exc)
+            )
+        return PatchResult(
+            provider_id=patch.provider_id, reference=patch.reference, status="applied", revision=written.revision
+        )
 
     def provider_item_from_issue(
         self,

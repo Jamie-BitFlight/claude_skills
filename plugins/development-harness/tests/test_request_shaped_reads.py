@@ -169,6 +169,9 @@ class FakeRequester:
         elif "query GetComment(" in query:
             operation = "GetComment"
             data = self._get_comment(variables)
+        elif "query GetIssueComments(" in query:
+            operation = "GetIssueComments"
+            data = self._issue_comments(variables)
         elif "mutation AddComment(" in query:
             operation = "AddComment"
             data = self._add_comment(variables)
@@ -235,6 +238,23 @@ class FakeRequester:
             }
         }
 
+    def _issue_comments(self, variables: dict[str, object]) -> dict[str, object]:
+        """Answer the newest-``last`` read audit writes make before posting (the only shape used)."""
+        last = variables.get("last")
+        if not isinstance(last, int):
+            raise TypeError(f"GetIssueComments called without a last count: {variables!r}")
+        node_id = f"I_{variables['number']}"
+        nodes = [
+            node
+            for comment_id, node in self._fixture.comment_nodes.items()
+            if self._fixture.comment_issue.get(comment_id) == node_id
+        ]
+        return {
+            "repository": {
+                "issue": {"comments": {"nodes": nodes[-last:], "pageInfo": {"hasNextPage": False, "endCursor": None}}}
+            }
+        }
+
     def _get_comment(self, variables: dict[str, object]) -> dict[str, object]:
         comment_id = str(variables.get("id", ""))
         return {"node": self._fixture.comment_nodes.get(comment_id)}
@@ -243,6 +263,7 @@ class FakeRequester:
         new_id = f"IC_new_{len(self._fixture.comment_nodes) + 1}"
         body = str(variables.get("body", ""))
         database_id = 9000 + len(self._fixture.comment_nodes)
+        self._fixture.comment_issue[new_id] = str(variables.get("subjectId", ""))
         self._fixture.comment_nodes[new_id] = {
             "id": new_id,
             "fullDatabaseId": database_id,
@@ -287,6 +308,8 @@ class FakeGitHubFixture:
         self.owner, self.name = owner, name
         self.issues: dict[int, FakeIssue] = {}
         self.comment_nodes: dict[str, dict[str, object]] = {}
+        #: Comment id -> the issue node id it was posted on, so a per-issue comment read can filter.
+        self.comment_issue: dict[str, str] = {}
         self.contents = FakeContentStore()
         self.repository = FakeRepository(self, owner, name)
         self.backend = GitHubBackend(repo=f"{owner}/{name}", cache=FileCache(tmp_path), contents=self.contents)
@@ -315,6 +338,7 @@ class FakeGitHubFixture:
         root = self.contents.seed_head(
             reference, node_id=node_id, raw_body=raw_body, tracked_body=tracked_body, comment_id=comment_id
         )
+        self.comment_issue[comment_id] = node_id
         self.comment_nodes[comment_id] = {
             "id": comment_id,
             "body": render_work_item_comment(root, tracked_body),

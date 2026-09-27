@@ -380,3 +380,38 @@ def test_writes_cache_file(tmp_path: Path) -> None:
     assert data["tasks"][0]["task_id"] == "T1"
     assert data["feature_slug"] == "my-feature"
     assert data["parent_issue_number"] == 480
+
+
+def test_a_link_timeout_records_the_created_issue_and_stops(tmp_path: Path) -> None:
+    """createIssue landed but addSubIssue timed out: the number is written before the run stops.
+
+    A rerun skips a task whose ``github_issue`` is set, so recording the number is what keeps it
+    from creating a second issue.
+    """
+    from backlog_core.models import GitHubMutationOutcomeUnknownError
+    from typer.testing import CliRunner
+
+    from migrate_tasks_to_github import app
+
+    task_file = _make_two_task_file(tmp_path)
+
+    def _link_times_out(_repo, _parent, _sam_task, **_kwargs):
+        msg = "Created task issue #481; linking it as a sub-issue timed out"
+        raise GitHubMutationOutcomeUnknownError(msg, timeout_seconds=60, created_issue_number=481)
+
+    with (
+        patch("migrate_tasks_to_github.SamTask") as mock_sam_cls,
+        patch("migrate_tasks_to_github.get_github", return_value=MagicMock()),
+        patch("migrate_tasks_to_github.create_task_issue", side_effect=_link_times_out) as create,
+        patch("migrate_tasks_to_github._write_cache") as write_cache,
+    ):
+        mock_sam_cls.side_effect = lambda **kw: MagicMock(task_id=kw["task_id"])
+        result = CliRunner().invoke(app, ["--task-file", str(task_file), "--parent-issue", "480"])
+
+    assert result.exit_code == 0, result.output
+    assert "github_issue: 481" in task_file.read_text()
+    assert create.call_count == 1, "the run must stop once GitHub's state is uncertain"
+    report = json.loads(result.output)
+    assert report["results"][0]["status"] == "outcome_unknown"
+    assert report["results"][0]["issue"] == 481
+    assert [number for _task, number in write_cache.call_args.args[2]] == [481]

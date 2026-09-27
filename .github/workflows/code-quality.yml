@@ -198,7 +198,7 @@ jobs:
 
   # =============================================================================
   # Local hooks: manifest sync (via prek)
-  # Blocking. The hook runs `agent-marketplace-versioner reconcile --dry-run`:
+  # Blocking. The `agent-marketplace-versioner-check` hook runs `reconcile --dry-run --staged`:
   # it fails when plugin.json component arrays or marketplace membership drift
   # from plugins/, and never changes version fields. bump-marketplace.yml
   # assigns patch versions after merge to main.
@@ -219,7 +219,7 @@ jobs:
           fetch-depth: 0
 
       - name: Check manifest sync
-        run: uv run -q --locked prek run agent-marketplace-versioner --all-files --show-diff-on-failure
+        run: uv run -q --locked prek run agent-marketplace-versioner-check --all-files --show-diff-on-failure
 
       - name: Exercise pinned remote versioner integration
         run: uv run --locked pytest -m integration tests/test_marketplace_versioner_integration.py --no-cov
@@ -253,7 +253,7 @@ jobs:
 
       - name: Run file hygiene hooks
         env:
-          SKIP: sync-pre-commit-deps,conventional-pre-commit,repair-symlinks,biome-check,ruff,ruff-format,pypfmt,markdownlint-cli2,shell-fmt-go,shellcheck,agent-marketplace-versioner,skilllint,ty,enable-rerere,validate-research-entries,audit-dependencies
+          SKIP: sync-pre-commit-deps,conventional-pre-commit,repair-symlinks,biome-check,ruff,ruff-format,pypfmt,markdownlint-cli2,shell-fmt-go,shellcheck,agent-marketplace-versioner-check,skilllint,ty,enable-rerere,validate-research-entries,audit-dependencies
         run: uv run --script .github/ci/run.py prek
 
   # =============================================================================

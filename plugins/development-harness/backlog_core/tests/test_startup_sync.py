@@ -868,7 +868,7 @@ class TestSyncStateIsRunning:
 
 class TestSyncStateTryClaim:
     """try_claim()/release_claim() are the single-flight primitive shared by
-    startup sync, sync_now (via try_start()), and operations.list_items's
+    sync_now (via try_start()) and operations.list_items's
     implicit cold-cache read-through (PR #3573 review Finding 1)."""
 
     def test_try_claim_returns_previous_status_and_sets_running(self, fresh_sync_state: SyncState) -> None:

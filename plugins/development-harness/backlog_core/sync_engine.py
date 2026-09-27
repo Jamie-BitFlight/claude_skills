@@ -30,7 +30,7 @@ from github import GithubException
 
 from . import operations
 from .models import BacklogError, ContentProviderError
-from .sync_state import SyncErrorKind, SyncState, SyncStatus, classify_sync_error
+from .sync_state import SyncErrorKind, SyncState, SyncStatus, classify_sync_error, retry_after_seconds
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -218,6 +218,7 @@ async def _attempt_sync(state: SyncState, attempt: int, full_refresh: bool) -> b
 
             state.retry_count += 1
             state.last_error = error_msg
+            state.retry_after = retry_after_seconds(exc)
             return False  # retryable — caller will sleep and retry
         else:
             return True  # success — loop terminates
@@ -253,7 +254,9 @@ async def _sync_loop(state: SyncState, full_refresh: bool = False) -> None:
                 _log.error("Sync ERROR: exhausted %d retries. Last error: %s", MAX_RETRIES, state.last_error)
                 return
 
-            delay = _compute_backoff_delay(attempt)
+            # GitHub's Retry-After hint outranks the fixed schedule: retrying sooner is refused
+            # again and spends an attempt for nothing.
+            delay = max(_compute_backoff_delay(attempt), state.retry_after or 0.0)
             _log.info("Retrying in %.0f s (attempt %d/%d).", delay, attempt + 1, MAX_RETRIES)
             # Sleep outside the lock so other tool calls can proceed during the wait.
             await asyncio.sleep(delay)

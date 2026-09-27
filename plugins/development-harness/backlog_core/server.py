@@ -99,6 +99,7 @@ from .sync_state import (
     SyncStatus,
     classify_github_failure,
     get_sync_state,
+    retry_after_seconds,
 )
 from .tool_responses import (
     AccumulatedUsage,
@@ -302,6 +303,24 @@ def _retryable(exc: BaseException) -> bool | None:
     if github_failure is SyncErrorKind.NON_RETRYABLE:
         return False
     return None
+
+
+def _failure_verdict(exc: BaseException) -> dict[str, object]:
+    """Return the retry fields every tool error response carries for ``exc``.
+
+    ``retryable`` comes from ``_retryable``. ``retry_after`` is added only when GitHub sent a
+    ``Retry-After`` hint (see ``retry_after_seconds``), so a response without one keeps its shape.
+
+    Args:
+        exc: The exception the tool's except arm caught.
+
+    Returns:
+        A dict to splice into the error payload.
+    """
+    verdict: dict[str, object] = {"retryable": _retryable(exc)}
+    if (retry_after := retry_after_seconds(exc)) is not None:
+        verdict["retry_after"] = retry_after
+    return verdict
 
 
 # Module-level logger for done-callback exception reporting.
@@ -1397,7 +1416,7 @@ async def backlog_add(
         )
         return _respond(BacklogAddResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return _respond(BacklogAddResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(BacklogAddResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
 
 
 def _assert_config() -> None:
@@ -1885,7 +1904,7 @@ async def backlog_list(
         backend_status = await asyncio.to_thread(_probe_backend_status)
         return _respond(
             BacklogListResponse,
-            {"error": str(e), "retryable": _retryable(e), "backend": backend_status.model_dump(), **out.to_dict()},
+            {"error": str(e), **_failure_verdict(e), "backend": backend_status.model_dump(), **out.to_dict()},
         )
 
     sync_state_block, sync_warnings = _build_sync_state_block(get_sync_state())
@@ -2251,12 +2270,12 @@ def _execute_disclosure_or_passthrough(
     except OrdinalNotFoundError as exc:
         return {
             "error": str(exc),
-            "retryable": _retryable(exc),
+            **_failure_verdict(exc),
             "requested_ordinal": exc.requested,
             "valid_ordinals": exc.valid_ordinals,
         }
     except BacklogError as exc:
-        return {"error": str(exc), "retryable": _retryable(exc), "error_type": type(exc).__name__}
+        return {"error": str(exc), **_failure_verdict(exc), "error_type": type(exc).__name__}
 
 
 @mcp.tool(
@@ -2440,7 +2459,7 @@ async def backlog_view(
                 _execute_disclosure_or_passthrough, selector, disclosure_req, refresh, allow_cached
             )
     except DisclosureParamError as exc:
-        disclosure_result = {"error": str(exc), "retryable": _retryable(exc), "invalid_params": exc.invalid_params}
+        disclosure_result = {"error": str(exc), **_failure_verdict(exc), "invalid_params": exc.invalid_params}
 
     if disclosure_result is not None:
         return _respond(BacklogViewResponse, disclosure_result, exclude_none=False, exclude_unset=True)
@@ -2564,7 +2583,7 @@ async def backlog_view(
     except BacklogError as e:
         return _respond(
             BacklogViewResponse,
-            {"error": str(e), "retryable": _retryable(e), **out.to_dict()},
+            {"error": str(e), **_failure_verdict(e), **out.to_dict()},
             exclude_none=False,
             exclude_unset=True,
         )
@@ -2588,7 +2607,7 @@ async def backlog_sync(
         result = await asyncio.to_thread(operations.sync_items, dry_run=dry_run, output=out)
         return _respond(BacklogSyncResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return _respond(BacklogSyncResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(BacklogSyncResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -2628,7 +2647,7 @@ async def backlog_link_followup(
         )
         return _respond(BacklogLinkFollowupResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return _respond(BacklogLinkFollowupResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(BacklogLinkFollowupResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -2664,7 +2683,7 @@ async def backlog_list_followups(
         )
         return _respond(BacklogListFollowupsResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return _respond(BacklogListFollowupsResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(BacklogListFollowupsResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -2717,7 +2736,7 @@ async def backlog_close(
         )
         return _respond(BacklogCloseResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return _respond(BacklogCloseResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(BacklogCloseResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -2774,7 +2793,7 @@ async def backlog_resolve(
         )
         return _respond(BacklogResolveResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return _respond(BacklogResolveResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(BacklogResolveResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -2875,7 +2894,7 @@ async def backlog_update(
         )
         return _respond(BacklogUpdateResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return _respond(BacklogUpdateResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(BacklogUpdateResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -2987,7 +3006,7 @@ async def backlog_groom(
         )
         return _respond(BacklogGroomResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return _respond(BacklogGroomResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(BacklogGroomResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3012,7 +3031,7 @@ async def backlog_normalize(
         )
         return _respond(BacklogNormalizeResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return _respond(BacklogNormalizeResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(BacklogNormalizeResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3064,7 +3083,7 @@ async def backlog_pull(
         result = await asyncio.to_thread(operations.pull_items, dry_run=dry_run, force=force, diff=diff, output=out)
         return _respond(BacklogPullResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return _respond(BacklogPullResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(BacklogPullResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3114,7 +3133,7 @@ async def backlog_create_sam_task(
         )
         return _respond(BacklogCreateSamTaskResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return _respond(BacklogCreateSamTaskResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(BacklogCreateSamTaskResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3146,7 +3165,7 @@ async def backlog_get_sam_tasks(
         )
         return _respond(SamTaskLookupResult, {**result, **out.to_dict()})
     except BacklogError as e:
-        return _respond(SamTaskLookupResult, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(SamTaskLookupResult, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3174,9 +3193,7 @@ async def backlog_update_sam_task_status(
         )
         return _respond(BacklogUpdateSamTaskStatusResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return _respond(
-            BacklogUpdateSamTaskStatusResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()}
-        )
+        return _respond(BacklogUpdateSamTaskStatusResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
 
 
 # ---------------------------------------------------------------------------
@@ -3318,7 +3335,7 @@ async def artifact_register(
             {**result.model_dump(), "messages": out.messages, "warnings": out.warnings, "errors": out.errors},
         )
     except BacklogError as e:
-        return _respond(ArtifactRegisterResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(ArtifactRegisterResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3358,7 +3375,7 @@ async def artifact_list(
         artifacts = await asyncio.to_thread(_run)
         return _respond(ArtifactsListResponse, {"artifacts": artifacts, "count": len(artifacts), **out.to_dict()})
     except BacklogError as e:
-        return _respond(ArtifactsListResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(ArtifactsListResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3414,7 +3431,7 @@ async def artifact_get(
         artifacts = await asyncio.to_thread(_run)
         return _respond(ArtifactsListResponse, {"artifacts": artifacts, "count": len(artifacts), **out.to_dict()})
     except BacklogError as e:
-        return _respond(ArtifactsListResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(ArtifactsListResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3485,7 +3502,7 @@ async def artifact_read(
         result = await asyncio.to_thread(_run)
         return _respond(ArtifactReadResponse, {**result.model_dump(mode="json"), **out.to_dict()})
     except BacklogError as e:
-        return _respond(ArtifactReadResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(ArtifactReadResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3508,7 +3525,7 @@ async def backlog_get_ready_sam_tasks(
         )
         return _respond(BacklogGetReadySamTasksResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return _respond(BacklogGetReadySamTasksResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(BacklogGetReadySamTasksResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3558,7 +3575,7 @@ async def backlog_strike_entry(
         )
         return _respond(BacklogStrikeEntryResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return _respond(BacklogStrikeEntryResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(BacklogStrikeEntryResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3580,7 +3597,7 @@ async def backlog_list_labels(
         result = await asyncio.to_thread(operations.list_labels, limit=limit, output=out)
         return _respond(BacklogListLabelsResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return _respond(BacklogListLabelsResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(BacklogListLabelsResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3612,7 +3629,7 @@ async def backlog_list_merged_prs(
         result = await asyncio.to_thread(operations.list_merged_prs, search=search, limit=limit, output=out)
         return _respond(BacklogListMergedPrsResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return _respond(BacklogListMergedPrsResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(BacklogListMergedPrsResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3632,7 +3649,7 @@ async def backlog_list_milestones(
     try:
         result = await asyncio.to_thread(operations.list_milestones, state=state, output=out)
     except BacklogError as e:
-        return _respond(BacklogListMilestonesResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(BacklogListMilestonesResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
     response = BacklogListMilestonesResponse.model_validate({**result, **out.to_dict()})
     dump = response.model_dump(exclude_none=True)
     # due_on is a meaningful, documented null per milestone (no due date set) --
@@ -3670,9 +3687,7 @@ async def backlog_get_soonest_milestone() -> Annotated[
     try:
         result = await asyncio.to_thread(operations.get_soonest_milestone, output=out)
     except BacklogError as e:
-        return _respond(
-            BacklogGetSoonestMilestoneResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()}
-        )
+        return _respond(BacklogGetSoonestMilestoneResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
     response = BacklogGetSoonestMilestoneResponse.model_validate({**result, **out.to_dict()})
     # milestone=None is a meaningful, documented success value (no open
     # milestones exist), not an absent-on-this-branch field like `error` --
@@ -3710,7 +3725,7 @@ async def backlog_create_milestone(
             operations.create_milestone, title=title, description=description, due_on=due_on, output=out
         )
     except BacklogError as e:
-        return _respond(BacklogCreateMilestoneResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(BacklogCreateMilestoneResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
     response = BacklogCreateMilestoneResponse.model_validate({**result, **out.to_dict()})
     dump = response.model_dump(exclude_none=True)
     # due_on is a meaningful, legitimate null (caller can create a milestone
@@ -3749,7 +3764,7 @@ async def backlog_assign_item_to_milestone(
     except BacklogError as e:
         return BacklogAssignItemToMilestoneResponse.model_validate({
             "error": str(e),
-            "retryable": _retryable(e),
+            **_failure_verdict(e),
             **out.to_dict(),
         }).model_dump(exclude_none=True)
     return BacklogAssignItemToMilestoneResponse.model_validate({**result, **out.to_dict()}).model_dump(
@@ -3775,7 +3790,7 @@ async def backlog_list_issues(
             operations.list_issues, milestone=milestone, labels=labels, state=state, limit=limit, output=out
         )
     except BacklogError as e:
-        return _respond(BacklogListIssuesResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(BacklogListIssuesResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
     response = BacklogListIssuesResponse.model_validate({**result, **out.to_dict()})
     dump = response.model_dump(exclude_none=True)
     # milestone is a meaningful, documented null per issue (no milestone
@@ -3812,7 +3827,7 @@ async def backlog_comment_issue(
         result = await asyncio.to_thread(operations.comment_issue, issue_number=issue_number, body=body, output=out)
         return _respond(BacklogCommentIssueResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return _respond(BacklogCommentIssueResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(BacklogCommentIssueResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3841,7 +3856,7 @@ async def backlog_list_comments(
         )
         return _respond(BacklogListCommentsResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return _respond(BacklogListCommentsResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(BacklogListCommentsResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3879,7 +3894,7 @@ async def backlog_read_comment(
         )
         return _respond(BacklogReadCommentResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return _respond(BacklogReadCommentResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(BacklogReadCommentResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3897,7 +3912,7 @@ async def backlog_list_projects(
         result = await asyncio.to_thread(operations.list_projects, owner=owner, limit=limit, output=out)
         return _respond(BacklogListProjectsResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return _respond(BacklogListProjectsResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(BacklogListProjectsResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3922,7 +3937,7 @@ async def backlog_create_project(
         result = await asyncio.to_thread(operations.create_project, title=title, owner=owner, output=out)
         return _respond(BacklogCreateProjectResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return _respond(BacklogCreateProjectResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
+        return _respond(BacklogCreateProjectResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
 
 
 def _dispatch_reference(milestone_number: int) -> ContentRef:
@@ -3988,8 +4003,7 @@ async def dispatch_read(
         )
     except ValueError as exc:
         return _respond(
-            DispatchReadResponse,
-            {"error": str(exc), "retryable": _retryable(exc), "milestone_number": milestone_number},
+            DispatchReadResponse, {"error": str(exc), **_failure_verdict(exc), "milestone_number": milestone_number}
         )
     return _respond(DispatchReadResponse, {"milestone_number": milestone_number, "plan": plan.model_dump()})
 
@@ -4016,8 +4030,7 @@ async def dispatch_validate(
         plan = await asyncio.to_thread(_read_dispatch_plan, milestone_number)
     except (ContentUnavailableError, ValueError) as exc:
         return _respond(
-            DispatchValidateResponse,
-            {"error": str(exc), "retryable": _retryable(exc), "milestone_number": milestone_number},
+            DispatchValidateResponse, {"error": str(exc), **_failure_verdict(exc), "milestone_number": milestone_number}
         )
     result = await asyncio.to_thread(dispatch_schema.validate_plan_integrity, plan)
     return _respond(DispatchValidateResponse, {"milestone_number": milestone_number, **dataclasses.asdict(result)})
@@ -4149,7 +4162,7 @@ async def dispatch_create_plan(
     except (BacklogError, ContentConflictError, UnsupportedCapabilityError) as exc:
         return _respond(
             DispatchCreatePlanResponse,
-            {"error": str(exc), "retryable": _retryable(exc), "milestone_number": milestone_number, **out.to_dict()},
+            {"error": str(exc), **_failure_verdict(exc), "milestone_number": milestone_number, **out.to_dict()},
         )
 
     out.info(f"Stored dispatch plan {milestone_number}")

@@ -814,14 +814,14 @@ class GitHubBackend:
         return gh_client._add_comment_graphql(repo, issue_node_id, body)
 
     def _fetch_issue_comments_graphql(
-        self, repo: Repository, owner: str, repo_name: str, issue_number: int
+        self, repo: Repository, owner: str, repo_name: str, issue_number: int, *, latest: int | None = None
     ) -> list[IssueCommentNode]:
-        """Fetch all comments on an issue.
+        """Fetch the comments on an issue, or only the newest ``latest`` of them.
 
         Returns:
             List of IssueCommentNode instances.
         """
-        return gh_client._fetch_issue_comments_graphql(repo, owner, repo_name, issue_number)
+        return gh_client._fetch_issue_comments_graphql(repo, owner, repo_name, issue_number, latest=latest)
 
     def _fetch_comment_by_id_graphql(self, repo: Repository, comment_node_id: str) -> IssueCommentNode:
         """Fetch a single comment by its GraphQL node ID.
