@@ -4,9 +4,9 @@ A plugin distributed standalone into another repo (installed via the marketplace
 checkout) has no sibling `rules/`, `docs/`, or other plugin directories to resolve against. A
 relative markdown link that walks upward past the plugin root — e.g.
 `[x](../../../../rules/foo.md)` — silently 404s for that installer even though it resolves fine
-inside this monorepo. The link guard runs over every plugin's git-tracked `.md`, `.markdown`
-and `.mdx` files. It is a stopgap until skilllint's own rule (bitflight-devops/skilllint#291)
-replaces it (#3971).
+inside this monorepo. The link guard runs over every plugin's git-tracked `.md` and `.markdown`
+files, including `href`/`src` in raw HTML, and fails on any `.mdx` file. It is a stopgap until
+skilllint's own rule (bitflight-devops/skilllint#291) replaces it (#3971).
 
 plugin-creator's `skills/lint/scripts/audit_runtime_escapes.py` also reports escaping links, and
 neither check can replace the other. The audit ships inside the plugin for consumers to run, so it
@@ -48,14 +48,19 @@ _URL_PATTERN = re.compile(r"https?://\S+")
 _ABS_PATH_PATTERN = re.compile(r"(?<![\w/{])/(?:Users|home|root)/[\w./-]*")
 _AUTHORING_DIR_TOKENS = ("rules/", ".claude/hooks/", "docs/")
 _DESIGN_TIME_FILENAMES = {"MAINTENANCE.md", "SKILL-GOALS.md"}
-_MARKDOWN_SUFFIXES = (".md", ".markdown", ".mdx")
+_MARKDOWN_SUFFIXES = (".md", ".markdown")
+# marko parses JSX-wrapped Markdown in `.mdx` as an opaque HTML block, so its links are invisible.
+_UNSUPPORTED_SUFFIXES = (".mdx",)
 _EXCLUDED_LINK_PREFIXES = ("http://", "https://", "mailto:", "#", "${", "//")
 # A link leaves the plugin only through `..`, a root-absolute `/`, or a `file:` URL. A file with
-# none of these in plain text, and no link destination holding a `\`, `%` or `&` that could encode
-# them, cannot hold an escaping link, so the link guard skips parsing it.
+# none of these in plain text, no link destination holding a `\`, `%` or `&` that could encode
+# them, and no HTML `href=`/`src=`, cannot hold an escaping link, so the link guard skips it.
 _MAY_ESCAPE_PATTERN = re.compile(
-    r"(?:^|[\s(<:/])\.\.(?:[/)#>\s]|$)|(?:\]\(|\]:)\s*<?(?:/|file:|[^\s)>]*[\\%&])", re.IGNORECASE | re.MULTILINE
+    r"(?:^|[\s(<:/])\.\.(?:[/)#>\s]|$)|(?:\]\(|\]:)\s*<?(?:/|file:|[^\s)>]*[\\%&])|\b(?:href|src)\s*=",
+    re.IGNORECASE | re.MULTILINE,
 )
+# `href`/`src` attribute values in raw HTML, double-quoted, single-quoted or unquoted.
+_HTML_URL_ATTR_PATTERN = re.compile(r"""\b(?:href|src)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))""", re.IGNORECASE)
 # CommonMark backslash escapes: a backslash before ASCII punctuation.
 _BACKSLASH_ESCAPE_PATTERN = re.compile(r"\\([!-/:-@\[-`{-~])")
 
@@ -83,6 +88,18 @@ _PLUGIN_DIRS = sorted({
 })
 
 
+def _unsupported_files(files: list[Path]) -> list[Path]:
+    """Select the files the link guard cannot parse, so it fails closed on them.
+
+    Args:
+        files: Candidate file paths, normally `_TRACKED_PLUGIN_FILES`.
+
+    Returns:
+        The `.mdx` files in `files`.
+    """
+    return [path for path in files if path.suffix in _UNSUPPORTED_SUFFIXES]
+
+
 def _markdown_files(plugin_dir: Path, files: list[Path]) -> list[Path]:
     """Select the Markdown files under `plugin_dir` from `files`.
 
@@ -91,7 +108,7 @@ def _markdown_files(plugin_dir: Path, files: list[Path]) -> list[Path]:
         files: Candidate file paths, normally `_TRACKED_PLUGIN_FILES`.
 
     Returns:
-        The `.md`, `.markdown` and `.mdx` files inside `plugin_dir`.
+        The `.md` and `.markdown` files inside `plugin_dir`.
     """
     return [path for path in files if path.suffix in _MARKDOWN_SUFFIXES and path.is_relative_to(plugin_dir)]
 
@@ -179,6 +196,36 @@ def _decode_destination(dest: str) -> str:
     return unquote(html.unescape(_BACKSLASH_ESCAPE_PATTERN.sub(r"\1", dest)))
 
 
+def _link_targets(nodes: list[tuple[Element, int]]) -> list[tuple[str, int]]:
+    """Collect every link destination in a walked document, with its enclosing block's offset.
+
+    Args:
+        nodes: `_walk_nodes` output for one document.
+
+    Returns:
+        `(destination, offset)` for each Markdown link, image, reference definition, and HTML
+        `href`/`src` attribute value.
+    """
+    # A `[text][label]` usage carries its definition's destination (backslash-unescaped by
+    # marko, unlike the definition's), so it is checked through its `LinkRefDef` alone.
+    defined = {_decode_destination(node.dest.strip()) for node, _start in nodes if isinstance(node, block.LinkRefDef)}
+    targets: list[tuple[str, int]] = []
+    for node, start in nodes:
+        if isinstance(node, (inline.Link, inline.Image)):
+            if _decode_destination(node.dest.strip()) not in defined:
+                targets.append((node.dest, start))
+        elif isinstance(node, block.LinkRefDef):
+            # Covers reference-style definitions (`[label]: url`), used or not.
+            targets.append((node.dest, start))
+        elif isinstance(node, (block.HTMLBlock, inline.InlineHTML)):
+            raw = str(node.body if isinstance(node, block.HTMLBlock) else node.children)
+            targets.extend(
+                (match.group(1) or match.group(2) or match.group(3) or "", start)
+                for match in _HTML_URL_ATTR_PATTERN.finditer(raw)
+            )
+    return targets
+
+
 def find_self_containment_violations(
     plugin_dir: Path, md_files: list[Path] | None = None
 ) -> list[tuple[Path, int, str, Path]]:
@@ -201,20 +248,10 @@ def find_self_containment_violations(
         if not _MAY_ESCAPE_PATTERN.search(content):
             continue
         doc, starts = _parse(content)
-        nodes = list(_walk_nodes(doc, starts))
-        # A `[text][label]` usage carries its definition's destination (backslash-unescaped by
-        # marko, unlike the definition's), so it is checked through its `LinkRefDef` alone.
-        defined = {
-            _decode_destination(node.dest.strip()) for node, _start in nodes if isinstance(node, block.LinkRefDef)
-        }
-        for node, start in nodes:
-            # `LinkRefDef` covers reference-style definitions (`[label]: url`), used or not.
-            if not isinstance(node, (inline.Link, inline.Image, block.LinkRefDef)):
-                continue
-            target = node.dest.strip()
+        targets = _link_targets(list(_walk_nodes(doc, starts)))
+        for raw_target, start in targets:
+            target = raw_target.strip()
             decoded = _decode_destination(target)
-            if not isinstance(node, block.LinkRefDef) and decoded in defined:
-                continue
             if decoded.startswith(_EXCLUDED_LINK_PREFIXES):
                 continue
             if decoded.lower().startswith("file:"):
@@ -283,11 +320,54 @@ def test_link_guard_flags_escaped_and_encoded_destinations(tmp_path: Path, form:
     assert len(find_self_containment_violations(tmp_path, [md_file])) == 1
 
 
-def test_markdown_file_selection_covers_markdown_and_mdx(tmp_path: Path) -> None:
-    """`.markdown` and `.mdx` files are scanned alongside `.md`; other files and other dirs are not."""
+@pytest.mark.parametrize(
+    "html",
+    [
+        '<a href="../../outside.md">x</a>',
+        '<p align="center"><img src="../../outside.png"></p>',
+        "Text <img src='/etc/outside.png'/> more.",
+        "<a href=&quot;x&quot; HREF=../../outside.md>x</a>",
+        '<a href="&#46;&#46;/outside.md">x</a>',
+    ],
+    ids=["inline-href", "block-src", "inline-src-root-absolute", "unquoted-uppercase", "entity-encoded"],
+)
+def test_link_guard_flags_escaping_html_href_and_src(tmp_path: Path, html: str) -> None:
+    """`href` and `src` attributes in HTML blocks and inline HTML that leave the plugin are flagged."""
+    md_file = tmp_path / "doc.md"
+    md_file.write_text(f"Intro.\n\n{html}\n")
+
+    assert len(find_self_containment_violations(tmp_path, [md_file])) == 1
+
+
+def test_link_guard_passes_html_links_inside_the_plugin(tmp_path: Path) -> None:
+    """HTML `href`/`src` values that stay in the plugin, or are URLs, are not flagged."""
+    md_file = tmp_path / "doc.md"
+    md_file.write_text('<a href="./a.md">a</a> <img src="https://example.com/x.png">\n')
+
+    assert find_self_containment_violations(tmp_path, [md_file]) == []
+
+
+def test_mdx_files_are_rejected_not_scanned(tmp_path: Path) -> None:
+    """marko parses JSX-wrapped Markdown as an HTML block, so an `.mdx` file fails closed."""
+    files = [tmp_path / "a.md", tmp_path / "b.mdx"]
+
+    assert _unsupported_files(files) == [tmp_path / "b.mdx"]
+
+
+def test_no_tracked_plugin_file_is_mdx() -> None:
+    """MDX is not supported by this guard; see #3971."""
+    unsupported = _unsupported_files(_TRACKED_PLUGIN_FILES)
+
+    assert not unsupported, "MDX is not supported by this guard; see #3971:\n" + "\n".join(
+        str(path.relative_to(_REPO_ROOT)) for path in unsupported
+    )
+
+
+def test_markdown_file_selection_covers_markdown(tmp_path: Path) -> None:
+    """`.markdown` files are scanned alongside `.md`; `.mdx`, other files and other dirs are not."""
     files = [tmp_path / "a.md", tmp_path / "b.markdown", tmp_path / "c.mdx", tmp_path / "d.txt", Path("/other/e.md")]
 
-    assert _markdown_files(tmp_path, files) == files[:3]
+    assert _markdown_files(tmp_path, files) == files[:2]
 
 
 def find_authoring_repo_leakage(plugin_dir: Path) -> list[tuple[Path, int, str, str]]:
