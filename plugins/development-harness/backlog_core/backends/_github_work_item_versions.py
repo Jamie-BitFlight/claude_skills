@@ -38,10 +38,21 @@ class WorkItemHead(BaseModel):
     body: str
     digest: str = Field(pattern=r"^[0-9a-f]{64}$")
     comment_id: str = Field(min_length=1)
+    #: Agent-owned structured fields (see models.HEAD_FIELDS), keyed by
+    #: BacklogItemMetadata field name. Additive with a default so an older
+    #: reader (extra="ignore") tolerates this key, and a head written by an
+    #: older plugin version simply omits it -- see design doc R1.
+    fields: dict[str, str] = Field(default_factory=dict)
 
     @classmethod
     def create(
-        cls, issue_reference: str, parent_revision: str, root_revision: str, body: str, comment_id: str
+        cls,
+        issue_reference: str,
+        parent_revision: str,
+        root_revision: str,
+        body: str,
+        comment_id: str,
+        fields: dict[str, str] | None = None,
     ) -> WorkItemHead:
         """Create an authenticated logical head for a successful Contents update.
 
@@ -55,6 +66,7 @@ class WorkItemHead(BaseModel):
             body=body,
             digest=_body_digest(body),
             comment_id=comment_id,
+            fields=fields or {},
         )
 
     @model_validator(mode="after")

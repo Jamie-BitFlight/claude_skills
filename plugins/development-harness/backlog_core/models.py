@@ -1143,6 +1143,37 @@ class BacklogItemMetadata(BaseModel):
         return v
 
 
+# ---------------------------------------------------------------------------
+# GitHub work-item field partition (design: item-fields-in-head-record)
+# ---------------------------------------------------------------------------
+#
+# Every BacklogItemMetadata field belongs to exactly one class, which decides
+# where the GitHub backend carries it:
+#
+# - PROVIDER_NATIVE: carried by the GitHub issue itself (labels, milestone,
+#   assignees, the issue reference). Never duplicated onto the head record.
+# - LOCAL_BOOKKEEPING: never leaves the private FileCache -- sync plumbing,
+#   not agent-facing content.
+# - HEAD_FIELDS: everything else. Carried on WorkItemHead.fields (see
+#   backends/_github_work_item_versions.py) so a fresh reader with no local
+#   cache still recovers it. HEAD_FIELDS is the *complement* of the other two
+#   sets, not an explicit list, so a newly added metadata field lands here by
+#   default -- test_field_partition_drift.py fails the build if that new
+#   field is not a plain str (a list/submodel field must instead be added to
+#   PROVIDER_NATIVE_METADATA_FIELDS or LOCAL_BOOKKEEPING_METADATA_FIELDS).
+PROVIDER_NATIVE_METADATA_FIELDS: frozenset[str] = frozenset({
+    "issue",
+    "labels",
+    "milestone",
+    "milestone_info",
+    "assignees",
+})
+LOCAL_BOOKKEEPING_METADATA_FIELDS: frozenset[str] = frozenset({"last_synced", "updated_at", "sync_fingerprint"})
+HEAD_FIELDS: frozenset[str] = frozenset(BacklogItemMetadata.model_fields) - (
+    PROVIDER_NATIVE_METADATA_FIELDS | LOCAL_BOOKKEEPING_METADATA_FIELDS
+)
+
+
 def _derive_stable_reference(issue: str, title: str) -> str:
     """Return the stable backend reference a work item should carry.
 
@@ -1383,6 +1414,17 @@ class ProviderItem(BaseModel):
     revision: str
     milestone: str = ""
     exists: bool = True
+    #: Head-record field values (see HEAD_FIELDS), keyed by BacklogItemMetadata
+    #: field name. ``None`` means no head record exists at all for this issue
+    #: (never written by this design, or a plugin version that predates it) --
+    #: distinct from ``{}``, an existing head that carries no field values.
+    #: Populated from a stale head too (see provider_item_from_issue), so a
+    #: field-only patch can still be planned against an issue whose body root
+    #: has moved on.
+    fields: dict[str, str] | None = None
+    #: The issue's GraphQL ``createdAt``, used as the ``added`` fallback for
+    #: an item with neither a head value nor a legacy body-block value.
+    created_at: str = ""
 
 
 class ProviderSnapshot(BaseModel):
@@ -1400,6 +1442,12 @@ class ProviderPatch(BaseModel):
     reference: str
     expected_revision: str
     body: str
+    #: The candidate's full head-field map (see HEAD_FIELDS), always set
+    #: whenever a patch is emitted -- regardless of whether the patch was
+    #: triggered by a body change, a head-field change, or both. ``None``
+    #: means "do not touch fields" (reserved for a future caller that only
+    #: ever patches the body; reconciliation.py always sets a dict).
+    fields: dict[str, str] | None = None
 
 
 class PatchResult(BaseModel):
