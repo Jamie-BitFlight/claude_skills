@@ -1297,3 +1297,16 @@ def test_dry_run_normalize_writes_nothing_to_the_cache(fixture: FakeGitHubFixtur
 
     assert result["normalized"] == 2, result
     assert fixture.backend.list_work_items() == []
+
+
+def test_title_read_finds_the_live_issue_when_pending_intent_shares_its_title(fixture: FakeGitHubFixture) -> None:
+    repo = f"{fixture.owner}/{fixture.name}"
+    fixture.add_tracked_issue(1, "shared title", state="OPEN")
+    fixture.backend.put_work_item(BacklogItem(title="shared title", priority="P1"), repo)
+    assert any(not item.issue for item in fixture.backend.pending_work_items(repo))
+
+    context = WorkItemDecisionContext(fixture.backend, repo=repo)
+    target = context.select("shared title", purpose="read")
+
+    assert target.provider is not None
+    assert target.provider.issue == "#1", target.provider

@@ -255,9 +255,9 @@ class WorkItemDecisionContext:
     ) -> tuple[BacklogItem | None, ProviderSnapshot | None]:
         """Resolve a non-exact selector against pending intent, then GitHub search (D5).
 
-        Pending (not-yet-created) items are checked first -- a slug or
-        string-id selector matching queued intent skips the live search
-        entirely (D5 point 4). When search finds no title containing the
+        For a mutation, pending (not-yet-created) items are checked first --
+        a slug or string-id selector matching queued intent skips the live
+        search entirely (D5 point 4). A read always asks the provider. When search finds no title containing the
         selector -- it was skipped as unsafe (too long, or carrying a quote --
         risk R-B), returned nothing, or returned only tokenized near-misses
         (risk R-A: it can also lag a just-created or just-edited issue) -- a
@@ -273,11 +273,12 @@ class WorkItemDecisionContext:
             The matched item and its targeted snapshot (``None`` for a
             pending-only match, which has no provider snapshot).
         """
-        pending_match = find_item(self.pending(), selector)
+        pending_match = find_item(self.pending(), selector) if purpose == "mutation" else None
         if pending_match is not None and not pending_match.issue:
             # Not yet created -- no provider row exists to find. select()'s
             # normal pending-journal lookup below still resolves this same
             # match as target.pending/mutation_base; skip the search entirely.
+            # A read ignores pending intent, so it always asks the provider.
             return None, None
         try:
             candidates = (
