@@ -173,8 +173,8 @@ class WorkItemDecisionContext:
         ``apply_local_patches`` follows *refresh*, so a plain read acknowledges
         nothing while ``refresh=True`` also pushes local intent for these rows
         only (D6). The checkpoint never moves: TARGETED never advances it. A
-        failed write-through is warned, not raised — the read it is attached to
-        has already succeeded. A plain read reports only failures, since a silent
+        failed write-through, including a local cache I/O error, is warned, not
+        raised — the read it is attached to has already succeeded. A plain read reports only failures, since a silent
         one leaves later ``allow_cached`` reads stale.
         """
         if not isinstance(self.backend, SyncProvider):
@@ -188,7 +188,7 @@ class WorkItemDecisionContext:
                 ),
                 snapshot=snapshot,
             )
-        except BacklogError as exc:
+        except (BacklogError, OSError) as exc:
             output.warn(f"  WARNING: Could not write this page through to the local cache: {exc}")
             return
         if refresh or result.failures:

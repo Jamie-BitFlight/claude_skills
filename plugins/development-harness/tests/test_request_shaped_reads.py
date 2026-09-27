@@ -1256,3 +1256,26 @@ def test_live_view_writes_its_target_through_to_the_cache(fixture: FakeGitHubFix
     assert viewed.title == "selected target", viewed
     assert [item.issue for item in fixture.backend.list_work_items()] == ["#1"]
     assert fixture.backend.has_synced_snapshot() is False
+
+
+def test_cache_io_failure_in_write_through_does_not_fail_the_live_list(fixture: FakeGitHubFixture) -> None:
+    from backlog_core import operations
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+
+    fixture.add_tracked_issue(1, "issue 1", state="OPEN")
+
+    def unwritable(request: object, snapshot: object = None) -> object:
+        del request, snapshot
+        raise PermissionError("cache directory is read-only")
+
+    fixture.backend.reconcile = unwritable  # ty: ignore[invalid-assignment]
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        result = operations.list_items(repo=f"{fixture.owner}/{fixture.name}")
+    finally:
+        reset_config()
+
+    assert [item["issue"] for item in _items(result)] == ["#1"], result
+    warnings = cast("list[str]", result.get("warnings", []))
+    assert any("read-only" in warning for warning in warnings), warnings
