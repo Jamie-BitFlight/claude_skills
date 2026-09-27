@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import re
+import threading
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Final, Protocol
 
@@ -19,7 +20,13 @@ import requests
 from github import GithubException
 from typing_extensions import TypedDict
 
-from backlog_core.github_client import TOKEN_ENV_VARS, MissingGitHubTokenError, make_github_client, resolve_token
+from backlog_core.github_client import (
+    TOKEN_ENV_VARS,
+    MissingGitHubTokenError,
+    graphql_total_timeout_seconds,
+    make_github_client,
+    resolve_token,
+)
 
 from .backend_types import (
     AddedCommentNode,
@@ -40,6 +47,7 @@ from .models import (
     BacklogItem,
     ContentConflictError,
     ContentUnavailableError,
+    GitHubRequestTimeoutError,
     GitHubUnavailableError,
     GraphQLUnavailableError,
     IssueLocalFields,
@@ -568,13 +576,98 @@ def is_graphql_unavailable(exc: GithubException) -> bool:
     return any(marker in message for marker in GRAPHQL_UNAVAILABLE_MARKERS)
 
 
+def _graphql_total_timeout_seconds() -> float:
+    """Return the configured total deadline for one ``_graphql_request`` call, in seconds.
+
+    Delegates to ``github_client.graphql_total_timeout_seconds`` rather than reading
+    ``.dh/config.yaml`` here directly: gh_client.py's own module boundary
+    (backlog_core/ARCHITECTURE.md's "Module: gh_client.py" entry) limits its imports to
+    ``.models``, ``.parsing``, and ``.github_client``, and timeout configuration is
+    ``github_client.py``'s stated responsibility, not this module's.
+    """
+    return graphql_total_timeout_seconds()
+
+
+_GRAPHQL_OPERATION_NAME_PATTERN = re.compile(r"(?:query|mutation)\s+(\w+)")
+
+
+def _graphql_operation_name(query: str) -> str:
+    """Extract the named operation from a GraphQL query/mutation string, for error messages.
+
+    Returns:
+        The operation name (e.g. ``"ListIssues"``), or ``"unnamed operation"`` when the query
+        string names none.
+    """
+    match = _GRAPHQL_OPERATION_NAME_PATTERN.search(query)
+    return match.group(1) if match else "unnamed operation"
+
+
+class _DeadlineExceeded(Exception):
+    """Raised only by ``_call_with_deadline`` itself when its thread does not finish in time.
+
+    A dedicated type rather than the builtin ``TimeoutError`` — ``asyncio.TimeoutError`` is a
+    ``TimeoutError`` alias since Python 3.11 and is one of the transport exceptions ``fn`` may
+    legitimately raise; catching the builtin type in ``_graphql_request`` would misclassify that
+    genuine transport failure as this wrapper's own deadline expiry.
+    """
+
+
+def _call_with_deadline(fn: Callable[[], tuple[dict[str, Any], dict[str, Any]]], timeout: float) -> tuple[dict, dict]:
+    """Run ``fn`` under a hard wall-clock deadline that ``requests``/``urllib3`` cannot enforce.
+
+    ``Github(timeout=...)`` only bounds the gap between two consecutive reads on the socket (see
+    ``make_github_client``) — a response that trickles bytes slowly enough to keep every
+    individual read under that bound can still block for arbitrarily long, because nothing
+    downstream of ``requests.Session.request`` ever measures the *total* elapsed time. Running
+    ``fn`` on a background thread and joining it with a real deadline is the only way to bound
+    that total duration.
+
+    The thread is started as a daemon and is not killed on timeout — Python has no safe way to
+    kill a running thread. On timeout it is abandoned; being a daemon, it does not block process
+    exit, and its eventual (possibly very late) result is discarded.
+
+    Args:
+        fn: Zero-argument callable to run — the caller closes over its own arguments.
+        timeout: Seconds to wait before giving up.
+
+    Returns:
+        Whatever ``fn`` returned, once it returns within the deadline.
+
+    Raises:
+        The exception ``fn`` raised, when it raised one within the deadline.
+        _DeadlineExceeded: When ``timeout`` seconds elapsed with no result. The caller is
+            expected to convert this into a typed, retryable error naming the operation and the
+            timeout.
+    """
+    outcome: list[tuple[dict, dict]] = []
+    failure: list[BaseException] = []
+
+    def _run() -> None:
+        try:
+            outcome.append(fn())
+        except BaseException as exc:  # ruff: ignore[blind-except] — re-raised on the caller's thread below
+            failure.append(exc)
+
+    thread = threading.Thread(target=_run, daemon=True, name="gh-graphql-request")
+    thread.start()
+    thread.join(timeout)
+    if thread.is_alive():
+        msg = f"total timeout of {timeout}s elapsed"
+        raise _DeadlineExceeded(msg)
+    if failure:
+        raise failure[0]
+    return outcome[0]
+
+
 def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, object] | None = None) -> dict[str, Any]:
     """Execute a raw GraphQL query using PyGithub's requester.
 
     Follows the same pattern as ``_resolve_labels_graphql``.  Raises
     ``BackendUnavailableError`` when the requester raises a provider or transport
     failure (including ``UnknownObjectException`` for NOT_FOUND / 404 responses),
-    and ``BacklogError`` when the GraphQL response contains errors or invalid data.
+    ``GitHubRequestTimeoutError`` when the call exceeds its total deadline (see
+    ``_call_with_deadline``), and ``BacklogError`` when the GraphQL response contains errors or
+    invalid data.
 
     Args:
         repo: Any object exposing ``.requester.graphql_query(...)`` -- a real
@@ -588,11 +681,16 @@ def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, obj
 
     Raises:
         GraphQLUnavailableError: When the environment refuses GraphQL outright.
+        GitHubRequestTimeoutError: When the call exceeds its total deadline.
         BackendUnavailableError: On GitHub API or transport failures.
         BacklogError: On answered GraphQL errors or invalid response shapes.
     """
+    timeout = _graphql_total_timeout_seconds()
     try:
-        _headers, response = repo.requester.graphql_query(query, variables or {})
+        _headers, response = _call_with_deadline(lambda: repo.requester.graphql_query(query, variables or {}), timeout)
+    except _DeadlineExceeded as exc:
+        msg = f"GraphQL request timed out after {timeout}s (operation: {_graphql_operation_name(query)})"
+        raise GitHubRequestTimeoutError(msg, timeout_seconds=timeout) from exc
     except GithubException as exc:
         if is_graphql_unavailable(exc):
             msg = f"GraphQL is unavailable in this environment: {_github_exception_message(exc)}"

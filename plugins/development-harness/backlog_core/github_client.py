@@ -216,10 +216,12 @@ if TYPE_CHECKING:
 __all__ = [
     "CA_BUNDLE_ENV_VARS",
     "DEFAULT_TIMEOUT",
+    "GRAPHQL_TOTAL_TIMEOUT_DEFAULT",
     "TOKEN_ENV_VARS",
     "MissingGitHubTokenError",
     "bundle_adds_new_anchor",
     "bundle_requires_relaxed_verification",
+    "graphql_total_timeout_seconds",
     "install_proxy_tls_support",
     "make_github_client",
     "resolve_ca_bundle",
@@ -228,6 +230,44 @@ __all__ = [
 
 DEFAULT_TIMEOUT: Final = 30
 """Seconds before a GitHub request gives up, when a caller states no preference."""
+
+_GRAPHQL_TOTAL_TIMEOUT_ENV_VAR: Final = "DH_GRAPHQL_TOTAL_TIMEOUT_SECONDS"
+
+GRAPHQL_TOTAL_TIMEOUT_DEFAULT: Final = 60
+"""Fallback total wall-clock deadline for one GraphQL request, in seconds (see
+``graphql_total_timeout_seconds``). Deliberately larger than ``DEFAULT_TIMEOUT`` (the per-read/
+connect timeout PyGithub enforces): a healthy request can legitimately need several individual
+reads to complete, and this deadline must not fire before a slow-but-fine response would anyway.
+"""
+
+
+def graphql_total_timeout_seconds() -> float:
+    """Return the configured total wall-clock deadline for one GraphQL request, in seconds.
+
+    ``Github(timeout=...)`` only bounds the gap between two consecutive reads on the socket, not
+    a request's total duration -- a response that trickles bytes slowly enough to keep every
+    individual read under that bound can still block indefinitely (see
+    ``gh_client._call_with_deadline``, which uses this value as its deadline). This supplies that
+    caller-imposed total deadline.
+
+    Configurable via the ``DH_GRAPHQL_TOTAL_TIMEOUT_SECONDS`` env var rather than
+    ``.dh/config.yaml``: this module's filesystem reads are limited to trust stores and
+    certifi's baseline bundle (see this module's ``backlog_core/ARCHITECTURE.md`` entry), and an
+    env var is already how it resolves every other user-facing setting here (``TOKEN_ENV_VARS``,
+    ``CA_BUNDLE_ENV_VARS``, ``GITHUB_API_URL``).
+
+    Returns:
+        The configured value, or ``GRAPHQL_TOTAL_TIMEOUT_DEFAULT`` when the env var is unset or
+        not a number.
+    """
+    raw = os.environ.get(_GRAPHQL_TOTAL_TIMEOUT_ENV_VAR)
+    if raw is None:
+        return GRAPHQL_TOTAL_TIMEOUT_DEFAULT
+    try:
+        return float(raw)
+    except ValueError:
+        return GRAPHQL_TOTAL_TIMEOUT_DEFAULT
+
 
 CA_BUNDLE_ENV_VARS: Final[Sequence[str]] = ("GITHUB_CA_BUNDLE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE", "SSL_CERT_FILE")
 """CA bundle variables in priority order. The first one naming a real file or an

@@ -693,6 +693,26 @@ class GraphQLUnavailableError(BackendUnavailableError):
         super().__init__(*args, retryable=False)
 
 
+class GitHubRequestTimeoutError(BackendUnavailableError):
+    """Raised when a GitHub request exceeds its total wall-clock deadline.
+
+    Distinct from the per-read/connect timeout ``requests``/``urllib3`` already enforce: that
+    timeout only bounds the gap between two consecutive bytes on the socket, so a response that
+    trickles data slowly enough to keep every individual read under it can still block for
+    arbitrarily long. This error marks the point where a caller-imposed *total* deadline gave up
+    waiting instead. Always retryable -- a slow response says nothing about whether the same
+    request would succeed faster on a later attempt.
+
+    Attributes:
+        timeout_seconds: The total deadline that elapsed.
+    """
+
+    def __init__(self, *args: object, timeout_seconds: float) -> None:
+        """Initialize with the usual exception args and the deadline that elapsed."""
+        super().__init__(*args, retryable=True)
+        self.timeout_seconds = timeout_seconds
+
+
 # Maps a capability flag name to the runtime_checkable Protocol it gates, for use in
 # UnsupportedBackendCapabilityError's protocol_mismatch message — "github_extras" alone
 # doesn't tell a reader which Protocol class the backend failed to satisfy.
