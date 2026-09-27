@@ -77,18 +77,12 @@ def test_branch_version_change_fails(tmp_path: Path) -> None:
 
 
 def test_renamed_manifest_version_change_fails(tmp_path: Path) -> None:
-    """Moving a plugin directory does not hide a version edit made in the same branch."""
+    """Moving a plugin directory does not hide a version edit to the same plugin."""
     repo = fixture(tmp_path)
-    manifest = {"name": "tool", "version": "1.0.0", "description": "d", "author": {"name": "a"}, "skills": []}
-    (repo / PLUGIN).write_text(json.dumps(manifest, indent=2) + "\n")
-    commit(repo, "multi-line manifest, as every real plugin.json is")
-    git(repo, "switch", "-q", "main")
-    git(repo, "merge", "-q", "--ff-only", "branch")
-    git(repo, "switch", "-q", "branch")
     git(repo, "mv", "plugins/tool", "plugins/renamed")
     renamed = "plugins/renamed/.claude-plugin/plugin.json"
-    (repo / renamed).write_text(json.dumps({**manifest, "name": "renamed", "version": "9.9.9"}, indent=2) + "\n")
-    commit(repo, "rename plugin and bump")
+    write(repo, renamed, {"name": "tool", "version": "9.9.9", "skills": []})
+    commit(repo, "move plugin and bump")
 
     result = check(repo)
 
@@ -96,22 +90,59 @@ def test_renamed_manifest_version_change_fails(tmp_path: Path) -> None:
     assert f"{renamed}: version '1.0.0' -> '9.9.9'" in result.stderr
 
 
-def test_rewritten_move_version_change_fails(tmp_path: Path) -> None:
-    """A move rewritten past git's rename threshold (a delete plus an add) is still paired and checked."""
+def test_rewritten_moves_version_change_fails(tmp_path: Path) -> None:
+    """Several moves rewritten past git's rename threshold are each matched by name and checked."""
     repo = fixture(tmp_path)
-    git(repo, "rm", "-q", PLUGIN)
-    moved = "plugins/renamed/.claude-plugin/plugin.json"
-    write(repo, moved, {"name": "renamed", "version": "9.9.9", "description": "rewritten", "agents": ["./a.md"]})
-    commit(repo, "move and rewrite")
-    assert set(git(repo, "diff", "--name-status", "-M", "main", "branch").splitlines()) == {
-        f"D\t{PLUGIN}",
-        f"A\t{moved}",
-    }
+    other = "plugins/other/.claude-plugin/plugin.json"
+    write(repo, other, {"name": "other", "version": "1.0.0"})
+    commit(repo, "second plugin")
+    git(repo, "switch", "-q", "main")
+    git(repo, "merge", "-q", "--ff-only", "branch")
+    git(repo, "switch", "-q", "branch")
+    moved = []
+    for old, plugin in ((PLUGIN, "tool"), (other, "other")):
+        git(repo, "rm", "-q", old)
+        path = f"plugins/{plugin}-moved/.claude-plugin/plugin.json"
+        write(repo, path, {"name": plugin, "version": "9.9.9", "description": "rewritten", "agents": ["./a.md"]})
+        moved.append(path)
+    commit(repo, "move and rewrite both")
+    status = git(repo, "diff", "--name-status", "-M", "main", "branch").splitlines()
+    assert sorted(line[0] for line in status) == ["A", "A", "D", "D"]
 
     result = check(repo)
 
     assert result.returncode == 1, result.stdout + result.stderr
-    assert f"{moved}: version '1.0.0' -> '9.9.9'" in result.stderr
+    for path in moved:
+        assert f"{path}: version '1.0.0' -> '9.9.9'" in result.stderr
+
+
+def test_unrelated_removal_and_addition_pass(tmp_path: Path) -> None:
+    """Removing one plugin and adding a different one of the same kind is not a version edit."""
+    repo = fixture(tmp_path)
+    write(repo, PLUGIN, {"name": "tool", "version": "3.2.1", "skills": []})
+    commit(repo, "tool at 3.2.1")
+    git(repo, "switch", "-q", "main")
+    git(repo, "merge", "-q", "--ff-only", "branch")
+    git(repo, "switch", "-q", "branch")
+    git(repo, "rm", "-q", PLUGIN)
+    write(repo, "plugins/fresh/.claude-plugin/plugin.json", {"name": "fresh", "version": "0.1.0"})
+    commit(repo, "replace tool with fresh")
+
+    result = check(repo)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_name_and_version_changed_together_is_a_new_plugin(tmp_path: Path) -> None:
+    """Known limit: identity is the manifest name, so renaming a plugin and bumping it in one PR passes."""
+    repo = fixture(tmp_path)
+    git(repo, "mv", "plugins/tool", "plugins/renamed")
+    write(repo, "plugins/renamed/.claude-plugin/plugin.json", {"name": "renamed", "version": "9.9.9", "skills": []})
+    commit(repo, "rename plugin and bump")
+
+    result = check(repo)
+
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_branch_behind_main_bump_and_new_plugin_pass(tmp_path: Path) -> None:

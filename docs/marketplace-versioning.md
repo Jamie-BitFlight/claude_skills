@@ -24,6 +24,12 @@ which fails when the branch changed any plugin or marketplace `version` field si
 `main`. `repair` would treat such an edit, including a downgrade from a conflict resolution, as that
 plugin's last bump and never correct it. Restore the listed fields to the values the check prints.
 
+The check identifies a manifest by its kind (for example `.claude-plugin/plugin.json`) and its
+`name`, not by its path. A plugin that is moved or rewritten is still compared with its
+merge-base version. A name that did not exist at the merge base counts as a new plugin, and its
+version is not checked. Known limit: changing a plugin's `name` and its version in the same PR is
+treated as adding a new plugin, so that version change is not reported.
+
 Branch commits no longer change a plugin's version, so the plugin cache keyed on that version does
 not refresh from branch work. To exercise a plugin from your working copy, load it directly:
 `claude --plugin-dir plugins/<name>`.
