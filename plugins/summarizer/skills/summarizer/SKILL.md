@@ -1,158 +1,72 @@
 ---
 name: summarizer
-description: Route summarization requests to the correct methodology and enforce fidelity rules. Activates on summarize, tl;dr, give me the highlights, what's important in this, break down this, what does this code do, explain this file, describe this image, read and summarize. Routes files, URLs, images, and multi-source content to type-specific strategies. Enforces anti-hallucination rules — read before summarizing, extract before abstracting, preserve counts, distinguish absence from nonexistence, prevent lossy re-summarization chains.
+description: Route requests to summarize files, URLs, images, inline text, or multiple sources. Select the requested format and preserve evidence, exact counts, uncertainty and source coverage through summarization, synthesis and agent-result relay.
 ---
 
 # Summarizer
 
-Route to the correct summarization methodology and enforce fidelity rules across all summarization operations.
+Read the [fidelity rules](./references/fidelity-rules.md) and
+[execution contract](./references/execution-contract.md). They govern all routes below.
 
-## Format Selection
+## Resolve the request
 
-When the user specifies an output format, load the corresponding template before delegating to a domain skill or agent. If no format is specified, default to `structured`.
+Identify the requested operation (summary, synthesis, comparison or relay), source scope, format
+and any explicit length/focus requirement. Preserve user-provided directory scope; do not silently
+replace a directory with one file. Enumerate readable sources and report omissions. Do not turn a
+summary request into implementation, external research or code execution without authorization.
 
-| User Signal | format_id | Template |
-|-------------|-----------|----------|
-| (no format specified) | `structured` | [structured.md](./templates/structured.md) |
-| "bullet points", "key points", "quick bullets" | `bullets` | [bullets.md](./templates/bullets.md) |
-| "tl;dr", "one-liner", "in a nutshell" | `tldr` | [tldr.md](./templates/tldr.md) |
-| "json", "machine-readable", "structured data" | `json` | [json.md](./templates/json.md) |
-| "table", "tabular", "grid format" | `table` | [table.md](./templates/table.md) |
-| "outline", "table of contents", "hierarchical" | `outline` | [outline.md](./templates/outline.md) |
+Select and read one template:
 
-**Loading instruction**: Read `$SKILL_DIR/templates/{format_id}.md` to obtain the schema, example, and fidelity constraints for the selected format. Pass the `format` parameter to the delegated agent or apply the template directly when summarizing inline.
+| Signal | Format | Template |
+| --- | --- | --- |
+| No format specified; full/detailed summary | structured | [structured](./templates/structured.md) |
+| Bullet points, key points | bullets | [bullets](./templates/bullets.md) |
+| TL;DR, one-liner, nutshell | tldr | [TL;DR](./templates/tldr.md) |
+| JSON, machine-readable data | json | [JSON](./templates/json.md) |
+| Table, tabular, grid | table | [table](./templates/table.md) |
+| Outline, hierarchy, table of contents | outline | [outline](./templates/outline.md) |
 
-## Decision Tree
+The selected format overrides legacy structured-only requirements in source skills. In particular,
+raw JSON has no Markdown envelope and TL;DR has no mandatory What Was NOT Found section.
 
-When the model needs to summarize content, follow this decision tree to select the correct approach:
+## Route sources
 
-```text
-INPUT RECEIVED
-  │
-  ├─ Is it a FILE path?
-  │   ├─ Yes → Load file-summarization skill
-  │   │         Run file_metrics.py to assess size
-  │   │         Select strategy based on size thresholds
-  │   └─ No ↓
-  │
-  ├─ Is it a URL?
-  │   ├─ Yes → Load url-summarization skill
-  │   │         Fetch content first, then summarize
-  │   └─ No ↓
-  │
-  ├─ Is it an IMAGE (path to .png, .jpg, .gif, .svg, .webp, screenshot)?
-  │   ├─ Yes → Load image-summarization skill
-  │   │         Read image with Read tool (multimodal)
-  │   └─ No ↓
-  │
-  ├─ Is it MULTIPLE sources (list of files, URLs, or mixed)?
-  │   ├─ Yes → Count sources
-  │   │   ├─ 3+ sources AND Teammate tool available?
-  │   │   │   ├─ Yes → Spawn summarizer team (see Team Coordination below)
-  │   │   │   │         Each teammate summarizes one source
-  │   │   │   │         Teammates cross-check findings via messaging
-  │   │   │   │         Leader synthesizes with multi-source-synthesis skill
-  │   │   │   └─ No ↓
-  │   │   └─ Summarize each source individually (subagents or sequential)
-  │   │             Then load multi-source-synthesis skill
-  │   │             Combine with deduplication and attribution
-  │   └─ No ↓
-  │
-  └─ Is it INLINE TEXT (pasted content, agent output, conversation excerpt)?
-      └─ Yes → Apply fidelity rules directly
-               Use extractive method: identify key passages first
-               Produce structured output
-```
+Resolve cardinality first, then transport (local, URL, inline) and actual media type. A local
+image is not ordinary text just because it has a file path; a URL can return an image or PDF.
+Inspect content/type evidence rather than relying solely on extensions.
 
-## Delegation Decision
+| Input | Method |
+| --- | --- |
+| Text/code/config/data/document file | [file-summarization](../file-summarization/SKILL.md) |
+| URL | [url-summarization](../url-summarization/SKILL.md); route acquired visual content to the image method |
+| Image or screenshot | [image-summarization](../image-summarization/SKILL.md) |
+| Inline text | Extract passages directly, then apply fidelity and the selected template |
+| Multiple sources | Apply the appropriate method to each; synthesize only when requested |
+| Existing agent result | [agent-result-relay](../agent-result-relay/SKILL.md) |
 
-When the summarization task is autonomous (user asks to summarize something and move on), delegate to a specialized agent:
+For requested integration, load [multi-source-synthesis](../multi-source-synthesis/SKILL.md).
+Otherwise keep individual summaries separately attributable. Record failed sources alongside the
+successful ones rather than dropping them from the input set.
 
-| Source Type | Agent | When to Use |
-|-------------|-------|-------------|
-| File(s) | @file-summarizer | Summarizing files without immediate follow-up questions |
-| URL(s) | @url-summarizer | Summarizing web content autonomously |
-| Image(s) | @image-summarizer | Describing visual content autonomously |
+## Delegate when useful
 
-When the summarization is part of the current conversation flow (user wants to discuss the content), apply the relevant skill methodology directly rather than delegating.
+Use `summarizer:file-summarizer`, `summarizer:url-summarizer`, or `summarizer:image-summarizer` for
+an autonomous task when the host supports delegation. For an interactive conversation, or when
+agents are unavailable, run the same source skill directly.
 
-**Orchestrator relay**: When receiving results from any summarizer agent, the orchestrator MUST follow the agent-result-relay skill to preserve counts, failure reasons, and structured output. Do not re-summarize agent summaries.
+Forward the format, source scope, focus, assigned output path and caller return contract. Supply
+the exact initial-task controls defined in the execution contract. Workers read their own skills
+and sources. Preserve context isolation instead of assuming parent-loaded instructions carry over.
 
-## Team Coordination (Multi-Source)
+For multiple independent sources, choose parallel extraction only when available capacity and
+source cost justify it. Use sequential execution when sources depend on earlier results. Interactive
+teams are appropriate only when workers need communication, not simply because there are three
+sources. If teams are used, collect explicit terminal results, retain each source's provenance,
+perform the full synthesis step and release workers. Worker agreement is not independent verification.
 
-When the Teammate tool is available and 3+ sources require summarization, the model SHOULD use agent teams instead of sequential subagents. If the Teammate tool is not available, fall back to subagent delegation.
+## Deliver
 
-### Workflow
-
-1. **Create team** - `Teammate({ operation: "spawnTeam", team_name: "summarize-{task-id}" })`
-2. **Create tasks** - One TaskCreate per source, all independent (no dependencies)
-3. **Spawn teammates** - One per source, using the appropriate agent type:
-
-```text
-Agent({
-  team_name: "summarize-{task-id}",
-  name: "source-1",
-  subagent_type: "file-summarizer",  // or url-summarizer, image-summarizer
-  prompt: "Summarize [source path]. Format: {format_id}. When done, send findings to team-lead via Teammate write. If you find information that contradicts another source, message that teammate directly.",
-  run_in_background: true
-})
-```
-
-4. **Collect results** - Leader receives findings via inbox messages
-5. **Synthesize** - Leader applies multi-source-synthesis skill to the collected findings
-6. **Cleanup** - Request shutdown for all teammates, then cleanup
-
-### When NOT to Use Teams
-
-- Fewer than 3 sources (subagent overhead is lower)
-- Sources have sequential dependencies (one source references another)
-- User is in a conversational flow and wants to discuss each source
-
-### Fidelity Rules Still Apply
-
-All fidelity rules apply identically to teammate output. The SubagentStop hook validates teammate summaries the same way it validates subagent summaries.
-
-## Fidelity Rules (Mandatory)
-
-These rules apply to ALL summarization regardless of source type. See [Fidelity Rules](./references/fidelity-rules.md) for full details.
-
-**Rule 1: Read Before Summarizing** - Read actual content. Never guess from filenames or paths.
-
-**Rule 2: Extract Before Abstracting** - Pull quotes/passages first, then summarize from extracts.
-
-**Rule 3: Preserve Counts and Specifics** - Keep exact numbers. "7 of 10" not "most."
-
-**Rule 4: Distinguish Absence from Nonexistence** - "Not mentioned in source" not "doesn't exist."
-
-**Rule 5: No Lossy Re-Summarization** - When relaying agent results, relay counts and references. Do not summarize the summary.
-
-**Rule 6: State Confidence Explicitly** - Every summary includes confidence level with rationale.
-
-**Rule 7: Structured Output Always** - Use the format defined in [Structured Summary](./templates/structured.md).
-
-## Output Format
-
-All summaries MUST use structured markdown with YAML frontmatter. See [Structured Summary](./templates/structured.md) for the complete specification.
-
-Required sections in every summary:
-
-1. **YAML frontmatter** - source_type, source_path, method, confidence, word counts
-2. **Summary** - the condensed content (BLUF style)
-3. **What Was Found** - items discovered with source references
-4. **What Was NOT Found** - items searched for but absent
-5. **Uncertain** - ambiguous items requiring interpretation
-6. **Sources** - full attribution with access dates
-
-## Anti-Patterns
-
-The model MUST NOT:
-
-- Summarize a file based on its name without reading it
-- Summarize a URL based on its domain without fetching it
-- Describe an image based on its filename without viewing it
-- Re-summarize a sub-agent's summary (relay instead)
-- Upgrade "not found" to "doesn't exist"
-- Drop counts ("7 of 10" → "most")
-- Omit the "What Was NOT Found" section
-- Present uncertain information as definitive
-- Summarize from excerpts (head/tail/grep) without disclosing the limitation
+Check support and coverage, render the selected template, then validate the final delivered result
+under the execution contract. A worker's validation does not cover a later rewritten synthesis.
+Preserve caller status envelopes separately from summary artifacts. Relay exact counts and failure
+reasons, name full result artifacts, and keep unverified behavior explicit.

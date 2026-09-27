@@ -198,17 +198,10 @@ jobs:
 
   # =============================================================================
   # Local hooks: manifest sync (via prek)
-  # Blocking — drift was resolved 2026-02-18.
-  #
-  # The prek step below only reflects *staged* changes (git diff --cached),
-  # which is always empty on a plain CI checkout — it cannot see the PR diff
-  # at all, so it always reports "no updates needed" regardless of what
-  # actually changed. That gap (issue #3021) is what let PR #3005 merge a
-  # plugin content change with zero plugin.json version bump. The second step
-  # below closes it with a real base-vs-head comparison. --head-ref is passed
-  # explicitly as the PR's own branch tip: on a pull_request trigger,
-  # actions/checkout's default HEAD is a synthetic base+PR merge commit, so
-  # diffing against bare "HEAD" would mix in base-only changes.
+  # Blocking. The hook runs `agent-marketplace-versioner reconcile --dry-run`:
+  # it fails when plugin.json component arrays or marketplace membership drift
+  # from plugins/, and never changes version fields. bump-marketplace.yml
+  # assigns patch versions after merge to main.
   # =============================================================================
   manifest-sync:
     needs: changes
@@ -230,12 +223,6 @@ jobs:
 
       - name: Exercise pinned remote versioner integration
         run: uv run --locked pytest -m integration tests/test_marketplace_versioner_integration.py --no-cov
-
-      - name: Require plugin.json version bump for every changed plugin
-        if: github.event_name == 'pull_request'
-        uses: Jamie-BitFlight/agent-marketplace-versioner@562755fd8f14ee76280130eb6db4612af72fdf45 # v0.1.2
-        with:
-          command: check
 
   # =============================================================================
   # File hygiene: trailing whitespace, line endings, etc.

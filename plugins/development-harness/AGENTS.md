@@ -9,7 +9,7 @@ Language-agnostic development process harness that orchestrates feature developm
 
 ## Plugin Identity
 
-**Name:** `dh` — the version is in `.claude-plugin/plugin.json`, bumped by a pre-commit hook.
+**Name:** `dh` — the version is in `.claude-plugin/plugin.json`, bumped by CI after merge to `main`.
 **Purpose:** Provide a reusable, language-independent development workflow based on the Stateless Agent Methodology (SAM) with ARL-derived human touchpoints and Voltron-style language plugin composition.
 
 **Design Principles:**
