@@ -390,7 +390,12 @@ Issue and comment reads and writes.
 The Issue body remains the human-owned work-item root. Reconciliation versions
 agent-rendered bodies through a provider-private head plus validated audit
 comments. These private records are not available through public content list,
-get, or put operations.
+get, or put operations. The head also carries every agent-owned structured
+field (plan, topic, source, and the rest of `models.HEAD_FIELDS`), so a fresh
+read with no local cache still recovers them; a field-only change advances
+the head without posting a new audit comment. `priority`, `type`, and `status`
+are additionally mirrored onto GitHub labels on every write, and a label a
+person edited by hand on GitHub wins over the head on the next read.
 
 Legacy Gist and index records are read-only migration sources. Their first
 successful update validates the legacy revision, preserves its owner reference,

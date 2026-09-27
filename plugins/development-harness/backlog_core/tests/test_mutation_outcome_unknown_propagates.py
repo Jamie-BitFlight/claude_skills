@@ -259,21 +259,14 @@ class TestReconcileReportsTheUnknownOutcomeNotQueued:
         mocker.patch.object(operations, "get_config", return_value=BacklogConfig(backend=backend))
         return backend
 
-    def test_reconcile_item_surfaces_the_error(self, backend: GitHubBackend) -> None:
+    def test_publish_surfaces_the_error(self, backend: GitHubBackend) -> None:
+        """``_publish`` is the one publish step for every mutating command, strikes included."""
         out = Output()
-        snapshot = ProviderSnapshot(items=[], sync_started_at="2026-09-27T00:00:00+00:00")
+        context = Mock()
+        context.snapshot_for.return_value = ProviderSnapshot(items=[], sync_started_at="2026-09-27T00:00:00+00:00")
 
         with pytest.raises(GitHubMutationOutcomeUnknownError):
-            operations._reconcile_item(BacklogItem(title="t", issue="#5"), out, repo="o/r", snapshot=snapshot)
-
-        assert not any("Queued" in message for message in out.to_dict().get("messages", []))
-
-    def test_reconcile_strike_surfaces_the_error(self, backend: GitHubBackend) -> None:
-        out = Output()
-        snapshot = ProviderSnapshot(items=[], sync_started_at="2026-09-27T00:00:00+00:00")
-
-        with pytest.raises(GitHubMutationOutcomeUnknownError):
-            operations._reconcile_strike(BacklogItem(title="t", issue="#5"), snapshot, out, repo="o/r")
+            operations._publish(BacklogItem(title="t", issue="#5"), context, None, out, repo="o/r")
 
         assert not any("Queued" in message for message in out.to_dict().get("messages", []))
 

@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 
 import backlog_core.backends.github_backend as github_backend_module
 import pytest
+from backlog_core import gh_client
 from backlog_core.backend_types import AddedCommentNode
 from backlog_core.backends._github_work_item_versions import render_work_item_comment, root_revision, work_item_head_ref
 from backlog_core.backends.github_backend import GitHubBackend, _GitHubDispatchPersistence
@@ -273,7 +274,9 @@ def test_github_sync_provider_publishes_body_change_as_audit_comment() -> None:
     backend._fetch_issues_graphql.assert_not_called()
 
 
-def test_reconcile_fetches_and_applies_patches_to_supplied_repository(tmp_path: Path) -> None:
+def test_reconcile_fetches_and_applies_patches_to_supplied_repository(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     contents = _InMemoryContents()
     backend = GitHubBackend(repo="default/repository", cache=FileCache(tmp_path), contents=contents)
     repository = MagicMock(full_name="supplied/repository")
@@ -289,6 +292,12 @@ def test_reconcile_fetches_and_applies_patches_to_supplied_repository(tmp_path: 
     backend._fetch_issues_graphql = MagicMock(return_value=[issue])
     backend._fetch_targeted_issues = MagicMock(return_value={"#1": issue})
     backend._add_comment_graphql = MagicMock(return_value=AddedCommentNode(id="comment-1", database_id=None))
+    # This test is about repo-scoping, not label mirroring (design D3/D4) --
+    # the bare MagicMock repository has no requester wired up for the real
+    # label-resolution GraphQL calls mirror_work_item_labels would otherwise
+    # make when the pending item's default item_type ("Feature") has no
+    # matching label yet.
+    monkeypatch.setattr(gh_client, "mirror_work_item_labels", lambda *args, **kwargs: None)
 
     result = backend.reconcile(ReconcileRequest(scope=ReconcileScope.INITIAL, repo="supplied/repository"))
 

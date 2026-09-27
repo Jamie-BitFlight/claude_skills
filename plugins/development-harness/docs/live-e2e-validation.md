@@ -94,7 +94,7 @@ provider contracts.
 | L1 creates a native issue | Native GitHub read confirms identity, submitted description and run ownership; returned title must contain the supplied title | STRENGTHEN |
 | L2 listing includes created work | Page size one and explicit continuation; independently recorded issue references must appear across the collection | STRENGTHEN |
 | L3 numeric view resolves the item | MCP view by native reference with live provenance and expected stored identity | KEEP |
-| L4 associates a plan | Separate writer-backend view confirms the association, not only the update echo; this does not execute the plan or claim cross-cache plan recovery | STRENGTHEN |
+| L4 associates a plan | A fresh-cache reader confirms the association, not only the update echo or a same-writer read that a cache could satisfy without the plan ever reaching GitHub's head record; this does not execute the plan or claim cross-cache plan recovery | STRENGTHEN |
 | L5 changes status | Native GitHub labels independently confirm in-progress state | STRENGTHEN |
 | L6/L7 full and incremental grooming | Native audit comments and a fresh-cache MCP reader retain both known content values; raw issue bodies remain human-owned | STRENGTHEN |
 | L8 sync publishes changes | Seed an unacknowledged mutation through the public backend queue, confirm it is absent remotely, then explicit sync and a fresh reader must observe it while preserving earlier grooming | STRENGTHEN |

@@ -158,7 +158,16 @@ async def test_live_crud_persists_changes_and_preserves_other_sections(live_envi
                 # successful call -- which calls.call already enforces. The view below is
                 # the actual oracle for whether the association persisted.
                 await calls.call("backlog_update", {"selector": title, "plan": plan})
-                associated = await calls.call("backlog_view", {"selector": title, "summary": False})
+                # A same-writer read can be served from the writer's own cache
+                # and would prove nothing about the head record actually
+                # carrying the plan on GitHub -- see item-fields-in-head-record
+                # design doc §6 ("Recommend strengthening L4"), and passing run
+                # 36209924369, which returned status_source="cache" from a
+                # 0.0076s view here before this fix. A fresh reader has no
+                # cache to fall back on, so this can only pass by reading the
+                # plan back off the live head record.
+                with env.fresh_reader():
+                    associated = await calls.call("backlog_view", {"selector": f"#{primary}", "summary": False})
                 assert associated["plan"] == plan, associated
                 updated = await calls.call("backlog_update", {"selector": title, "status": "in-progress"})
                 assert updated["status"] == "in-progress", updated

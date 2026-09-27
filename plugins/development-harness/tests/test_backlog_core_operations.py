@@ -1102,10 +1102,13 @@ class TestCheckForDuplicatesFreshness:
         assert "Completely Unrelated New Feature Proposal" in stored_titles
 
     def test_duplicate_check_does_not_reconcile_before_creation(self, mocker: MockerFixture) -> None:
-        """Duplicate truth comes from the live read, not a reconciliation result.
+        """Duplicate truth comes from the live read; the one publish call creates no second reconcile.
 
-        The only reconcile allowed is the scan's own write-through (D7): TARGETED over
-        the rows it already read, from its own snapshot, pushing no local intent.
+        Tests: design D4 -- add_item publishes its own new issue exactly once
+        (Q2), through the same _publish step every other mutating command
+        uses. Any other reconcile is the scan's own write-through (#3969 D7):
+        TARGETED over the rows it already read, from its own snapshot,
+        pushing no local intent -- never a duplicate-check-driven reconcile.
         """
         from backlog_core.backend_protocol import get_config
 
@@ -1124,7 +1127,12 @@ class TestCheckForDuplicatesFreshness:
         )
 
         assert result["file_path"]
+        publishes = [call for call in reconcile.call_args_list if call.args[0].references == ["#42"]]
+        assert len(publishes) == 1, reconcile.call_args_list
+        assert publishes[0].args[0].scope == ReconcileScope.TARGETED
         for call in reconcile.call_args_list:
+            if call in publishes:
+                continue
             request = call.args[0]
             assert request.scope is ReconcileScope.TARGETED, request
             assert request.apply_local_patches is False, request
@@ -1476,14 +1484,16 @@ class TestApplyIssueStatusLabelsBeads:
         mock_apply.assert_called_once_with(item, "", output=out)
         assert result.get("status") == "in-progress"
 
-    def test_github_backend_status_in_progress_unchanged(self, mocker: MockerFixture) -> None:
-        """Non-beads backend: status="in-progress" path is unaffected by the fix.
+    def test_github_backend_status_in_progress_writes_local_metadata(self, mocker: MockerFixture) -> None:
+        """Non-beads (integer-issue) backend: status="in-progress" writes local metadata only.
 
-        Tests: Regression guard — GitHub path must still call apply_status_in_progress
-               and must NOT call update_item_metadata for status changes.
+        Tests: design D3/D4 — the caller's end-of-command _publish mirrors this
+               onto the status:in-progress label; _apply_issue_status_labels
+               itself no longer calls the GitHub API directly for an
+               integer-issue item, only for the string-ID (beads) claim path.
         How: Keep default GitHub backend; inject item with issue="#7"; assert
-             apply_status_in_progress is called and update_item_metadata is not.
-        Why: The beads-specific code path must not affect existing GitHub behaviour.
+             update_item_metadata is called and apply_status_in_progress is not.
+        Why: The beads-specific claim call must not leak into the GitHub path.
         """
         from backlog_core.operations import _apply_issue_status_labels
 
@@ -1501,16 +1511,20 @@ class TestApplyIssueStatusLabelsBeads:
 
         _apply_issue_status_labels(item, "in-progress", False, "", result, out)
 
-        mock_apply.assert_called_once_with(item, "", output=out)
-        mock_update.assert_not_called()
+        mock_apply.assert_not_called()
+        mock_update.assert_called_once_with(
+            item.reference, {"metadata": {"status": "in-progress"}}, output=out, base_item=item, repo=""
+        )
         assert result.get("status") == "in-progress"
 
-    def test_status_blocked_applies_github_label_instead_of_silent_noop(self, mocker: MockerFixture) -> None:
-        """status="blocked" on a GitHub-backend item calls apply_status_blocked, not a no-op.
+    def test_status_blocked_writes_local_metadata_instead_of_silent_noop(self, mocker: MockerFixture) -> None:
+        """status="blocked" on a GitHub-backend item writes local metadata, not a no-op.
 
         Tests: regression for #2905 — only "in-progress" had a dedicated branch;
                every other status value (including "blocked") fell through with
-               no action and no error.
+               no action and no error. Design D3/D4: the label mutation itself
+               now happens through the caller's end-of-command _publish, not a
+               direct apply_status_blocked call from this function.
         Why: work-backlog-item's RT-ICA gate calls
              backlog_update(selector=item_ref, status='blocked') expecting it to
              actually mark the issue blocked (via a status:blocked label) —
@@ -1533,8 +1547,10 @@ class TestApplyIssueStatusLabelsBeads:
 
         _apply_issue_status_labels(item, "blocked", False, "", result, out)
 
-        mock_blocked.assert_called_once_with(item, "", output=out)
-        mock_update.assert_not_called()
+        mock_blocked.assert_not_called()
+        mock_update.assert_called_once_with(
+            item.reference, {"metadata": {"status": "blocked"}}, output=out, base_item=item, repo=""
+        )
         assert result.get("status") == "blocked"
 
     def test_status_blocked_beads_writes_local_metadata(self, mocker: MockerFixture) -> None:
@@ -1697,32 +1713,13 @@ class TestApplyIssueStatusLabelsBeads:
         assert result.get("error") == "Cannot set status='blocked': item has no issue reference"
         assert result.get("status") is None
 
-    def test_status_blocked_github_exception_reports_error_not_uncaught(self, mocker: MockerFixture) -> None:
-        """A GithubException raised while applying the blocked label surfaces as result["error"].
-
-        Tests: regression — apply_status_blocked was called with no exception guard,
-               unlike the sibling apply_status_verified call site, so a transient
-               GitHub API failure would crash the whole backlog_update call instead
-               of degrading gracefully like every other status mutation in this file.
-        """
-        from backlog_core.operations import _apply_issue_status_labels
-
-        mocker.patch("backlog_core.operations.apply_status_blocked", side_effect=GithubException(500, "boom", None))
-
-        item = BacklogItem(
-            title="Flaky GitHub Task",
-            section="P1",
-            skip=False,
-            metadata=BacklogItemMetadata(source="test", added="2026-01-01", priority="P1", status="open", issue="#9"),
-            reference="#9",
-        )
-        result: dict[str, str | int | bool | list[str]] = {"title": item.title}
-        out = Output()
-
-        _apply_issue_status_labels(item, "blocked", False, "", result, out)
-
-        assert "error" in result
-        assert result.get("status") is None
+    # test_status_blocked_github_exception_reports_error_not_uncaught removed:
+    # its premise (_apply_issue_status_labels calling apply_status_blocked
+    # directly, unguarded) no longer holds under design D3/D4 -- the label
+    # mutation moved into apply_patches's gh_client.mirror_work_item_labels
+    # call, which is already wrapped in its own GithubException/BacklogError
+    # handling there (see backlog_core/tests/test_item_fields_head_record.py
+    # card 5 for the equivalent coverage of a label-write failure).
 
 
 # ---------------------------------------------------------------------------
@@ -3734,17 +3731,21 @@ class TestGroomItemMarkGroomed:
         assert '"status":"groomed"' in body
 
     def test_groom_item_mark_groomed_manages_github_labels(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """mark_groomed=True delegates GitHub label update to apply_status_groomed.
+        """mark_groomed=True publishes the status change for a linked issue.
 
-        Tests: groom_item mark_groomed calls apply_status_groomed when item has an issue.
-        How: Write item with issue #123; mock apply_status_groomed; call with mark_groomed=True.
-        Why: GitHub label transition must be routed to the dedicated function, not implemented inline.
+        Tests: groom_item mark_groomed reconciles the item's own status write
+               through the caller's end-of-command _publish (design D4) --
+               the GitHub label mutation itself now happens inside
+               apply_patches's label mirror, not a direct apply_status_groomed
+               call from this function.
+        How: Write item with issue #123; call with mark_groomed=True; assert a
+             targeted reconcile ran for #123 and the stored status advanced.
         """
         import backlog_core.models as m
-        from backlog_core.models import Output
+        from backlog_core.backend_protocol import get_config
+        from backlog_core.models import Output, ReconcileScope
 
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
-        mock_apply = mocker.patch("backlog_core.operations.apply_status_groomed")
 
         backlog_dir = m.get_backlog_dir()
         # Use .yaml file so parse_backlog() re-finds the item after save_item converts it
@@ -3752,6 +3753,7 @@ class TestGroomItemMarkGroomed:
             backlog_dir, title="Mark Groomed Github", priority="P1", topic="mark-groomed-github", issue="#123"
         )
         _seed_provider_items([_stored_item(filepath)])
+        backend = cast("_ProviderMemoryBackend", get_config().backend)
 
         out = Output()
         result = ops.groom_item(
@@ -3763,12 +3765,18 @@ class TestGroomItemMarkGroomed:
         )
 
         assert "error" not in result
-        mock_apply.assert_called_once()
-        called_item = mock_apply.call_args.args[0]
-        assert called_item.issue == "#123"
+        assert result.get("mark_groomed_applied") is True
+        targeted = [r for r in backend.reconcile_requests if r.scope == ReconcileScope.TARGETED]
+        assert any(r.references == ["#123"] for r in targeted)
+        # The provider-observed item (built from _seed_provider_items, reference
+        # "#123") is a distinct local record from the file-backed one _write_item_yaml
+        # created (reference derived from filepath) -- update_item_metadata writes
+        # the status onto the former, which is what _apply_issue_status_labels and
+        # _publish both key on, so that is the record this asserts against.
+        assert _stored_item("#123").metadata.status == "groomed"
 
     def test_groom_item_mark_groomed_false_no_status_change(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """mark_groomed=False (default) does not advance status or call apply_status_groomed.
+        """mark_groomed=False (default) does not advance status.
 
         Tests: groom_item mark_groomed=False preserves existing behavior unchanged.
         How: Write item with issue; call groom_item with mark_groomed=False.
@@ -3778,7 +3786,6 @@ class TestGroomItemMarkGroomed:
         from backlog_core.models import Output
 
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
-        mock_apply = mocker.patch("backlog_core.operations.apply_status_groomed")
 
         backlog_dir = m.get_backlog_dir()
         filepath = _write_item(
@@ -3796,7 +3803,6 @@ class TestGroomItemMarkGroomed:
         )
 
         assert "error" not in result
-        mock_apply.assert_not_called()
         assert result.get("mark_groomed_applied") is not True
         # save_item auto-migrates .md -> .yaml; read from the migrated path.
         body = _render_item(filepath)
@@ -3813,7 +3819,6 @@ class TestGroomItemMarkGroomed:
         from backlog_core.models import Output
 
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
-        mock_apply = mocker.patch("backlog_core.operations.apply_status_groomed")
 
         backlog_dir = m.get_backlog_dir()
         # Use .yaml file so parse_backlog() re-finds the item after save_item converts it
@@ -3832,7 +3837,10 @@ class TestGroomItemMarkGroomed:
 
         assert "error" not in result
         assert result.get("mark_groomed_applied") is True
-        mock_apply.assert_called_once()
+        # See test_groom_item_mark_groomed_manages_github_labels: the write
+        # lands on the provider-observed record (reference "#789"), not the
+        # file-backed one _write_item_yaml created.
+        assert _stored_item("#789").metadata.status == "groomed"
 
     def test_groom_item_mark_groomed_skipped_on_error(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """mark_groomed is not applied when update_item returns an error.
@@ -3846,7 +3854,6 @@ class TestGroomItemMarkGroomed:
 
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
         mocker.patch("backlog_core.operations.update_item", return_value={"error": "some error"})
-        mock_apply = mocker.patch("backlog_core.operations.apply_status_groomed")
 
         backlog_dir = m.get_backlog_dir()
         filepath = _write_item(
@@ -3864,7 +3871,6 @@ class TestGroomItemMarkGroomed:
         )
 
         assert "error" in result
-        mock_apply.assert_not_called()
         assert result.get("mark_groomed_applied") is not True
         body = _render_item(filepath)
         assert "status: groomed" not in body

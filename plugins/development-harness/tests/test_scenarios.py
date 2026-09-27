@@ -219,7 +219,16 @@ class TestWorkBacklogItem:
         assert isinstance(result["errors"], list)
 
     async def test_update_status_in_progress(self, backlog_dir, mock_github, write_test_item):
-        """Scenario 9: backlog_update with status=in-progress calls apply_status_in_progress."""
+        """Scenario 9: backlog_update with status=in-progress writes the status locally.
+
+        Design D3/D4: the status:in-progress label mutation itself now
+        happens through the caller's end-of-command _publish (a
+        reconcile -> apply_patches label mirror), not a direct
+        apply_status_in_progress call -- so that mock is no longer the
+        right place to assert this, only the local metadata write is.
+        """
+        from backlog_core.backend_protocol import get_config
+
         write_test_item("Status Update Test", issue="#55")
         _seed_provider_items("Status Update Test")
         mock_github["try_get_github"].return_value = MagicMock()
@@ -228,7 +237,8 @@ class TestWorkBacklogItem:
 
         assert result["title"] == "Status Update Test"
         assert result["status"] == "in-progress"
-        mock_github["apply_status_in_progress"].assert_called_once()
+        mock_github["apply_status_in_progress"].assert_not_called()
+        assert get_config().backend.get_work_item("#55").metadata.status == "in-progress"
         assert isinstance(result["messages"], list)
         assert isinstance(result["warnings"], list)
         assert isinstance(result["errors"], list)
@@ -1431,11 +1441,15 @@ class TestResolveVerifiedGate:
         assert update_result["plan"] == "plan/test-plan.md"
 
     async def test_resolve_passes_with_verified_label(self, backlog_dir, mock_github, write_test_item):
-        """Resolve proceeds when status:verified label is present on the issue.
+        """Resolve proceeds when the verified status is recorded on the item.
 
-        After backlog_update(verified=True) applies the label, backlog_view
-        returns it in labels, and the resolve call succeeds.
+        After backlog_update(verified=True) writes the status locally, and
+        the resolve call succeeds. Design D3/D4: the status:verified label
+        mutation itself now happens through the caller's end-of-command
+        _publish, not a direct apply_status_verified call.
         """
+        from backlog_core.backend_protocol import get_config
+
         write_test_item("Verified Pass Test", issue="#201")
         _seed_provider_items("Verified Pass Test")
         mock_github["view_enrich_from_github"].return_value = False
@@ -1447,7 +1461,8 @@ class TestResolveVerifiedGate:
         update_result = await _call("backlog_update", {"selector": "#201", "verified": True})
 
         assert update_result.get("verified") is True
-        mock_github["apply_status_verified"].assert_called_once()
+        mock_github["apply_status_verified"].assert_not_called()
+        assert get_config().backend.get_work_item("#201").metadata.status == "verified"
 
         # Resolve succeeds
         resolve_result = await _call("backlog_resolve", {"selector": "Verified Pass Test", "summary": "Work completed"})
@@ -1531,10 +1546,16 @@ class TestResolveVerifiedGate:
         # Step 1: Attach plan (simulating /add-new-feature output)
         await _call("backlog_update", {"selector": "#205", "plan": "plan/pipeline-test.md"})
 
-        # Step 2: Apply verified label (simulating /complete-implementation)
+        # Step 2: Apply verified label (simulating /complete-implementation).
+        # Design D3/D4: the status:verified label mutation itself now happens
+        # through the caller's end-of-command _publish, not a direct
+        # apply_status_verified call -- assert the local status write instead.
+        from backlog_core.backend_protocol import get_config
+
         update_result = await _call("backlog_update", {"selector": "#205", "verified": True})
         assert update_result.get("verified") is True
-        mock_github["apply_status_verified"].assert_called_once()
+        mock_github["apply_status_verified"].assert_not_called()
+        assert get_config().backend.get_work_item("#205").metadata.status == "verified"
 
         # Step 3: Resolve (simulating /work-backlog-item resolve)
         resolve_result = await _call(

@@ -335,6 +335,18 @@ class WorkItemDecisionContext:
         started_at = self._targeted[references[0]].sync_started_at if references else ""
         return ProviderSnapshot(items=items, sync_started_at=started_at)
 
+    def invalidate_snapshot(self, reference: str) -> None:
+        """Drop a memoized targeted snapshot for *reference* so the next read is live.
+
+        Called by ``_publish`` (operations.py) after a reconcile advances a
+        reference's head, so a second ``_publish`` call later in the same
+        command (e.g. ``groom_item``'s mark_groomed write, after
+        ``update_item``'s content write already published once) observes the
+        just-written state rather than the pre-write snapshot it memoized --
+        see design D4. A no-op when *reference* was never memoized.
+        """
+        self._targeted.pop(reference, None)
+
     @property
     def _is_github(self) -> bool:
         return bool(getattr(self.backend, "supports_github_extras", False))

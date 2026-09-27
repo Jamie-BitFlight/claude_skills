@@ -195,30 +195,39 @@ class TestHandleBatchGroomedGithubSync:
         assert backend.requests == []
 
     def test_reconciles_batch_once_when_issue_set(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        backend = _use_sync_backend()
-        filepath = _write_item_file(tmp_path, title="Github Sync Item", topic="github-sync-item", issue="#42")
-        item = BacklogItem(title="Github Sync Item", reference=str(filepath), issue="#42", added="2026-01-01")
+        """update_item(sections=...) publishes the batch write exactly once (design D4).
 
-        ops._handle_batch_groomed(item, {"Plan": "Plan text.", "Research": "Research text."}, repo="owner/repo")
+        _handle_batch_groomed itself no longer reconciles inline -- the
+        caller (update_item) publishes once at the end of the command, after
+        every section in the batch has already been written locally. This
+        test now drives that public entry point instead of the private
+        helper directly.
+        """
+        backend = _use_sync_backend()
+        _write_item_file(tmp_path, title="Github Sync Item", topic="github-sync-item", issue="#42")
+
+        ops.update_item(
+            selector="Github Sync Item",
+            sections={"Plan": "Plan text.", "Research": "Research text."},
+            repo="owner/repo",
+        )
 
         assert len(backend.requests) == 1
 
     def test_reconcile_receives_linked_issue_reference(self, tmp_path: Path, mocker: MockerFixture) -> None:
         backend = _use_sync_backend()
-        filepath = _write_item_file(tmp_path, title="Arg Check Item", topic="arg-check-item", issue="#77")
-        item = BacklogItem(title="Arg Check Item", reference=str(filepath), issue="#77", added="2026-01-01")
+        _write_item_file(tmp_path, title="Arg Check Item", topic="arg-check-item", issue="#77")
 
-        ops._handle_batch_groomed(item, {"Decision": "The decision is X."}, repo="owner/repo")
+        ops.update_item(selector="Arg Check Item", sections={"Decision": "The decision is X."}, repo="owner/repo")
 
         assert backend.requests == [ReconcileRequest(scope="targeted", repo="owner/repo", references=["#77"])]
 
     def test_all_local_writes_precede_reconciliation(self, tmp_path: Path, mocker: MockerFixture) -> None:
         backend = _use_sync_backend()
-        filepath = _write_item_file(tmp_path, title="Ordering Test", topic="ordering-test", issue="#10")
+        _write_item_file(tmp_path, title="Ordering Test", topic="ordering-test", issue="#10")
         backend.events.clear()
-        item = BacklogItem(title="Ordering Test", reference=str(filepath), issue="#10", added="2026-01-01")
 
-        ops._handle_batch_groomed(item, {"Plan": "P.", "Research": "R."}, repo="owner/repo")
+        ops.update_item(selector="Ordering Test", sections={"Plan": "P.", "Research": "R."}, repo="owner/repo")
 
         assert backend.events == ["put", "reconcile"]
 

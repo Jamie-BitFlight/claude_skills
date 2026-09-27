@@ -897,29 +897,15 @@ def _rename_item_title(
     return True
 
 
-def _update_item_description(
-    item: BacklogItem,
-    description: str,
-    repo: str = "",
-    output: Output | None = None,
-    *,
-    snapshot: ProviderSnapshot | None = None,
-) -> bool:
-    """Update the backend-owned item description and reconcile immediately.
-
-    Mirrors grooming's and striking's immediate-reconcile behavior. Without
-    the ``_reconcile_item`` call below, the description write was only queued
-    to the offline mutation cache and became visible at whatever unbounded
-    delay some *unrelated* later reconcile happened to run at (#3458) -- on a
-    GitHub-backed checkout, that could mean never, since nothing else in this
-    write path triggers one. See ``_reconcile_item`` for what "reconcile"
-    durably records (a GitHub audit-comment, not the issue's raw ``body``
-    field).
+def _update_item_description(item: BacklogItem, description: str, repo: str = "", output: Output | None = None) -> bool:
+    """Update the backend-owned item description.
 
     ``item`` is updated in place and persisted as the command's selected
     mutation base. This preserves the live provider fields without reloading
     a stale or absent cache record, and keeps subsequent updates in the same
-    command cumulative.
+    command cumulative. The caller (``update_item``) publishes the mutation
+    once, at the end of the command (design D4) -- this no longer reconciles
+    inline.
 
     Returns:
         True if updated, False if no backend reference on item.
@@ -929,7 +915,6 @@ def _update_item_description(
     if not reference:
         return False
     update_item_metadata(reference, {"description": description}, output=out, base_item=item, repo=repo)
-    _reconcile_item(item, out, repo=repo, snapshot=snapshot)
     return True
 
 
@@ -1359,32 +1344,48 @@ def _check_ac_overlap(item: BacklogItem, output: Output) -> None:
         output.warn(_AC_OVERLAP_MSG)
 
 
-def _reconcile_item(
-    item: BacklogItem, output: Output, *, repo: str = "", snapshot: ProviderSnapshot | None = None
+def _publish(
+    item: BacklogItem,
+    context: WorkItemDecisionContext | None,
+    target: DecisionTarget | None,
+    output: Output,
+    repo: str = "",
 ) -> None:
-    """Trigger an immediate targeted reconcile for one item's queued mutation.
+    """Publish one item's queued mutation immediately -- the sole publish step (design D4).
 
-    Shared by the write paths that must not leave their mutation sitting in
-    the offline queue at an unbounded delay (#3458): single/batch grooming and
-    description updates call this right after persisting the mutation.
-    ``strike_entry`` runs the same targeted reconcile inline (it reports a
-    strike-specific message); ``_rename_item_title`` does not reconcile at all
-    -- it edits the GitHub issue title directly over GraphQL. A GitHub-backed
-    reconcile posts the audit-comment record backing ``backlog_view``'s
-    rendered body/description immediately
-    (see ``backlog_core/ARCHITECTURE.md`` "GitHub writable records") -- it
-    never edits the issue's raw ``body`` field, which stays human-owned by
-    design, so a caller comparing against ``gh issue view --json body``
-    still sees the pre-update text even after a successful reconcile.
+    Every mutating command calls this exactly once, at the end, replacing the
+    former per-call-site ``_reconcile_item``/``_reconcile_strike`` (which some
+    commands called from an inner helper mid-command, and others never called
+    at all -- see the design doc's root-cause section). Reusing the command's
+    own live observation, rather than reconciling twice against the same
+    pre-write snapshot, avoids the optimistic-concurrency conflict a second
+    reconcile would hit against an ``expected_revision`` the first reconcile
+    already moved past.
+
+    A GitHub-backed publish posts the audit-comment record and/or advances
+    the head record backing ``backlog_view``'s rendered body/description and
+    structured fields immediately (see ``backlog_core/ARCHITECTURE.md``
+    "GitHub writable records") -- it never edits the issue's raw ``body``
+    field, which stays human-owned by design, so a caller comparing against
+    ``gh issue view --json body`` still sees the pre-update text even after a
+    successful publish.
 
     Args:
-        item: The work item whose queued mutation should be reconciled. Only
+        item: The work item whose queued mutation should be published. Only
             ``item.issue`` is read; the mutation content itself was already
             persisted by the caller before this call.
+        context: The command's ``WorkItemDecisionContext``, when one was
+            obtained -- used to fetch a compatible snapshot when *target*
+            does not already carry one for ``item.issue``, and to invalidate
+            the memoized snapshot afterward so a second ``_publish`` call
+            later in the same command (``groom_item``'s mark_groomed write)
+            observes this write instead of the pre-write snapshot.
+        target: The command's ``DecisionTarget``, when one was obtained --
+            ``None`` (e.g. ``add_item``, which selects no target for a
+            brand-new item) is treated as live.
         output: Output aggregator that receives a reconciled/queued/
             unsupported status message.
         repo: Repository slug used for the command's provider observation.
-        snapshot: Compatible live decision snapshot, when one was obtained.
 
     Raises:
         CacheStateCorruptError: When the local cache state file is corrupted
@@ -1397,7 +1398,29 @@ def _reconcile_item(
     if not isinstance(backend, SyncProvider):
         output.info("Active backend does not support reconciliation.")
         return
-    if snapshot is None and getattr(backend, "supports_github_extras", False):
+    if target is not None and not _has_live_provider_target(target):
+        output.info(f"Queued {item.issue} for provider reconciliation.")
+        return
+    is_github = getattr(backend, "supports_github_extras", False)
+    # Prefer the context's own memoized/live snapshot over target.provider_snapshot:
+    # on a command's first _publish call the two are the same underlying data
+    # (target.provider_snapshot was itself populated from the context), but a
+    # second _publish call in the same command (groom_item's mark_groomed write,
+    # after update_item's content write already published once) needs the
+    # context's copy specifically, since invalidate_snapshot() below only ever
+    # updates the context, never a DecisionTarget the caller is still holding.
+    snapshot: ProviderSnapshot | None = None
+    if context is not None and is_github:
+        try:
+            snapshot = context.snapshot_for(
+                ReconcileRequest(scope=ReconcileScope.TARGETED, repo=repo, references=[item.issue])
+            )
+        except BacklogError:
+            snapshot = None
+    if snapshot is None and target is not None and target.provider_snapshot is not None:
+        holds_reference = any(provider_item.reference == item.issue for provider_item in target.provider_snapshot.items)
+        snapshot = target.provider_snapshot if holds_reference else None
+    if snapshot is None and is_github:
         output.info(f"Queued {item.issue} for provider reconciliation.")
         return
     try:
@@ -1417,6 +1440,8 @@ def _reconcile_item(
         # upstream, so degrade to "queued" rather than crash the caller.
         output.info(f"Queued {item.issue} for provider reconciliation.")
         return
+    if context is not None:
+        context.invalidate_snapshot(item.issue)
     output.info(
         f"Reconciled {item.issue}: {result.provider_patches} provider patch(es), "
         f"{result.pending_mutations} pending mutation(s), {result.rejected_mutations} rejected mutation(s), "
@@ -1435,9 +1460,12 @@ def _handle_update_groomed(
     replace_section: bool = False,
     reason: str | None = None,
     append: bool = False,
-    snapshot: ProviderSnapshot | None = None,
 ) -> None:
-    """Handle groomed content through the configured backend and its sync capability."""
+    """Handle groomed content through the configured backend and its sync capability.
+
+    The caller (``update_item``) publishes the mutation once, at the end of
+    the command (design D4) -- this no longer reconciles inline.
+    """
     out = output or Output()
     added_date = item.added if hasattr(item, "added") and item.added else "0000-00-00"
 
@@ -1464,28 +1492,23 @@ def _handle_update_groomed(
         repo=repo,
     )
     out.info(f"Updated {item.reference} with groomed content")
-    _reconcile_item(item, out, repo=repo, snapshot=snapshot)
 
 
 def _handle_batch_groomed(
-    item: BacklogItem,
-    sections: dict[str, str],
-    repo: str,
-    output: Output | None = None,
-    *,
-    snapshot: ProviderSnapshot | None = None,
+    item: BacklogItem, sections: dict[str, str], repo: str, output: Output | None = None
 ) -> list[str]:
-    """Write multiple groomed sections, then reconcile the linked item once.
+    """Write multiple groomed sections.
 
     Args:
         item: BacklogItem with a stable backend reference.
         sections: Mapping of section name to raw content (entry-block wrapping applied automatically).
         repo: GitHub repo slug (e.g. "owner/repo").
         output: Optional Output aggregator.
-        snapshot: Compatible live decision snapshot, when one was obtained.
 
     Returns:
-        List of section names that were written locally.
+        List of section names that were written locally. The caller
+        (``update_item``) publishes the mutation once, at the end of the
+        command (design D4) -- this no longer reconciles inline.
 
     Raises:
         BacklogError: If item has no file_path.
@@ -1528,8 +1551,6 @@ def _handle_batch_groomed(
     # (#3015 Greptile review finding).
     if SectionKey.ACCEPTANCE_CRITERIA.value in written:
         _check_ac_overlap(item, out)
-
-    _reconcile_item(batch_item, out, repo=repo, snapshot=snapshot)
 
     return written
 
@@ -2010,6 +2031,11 @@ def add_item(
         out.info(f"  Issue: {issue_ref}")
     out.info(f"Next steps: /work-backlog-item groom {stored_title}  /work-backlog-item work {stored_title}")
 
+    # No DecisionTarget exists for a brand-new item -- context.snapshot_for
+    # fetches it fresh rather than slicing the pre-creation duplicate-check
+    # snapshot context.all() took above (design D4).
+    _publish(item_to_write, context, None, out, repo)
+
     result: dict[str, str | int | bool | list[str]] = {
         "title": stored_title,
         "priority": priority,
@@ -2052,7 +2078,7 @@ def refresh_local_cache_from_github(
     Returns:
         Dict with count of refreshed (open) issues, count of reconciled
         (closed) issues, and the offline queue's pending/rejected mutation
-        counts (see ``_reconcile_item`` for the same counts on the
+        counts (see ``_publish`` for the same counts on the
         per-item grooming path).
     """
     out = output or Output()
@@ -3025,11 +3051,9 @@ def link_followup(
         ItemNotFoundError: When *selector* does not match any backlog item.
     """
     out = output or Output()
-    item = (
-        _decision_context(repo=repo, allow_cached=allow_cached, output=out)
-        .select(selector, purpose="mutation")
-        .mutation_base
-    )
+    context = _decision_context(repo=repo, allow_cached=allow_cached, output=out)
+    target = context.select(selector, purpose="mutation")
+    item = target.mutation_base
     if not item:
         raise ItemNotFoundError(selector)
     reference = item.reference
@@ -3038,6 +3062,7 @@ def link_followup(
         raise BacklogError(msg)
     update_item_metadata(reference, {"metadata": {"followup_to": followup_to}}, output=out, base_item=item, repo=repo)
     out.info(f"  Linked follow-up: {item.title} -> {followup_to or '(cleared)'}")
+    _publish(item, context, target, out, repo)
     return {"title": item.title, "followup_to": followup_to, **out.to_dict()}
 
 
@@ -4549,7 +4574,8 @@ def close_item(
     if reason not in VALID_CLOSE_REASONS:
         msg = f"Invalid close reason: {reason!r}. Valid reasons: {', '.join(VALID_CLOSE_REASONS)}"
         raise ValidationError(msg)
-    target = _decision_context(repo=repo, allow_cached=allow_cached, output=out).select(selector, purpose="mutation")
+    context = _decision_context(repo=repo, allow_cached=allow_cached, output=out)
+    target = context.select(selector, purpose="mutation")
     item = target.mutation_base
     if not item:
         raise ItemNotFoundError(selector)
@@ -4601,10 +4627,10 @@ def close_item(
     out.info(f'Backlog item "{item.title}" closed ({reason}).')
     if issue_ref and live_provider_target:
         close_github_issue(issue_ref, reason, reference=reference, comment=comment, repo=repo, output=out)
-    elif issue_ref:
-        out.info(f"Queued {issue_ref} for provider reconciliation.")
     if cleanup and issue_ref:
         out.info("Cleanup is managed by the configured backend.")
+
+    _publish(item, context, target, out, repo)
 
     return {"title": item.title, "closed": True, "reason": reason, **out.to_dict()}
 
@@ -4641,7 +4667,8 @@ def resolve_item(
     if not summary.strip():
         msg = "summary is required (what was done)"
         raise ValidationError(msg)
-    target = _decision_context(repo=repo, allow_cached=allow_cached, output=out).select(selector, purpose="mutation")
+    context = _decision_context(repo=repo, allow_cached=allow_cached, output=out)
+    target = context.select(selector, purpose="mutation")
     item = target.mutation_base
     if not item:
         raise ItemNotFoundError(selector)
@@ -4692,22 +4719,16 @@ def resolve_item(
             repo=repo,
             output=out,
         )
-    elif issue_ref:
-        out.info(f"Queued {issue_ref} for provider reconciliation.")
     if cleanup and issue_ref:
         out.info("Cleanup is managed by the configured backend.")
+
+    _publish(item, context, target, out, repo)
 
     return {"title": item.title, "resolved": True, "summary": summary, **out.to_dict()}
 
 
 def _apply_non_in_progress_status(
-    item: BacklogItem,
-    status: str,
-    repo: str,
-    result: dict[str, str | int | bool | list[str]],
-    output: Output,
-    *,
-    live_provider_target: bool = True,
+    item: BacklogItem, status: str, repo: str, result: dict[str, str | int | bool | list[str]], output: Output
 ) -> None:
     """Handle every status value other than "in-progress" for _apply_issue_status_labels.
 
@@ -4723,7 +4744,6 @@ def _apply_non_in_progress_status(
         repo: GitHub repo slug (e.g. ``"owner/repo"``).
         result: Partial result dict mutated in place with ``"status"`` / ``"error"`` keys.
         output: Output aggregator for info/warning messages.
-        live_provider_target: Whether direct provider label mutation is valid.
     """
     is_string_id_backend = get_config().backend.issue_id_type == "string"
     has_integer_issue = parse_issue_number(item.issue) is not None
@@ -4741,14 +4761,10 @@ def _apply_non_in_progress_status(
                 result["status"] = "blocked"
             else:
                 result["error"] = "Cannot set status='blocked': item has no backend reference"
-        elif has_integer_issue and live_provider_target:
-            try:
-                apply_status_blocked(item, repo, output=output)
-            except GithubException as e:
-                result["error"] = str(e)
-                return
-            result["status"] = "blocked"
         elif has_integer_issue:
+            # Written locally only -- the caller's end-of-command _publish
+            # mirrors this onto the status:blocked label (design D3/D4) when
+            # live_provider_target permits it, and queues it otherwise.
             update_item_metadata(
                 item.reference, {"metadata": {"status": "blocked"}}, output=output, base_item=item, repo=repo
             )
@@ -4774,28 +4790,16 @@ def _apply_verified_status(
     repo: str,
     result: dict[str, str | int | bool | list[str]],
     output: Output,
-    *,
-    live_provider_target: bool,
 ) -> None:
-    """Apply a live verified label or persist its queued status intent."""
+    """Persist a verified status intent; the caller's end-of-command _publish mirrors it live."""
     if not verified:
-        return
-    if not live_provider_target:
-        update_item_metadata(
-            item.reference, {"metadata": {"status": "verified"}}, output=output, base_item=item, repo=repo
-        )
-        result["verified"] = True
         return
     if not has_integer_issue:
         # verified label requires a numeric issue ID — no-op for backends
         # that use string IDs or for items with no issue reference.
         result["verified"] = True
         return
-    try:
-        apply_status_verified(item, repo, output=output)
-    except GithubException as e:
-        result["error"] = str(e)
-        return
+    update_item_metadata(item.reference, {"metadata": {"status": "verified"}}, output=output, base_item=item, repo=repo)
     result["verified"] = True
 
 
@@ -4806,13 +4810,13 @@ def _apply_issue_status_labels(
     repo: str,
     result: dict[str, str | int | bool | list[str]],
     output: Output,
-    *,
-    live_provider_target: bool = True,
 ) -> None:
     """Apply status changes for the item.
 
-    For items with a numeric integer issue reference, applies status labels via
-    the backend (in-progress, verified).
+    For items with a numeric integer issue reference, writes status/verified
+    to local metadata only -- the caller's end-of-command ``_publish`` mirrors
+    it onto the GitHub status label (design D3/D4) when a live provider target
+    permits it, and queues it for later otherwise.
 
     For backends whose ``issue_id_type`` is ``"string"`` — where ``item.issue``
     may be empty or hold an opaque string ID (e.g. a beads nanoid) — writes the
@@ -4820,8 +4824,9 @@ def _apply_issue_status_labels(
     This prevents the status change from becoming a silent no-op on such backends
     (BUG-3).  The ``apply_status_in_progress`` backend call is still issued when
     ``item.issue`` is a string ID so the backend can claim the item (e.g.
-    ``bd update --claim``).  When ``item.issue`` is empty the backend is
-    responsible for resolving the item by title.
+    ``bd update --claim``) -- this string-ID path is unchanged by design D4.
+    When ``item.issue`` is empty the backend is responsible for resolving the
+    item by title.
 
     This function checks ``BacklogBackend.issue_id_type`` rather than the
     concrete backend type, so future string-ID backends (e.g. Linear) inherit
@@ -4834,7 +4839,6 @@ def _apply_issue_status_labels(
         repo: GitHub repo slug (e.g. ``"owner/repo"``).
         result: Partial result dict mutated in place with ``"status"`` / ``"verified"`` / ``"error"`` keys.
         output: Output aggregator for info/warning messages.
-        live_provider_target: Whether direct provider label mutation is valid.
     """
     has_integer_issue = parse_issue_number(item.issue) is not None
     is_string_id_backend = get_config().backend.issue_id_type == "string"
@@ -4853,8 +4857,6 @@ def _apply_issue_status_labels(
                 update_item_metadata(
                     item.reference, {"metadata": {"status": "in-progress"}}, output=output, base_item=item, repo=repo
                 )
-        elif has_integer_issue and live_provider_target:
-            apply_status_in_progress(item, repo, output=output)
         elif has_integer_issue:
             update_item_metadata(
                 item.reference, {"metadata": {"status": "in-progress"}}, output=output, base_item=item, repo=repo
@@ -4864,15 +4866,13 @@ def _apply_issue_status_labels(
         # Unlike "in-progress" above, these outcomes don't all require a
         # backend target — terminal-status/unrecognized-value rejection is
         # pure validation, so run it even when no_backend_target is True.
-        _apply_non_in_progress_status(item, status, repo, result, output, live_provider_target=live_provider_target)
+        _apply_non_in_progress_status(item, status, repo, result, output)
     elif no_backend_target:
         # No status change requested and nothing to write to: skip the
         # verified check below too, rather than reporting a no-op "verified".
         return
 
-    _apply_verified_status(
-        item, verified, has_integer_issue, repo, result, output, live_provider_target=live_provider_target
-    )
+    _apply_verified_status(item, verified, has_integer_issue, repo, result, output)
 
 
 # ---------------------------------------------------------------------------
@@ -4895,11 +4895,12 @@ def _apply_groomed_update(
     reason: str | None,
     append: bool,
     sections: dict[str, str] | None,
-    snapshot: ProviderSnapshot | None = None,
 ) -> dict[str, str | int | bool | list[str] | dict[str, str | int | bool]]:
     """Apply groomed content update (batch or single-section) and return result dict.
 
     Extracted from update_item to keep cyclomatic complexity within limit.
+    The caller (``update_item``) publishes the mutation once, at the end of
+    the command (design D4) -- this no longer reconciles inline.
 
     Args:
         item: Resolved BacklogItem with a stable backend reference.
@@ -4915,7 +4916,6 @@ def _apply_groomed_update(
         reason: Reason string for entry-block operations.
         append: When True and section is set, append content.
         sections: Batch mapping of section name to raw content.
-        snapshot: Compatible live decision snapshot for reconciliation reuse.
 
     Returns:
         Completed result dict with groomed_updated and optional sections_written.
@@ -4932,7 +4932,7 @@ def _apply_groomed_update(
 
     if sections is not None:
         if sections:
-            written = _handle_batch_groomed(item, sections, repo, output=output, snapshot=snapshot)
+            written = _handle_batch_groomed(item, sections, repo, output=output)
             return {**result, "sections_written": written, "groomed_updated": True, **output.to_dict()}
         return {**result, "sections_written": [], "groomed_updated": False, **output.to_dict()}
 
@@ -4950,7 +4950,6 @@ def _apply_groomed_update(
         replace_section=replace_section,
         reason=reason,
         append=append,
-        snapshot=snapshot,
     )
     return {**result, "groomed_updated": True, **output.to_dict()}
 
@@ -5023,18 +5022,12 @@ def update_item(
         result["renamed_to"] = title
 
     if description is not None:
-        _update_item_description(
-            item,
-            description,
-            repo=repo,
-            output=out,
-            snapshot=target.provider_snapshot if live_provider_target else None,
-        )
+        _update_item_description(item, description, repo=repo, output=out)
         result["description_updated"] = True
 
     has_groomed = groomed or groomed_file or groomed_content or (section and content) or (sections is not None)
     if has_groomed:
-        return _apply_groomed_update(
+        groomed_result = _apply_groomed_update(
             item,
             result,
             groomed_file=groomed_file,
@@ -5048,8 +5041,9 @@ def update_item(
             reason=reason,
             append=append,
             sections=sections,
-            snapshot=target.provider_snapshot if live_provider_target else None,
         )
+        _publish(item, context, target, out, repo)
+        return groomed_result
 
     if plan:
         _apply_plan_to_item(item, plan, repo, output=out, live_provider_target=live_provider_target)
@@ -5062,10 +5056,9 @@ def update_item(
             out.info(f"  Issue: #{issue_num}")
             result["issue_num"] = issue_num
 
-    _apply_issue_status_labels(item, status, verified, repo, result, out, live_provider_target=live_provider_target)
+    _apply_issue_status_labels(item, status, verified, repo, result, out)
 
-    if item.issue and not live_provider_target:
-        out.info(f"Queued {item.issue} for provider reconciliation.")
+    _publish(item, context, target, out, repo)
 
     changes = _extract_changes(result)
     return {**result, "changes": changes, **out.to_dict()}
@@ -5125,7 +5118,7 @@ def groom_item(
     item = target.mutation_base
     if item is None:
         raise ItemNotFoundError(selector)
-    live_provider_target = _has_live_provider_target(target)
+    _has_live_provider_target(target)
     if has_input:
         result = update_item(
             selector=selector,
@@ -5157,55 +5150,26 @@ def groom_item(
             out.warn(f"  mark_groomed requested but item '{selector}' not found after re-parse — status not advanced")
             result["mark_groomed_skipped"] = True
             result["mark_groomed_skip_reason"] = f"Item '{selector}' not found in re-parsed backlog"
-        else:
-            if fresh_item.reference:
-                update_item_metadata(
-                    fresh_item.reference,
-                    {"metadata": {"status": "groomed"}},
-                    output=out,
-                    base_item=fresh_item,
-                    repo=repo,
-                )
-                result["mark_groomed_applied"] = True
-                out.info("  Status: groomed (local)")
-            if fresh_item.issue and live_provider_target:
-                try:
-                    apply_status_groomed(fresh_item, repo, output=out)
-                except GithubException as e:
-                    out.warn(f"  GitHub label update failed: {e}")
-                    result["mark_groomed_label_error"] = str(e)
-            elif fresh_item.issue:
-                out.info(f"Queued {fresh_item.issue} for provider reconciliation.")
+        elif fresh_item.reference:
+            update_item_metadata(
+                fresh_item.reference, {"metadata": {"status": "groomed"}}, output=out, base_item=fresh_item, repo=repo
+            )
+            result["mark_groomed_applied"] = True
+            out.info("  Status: groomed (local)")
+            # This is a second local write after update_item's own (when
+            # has_input) already published once above -- publish again here
+            # so the status change is not left in the queue until some later,
+            # unrelated command reconciles it (design D4). Skipped when
+            # has_input was False and this local write never happened, so a
+            # bare mark_groomed=False call (or one that hit the two error/
+            # not-found branches above) never publishes an unrelated no-op.
+            _publish(item, context, target, out, repo)
     return result
 
 
 # ---------------------------------------------------------------------------
 # Public API: STRIKE ENTRY
 # ---------------------------------------------------------------------------
-
-
-def _reconcile_strike(item: BacklogItem, snapshot: ProviderSnapshot | None, output: Output, *, repo: str = "") -> None:
-    """Reconcile one queued strike against its command observation."""
-    if not item.issue:
-        return
-    backend = get_config().backend
-    if not isinstance(backend, SyncProvider):
-        output.info("  Active backend does not support reconciliation.")
-        return
-    if snapshot is None:
-        output.info(f"  Queued {item.issue} for provider reconciliation.")
-        return
-    try:
-        backend.reconcile(
-            ReconcileRequest(scope=ReconcileScope.TARGETED, repo=repo, references=[item.issue]), snapshot=snapshot
-        )
-    except (CacheStateCorruptError, GitHubMutationOutcomeUnknownError):
-        # A timed-out audit write may still land: report that, never "queued".
-        raise
-    except BacklogError:
-        output.info(f"  Queued {item.issue} for provider reconciliation.")
-    else:
-        output.info(f"  Reconciled strike for {item.issue}")
 
 
 def strike_entry(
@@ -5244,9 +5208,8 @@ def strike_entry(
             section holding two entries with the same stored id).
     """
     out = output or Output()
-    target_decision = _decision_context(repo=repo, allow_cached=allow_cached, output=out).select(
-        selector, purpose="mutation"
-    )
+    context = _decision_context(repo=repo, allow_cached=allow_cached, output=out)
+    target_decision = context.select(selector, purpose="mutation")
     item = target_decision.mutation_base
     if not item:
         raise ItemNotFoundError(selector)
@@ -5276,7 +5239,7 @@ def strike_entry(
 
     _put_work_item(item, repo)
     out.info(f"Struck entry {entry_id} in {item.reference}")
-    _reconcile_strike(item, target_decision.provider_snapshot, out, repo=repo)
+    _publish(item, context, target_decision, out, repo)
 
     return {"title": item.title, "entry_id": entry_id, "struck": True, **out.to_dict()}
 
