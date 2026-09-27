@@ -1040,8 +1040,10 @@ class TestMakeGithubClient:
 class TestAgainstLiveGitHub:
     """Proves the module reaches GitHub from whatever network is actually present.
 
-    Deselected by default. It needs the live network, so it belongs to the e2e lane: run
-    with ``-m e2e`` and ``DH_ALLOW_TEST_NETWORK=1``. The unit tests above assert the
+    Deselected by default. It needs the live network, so it belongs to the e2e lane and
+    reads only the sandbox that lane's ``live_sandbox`` contract validated, never the
+    source repository (plugins/development-harness/docs/live-e2e-validation.md). The unit
+    tests above assert the
     TLS context's shape; only a real request proves that shape completes a handshake.
     """
 
@@ -1056,9 +1058,10 @@ class TestAgainstLiveGitHub:
             if value is not None:
                 monkeypatch.setenv(name, value)
 
-    def test_a_real_repository_read_succeeds(self):
-        """The end-to-end path: install, build a client, and fetch a public repository."""
+    def test_a_real_repository_read_succeeds(self, live_sandbox):
+        """The end-to-end path: install, build a client, and fetch the sandbox repository."""
+        scope, sandbox = live_sandbox
         client = make_github_client()
-        repo = client.get_repo("Jamie-BitFlight/claude_skills")
+        repo = client.get_repo(scope.repository)
 
-        assert repo.full_name == "Jamie-BitFlight/claude_skills"
+        assert repo.full_name == sandbox.full_name

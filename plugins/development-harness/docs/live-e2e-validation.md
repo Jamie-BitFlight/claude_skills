@@ -30,6 +30,11 @@ sandbox variable, and serializes live jobs using that target. Only preflight, te
 receive the sandbox secret. Missing or inconsistent configuration fails preflight; it never falls
 back to production or reports an all-skipped live pass. E2E remains advisory outside Quality Gate.
 
+The live job selects every `e2e`-marked test in the plugin, so each one must request the
+`live_sandbox` fixture (plugin-root `conftest.py`). That fixture validates the scope above and the
+sandbox marker before any live request. Collection fails, in every lane, when an `e2e` test does not
+request it.
+
 ## Run and diagnose
 
 After exporting `DH_E2E_REPOSITORY`, a unique `DH_E2E_RUN_ID`, `DH_ALLOW_TEST_NETWORK=1`, and the

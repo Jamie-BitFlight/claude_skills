@@ -73,6 +73,11 @@ _CLASS_SCOPED_LIVE_BACKEND_PROBE = """
         '''Stands in for the live backend an e2e fixture installs.'''
 
 
+    @pytest.fixture(autouse=True)
+    def live_sandbox():
+        '''Stand in for the sandbox contract fixture, which needs live credentials.'''
+
+
     @pytest.fixture(scope="class")
     def live_backend():
         backend = SentinelBackend()

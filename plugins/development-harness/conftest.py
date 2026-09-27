@@ -35,6 +35,10 @@ import pytest
 if TYPE_CHECKING:
     from socket import _Address
 
+    from github.Repository import Repository
+
+    from live_test_scope import LiveTestScope
+
 _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost", "localhost.localdomain", ""})
 
 _ADVICE = (
@@ -118,6 +122,7 @@ def close_sqlite_connections(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
 
 import tiktoken
+from tests.live_test_support import unscoped_e2e
 from tests.network_blocked import NetworkBlocked
 
 # tiktoken downloads its BPE encoding from openaipublic.blob.core.windows.net
@@ -280,6 +285,46 @@ def install_network_guard() -> None:
 def remove_network_guard() -> None:
     """Restore the real socket connect and DNS functions."""
     _network_patch.undo()
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Fail closed when an e2e test bypasses the sandbox scope and preflight contract.
+
+    The live job selects every e2e-marked test, so this check, not the job, is what
+    keeps its requests inside the sandbox. It runs on every collection, marker filter
+    or not.
+
+    Args:
+        config: The pytest config object (unused).
+        items: Every collected test item.
+
+    Raises:
+        pytest.UsageError: If an e2e test does not request the ``live_sandbox`` fixture.
+    """
+    # Only a pytest.Function has fixturenames; any other e2e item cannot request the
+    # fixture, so it counts as unscoped.
+    collected = (
+        (item.nodeid, item.get_closest_marker("e2e") is not None, getattr(item, "fixturenames", ())) for item in items
+    )
+    if unscoped := unscoped_e2e(collected):
+        raise pytest.UsageError("e2e tests must request the live_sandbox fixture: " + ", ".join(unscoped))
+
+
+@pytest.fixture
+def live_sandbox(request: pytest.FixtureRequest) -> tuple[LiveTestScope, Repository]:
+    """Validate the sandbox scope and its remote marker before any live request.
+
+    Returns:
+        The run's scope and the sandbox repository whose identity and marker were checked.
+    """
+    if request.config.getoption("numprocesses", default=0) not in {None, 0}:
+        pytest.fail("Live scenarios share one configured MCP backend; run this lane with -n 0")
+    # Lazy: these pull in PyGithub, which only the e2e lane needs.
+    from close_test_issues import open_sandbox
+    from live_test_scope import LiveTestScope
+
+    scope = LiveTestScope.from_environment(os.environ)
+    return scope, open_sandbox(scope)
 
 
 @pytest.fixture(autouse=True)

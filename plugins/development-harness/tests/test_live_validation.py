@@ -59,11 +59,13 @@ class LiveEnvironment:
 
 
 @pytest.fixture
-def live_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest):
-    if request.config.getoption("numprocesses", default=0) not in (None, 0):
-        pytest.fail("Live scenarios share one configured MCP backend; run this lane with -n 0")
-    scope = LiveTestScope.from_environment(os.environ)
-    repository = open_sandbox(scope)
+def live_environment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    request: pytest.FixtureRequest,
+    live_sandbox: tuple[LiveTestScope, Repository],
+):
+    scope, repository = live_sandbox
     report_dir = Path(os.environ.get("DH_E2E_REPORT_DIR", str(tmp_path / "reports")))
     journal = Journal(report_dir / f"{request.node.name}.jsonl")
     journal.record("scope", repository=scope.repository, run_id=scope.run_id, scenario=request.node.name)
