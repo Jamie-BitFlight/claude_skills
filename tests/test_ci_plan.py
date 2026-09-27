@@ -357,3 +357,10 @@ def test_marketplace_comparison_without_history_is_conservative(repository: Path
     plan = planner.build_plan(repository, [".claude-plugin/marketplace.json", "plugins/alpha/README.md"])
     assert plan["full_tests"]
     assert plan["lint_all"]
+
+
+@pytest.mark.parametrize("runner_path", ["--with=evil", "../other/run_pytests.py", "/abs/run_pytests.py"])
+def test_runner_rejects_an_unsafe_shard_runner(runner_path: str) -> None:
+    """The shard's runner path is validated like its target paths before it reaches argv."""
+    with pytest.raises(ValueError, match="Unsafe target path"):
+        runner.command("pytest", {}, {"name": "alpha", "runner": runner_path, "paths": [], "marker": ""})
