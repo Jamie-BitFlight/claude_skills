@@ -130,26 +130,36 @@ DH_LABELS: dict[str, str] = {
 }
 
 
+#: Repos already checked this process — keyed by `repo.full_name`. Labels don't change mid-
+#: session, so a second `ensure_dh_labels` call for the same repo has nothing new to find.
+# ponytail: process-lifetime cache with no invalidation — if a repo's dh labels are deleted by
+# something else mid-process, restart the process to re-check; not worth a TTL for this.
+_labels_ensured_for_repo: set[str] = set()
+
+
 def ensure_dh_labels(repo: Repository, output: Output | None = None) -> None:
     """Create any missing dh labels on the repository.
 
-    Iterates ``DH_LABELS`` and creates each label that does not yet exist.
-    Idempotent — existing labels are left unchanged.  Label creation uses
-    REST — there is no GraphQL createLabel mutation.
+    Costs at most one REST request (``repo.get_labels()``) when every dh label already exists,
+    plus one ``create_label()`` per label actually missing — replacing a previous per-label
+    ``get_label()`` probe (one REST request per entry in ``DH_LABELS``, every call, even when
+    nothing was missing). Skips the check entirely on a repeat call for the same repo within this
+    process (see ``_labels_ensured_for_repo``). Idempotent — existing labels are left unchanged.
+    Label creation uses REST — there is no GraphQL createLabel mutation.
 
     Args:
         repo: PyGithub Repository object.
         output: Optional Output collector for status/warning messages.
     """
+    if repo.full_name in _labels_ensured_for_repo:
+        return
     out = output or Output()
+    existing_names = {label.name for label in repo.get_labels()}
     for name, color in DH_LABELS.items():
-        try:
-            repo.get_label(name)
-        except GithubException as exc:
-            if exc.status != _HTTP_NOT_FOUND:
-                raise
+        if name not in existing_names:
             repo.create_label(name=name, color=color)
             out.info(f"  Created label '{name}'")
+    _labels_ensured_for_repo.add(repo.full_name)
 
 
 # ---------------------------------------------------------------------------

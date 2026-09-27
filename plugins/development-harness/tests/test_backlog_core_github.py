@@ -94,6 +94,7 @@ def _make_mock_repo(mocker: MockerFixture, full_name: str = "test-owner/test-rep
     repo = mocker.Mock()
     repo.full_name = full_name
     repo.node_id = "R_kgDOABCDEF"
+    repo.get_labels.return_value = []  # ensure_dh_labels lists labels before creating any missing ones
     return repo
 
 
