@@ -1,6 +1,7 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
+#   "pydantic>=2.12.5",
 #   "pytest>=9.1.1",
 #   "pytest-asyncio>=1.4.0",
 # ]

@@ -137,6 +137,12 @@ test('JSON presentation field types reject malformed metadata and gap arrays', (
   assert.deepEqual(validate(JSON.stringify(legitimate), 'json'), []);
 });
 
+test('JSON accepts every source_type the structured template defines', () => {
+  const inline = JSON.parse(outputs.json);
+  inline.metadata.source_type = 'inline';
+  assert.deepEqual(validate(JSON.stringify(inline), 'json'), []);
+});
+
 test('headings inside a quoted code fence do not satisfy the structure contract', () => {
   const fake = outputs.structured.replace('## What Was Found', '```\n## What Was Found\n```');
   assert.ok(validate(fake, 'structured').length);

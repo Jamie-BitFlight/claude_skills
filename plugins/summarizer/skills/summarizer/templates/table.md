@@ -1,75 +1,37 @@
 ---
 format_id: table
 format_name: Table
-description: Findings presented as a markdown table with columns for item, detail, source reference, and status. Compact visual format for scanning many findings quickly.
-fidelity_sections_required:
-- Findings table
-- Not Found (rows or section)
-- Uncertain (rows or section)
-metadata_preserved:
-- source_path
-- confidence
+description: Attributed findings in a Markdown table with explicit finding status.
 ---
 
 # Table Format
 
-Tabular output for quick visual scanning of findings. Each row represents one finding with its source reference and status.
-
-## When to Use
-
-- User asks for "table", "tabular", "comparison", "grid format"
-- When there are many discrete findings that benefit from columnar layout
-- When the user wants to scan and compare items quickly
-- Good for config files, API endpoints, feature lists
+Use for tabular or comparison requests. Apply shared [fidelity rules](../references/fidelity-rules.md).
 
 ## Schema
 
-<eg>
+```text
 ## Summary
 
-[1-2 sentence BLUF summary]
+[Lead with the answer and any critical limitation.]
 
-| # | Finding | Detail | Source | Status |
-|---|---------|--------|--------|--------|
-| 1 | [item] | [detail] | [ref] | Found |
-| 2 | [item] | [detail] | [ref] | Found |
-| 3 | [item] | [detail] | N/A | Not Found |
-| 4 | [item] | [detail] | [ref] | Uncertain |
+| Finding | Detail | Source | Status |
+| --- | --- | --- | --- |
+| [item] | [claim with exact counts/qualifiers] | [source location] | Found |
+| [searched item] | [inspected scope and absence] | [scope] | Not Found |
+| [ambiguous item] | [uncertainty] | [source location] | Uncertain |
 
----
-Source: [path or URL] | Confidence: [high|medium|low] | [access date]
-</eg>
+Source: [path or URL] | Confidence: [high|medium|low] | [actual access date]
+```
 
-## Example
+## Fidelity constraints
 
-<eg>
-## Summary
+All four named columns are required; an optional numbering column is permitted. Every `Found`
+row needs a meaningful Source reference. Status values are exactly `Found`, `Not Found` or
+`Uncertain`. Preserve one row for each empty Not Found or Uncertain category, using `None
+identified` as the finding and that category as its status. Do not invent a missing feature
+just to populate a row. State inaccessible/unassessed scope as such, not searched absence.
 
-API configuration file defining 4 endpoints with JWT authentication and rate limiting.
-
-| # | Finding | Detail | Source | Status |
-|---|---------|--------|--------|--------|
-| 1 | Auth method | JWT with 24h expiry | Section 3.2, line 45 | Found |
-| 2 | Rate limit | 100 req/min per key | Section 5.1, line 112 | Found |
-| 3 | Base URL | <https://api.example.com/v2> | Line 3 | Found |
-| 4 | WebSocket support | Not mentioned in source | N/A | Not Found |
-| 5 | Enterprise limits | "Custom limits" referenced, values unspecified | Section 6.1 | Uncertain |
-
----
-Source: ./config/api.yaml | Confidence: high | Read 2026-02-06
-</eg>
-
-## Fidelity Constraints
-
-- Status column MUST use exactly: `Found`, `Not Found`, or `Uncertain`
-- Every `Found` row MUST have a Source reference
-- `Not Found` rows MUST exist -- cannot omit them from the table
-- `Uncertain` rows MUST exist -- cannot omit them from the table
-- If no items are Not Found or Uncertain, include one row: "None identified" with appropriate status
-- Exact counts in Detail column -- "3 retries" not "several retries"
-- Footer MUST include source, confidence, and date
-
-## Metadata
-
-- **Format version**: 1.0
-- **Plugin**: summarizer
+Escape literal pipe characters in cells. Keep the footer last, with source, confidence and
+access date. Material numbers, conditions and failures must survive tabulation; source locations
+must support the actual detail, not merely mention the same topic.
