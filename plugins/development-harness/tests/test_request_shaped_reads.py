@@ -1066,3 +1066,44 @@ def test_plain_list_warns_when_its_write_through_fails(fixture: FakeGitHubFixtur
 
     warnings = cast("list[str]", result.get("warnings", []))
     assert any("1 failures" in warning for warning in warnings), warnings
+
+
+def test_open_scan_writes_its_live_rows_through_to_the_cache(fixture: FakeGitHubFixture) -> None:
+    # add_item's duplicate check and list_followups read through _open_scan;
+    # a later allow_cached read must see what that scan observed.
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+    from backlog_core.operations import _decision_context, _open_scan
+
+    for number in range(1, 4):
+        fixture.add_tracked_issue(number, f"issue {number}", state="OPEN")
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        _open_scan(_decision_context(repo=f"{fixture.owner}/{fixture.name}"))
+    finally:
+        reset_config()
+
+    assert {item.issue for item in fixture.backend.list_work_items()} == {"#1", "#2", "#3"}
+    assert fixture.backend.has_synced_snapshot() is False
+
+
+def test_section_filter_matches_the_tracked_head_priority(fixture: FakeGitHubFixture) -> None:
+    # The label and raw issue body say P1; the tracked head moved the item to P2.
+    from backlog_core import operations
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+    from backlog_core.github_sync import render_issue_body
+
+    moved = BacklogItem(title="moved to P2", issue="#1", priority="P2")
+    fixture.add_tracked_issue(1, "moved to P2", state="OPEN", tracked_body=render_issue_body(moved))
+    fixture.add_tracked_issue(2, "still P1", state="OPEN")
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        result = operations.list_items(repo=f"{fixture.owner}/{fixture.name}", section="P2", limit=1)
+    finally:
+        reset_config()
+
+    assert [item["issue"] for item in _items(result)] == ["#1"], result
+    assert result["has_more"] is False, result

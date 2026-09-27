@@ -1644,6 +1644,9 @@ class _OpenScan(BaseModel):
 def _open_scan(context: WorkItemDecisionContext) -> _OpenScan:
     """Read every open, live-candidate item, hydrated, with no closed history (O3).
 
+    A live scan writes its rows through to the cache (D7) like any list page,
+    acknowledging no local intent.
+
     Returns:
         The open-scan items (page rows plus queued pending intent) and
         whether the read was live.
@@ -1657,6 +1660,10 @@ def _open_scan(context: WorkItemDecisionContext) -> _OpenScan:
         match=lambda item, provider: _is_live_candidate(item),
         force_hydration=True,
     )
+    if page.provider_snapshot is not None:
+        _write_page_through(
+            context.backend, context.repo, page.provider_snapshot, refresh=False, output=context.output or Output()
+        )
     pending = [it for it in context.pending() if _is_live_candidate(it)]
     return _OpenScan(items=page.provider_items + pending, live=page.provider_snapshot is not None)
 
@@ -2324,12 +2331,19 @@ def _status_push_label(status: str | None) -> str | None:
 
 
 def _page_needs_hydration(
-    *, type_: str | None, topic: str | None, search: str | None, filter_by_key: dict[str, str] | None
+    *,
+    section: str | None,
+    type_: str | None,
+    topic: str | None,
+    search: str | None,
+    filter_by_key: dict[str, str] | None,
 ) -> bool:
     """Whether this page's local predicates need hydrated body content (D2').
 
-    ``type_``/``topic`` are parsed-body metadata and ``search`` reads the full
-    searchable body, so both always need hydration. ``filter_by_key`` is
+    ``section`` comes from the tracked head's priority, which can differ from
+    the raw issue body and the ``priority:`` label, ``type_``/``topic`` are
+    parsed-body metadata, and ``search`` reads the full searchable body, so
+    all of them need hydration. ``filter_by_key`` is
     conservatively treated the same way, since it can target a
     content-derived field (e.g. ``type``) as easily as a node-decidable one
     (e.g. ``issue``) — a documented simplification that over-hydrates a
@@ -2338,7 +2352,7 @@ def _page_needs_hydration(
     Returns:
         ``True`` when any content-dependent filter is active.
     """
-    return bool(type_ or topic or search is not None or filter_by_key)
+    return bool(section or type_ or topic or search is not None or filter_by_key)
 
 
 def _page_status_map(provider: ProviderItem) -> dict[int, IssueStatus]:
@@ -2415,6 +2429,44 @@ def _page_match(
     return True
 
 
+def _write_page_through(
+    backend: object, repo: str, snapshot: ProviderSnapshot, *, refresh: bool, output: Output
+) -> None:
+    """Write one live page's rows through to the cache with a TARGETED reconcile (D7).
+
+    ``apply_local_patches`` follows *refresh*, so a plain read acknowledges
+    nothing while ``refresh=True`` also pushes local intent for these rows
+    only (D6). The checkpoint never moves: TARGETED never advances it. A
+    failed write-through is warned, not raised — the read it is attached to
+    has already succeeded. A plain read reports only failures, since a silent
+    one leaves later ``allow_cached`` reads stale.
+    """
+    if not isinstance(backend, SyncProvider):
+        return
+    references = [item.reference for item in snapshot.items]
+    try:
+        result = backend.reconcile(
+            ReconcileRequest(
+                scope=ReconcileScope.TARGETED, repo=repo, references=references, apply_local_patches=refresh
+            ),
+            snapshot=snapshot,
+        )
+    except (BackendUnavailableError, BacklogError) as exc:
+        output.warn(f"  WARNING: Could not write this page through to the local cache: {exc}")
+        return
+    if refresh or result.failures:
+        summary = (
+            f"Reconciled {result.fetched_items} provider item(s): {result.local_updates} local updates, "
+            f"{result.provider_patches} patches, {result.no_ops} no-ops, {result.conflicts} conflicts, "
+            f"{result.failures} failures, {result.pending_mutations} pending mutation(s), "
+            f"{result.rejected_mutations} rejected mutation(s)."
+        )
+        if result.conflicts or result.failures or result.pending_mutations or result.rejected_mutations:
+            output.warn(summary)
+        else:
+            output.info(summary)
+
+
 def _read_list_page(
     *,
     backend: object,
@@ -2437,13 +2489,9 @@ def _read_list_page(
 ) -> ListPage:
     """Read one request-shaped GitHub list page and write it through the cache.
 
-    Every successful live page writes exactly the rows it fetched through a
-    TARGETED reconcile (D7) — ``apply_local_patches`` follows *refresh*, so a
-    plain list acknowledges nothing while ``refresh=True`` also pushes local
-    intent for the listed rows only (D6). The checkpoint never moves: TARGETED
-    never advances it. A failed write-through is warned, not raised — the
-    read it is attached to has already succeeded. A *count_only* page reads
-    no work-item content and so writes nothing through.
+    Every successful live page writes exactly the rows it fetched through
+    :func:`_write_page_through`. A *count_only* page reads no work-item
+    content and so writes nothing through.
 
     Returns:
         The request-shaped page (matched rows plus honest pagination facts).
@@ -2473,35 +2521,12 @@ def _read_list_page(
             filter_by_key=filter_by_key,
             search=search,
         ),
-        force_hydration=_page_needs_hydration(type_=type_, topic=topic, search=search, filter_by_key=filter_by_key),
+        force_hydration=_page_needs_hydration(
+            section=section, type_=type_, topic=topic, search=search, filter_by_key=filter_by_key
+        ),
     )
-    snapshot = page.provider_snapshot
-    if snapshot is not None and not count_only and isinstance(backend, SyncProvider):
-        references = [item.reference for item in snapshot.items]
-        try:
-            result = backend.reconcile(
-                ReconcileRequest(
-                    scope=ReconcileScope.TARGETED, repo=repo, references=references, apply_local_patches=refresh
-                ),
-                snapshot=snapshot,
-            )
-        except (BackendUnavailableError, BacklogError) as exc:
-            output.warn(f"  WARNING: Could not write this page through to the local cache: {exc}")
-        else:
-            # A plain list reports only failures: its write-through is part of
-            # the documented contract, and a silent failure leaves later
-            # allow_cached reads stale.
-            if refresh or result.failures:
-                summary = (
-                    f"Reconciled {result.fetched_items} provider item(s): {result.local_updates} local updates, "
-                    f"{result.provider_patches} patches, {result.no_ops} no-ops, {result.conflicts} conflicts, "
-                    f"{result.failures} failures, {result.pending_mutations} pending mutation(s), "
-                    f"{result.rejected_mutations} rejected mutation(s)."
-                )
-                if result.conflicts or result.failures or result.pending_mutations or result.rejected_mutations:
-                    output.warn(summary)
-                else:
-                    output.info(summary)
+    if page.provider_snapshot is not None and not count_only:
+        _write_page_through(backend, repo, page.provider_snapshot, refresh=refresh, output=output)
     return page
 
 

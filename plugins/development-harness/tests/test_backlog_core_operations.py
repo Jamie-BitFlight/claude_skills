@@ -1102,7 +1102,11 @@ class TestCheckForDuplicatesFreshness:
         assert "Completely Unrelated New Feature Proposal" in stored_titles
 
     def test_duplicate_check_does_not_reconcile_before_creation(self, mocker: MockerFixture) -> None:
-        """Duplicate truth comes from the live read, not a reconciliation result."""
+        """Duplicate truth comes from the live read, not a reconciliation result.
+
+        The only reconcile allowed is the scan's own write-through (D7): TARGETED over
+        the rows it already read, from its own snapshot, pushing no local intent.
+        """
         from backlog_core.backend_protocol import get_config
 
         backend = get_config().backend
@@ -1120,7 +1124,11 @@ class TestCheckForDuplicatesFreshness:
         )
 
         assert result["file_path"]
-        reconcile.assert_not_called()
+        for call in reconcile.call_args_list:
+            request = call.args[0]
+            assert request.scope is ReconcileScope.TARGETED, request
+            assert request.apply_local_patches is False, request
+            assert call.kwargs.get("snapshot") is not None, call
         stored_titles = [item.title for item in backend.list_work_items()]
         assert "Completely Unrelated New Feature Proposal" in stored_titles
 
