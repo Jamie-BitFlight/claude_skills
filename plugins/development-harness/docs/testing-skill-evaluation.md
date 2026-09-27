@@ -56,7 +56,7 @@ assertion failure set, process exit status, and preservation of the original fix
 Run it through the plugin runner, from any directory:
 
 ```bash
-uv run --script plugins/development-harness/run_pytests.py -m integration tests/test_testing_skill_fixtures.py
+uv run --locked --script plugins/development-harness/run_pytests.py -m integration tests/test_testing_skill_fixtures.py
 ```
 
 This validates the experiment inputs and fault mechanisms. It does not run an LLM or establish
