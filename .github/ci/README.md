@@ -58,17 +58,18 @@ outside the diff; these are cross-file invariants rather than file-local lint.
 The runner's unnamed `prek` operation is this global hygiene lane. Only explicitly
 named language hooks use changed-file selection.
 
-Every development-harness lane is its runner plus a marker, never a list of
-test files: `integration and not research_vault` in the integration matrix,
-`cross_backend` in `cross_backend_matrix`, and `e2e` in the live job. The runner owns the test roots,
-so a test that gains a marker anywhere in the plugin joins its lane; `run.py`
-rejects a runner shard that names paths. The planner schedules these lanes only
-while the runner exists. The integration matrix also holds the research-backlinks
-and rebase-publication root shards. The dh lane table lives in `plan.py`; move it
-into the runner contract once a second plugin needs a lane beyond its fast default. Pinned versioner integration remains in the manifest lane. Research-vault
-validation stays advisory. The live-E2E job retains its existing main/manual trigger,
-sandbox credentials, serialization, process deadlines, cleanup and evidence uploads;
-it runs the development-harness runner with `-m e2e -n 0`.
+The development-harness lanes beyond its runner's fast default are defined in
+`dh_lanes()` in `plan.py`; `build_plan()` there adds the repository-owned
+integration shards. Each dh lane is the runner plus a marker, never a list of
+test files. The runner owns the test roots, so a test that gains a marker
+anywhere in the plugin joins its lane; `run.py` rejects a runner shard that names
+paths. The planner schedules these lanes only while the runner exists. Move the
+lane table into the runner contract once a second plugin needs a lane beyond its
+fast default. Pinned versioner integration remains in the manifest lane.
+Research-vault validation stays advisory. The live-E2E job retains its existing
+main/manual trigger, sandbox credentials, serialization, process deadlines,
+cleanup and evidence uploads, and runs the development-harness runner with its
+`e2e` marker.
 
 ## Safety and evidence
 
