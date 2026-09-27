@@ -15,8 +15,7 @@ Lookup reference for the owner and portable handoff at each phase.
 | 4: Create hooks | hook creator | `/plugin-creator:hook-creator` |
 | 5: Debug | lint skill | `/plugin-creator:lint` or `/plugin-creator:lint --fix PATH` |
 | 5: Debug | refactor skill | `/plugin-creator:refactor-skill` |
-| 6: Optimize goals | goal extractor | `/plugin-creator:skill-goal-extractor` |
-| 6: Tighten | tightening skill | `/plugin-creator:evaluate-and-tighten-skills` |
+| 6: Semantic skill refinement | Skill Lapidary | `/skill-lapidary:skill-lapidary` (external owning skill; install if absent) |
 | 6: Refactor plugin | refactor skill | `/plugin-creator:refactor-plugin` |
 | 6: Optimize prose | Claude documentation optimizer | `/plugin-creator:optimize-claude-md` |
 | 6: Audit skill | `plugin-creator:skill-auditor` | Dispatch agent |
@@ -28,8 +27,7 @@ Lookup reference for the owner and portable handoff at each phase.
 
 Routing by concern:
 
-- Establish a skill's goals before judging content: `/plugin-creator:skill-goal-extractor`.
-- Remove content that serves no goal: `/plugin-creator:evaluate-and-tighten-skills`.
+- Recover goals, resolve authority, conserve semantics, and tighten skill instructions: `/skill-lapidary:skill-lapidary`. Plugin Creator must not duplicate this logic.
 - Optimize surviving skill or Claude instructions through `/plugin-creator:optimize-claude-md`;
   that skill owns baselines, dispatch, independent verification, and reporting.
 - Audit quality without writes by dispatching `plugin-creator:skill-auditor`.

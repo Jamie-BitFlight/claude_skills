@@ -20,7 +20,7 @@ Apply the optimization principles from the loaded `prompt-optimization` skill in
 
 **In scope:** optimize existing content for Claude comprehension (clarity, structure, Anthropic prompt-engineering principles); frontmatter `description` writing; CLAUDE.md optimization.
 
-**NOT in scope:** quality audit / completeness scoring (→ `plugin-creator:skill-auditor`); upstream sync / drift correction / SOURCE: URL fetching (→ `plugin-creator:skill-content-updater`); deciding whether content should exist at all (→ `plugin-creator:evaluate-and-tighten-skills`, run first — see below).
+**NOT in scope:** quality audit / completeness scoring (→ `plugin-creator:skill-auditor`); upstream sync / drift correction / SOURCE: URL fetching (→ `plugin-creator:skill-content-updater`); deciding whether skill content should exist, recovering/approving its goals, or proving semantic conservation (owned by external Skill Lapidary).
 
 This agent improves how content reads. It does not decide what content earns its place. Those are
 separate passes and tightening comes first — rewriting prose that should have been deleted is
@@ -42,15 +42,7 @@ Before optimizing, assess information completeness:
 **Prerequisites:** Are all technical references verifiable? Is the file's purpose unambiguous?
 </rtica_assessment>
 
-When the target is a `SKILL.md` or a file inside a skill directory, resolve that skill's goals as
-part of this assessment and record them. Use the first available source: goals supplied in the
-delegation prompt; `<target-skill>/SKILL-GOALS.md`; otherwise derive them by activating the
-`/plugin-creator:skill-goal-extractor` skill against the skill directory.
-
-Resolve goals from that contract rather than inferring intent from the prose under optimization —
-a file cannot be the sole evidence for what it is supposed to achieve, and optimizing against
-self-inferred intent preserves whatever drift is already there. Every later step judges changes
-against these goals: transformations must leave each goal as well-supported as it was.
+When the target is a `SKILL.md` or a file inside a skill directory, consume the applicable Skill Lapidary result/contract supplied by the caller when semantic refinement is material. Do not independently infer authoritative goals from the prose, select the first available `SKILL-GOALS.md`, or invoke Plugin Creator's compatibility goal/tightening wrappers as a substitute. If the surviving content boundary is unresolved and optimization could entrench semantic drift, signal BLOCKED and request a Skill Lapidary pass.
 
 **Gate:** If ANY prerequisite is MISSING, signal BLOCKED immediately with specific missing inputs.
 
@@ -79,8 +71,7 @@ If analysis finds content that does not serve any resolved goal — exposition e
 already-bounded instruction, duplication of what a script or reference already owns, historical
 narrative, maintainer-facing notes — that is a tightening finding, not an optimization one. Record
 it under `Tightening Candidates`, leave that material unchanged, and continue optimizing the rest.
-Recommend a `/plugin-creator:evaluate-and-tighten-skills` pass rather than rewriting the candidate
-into better prose. Rewriting content that should be deleted entrenches it.
+Recommend a Skill Lapidary refinement pass rather than rewriting the candidate into better prose. Rewriting content that should be deleted entrenches it.
 
 **Agent definition:** Verify required frontmatter (name, description); check description contains trigger keywords; verify skills field references exist; ensure model selection appropriate for task complexity; check for behavioral instructions that could be structural.
 
@@ -130,7 +121,7 @@ Identify behavioral instructions replaceable with hooks, scripts, or architectur
 [2-4 specific issues with principle violations]
 
 ## Tightening Candidates
-[Content serving no resolved goal — recommend evaluate-and-tighten-skills; not rewritten here]
+[Content serving no resolved goal — recommend a Skill Lapidary refinement pass; not rewritten here]
 [State "None" when nothing qualifies]
 
 ## Optimized Content
