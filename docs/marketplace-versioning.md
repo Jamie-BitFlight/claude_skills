@@ -14,8 +14,10 @@ pinned to the same full commit SHA in [.pre-commit-config.yaml](../.pre-commit-c
 The `agent-marketplace-versioner` pre-commit hook runs `reconcile --dry-run`. It changes no files.
 It fails when a `plugin.json` that lists `skills`, `agents` or `commands` explicitly is missing one
 that exists on disk (or lists one that does not), or when a marketplace catalog
-(`.claude-plugin/marketplace.json`, `.agents/plugins/marketplace.json`) does not list exactly the
-plugins under `plugins/`. Fix the reported entry by hand. Do not edit
+(`.claude-plugin/marketplace.json`, `.agents/plugins/marketplace.json`) lacks an entry for a plugin
+directory under `plugins/`, has a local (`./`) entry for a directory that does not exist, or names a
+local entry differently from its `plugin.json`. Entries with an external source (`github`,
+`git-subdir`) are not checked; keep them. Fix the reported entry by hand. Do not edit
 `version` fields. The `Local / Manifest sync` CI job runs the same hook on every PR that touches
 plugins.
 
@@ -39,10 +41,11 @@ not refresh from branch work. To exercise a plugin from your working copy, load 
    `chore(plugins): assign plugin versions`. If another merge landed meanwhile, the commit is
    rebased onto it and pushed again (three attempts).
 
-Loop guard: a rerun on the version commit finds nothing changed since the last bump and exits
-without committing. The job also skips pushes whose head commit carries that title, to save a
-runner. Runs share one concurrency group without cancellation, and a queued run starts from the
-newest `main`, so it covers anything an earlier run's commit did not.
+Loop guard: the version commit's push starts one more run, which finds nothing changed since the
+last bump and exits without committing or pushing. That run is not skipped on purpose. Runs share
+one concurrency group, and GitHub cancels a pending run when a newer one queues. If a merge lands
+while a run is active, the version commit's run can replace that merge's pending run, so it must
+process the merge. Every run starts from the newest `main` and bumps everything not yet versioned.
 
 ## Credential and ruleset bypass
 

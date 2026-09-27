@@ -106,7 +106,8 @@ Make your changes and commit. Do not change any `version` field. The `agent-mark
 pre-commit hook checks, without editing, that:
 
 - A `plugin.json` that lists `skills`, `agents` or `commands` explicitly matches the files on disk
-- The marketplace catalogs list exactly the plugins under `plugins/`
+- The marketplace catalogs have one entry per plugin directory under `plugins/`, with no local (`./`)
+  entry for a missing directory; entries with an external source (`github`, `git-subdir`) are kept as is
 
 After the PR merges, [bump-marketplace.yml](./.github/workflows/bump-marketplace.yml) patch-bumps each plugin that changed
 and the marketplace version, in one commit on `main`. See

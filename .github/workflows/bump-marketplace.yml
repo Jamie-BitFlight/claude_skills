@@ -9,8 +9,9 @@ on:
     branches: [main]
   workflow_dispatch: {}
 
-# One run at a time; a queued run starts from the newest main, so it picks up
-# whatever an earlier run's push did not cover.
+# One run at a time. GitHub keeps one pending run per group and cancels an
+# older pending run when a newer one queues; each run starts from the newest
+# main and bumps everything unversioned, so the surviving run covers them all.
 concurrency:
   group: bump-marketplace
   cancel-in-progress: false
@@ -21,9 +22,10 @@ jobs:
   bump:
     name: Bump changed plugins and sync marketplace.json
     runs-on: ubuntu-latest
-    # Main only. The bump commit's own push is skipped here to save a runner;
-    # a run on it would also find nothing to bump.
-    if: "github.ref == 'refs/heads/main' && (github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(plugins): assign plugin versions'))"
+    # Main only. The version commit's own push is NOT skipped: its run may be
+    # the pending run that replaced a racing merge's run, and must process that
+    # merge. With nothing left to bump it exits without pushing, ending the loop.
+    if: github.ref == 'refs/heads/main'
     permissions:
       contents: read
     steps:

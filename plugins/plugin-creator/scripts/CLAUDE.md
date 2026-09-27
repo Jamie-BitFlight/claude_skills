@@ -133,7 +133,7 @@ Before referencing script behavior, the model MUST:
 
 **Example citation:**
 
-> "The shared versioner synchronizes staged plugin manifests; marketplace version repair is proposed after merge."
+> "The versioner pre-commit hook runs `reconcile --dry-run` and changes no files (`.pre-commit-config.yaml`); `bump-marketplace.yml` assigns plugin and marketplace versions after merge to `main`."
 
 ### Verification Protocol
 

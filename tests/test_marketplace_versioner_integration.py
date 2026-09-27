@@ -49,8 +49,9 @@ def test_hook_checks_only_and_workflow_bumps_on_main() -> None:
     assert workflow["on"]["push"] == {"branches": ["main"]}
     assert workflow["concurrency"]["cancel-in-progress"] is False
     job = workflow["jobs"]["bump"]
-    assert "github.ref == 'refs/heads/main'" in job["if"]
-    assert repr(SUBJECT) in job["if"]
+    # The version commit's own run is not skipped: it may be the pending run that
+    # replaced a racing merge's run, so it must process that merge.
+    assert job["if"] == "github.ref == 'refs/heads/main'"
     scripts = "\n".join(step.get("run", "") for step in job["steps"])
     assert repr(SUBJECT) in scripts
     actions = [step["uses"] for step in job["steps"] if "agent-marketplace-versioner@" in step.get("uses", "")]
@@ -217,12 +218,12 @@ def test_branch_commits_keep_versions_and_main_workflow_bumps_once(tmp_path: Pat
     assert on_main("plugins/tool/evals/fixture/.claude-plugin/plugin.json", "version") == "1.0.1"
     assert on_main(".claude-plugin/marketplace.json", "metadata", "version") == "1.0.1"
 
-    # The run queued behind it bumps only the plugin the racing merge changed.
+    # The version commit's own run (which replaces the racing merge's pending run) bumps what that merge changed.
     run_workflow()
     assert plugin_versions() == ["1.0.1", "1.0.1", "1.0.1"]
     assert on_main(".claude-plugin/marketplace.json", "metadata", "version") == "1.0.2"
 
-    # A rerun on the version commit (the loop the job's `if` also skips) changes nothing.
+    # The run on that version commit changes nothing and pushes nothing, ending the loop.
     head = main_head()
     rerun = run_workflow()
     assert main_head() == head
