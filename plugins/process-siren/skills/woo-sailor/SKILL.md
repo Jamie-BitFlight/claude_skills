@@ -29,9 +29,9 @@ flowchart TD
     Analyze --> Scope{"Single file or directory?"}
     Represent --> Scope
     Improve --> Scope
-    Scope -->|"Single file"| One["Run process-siren with selected mode"]
+    Scope -->|"Single file"| One["Execute selected mode directly in this forked process-siren context"]
     Scope -->|"Directory"| Discover["Discover eligible files; bind material source identities"]
-    Discover --> Models["Run read-only ANALYZE for each file; collect ProcessModels and assessments"]
+    Discover --> Models["Analyze each file read-only in this forked process-siren context; collect ProcessModels and assessments"]
     Models --> Synthesize["Synthesize cross-file contracts, invariants, assumptions, ownership, and recovery"]
     Synthesize --> Route{"Selected mode?"}
     Route -->|"ANALYZE"| Aggregate["Return aggregate findings; preserve per-file assessments"]
@@ -46,6 +46,8 @@ flowchart TD
     Block --> Result
     Apply --> Result
 ```
+
+This skill already runs in the forked `process-siren:process-siren` context selected by frontmatter. Execute the routed work directly; do not recursively invoke or spawn another process-siren agent.
 
 A blocked file does not stop unrelated independent work. `UNVALIDATED` or `INVALID` does not by itself block ANALYZE or faithful REPRESENT. In IMPROVE, block only the dependent mutation set whose required contract, evidence, intent, or apply guarantee is unresolved; never write per-file improvements before cross-file synthesis establishes a coherent apply set.
 
