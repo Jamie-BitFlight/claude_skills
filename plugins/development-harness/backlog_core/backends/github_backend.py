@@ -422,6 +422,7 @@ class GitHubBackend:
         labels: list[str] | None = None,
         first: int = 100,
         after: str | None = None,
+        light: bool = False,
     ) -> gh_client.IssuesPage:
         """Fetch exactly one page of issues -- no cursor-following.
 
@@ -429,7 +430,7 @@ class GitHubBackend:
             This page's issues, continuation cursor, and connection total count.
         """
         return gh_client._fetch_issues_page_graphql(
-            repo, owner, repo_name, states=states, labels=labels, first=first, after=after
+            repo, owner, repo_name, states=states, labels=labels, first=first, after=after, light=light
         )
 
     def search_issues_by_title(self, repo: str, selector: str) -> list[IssueNode]:

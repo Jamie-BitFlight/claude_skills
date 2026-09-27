@@ -174,7 +174,7 @@ class FakeRequester:
             data = self._add_comment(variables)
         else:
             raise AssertionError(f"FakeRequester does not understand this query shape:\n{query}")
-        self.log.append({"operation": operation, "variables": dict(variables)})
+        self.log.append({"operation": operation, "variables": dict(variables), "query": query})
         return {}, {"data": data}
 
     def _matching_issues(self, states: list[str], label: str | None) -> list[FakeIssue]:
@@ -764,3 +764,62 @@ def test_t17_dead_code_is_removed() -> None:
 
     assert not hasattr(operations_module, "read_through_cold_cache")
     assert not hasattr(decisions_module.WorkItemDecisionContext, "all")
+
+
+# ---------------------------------------------------------------------------
+# Priority follow-up (2026-09, repository owner): backlog_add and backlog_list
+# must complete, not hang reading a whole-history page. Pins the exact
+# offline request count for each, and that the per-page query fetch_page
+# sends never selects the assignees connection or createdAt (GitHub's
+# GraphQL cost model penalizes nested connections, and neither field is read
+# by any request-shaped-reads consumer -- see _ISSUES_LIST_QUERY_LIGHT).
+# ---------------------------------------------------------------------------
+
+
+def test_backlog_add_force_true_makes_exactly_one_bounded_request(fixture: FakeGitHubFixture) -> None:
+    # add_item(force=True) skips the duplicate scan entirely and reduces to
+    # exactly this liveness probe (operations._probe_provider_liveness) --
+    # unit-test that seam directly rather than also exercising issue
+    # creation (a separate, unrelated concern this fixture does not fake).
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+    from backlog_core.operations import _decision_context, _probe_provider_liveness
+
+    for number in range(1, 251):
+        fixture.add_tracked_issue(number, f"issue {number}", state="OPEN" if number <= 120 else "CLOSED")
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        context = _decision_context(repo=f"{fixture.owner}/{fixture.name}")
+        assert _probe_provider_liveness(context) is True
+    finally:
+        reset_config()
+
+    list_calls = [entry for entry in fixture.requester.log if entry["operation"] == "ListIssues"]
+    assert len(list_calls) == 1, fixture.requester.log
+    assert list_calls[0]["variables"]["first"] <= 2, list_calls
+    assert "assignees" not in list_calls[0]["query"], list_calls[0]["query"]
+    assert "createdAt" not in list_calls[0]["query"], list_calls[0]["query"]
+
+
+def test_backlog_list_limit_one_makes_exactly_one_light_request(fixture: FakeGitHubFixture) -> None:
+    from backlog_core import operations
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+
+    for number in range(1, 251):
+        fixture.add_tracked_issue(number, f"issue {number}", state="OPEN" if number <= 120 else "CLOSED")
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        result = operations.list_items(limit=1)
+    finally:
+        reset_config()
+
+    assert result["count"] == 1, result
+    list_calls = [entry for entry in fixture.requester.log if entry["operation"] == "ListIssues"]
+    assert len(list_calls) == 1, fixture.requester.log
+    assert list_calls[0]["variables"]["states"] == ["OPEN"], list_calls
+    assert list_calls[0]["variables"]["first"] <= 2, list_calls
+    assert "assignees" not in list_calls[0]["query"], list_calls[0]["query"]
+    assert "createdAt" not in list_calls[0]["query"], list_calls[0]["query"]

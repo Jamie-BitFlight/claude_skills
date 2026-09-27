@@ -131,6 +131,7 @@ class _IssueGateway(Protocol):
         labels: list[str] | None = None,
         first: int = 100,
         after: str | None = None,
+        light: bool = False,
     ) -> gh_client.IssuesPage: ...
 
     def _fetch_targeted_issues(
@@ -313,7 +314,7 @@ class _GitHubWorkItemSync:
         has_next_page = True
         while True:
             page = self._issues._fetch_issues_page_graphql(
-                repo, owner, repo_name, states=states, labels=labels, first=page_size, after=cursor
+                repo, owner, repo_name, states=states, labels=labels, first=page_size, after=cursor, light=True
             )
             total_count = page["total_count"]
             fetched_count += len(page["issues"])

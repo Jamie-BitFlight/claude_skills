@@ -251,15 +251,48 @@ query ListIssues(
 }
 """
 
+#: Same shape as _ISSUES_LIST_QUERY, minus the fields no request-shaped-reads
+#: consumer touches: the assignees connection (a second nested connection per
+#: node, on top of labels -- GitHub's GraphQL cost model penalizes nested
+#: connections, and _GitHubWorkItemSync.fetch_page never reads assignees) and
+#: the createdAt scalar. `body` stays -- root_revision() hashes it as part of
+#: the CAS integrity check on every issue, tracked or not, so it cannot be
+#: dropped without breaking that check for every row (see
+#: backends/_github_work_item_versions.py). Used only by fetch_page's walk
+#: (via _fetch_issues_page_graphql(..., light=True)); _fetch_issues_graphql's
+#: whole-history callers (sync_issues_graphql, issue_to_local_fields) still
+#: need assignees/createdAt and keep the full query.
+_ISSUES_LIST_QUERY_LIGHT = """
+query ListIssues(
+  $owner: String!, $repo: String!, $states: [IssueState!],
+  $labels: [String!], $milestoneNumber: String, $since: DateTime, $first: Int!, $after: String
+) {
+  repository(owner: $owner, name: $repo) {
+    issues(
+      first: $first, after: $after,
+      filterBy: {states: $states, labels: $labels, milestoneNumber: $milestoneNumber, since: $since},
+      orderBy: {field: UPDATED_AT, direction: DESC}
+    ) {
+      totalCount
+      nodes {
+        id number title state body updatedAt
+        labels(first: 50) { nodes { name id } }
+        milestone { id number title dueOn state }
+      }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}
+"""
+
 _ISSUE_TITLE_SEARCH_QUERY = """
 query IssueTitleSearch($searchQuery: String!, $first: Int!, $after: String) {
   search(query: $searchQuery, type: ISSUE, first: $first, after: $after) {
     nodes {
       ... on Issue {
-        id number title state body createdAt updatedAt
+        id number title state body updatedAt
         labels(first: 50) { nodes { name id } }
         milestone { id number title dueOn state }
-        assignees(first: 10) { nodes { login } }
       }
     }
     pageInfo { hasNextPage endCursor }
@@ -753,6 +786,7 @@ def _fetch_issues_page_graphql(
     since: str | None = None,
     first: int = 100,
     after: str | None = None,
+    light: bool = False,
 ) -> IssuesPage:
     """Fetch exactly one ``ListIssues`` page — no cursor-following.
 
@@ -760,6 +794,23 @@ def _fetch_issues_page_graphql(
     follows every page) and :meth:`_GitHubWorkItemSync.fetch_page` (which stops
     as soon as it has enough matches — see that method's docstring for why a
     request-shaped read must not delegate to the follow-everything loop).
+
+    Args:
+        repo: PyGithub Repository object.
+        owner: GitHub repository owner login.
+        repo_name: GitHub repository name.
+        states: Issue states to filter by (e.g. ``["OPEN"]``).
+        labels: Optional list of label names to filter by.
+        milestone_number: Optional milestone number to filter by.
+        since: Optional ISO 8601 timestamp; only issues updated at or after
+            this time are returned.
+        first: Page size (max 100 per GitHub GraphQL limits).
+        after: Optional cursor to continue from.
+        light: Use :data:`_ISSUES_LIST_QUERY_LIGHT` (no assignees connection,
+            no createdAt) instead of the full query. Only a caller that never
+            reads those two fields from the returned nodes may pass ``True``
+            — see that query constant's docstring for which fields it still
+            requires and why.
 
     Returns:
         This page's issues, continuation cursor, and the connection's total count.
@@ -777,7 +828,7 @@ def _fetch_issues_page_graphql(
         "first": first,
         "after": after,
     }
-    data = _graphql_request(repo, _ISSUES_LIST_QUERY, variables)
+    data = _graphql_request(repo, _ISSUES_LIST_QUERY_LIGHT if light else _ISSUES_LIST_QUERY, variables)
     repo_data = data.get("repository") or {}
     issues_conn = repo_data.get("issues") if isinstance(repo_data, dict) else None
     if not isinstance(issues_conn, dict):
