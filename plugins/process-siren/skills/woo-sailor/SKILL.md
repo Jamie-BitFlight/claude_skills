@@ -14,6 +14,8 @@ You are about to process a set of files. Read every flag in <user_arguments>. Se
 
 If there is no <path> value, then stop, and say: /woo-sailor <file-or-directory> [--analyze|--improve|--represent] [--dry-run|--report]
 
+Before reading or analyzing the target, load `/process-siren:improve-processes` and use its semantic model, validation loop, Recursion Safety, and Result Contract. Execute the selected mode in the current invocation context. A host-applied context fork or agent route is optional acceleration, not a precondition for this workflow.
+
 The following diagram is the authoritative routing procedure. Eligible directory files: `**/SKILL.md`, `**/CLAUDE.md`, `**/AGENTS.md`, `**/AGENT.md`, `**/agents/*.md`, `**/rules/*.md`.
 
 ```mermaid
@@ -29,9 +31,9 @@ flowchart TD
     Analyze --> Scope{"Single file or directory?"}
     Represent --> Scope
     Improve --> Scope
-    Scope -->|"Single file"| One["Run process-siren with selected mode"]
+    Scope -->|"Single file"| One["Execute selected mode in the current invocation context"]
     Scope -->|"Directory"| Discover["Discover eligible files; bind material source identities"]
-    Discover --> Models["Run read-only ANALYZE for each file; collect ProcessModels and assessments"]
+    Discover --> Models["Analyze each file read-only in the current invocation context; collect ProcessModels and assessments"]
     Models --> Synthesize["Synthesize cross-file contracts, invariants, assumptions, ownership, and recovery"]
     Synthesize --> Route{"Selected mode?"}
     Route -->|"ANALYZE"| Aggregate["Return aggregate findings; preserve per-file assessments"]
@@ -46,6 +48,10 @@ flowchart TD
     Block --> Result
     Apply --> Result
 ```
+
+For the requested scope, execute `/process-siren:improve-processes` directly after loading it; keep all same-scope work in this invocation. When analysis requires a strictly narrower subsystem, boundary, claim, or unresolved dependency, descend according to its Recursion Safety procedure.
+
+When the selected mode is REPRESENT, load `/process-siren:mermaids-treasure` and render the faithful Mermaid projection. In ANALYZE or IMPROVE, load it and render Mermaid only when that would materially improve the requested result; otherwise return the process model and findings without Mermaid.
 
 A blocked file does not stop unrelated independent work. `UNVALIDATED` or `INVALID` does not by itself block ANALYZE or faithful REPRESENT. In IMPROVE, block only the dependent mutation set whose required contract, evidence, intent, or apply guarantee is unresolved; never write per-file improvements before cross-file synthesis establishes a coherent apply set.
 
