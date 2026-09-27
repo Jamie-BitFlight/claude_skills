@@ -17,7 +17,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, Final, Protocol
 
 import requests
-from github import GithubException
+from github import GithubException, RateLimitExceededException
 from typing_extensions import TypedDict
 
 from backlog_core.github_client import (
@@ -695,6 +695,29 @@ def _call_with_deadline(fn: Callable[[], tuple[dict[str, Any], dict[str, Any]]],
     return outcome[0]
 
 
+def _is_rate_limited(exc: GithubException) -> bool:
+    """Report whether a GraphQL ``GithubException`` is GitHub refusing for a rate limit.
+
+    PyGithub's ``Requester.graphql_query`` never returns a body with ``errors``: anything but a
+    single ``NOT_FOUND`` becomes ``createException(400, headers, data)``. So a ``RATE_LIMITED``
+    answer arrives here with the ``errors`` list in ``exc.data`` and the quota headers in
+    ``exc.headers``. A secondary limit is a real HTTP 403 that PyGithub itself raises as
+    ``RateLimitExceededException``.
+
+    Returns:
+        ``True`` for a ``RATE_LIMITED`` errors entry, an exhausted ``x-ratelimit-remaining``
+        header, or PyGithub's own rate-limit exception.
+    """
+    if isinstance(exc, RateLimitExceededException):
+        return True
+    data = exc.data if isinstance(exc.data, dict) else {}
+    errors = data.get("errors")
+    if isinstance(errors, list) and any(isinstance(e, dict) and e.get("type") == "RATE_LIMITED" for e in errors):
+        return True
+    remaining = {str(k).casefold(): v for k, v in (exc.headers or {}).items()}.get("x-ratelimit-remaining")
+    return str(remaining) == "0"
+
+
 def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, object] | None = None) -> dict[str, Any]:
     """Execute a raw GraphQL query using PyGithub's requester.
 
@@ -727,7 +750,7 @@ def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, obj
     """
     timeout = _graphql_total_timeout_seconds()
     try:
-        headers, response = _call_with_deadline(lambda: repo.requester.graphql_query(query, variables or {}), timeout)
+        _headers, response = _call_with_deadline(lambda: repo.requester.graphql_query(query, variables or {}), timeout)
     except _DeadlineExceeded as exc:
         operation = _graphql_operation_name(query)
         if _GRAPHQL_READ_PATTERN.match(query) is None:
@@ -740,6 +763,9 @@ def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, obj
         msg = f"GraphQL request timed out after {timeout}s (operation: {operation})"
         raise GitHubRequestTimeoutError(msg, timeout_seconds=timeout) from exc
     except GithubException as exc:
+        if _is_rate_limited(exc):
+            msg = f"GitHub GraphQL rate limit exceeded: {_github_exception_message(exc)}"
+            raise GitHubRateLimitedError(msg, retry_after=parse_retry_after_header(exc.headers)) from exc
         if is_graphql_unavailable(exc):
             msg = f"GraphQL is unavailable in this environment: {_github_exception_message(exc)}"
             raise GraphQLUnavailableError(msg) from exc
@@ -753,9 +779,6 @@ def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, obj
     if "errors" in response:
         first_error = response["errors"][0] if response["errors"] else {}
         msg = first_error.get("message", str(response["errors"]))
-        if first_error.get("type") == "RATE_LIMITED":
-            msg_0 = f"GitHub GraphQL rate limit exceeded: {msg}"
-            raise GitHubRateLimitedError(msg_0, retry_after=parse_retry_after_header(headers))
         msg_0 = f"GraphQL error: {msg}"
         raise BacklogError(msg_0)
     if (data := response.get("data")) is None:
