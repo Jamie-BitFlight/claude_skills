@@ -35,6 +35,10 @@ import pytest
 if TYPE_CHECKING:
     from socket import _Address
 
+    from github.Repository import Repository
+
+    from live_test_scope import LiveTestScope
+
 _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost", "localhost.localdomain", ""})
 
 _ADVICE = (
@@ -240,6 +244,11 @@ _MARKERS = (
     "critical: marks tests covering critical-path code requiring stronger correctness guarantees (e.g. round-trip property tests)",
     "cross_backend: marks tests that run only in the test-cross-backend CI matrix job",
     "e2e: marks tests as end-to-end tests",
+    (
+        "e2e_mechanics_probe: marks a pytester or subprocess probe that exercises e2e-marker mechanics "
+        "(network gate, fixture skips) without a sandbox; it skips the live_sandbox preflight, so never "
+        "put it on a test that makes a live request"
+    ),
     "integration: marks tests as integration tests",
     "slow: marks tests as slow",
     "unit: marks tests as unit tests",
@@ -280,6 +289,37 @@ def install_network_guard() -> None:
 def remove_network_guard() -> None:
     """Restore the real socket connect and DNS functions."""
     _network_patch.undo()
+
+
+@pytest.fixture(autouse=True)
+def _live_sandbox_contract(request: pytest.FixtureRequest) -> None:
+    """Run the sandbox scope and preflight check before every e2e test.
+
+    The live job selects every e2e-marked test, so this default, not each test's
+    fixture list, keeps live requests inside the sandbox. A test that needs the
+    validated scope or repository requests ``live_sandbox`` too and gets the same
+    value.
+    """
+    node = request.node
+    if node.get_closest_marker("e2e") and not node.get_closest_marker("e2e_mechanics_probe"):
+        request.getfixturevalue("live_sandbox")
+
+
+@pytest.fixture
+def live_sandbox(request: pytest.FixtureRequest) -> tuple[LiveTestScope, Repository]:
+    """Validate the sandbox scope and its remote marker before any live request.
+
+    Returns:
+        The run's scope and the sandbox repository whose identity and marker were checked.
+    """
+    if request.config.getoption("numprocesses", default=0) not in {None, 0}:
+        pytest.fail("Live scenarios share one configured MCP backend; run this lane with -n 0")
+    # Lazy: these pull in PyGithub, which only the e2e lane needs.
+    from close_test_issues import open_sandbox
+    from live_test_scope import LiveTestScope
+
+    scope = LiveTestScope.from_environment(os.environ)
+    return scope, open_sandbox(scope)
 
 
 @pytest.fixture(autouse=True)

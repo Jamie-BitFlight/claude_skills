@@ -36,9 +36,10 @@ Git symlinks (mode 120000) arrive as plain text files on Windows, so both checke
 ### Common ty failure patterns
 
 - **`unresolved-attribute` on a `ModuleType`**: almost always means the module's directory is
-  missing from `[tool.ty.environment] extra-paths` in `pyproject.toml`. Add it there first —
-  mirroring the matching entry already in `[tool.pytest.ini_options] pythonpath` — and re-run
-  before investigating the importing code itself. For the related `unresolved-import` failure
+  missing from `[tool.ty.environment] extra-paths` in `pyproject.toml`. Add it there first and
+  re-run before investigating the importing code itself. Root `pythonpath` is not the source to
+  mirror: it lists no plugin directories, because each plugin's import roots belong to its
+  `run_pytests.py`. For the related `unresolved-import` failure
   (same `extra-paths` root cause, different symptom — the module isn't found at all rather than
   an attribute on it), see `rules/python-development.md`'s "`unresolved-import` errors" section.
 - **TypedDict nominal typing**: ty treats a `TypedDict` as scoped to its defining module — two

@@ -126,11 +126,6 @@ _DH_PLUGIN_SCRIPTS_DIR = str(_DH_PLUGIN_DIR / "scripts")
 if _DH_PLUGIN_SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _DH_PLUGIN_SCRIPTS_DIR)
 
-_HOOK_REPO_ROOT = Path(__file__).resolve().parents[5]
-_HOOK_SAM_PACKAGES_DIR = str(_HOOK_REPO_ROOT / "packages")
-if _HOOK_SAM_PACKAGES_DIR not in sys.path:
-    sys.path.insert(0, _HOOK_SAM_PACKAGES_DIR)
-
 from run_bounded import terminate_process_tree
 
 # Alphanumeric task ID pattern: "1", "1.1", "T1", "P0-T01", etc.
