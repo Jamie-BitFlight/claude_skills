@@ -9,11 +9,10 @@ The workflow is [Code quality](../workflows/code-quality.yml).
 
 | Changed input | Fast pytest selection | Other checks |
 | --- | --- | --- |
-| `plugins/<name>/...` | That plugin's `run_pytests.py` and the global shard | Affected plugin validation, manifest checks, applicable file linters |
+| `plugins/<name>/...`, including its source and any `conftest.py` | That plugin's `run_pytests.py` and the global shard | Affected plugin validation, manifest checks, applicable file linters |
 | Root documentation, `docs/`, `rules/` documentation | Global shard | Applicable file linters |
 | `research/` documentation | Global shard | Research integration and advisory whole-vault validation |
-| Development-harness content | Its `run_pytests.py` and the global shard | Its integration and memory/SQLite backend lanes |
-| Python provider under a configured shared plugin `pythonpath`, or any `conftest.py` | All configured shards | Applicable file linters; repository-wide type checking |
+| Development-harness content | Its `run_pytests.py` and the global shard | Its integration and cross-backend lanes |
 | Root/shared code, CI, dependencies, tool configuration, or unclassified inputs | All configured shards | Full checks |
 | Main push, manual dispatch, or unavailable PR comparison history | All configured shards | Full checks |
 
@@ -24,10 +23,13 @@ skill tests), which form the `global` shard. Each `plugins/<name>/run_pytests.py
 is one plugin shard: the planner discovers the runner and passes it no marker, so
 the runner's own default selects the fast lane, and the runner owns that plugin's
 test roots and dependencies. `run.py` runs it as `uv run --locked --script`, so
-the runner's committed `run_pytests.py.lock` must be current. A plugin
+the runner's committed `run_pytests.py.lock` must be current; the setup action's
+uv cache key covers these lockfiles as well as `uv.lock`. A plugin
 path in root `testpaths`, or a missing configured directory, fails planning; a
-plugin without a runner gets no pytest shard. New tests still have to satisfy the
-test-root coverage guard, which reads both authorities.
+plugin without a runner gets no pytest shard. A plugin path in root `pythonpath`
+also fails planning: plugin imports belong to the runner's `IMPORT_PATHS`. New
+tests still have to satisfy the test-root coverage guard, which reads both
+authorities.
 
 A marketplace `metadata.version`-only bump does not expand an otherwise local
 change. The planner compares both immutable JSON documents after removing only
@@ -36,10 +38,10 @@ comparison evidence restore full checks. Manifest validation still runs.
 
 Global tests run for every change, including plugin documentation. They check
 cross-plugin/repository contracts, manifests, instruction drift and test discovery,
-so directory ownership alone is insufficient to skip them. Shared Python import
-roots also expand the test matrix conservatively: there is no claimed complete
-reverse-dependency graph. A source edit exposed through global `pythonpath` can
-therefore still run every shard, while a plugin-local test or Markdown edit does not.
+so directory ownership alone is insufficient to skip them. A plugin source or
+`conftest.py` edit selects only that plugin's shard and the global shard: each
+runner passes `-c os.devnull` and `--confcutdir` at its plugin root, so no other
+plugin's run can import that source or load that conftest.
 
 File-local checks use prek's existing filters and the complete PR diff rather than
 maintaining a second lint configuration. Ruff, Biome, Markdown and shell lanes are
@@ -56,11 +58,18 @@ outside the diff; these are cross-file invariants rather than file-local lint.
 The runner's unnamed `prek` operation is this global hygiene lane. Only explicitly
 named language hooks use changed-file selection.
 
-Integration tests keep their existing marker expressions and execution roots,
-with the development-harness shard run through its plugin runner, partitioned into development-harness, research-backlinks and rebase-publication
-shards. Pinned versioner integration remains in the manifest lane. Research-vault
-validation stays advisory. The live-E2E job retains its existing main/manual trigger,
-sandbox credentials, serialization, process deadlines, cleanup and evidence uploads.
+The development-harness lanes beyond its runner's fast default are defined in
+`dh_lanes()` in `plan.py`; `build_plan()` there adds the repository-owned
+integration shards. Each dh lane is the runner plus a marker, never a list of
+test files. The runner owns the test roots, so a test that gains a marker
+anywhere in the plugin joins its lane; `run.py` rejects a runner shard that names
+paths. The planner schedules these lanes only while the runner exists. Move the
+lane table into the runner contract once a second plugin needs a lane beyond its
+fast default. Pinned versioner integration remains in the manifest lane.
+Research-vault validation stays advisory. The live-E2E job retains its existing
+main/manual trigger, sandbox credentials, serialization, process deadlines,
+cleanup and evidence uploads, and runs the development-harness runner with its
+`e2e` marker.
 
 ## Safety and evidence
 

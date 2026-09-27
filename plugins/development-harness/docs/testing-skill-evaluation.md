@@ -53,10 +53,10 @@ integration test checks the fixture's discriminating properties in disposable co
 
 The integration check asserts exact collected case identities, no skips/setup errors, the expected
 assertion failure set, process exit status, and preservation of the original fixture bytes.
-Run it from the repository root using the normal environment:
+Run it through the plugin runner, from any directory:
 
 ```bash
-uv run pytest -m integration plugins/development-harness/tests/test_testing_skill_fixtures.py
+uv run --locked --script plugins/development-harness/run_pytests.py -m integration tests/test_testing_skill_fixtures.py
 ```
 
 This validates the experiment inputs and fault mechanisms. It does not run an LLM or establish

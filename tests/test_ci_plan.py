@@ -40,9 +40,7 @@ def repository(tmp_path: Path) -> Path:
         (tmp_path / plugin / "run_pytests.py").write_text("# runner\n", encoding="utf-8")
     (tmp_path / "tests/test_rebase_publication_identity.py").write_text("", encoding="utf-8")
     (tmp_path / "pyproject.toml").write_text(
-        "[tool.pytest.ini_options]\n"
-        f"testpaths = {json.dumps(paths)}\n"
-        'pythonpath = [".", "plugins/alpha/scripts", "plugins/development-harness"]\n',
+        f'[tool.pytest.ini_options]\ntestpaths = {json.dumps(paths)}\npythonpath = [".", ".agents/tool/scripts"]\n',
         encoding="utf-8",
     )
     return tmp_path
@@ -80,6 +78,59 @@ def test_full_partition_equals_authoritative_testpaths_once(repository: Path) ->
     assert global_shard["paths"] == ["tests", ".agents/tool/scripts"]
     assert plan["allowed_skips"] == ""
     assert names(plan, "integration_matrix") == {"development-harness", "research-backlinks", "rebase-publication"}
+    assert names(plan, "cross_backend_matrix") == {"development-harness"}
+
+
+@pytest.mark.parametrize("lane", ["unit_matrix", "integration_matrix", "cross_backend_matrix"])
+def test_plugin_shards_name_only_their_runner(repository: Path, lane: str) -> None:
+    """The runner owns a plugin's test roots; CI never re-encodes them as paths."""
+    for shard in planner.build_plan(repository, None)[lane]["include"]:
+        if shard["runner"]:
+            assert shard["paths"] == [], shard
+        assert not any(planner.plugin_owner(path) for path in shard["paths"]), shard
+
+
+def test_dh_lanes_are_its_runner_plus_a_marker(repository: Path) -> None:
+    """Every dh lane runs the whole runner topology, so a marker cannot outgrow a path list."""
+    plan = planner.build_plan(repository, None)
+    lanes = [
+        shard
+        for lane in ("integration_matrix", "cross_backend_matrix")
+        for shard in plan[lane]["include"]
+        if shard["name"] == "development-harness"
+    ]
+    assert {(shard["runner"], shard["marker"]) for shard in lanes} == {
+        ("plugins/development-harness/run_pytests.py", "integration and not research_vault"),
+        ("plugins/development-harness/run_pytests.py", "cross_backend"),
+    }
+    assert len(plan["cross_backend_matrix"]["include"]) == 1
+
+
+def test_deleted_dh_runner_schedules_no_dh_lane(repository: Path) -> None:
+    """A lane follows the runner that exists, not a remembered plugin path."""
+    (repository / "plugins/development-harness/run_pytests.py").unlink()
+    plan = planner.build_plan(repository, ["plugins/development-harness/run_pytests.py"])
+    assert names(plan, "integration_matrix") == set()
+    assert plan["cross_backend_matrix"]["include"] == []
+    assert not plan["checks"]["test-cross-backend"]
+    assert not plan["checks"]["test-integration"]
+
+
+def test_plugin_import_root_in_root_pythonpath_is_an_error(repository: Path) -> None:
+    """Plugin imports belong to the plugin runner, as plugin testpaths already do."""
+    config = repository / "pyproject.toml"
+    config.write_text(
+        config.read_text(encoding="utf-8").replace('".agents/tool/scripts"]', '"plugins/alpha/scripts"]'),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match=r"run_pytests\.py, not root pythonpath"):
+        planner.build_plan(repository, ["README.md"])
+
+
+def test_repository_configuration_plans() -> None:
+    """The real root config satisfies every rule the planner enforces on its fixture."""
+    plan = planner.build_plan(ROOT, None)
+    assert names(plan, "cross_backend_matrix") == {"development-harness"}
 
 
 @pytest.mark.parametrize("path", ["plugins/alpha/scripts/test_cli.py", "plugins/alpha/model/tests/test_model.py"])
@@ -90,12 +141,13 @@ def test_test_only_python_change_is_plugin_local(repository: Path, path: str) ->
     assert plan["checks"]["typecheck-ty"]
 
 
-@pytest.mark.parametrize("path", ["plugins/alpha/scripts/api.py", "plugins/alpha/tests/conftest.py"])
-def test_shared_imports_and_fixtures_expand_tests_not_file_lint(repository: Path, path: str) -> None:
-    """Shared Python consumers are not silently skipped, but file-local lint stays local."""
+@pytest.mark.parametrize(
+    "path", ["plugins/alpha/scripts/api.py", "plugins/alpha/tests/conftest.py", "plugins/alpha/conftest.py"]
+)
+def test_plugin_source_and_fixtures_stay_in_their_plugin(repository: Path, path: str) -> None:
+    """Runners read only their own imports and conftests, so no other plugin can consume these."""
     plan = planner.build_plan(repository, [path])
-    assert names(plan) == {"alpha", "beta", "development-harness", "global"}
-    assert plan["full_tests"]
+    assert names(plan) == {"alpha", "global"}
     assert not plan["lint_all"]
 
 
@@ -116,7 +168,6 @@ def test_shared_imports_and_fixtures_expand_tests_not_file_lint(repository: Path
 def test_shared_or_unknown_inputs_fail_safe_to_full_checks(repository: Path, path: str) -> None:
     """An unclassified dependency cannot produce a falsely narrow success."""
     plan = planner.build_plan(repository, [path])
-    assert plan["full_tests"]
     assert plan["lint_all"]
 
 
@@ -152,6 +203,7 @@ def test_dh_content_selects_backend_and_dh_integration(repository: Path) -> None
     plan = planner.build_plan(repository, ["plugins/development-harness/skills/example/SKILL.md"])
     assert names(plan) == {"development-harness", "global"}
     assert names(plan, "integration_matrix") == {"development-harness"}
+    assert names(plan, "cross_backend_matrix") == {"development-harness"}
     assert plan["checks"]["test-cross-backend"]
 
 
@@ -306,7 +358,7 @@ def test_runner_propagates_actual_child_failure(tmp_path: Path, exit_code: int) 
     env = dict(
         os.environ,
         PATH=f"{tmp_path}{os.pathsep}{os.environ['PATH']}",
-        CI_PLAN='{"version":1}',
+        CI_PLAN='{"version":2}',
         CI_SHARD='{"paths":["tests"]}',
     )
     result = subprocess.run(
@@ -345,7 +397,7 @@ def test_marketplace_version_bump_does_not_expand_plugin_content_change(
     head = git(repository, "rev-parse", "HEAD")
     paths, resolved, tip, reason = planner.changed_paths(repository, "pull_request", base, head)
     plan = planner.build_plan(repository, paths, resolved, tip, reason)
-    assert plan["full_tests"] is registry_changed
+    assert plan["lint_all"] is registry_changed
     assert names(plan) == (
         {"alpha", "beta", "development-harness", "global"} if registry_changed else {"alpha", "global"}
     )
@@ -355,7 +407,6 @@ def test_marketplace_version_bump_does_not_expand_plugin_content_change(
 def test_marketplace_comparison_without_history_is_conservative(repository: Path) -> None:
     """Unavailable manifest evidence does not become an assumed version-only bump."""
     plan = planner.build_plan(repository, [".claude-plugin/marketplace.json", "plugins/alpha/README.md"])
-    assert plan["full_tests"]
     assert plan["lint_all"]
 
 
@@ -366,7 +417,30 @@ def test_runner_rejects_an_unsafe_shard_runner(runner_path: str) -> None:
         runner.command("pytest", {}, {"name": "alpha", "runner": runner_path, "paths": [], "marker": ""})
 
 
+def test_runner_rejects_paths_for_a_plugin_shard() -> None:
+    """A path inside a runner shard would silently narrow the runner's own test roots."""
+    shard = {"name": "alpha", "runner": "plugins/alpha/run_pytests.py", "paths": ["tests"], "marker": "integration"}
+    with pytest.raises(ValueError, match="owns its test paths"):
+        runner.command("pytest", {}, shard)
+
+
 def test_runner_runs_a_plugin_shard_from_its_script_lockfile() -> None:
     """A plugin shard resolves from the runner's committed lockfile, never a fresh resolution."""
     shard = {"name": "alpha", "runner": "plugins/alpha/run_pytests.py", "paths": [], "marker": ""}
     assert runner.command("pytest", {}, shard) == ["uv", "run", "--locked", "--script", "plugins/alpha/run_pytests.py"]
+
+
+def test_runner_rejects_a_plan_from_another_schema_version(tmp_path: Path) -> None:
+    """A plan without cross_backend_matrix, or still carrying full_tests, is refused, not half-read."""
+    assert planner.build_plan(ROOT, None)["version"] == runner.PLAN_VERSION
+    env = dict(os.environ, CI_PLAN='{"version":1}', CI_SHARD="{}")
+    result = subprocess.run(
+        [sys.executable, str(ROOT / ".github/ci/run.py"), "pytest"],
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    assert result.returncode != 0
+    assert f"Expected CI plan version {runner.PLAN_VERSION}, received 1" in result.stderr
