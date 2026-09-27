@@ -27,7 +27,7 @@ import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, TypeGuard
+from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, TypeGuard, cast
 
 import dh_paths
 import dispatch_schema
@@ -46,7 +46,7 @@ from . import models, sync_engine
 from .artifact_manifest_store import artifact_content_reference, load_manifest as load_manifest_record, publish_artifact
 from .artifact_registry import ArtifactRegistry
 from .backend_protocol import get_config
-from .backend_types import ContentProvider, SnapshotCheckpointProvider, SyncProvider
+from .backend_types import ContentProvider, SyncProvider
 from .disclosure_handler import BacklogViewDisclosureHandler, DisclosureRequest, DisclosureRequestParser
 from .disclosure_types import DisclosureMode, DisclosureParamError
 from .dispatch_state import DispatchStateManager
@@ -1237,18 +1237,6 @@ def _launch_background_sync(*, full_refresh: bool = False) -> asyncio.Task[None]
     return task
 
 
-def _schedule_maintenance_if_checkpoint_absent() -> bool:
-    """Schedule non-blocking MCP maintenance only for a cold remote cache."""
-    backend = get_config().backend
-    if (
-        not _startup_sync_enabled()
-        or not isinstance(backend, SnapshotCheckpointProvider)
-        or backend.has_synced_snapshot()
-    ):
-        return False
-    return _launch_background_sync() is not None
-
-
 def _read_enabled_from_config_file(yaml_parser: object, config_path: object) -> bool | None:
     """Read ``backlog.startup_sync.enabled`` from one config file.
 
@@ -1797,7 +1785,14 @@ def _resolve_effective_limit(all_items: list[dict[str, str | bool]], offset: int
 )
 async def backlog_list(
     refresh: Annotated[
-        bool, Field(description="Reconcile the command's live provider snapshot in the foreground before returning")
+        bool,
+        Field(
+            description=(
+                "Reconcile the command's live provider snapshot in the foreground before returning. "
+                "Only pushes local intent for the rows this call actually listed — not the whole "
+                "backlog. Use backlog_sync for a whole-backlog reconcile."
+            )
+        ),
     ] = False,
     allow_cached: Annotated[bool, Field(description=_ALLOW_CACHED_DESCRIPTION)] = False,
     label: Annotated[str | None, Field(description="Filter by GitHub label (e.g. 'priority:p1', 'type:bug')")] = None,
@@ -1984,6 +1979,10 @@ async def backlog_list(
     a warned cache fallback after that live attempt fails.
     """
     out = Output()
+    # count_only walks the requested state set to an exact count (D4) regardless
+    # of the caller's limit -- a bounded request-shaped page would leave `total`
+    # honestly unknown (None) whenever a local predicate removed a row.
+    operations_limit = 0 if count_only else limit
     try:
         _assert_config()
         result, backend_status = await asyncio.gather(
@@ -2000,6 +1999,8 @@ async def backlog_list(
                 include_closed=include_closed,
                 filter_by_key=filter_by_key,
                 search=search,
+                offset=offset,
+                limit=operations_limit,
                 output=out,
             ),
             asyncio.to_thread(_probe_backend_status),
@@ -2011,7 +2012,6 @@ async def backlog_list(
             {"error": str(e), "retryable": _retryable(e), "backend": backend_status.model_dump(), **out.to_dict()},
         )
 
-    _schedule_maintenance_if_checkpoint_absent()
     sync_state_block, sync_warnings = _build_sync_state_block(get_sync_state())
 
     if result.get("items") is None:
@@ -2053,11 +2053,23 @@ async def backlog_list(
     # selected the same item).  Keyed on numeric issue number; first occurrence wins.
     all_items = _dedup_by_issue_number(all_items)
 
-    total = len(all_items)
+    # A GitHub-backed listing with an explicit positive limit already walked a
+    # request-shaped page (D3/D4): `all_items` IS the requested slice, already
+    # honestly counted by operations.list_items. Re-slicing or re-counting it
+    # here would silently discard that honesty (a `None` total papered over
+    # with `len(all_items)`, or a `has_more` recomputed against the wrong
+    # population). `limit=0` (count_only or the auto-paginate default) still
+    # walks to completion, so `all_items` is the *whole* matching set there and
+    # the pre-existing token-budget slicing below applies exactly as before.
+    page_already_shaped = operations_limit > 0 and "total" in result
+    total: int | None = cast("int | None", result.get("total")) if page_already_shaped else len(all_items)
 
     # cache_open_count reflects the same filter as the items list.
     # Hoisted above count_only short-circuit so divergence computation always has
     # the correct cache count regardless of which path returns.
+    # An unknown total (page_already_shaped with a local predicate in play)
+    # leaves this explicitly unknown too, rather than a real observation this
+    # response never made.
     backend_status.cache_open_count = total
 
     # Build sync_state block when the background sync is not IDLE.
@@ -2085,14 +2097,26 @@ async def backlog_list(
         # Without them, a caller reading a bare count from a warm cache that
         # still holds unconfirmed local writes could mistake local-only rows
         # for provider-acknowledged data (Codex review, PR #3576 finding 2).
-        return _build_count_only_response(total, result, out, sync_state_block, sync_warnings)
+        # count_only always forces operations_limit=0 (unbounded), so
+        # page_already_shaped is always False here and `total` is always the
+        # real int computed above, never the possibly-unknown `result["total"]`.
+        return _build_count_only_response(cast("int", total), result, out, sync_state_block, sync_warnings)
 
     # Append the human-readable backend status line to the messages list.
     out.info(_format_backend_status_message(backend_status))
 
-    effective_limit = _resolve_effective_limit(all_items, offset, limit)
-    page_items = all_items[offset : offset + effective_limit]
-    has_more = (offset + effective_limit) < total
+    if page_already_shaped:
+        # Already the exact requested page (D3/D4) -- operations.list_items
+        # computed an honest has_more itself; re-slicing or recomputing it
+        # against a possibly-unknown total would be wrong, not just redundant.
+        effective_limit = limit
+        page_items = all_items
+        has_more = bool(result.get("has_more"))
+    else:
+        effective_limit = _resolve_effective_limit(all_items, offset, limit)
+        page_items = all_items[offset : offset + effective_limit]
+        # Not page_already_shaped means total was set to len(all_items) above -- always an int.
+        has_more = (offset + effective_limit) < cast("int", total)
 
     # Primitive 2 and 1: enrich page items when depth or match context is requested.
     # Order matters: match context must read body BEFORE item_depth removes it.
@@ -2543,8 +2567,6 @@ async def backlog_view(
         disclosure_result = {"error": str(exc), "retryable": _retryable(exc), "invalid_params": exc.invalid_params}
 
     if disclosure_result is not None:
-        if "error" not in disclosure_result:
-            _schedule_maintenance_if_checkpoint_absent()
         return _respond(BacklogViewResponse, disclosure_result, exclude_none=False, exclude_unset=True)
     # ---- PASSTHROUGH: falls through to legacy code below -----------------------
 
@@ -2571,7 +2593,6 @@ async def backlog_view(
             allow_cached=allow_cached,
         )
         full_response = result.model_dump()
-        _schedule_maintenance_if_checkpoint_absent()
         if not summary:
             # Normalise an empty ``sections=[]`` to "no section filter" (equivalent
             # to None) so the falsy-vs-None handling is consistent everywhere
@@ -2765,7 +2786,6 @@ async def backlog_list_followups(
         result = await asyncio.to_thread(
             operations.list_followups, followup_to=followup_to, allow_cached=allow_cached, output=out
         )
-        _schedule_maintenance_if_checkpoint_absent()
         return _respond(BacklogListFollowupsResponse, {**result, **out.to_dict()})
     except BacklogError as e:
         return _respond(BacklogListFollowupsResponse, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})
@@ -3248,7 +3268,6 @@ async def backlog_get_sam_tasks(
             allow_cached=allow_cached,
             output=out,
         )
-        _schedule_maintenance_if_checkpoint_absent()
         return _respond(SamTaskLookupResult, {**result, **out.to_dict()})
     except BacklogError as e:
         return _respond(SamTaskLookupResult, {"error": str(e), "retryable": _retryable(e), **out.to_dict()})

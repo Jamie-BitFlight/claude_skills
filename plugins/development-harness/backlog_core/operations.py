@@ -36,6 +36,7 @@ from .backend_types import (
     ContentProvider,
     IssueCommentNode,
     IssueNode,
+    ListPageRequest,
     MilestoneFullNode,
     SnapshotCheckpointProvider,
     SnapshotCompletenessProvider,
@@ -71,6 +72,7 @@ from .models import (
     ItemNotFoundError,
     MilestoneInfo,
     Output,
+    ProviderItem,
     ProviderSnapshot,
     PullRequestRef,
     ReconcileRequest,
@@ -103,10 +105,10 @@ from .parsing import (
 from .rendering import heading_to_unknown_key, unknown_key_to_heading as reconstruct_unknown_heading
 from .search import ContentDuplicateMatch, DuplicateCheckStatus, apply_search_filter, find_content_duplicates
 from .section_registry import SectionKey, resolve_section_name
-from .status_registry import STATUS_LABEL_PREFIX, StatusLabel
-from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS, get_sync_state
+from .status_registry import STATUS_LABEL_PREFIX, StatusLabel, pick_primary_status_label
+from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS
 from .timestamps import now_iso
-from .work_item_decisions import CommandWorkItems, DecisionTarget, WorkItemDecisionContext
+from .work_item_decisions import CommandWorkItems, DecisionTarget, ListPage, WorkItemDecisionContext
 
 _SAM_SUCCESSFUL_STATUSES: frozenset[str] = SAM_CORE_SUCCESSFUL_STATUSES | {"closed", "done"}
 _SAM_PLAN_PAGE_SIZE: Final = 100
@@ -1610,70 +1612,124 @@ def _validate_add_item_type(type_: str) -> None:
 _DUPLICATE_TERMINAL_STATUSES: frozenset[str] = frozenset({"done", "resolved", "closed", "completed"})
 
 
-def _duplicate_candidates(context: WorkItemDecisionContext) -> list[dict[str, str | bool]]:
-    """Build duplicate-check candidates, excluding skipped and terminal-status items.
+def _is_live_candidate(item: BacklogItem) -> bool:
+    """Whether *item* belongs in a whole-set scan (not skipped, not terminal).
 
-    ``_build_list_entry(item, {})`` falls back to an empty ``status`` string for
-    numeric-issue items (no batch-fetched status map is available here), which
-    ``find_content_duplicates`` cannot match against its excluded-status set.
-    Filtering skip/terminal items before building entries keeps done/resolved/
-    closed/skipped items from surviving as live duplicate candidates. The
-    status check is case-insensitive because numeric-issue items reloaded with
-    a legacy/uppercase status (e.g. ``"COMPLETED"``) may not have gone through
-    the parsing-time skip computation that lowercases and sets ``item.skip``.
+    The status check is case-insensitive because numeric-issue items reloaded
+    with a legacy/uppercase status (e.g. ``"COMPLETED"``) may not have gone
+    through the parsing-time skip computation that lowercases and sets
+    ``item.skip``.
 
     Returns:
-        List entry dicts for every non-skipped, non-terminal-status item.
+        ``True`` when *item* is neither skipped nor terminal-status.
     """
-    items = context.all().provider_items + context.pending()
-    items = [it for it in items if not it.skip and it.status.casefold() not in _DUPLICATE_TERMINAL_STATUSES]
+    return not item.skip and item.status.casefold() not in _DUPLICATE_TERMINAL_STATUSES
+
+
+class _OpenScan(BaseModel):
+    """Every open, live-candidate item plus queued pending intent (O3).
+
+    Whole-set consumers — duplicate detection, follow-up listing, and
+    normalize — now scan the OPEN state set only, never closed history: the
+    repository owner's O3 decision (request-shaped-reads design brief).
+    ``live`` is ``True`` only once a GitHub scan got a real answer from the
+    provider (``False`` for a cache fallback); always ``True`` for a
+    non-GitHub backend, which has no such distinction.
+    """
+
+    items: list[BacklogItem]
+    live: bool
+
+
+def _open_scan(context: WorkItemDecisionContext) -> _OpenScan:
+    """Read every open, live-candidate item, hydrated, with no closed history (O3).
+
+    Returns:
+        The open-scan items (page rows plus queued pending intent) and
+        whether the read was live.
+    """
+    if not getattr(context.backend, "supports_github_extras", False):
+        items = [it for it in context.backend.list_work_items() if _is_live_candidate(it)]
+        pending = [it for it in context.pending() if _is_live_candidate(it)]
+        return _OpenScan(items=items + pending, live=True)
+    page = context.page(
+        ListPageRequest(repo=context.repo, include_closed=False, limit=0),
+        match=lambda item, provider: _is_live_candidate(item),
+        force_hydration=True,
+    )
+    pending = [it for it in context.pending() if _is_live_candidate(it)]
+    return _OpenScan(items=page.provider_items + pending, live=page.provider_snapshot is not None)
+
+
+def _probe_provider_liveness(context: WorkItemDecisionContext) -> bool:
+    """Confirm the provider answered, without a whole-set scan (D2, ``force=True`` path).
+
+    ``add_item(force=True)`` skips the duplicate scan entirely, so it has no
+    other signal that the provider actually answered rather than the read
+    quietly falling back to cache.
+
+    Returns:
+        ``True`` once the provider genuinely answered (or the backend is not
+        GitHub-backed, which has no such distinction).
+    """
+    if not getattr(context.backend, "supports_github_extras", False):
+        return True
+    page = context.page(
+        ListPageRequest(repo=context.repo, include_closed=False, limit=1),
+        match=lambda item, provider: True,
+        force_hydration=False,
+    )
+    return page.provider_snapshot is not None
+
+
+def _duplicate_candidates_from(items: list[BacklogItem]) -> list[dict[str, str | bool]]:
+    """Build duplicate-check candidate entries from an already-scanned item list.
+
+    ``_build_list_entry(item, {})`` falls back to an empty ``status`` string
+    for numeric-issue items (no batch-fetched status map is needed here,
+    since *items* is already restricted to live candidates).
+
+    Returns:
+        List entry dicts for the given items.
+    """
     return [_build_list_entry(it, {}) for it in items]
 
 
 def _classify_duplicate_check(
-    context: WorkItemDecisionContext, title: str, description: str, out: Output
+    items: list[BacklogItem], title: str, description: str
 ) -> tuple[DuplicateCheckStatus, list[ContentDuplicateMatch]]:
-    """Classify whether title/description content matches an existing backlog item.
-
-    Checks the command's live provider observation together with separately
-    queued local intent. A live read failure propagates by default; a context
-    configured with ``allow_cached=True`` may use its warned cache fallback.
-    A successful live observation with no match is authoritative.
+    """Classify whether title/description content matches an already-scanned item.
 
     Args:
-        context: Command-scoped live provider observation.
+        items: The open-scan's live-candidate items plus pending intent.
         title: Title of the new item.
         description: Description of the new item.
-        out: Output collector for a COULD_NOT_VERIFY warning.
 
     Returns:
         Tuple of (status, matches). *matches* is non-empty only when status is
         ``DUPLICATE_FOUND``.
     """
-    matches = find_content_duplicates(title, description, _duplicate_candidates(context))
+    matches = find_content_duplicates(title, description, _duplicate_candidates_from(items))
     if matches:
         return DuplicateCheckStatus.DUPLICATE_FOUND, matches
     return DuplicateCheckStatus.NO_DUPLICATE, []
 
 
-def _check_for_duplicates(
-    context: WorkItemDecisionContext, title: str, description: str, force: bool, out: Output
-) -> None:
+def _check_for_duplicates(scan: _OpenScan, title: str, description: str, force: bool) -> None:
     """Raise DuplicateItemError if a content duplicate is found and force is False.
 
     Args:
-        context: Command-scoped live provider observation.
+        scan: The open-scan already read for this command.
         title: Title of the new item.
         description: Description of the new item.
         force: When True, skip the check entirely.
-        out: Output collector for a COULD_NOT_VERIFY warning.
 
     Raises:
         DuplicateItemError: If one or more content-matching items are found.
     """
     if force:
         return
-    status, matches = _classify_duplicate_check(context, title, description, out)
+    status, matches = _classify_duplicate_check(scan.items, title, description)
     match status:
         case DuplicateCheckStatus.DUPLICATE_FOUND:
             raise DuplicateItemError(matches)
@@ -1682,9 +1738,19 @@ def _check_for_duplicates(
 
 
 def _resolve_reference(context: WorkItemDecisionContext, priority: str, slug: str) -> str:
+    """Resolve a collision-free slug reference from cached records and pending intent alone.
+
+    No live read: every provider reference is always ``#N`` (D2), so a
+    provider-linked row can never collide with a slug reference — checking
+    the provider-private cache plus queued intent is sufficient and avoids
+    spending a live round trip just to mint a reference.
+
+    Returns:
+        A slug reference not already used by a cached record or pending item.
+    """
     base = f"{priority.lower()}-{slug}"
     reference = base
-    existing_references = {item.reference for item in context.all().provider_items + context.pending()}
+    existing_references = {item.reference for item in context.cached_records() + context.pending()}
     idx = 0
     while reference in existing_references:
         idx += 1
@@ -1851,9 +1917,14 @@ def add_item(
 
     out = output or Output()
     context = _decision_context(repo=repo, allow_cached=allow_cached, output=out)
-    observed = context.all()
-
-    _check_for_duplicates(context, title, description, force, out)
+    if force:
+        # The duplicate scan below never runs, so it never provides this
+        # command's liveness signal either -- probe once, directly (D2).
+        live_observed = _probe_provider_liveness(context)
+    else:
+        scan = _open_scan(context)
+        live_observed = scan.live
+        _check_for_duplicates(scan, title, description, force)
 
     today_str = today()
     slug = title_to_slug(title)
@@ -1871,9 +1942,7 @@ def add_item(
         files=files,
         suggested_location=suggested_location,
     )
-    can_create_provider_item = not getattr(context.backend, "supports_github_extras", False) or (
-        observed.provider_snapshot is not None
-    )
+    can_create_provider_item = not getattr(context.backend, "supports_github_extras", False) or live_observed
     issue_ref = _try_create_backend_issue_ref(item_data, repo, out) if can_create_provider_item else ""
     item_reference = issue_ref or _resolve_reference(context, priority, slug)
 
@@ -2236,35 +2305,194 @@ def _build_list_entry(
     return entry
 
 
-def read_through_cold_cache(repo: str, output: Output) -> None:
-    """Attempt one fetch-only, unlabeled refresh for a never-synced cache."""
-    sync_state = get_sync_state()
-    previous_sync_state = sync_state.try_claim()
-    if previous_sync_state is None:
-        output.info(
-            "  A background sync is already in progress; skipping the implicit "
-            "read-through for this never-synced cache rather than starting a second one."
-        )
-        return
-    succeeded = False
+def _status_push_label(status: str | None) -> str | None:
+    """Return the GitHub label a ``status=`` filter value maps to, if any.
+
+    ``needs-grooming`` means "no status label present" — there is no label to
+    push for that value, so the local recheck alone decides it (D2). An
+    unrecognized value also pushes nothing; the local recheck still runs and
+    simply matches no row.
+    """
+    if not status or status == "needs-grooming":
+        return None
+    candidate = status if status.startswith(STATUS_LABEL_PREFIX) else f"{STATUS_LABEL_PREFIX}{status}"
     try:
-        # A label-scoped reconcile cannot establish the global snapshot checkpoint.
-        refresh_local_cache_from_github(repo, None, output=output, apply_local_patches=False)
-        succeeded = True
-    except (
-        GithubException,
-        BackendUnavailableError,
-        CacheStateCorruptError,
-        ContentUnavailableError,
-        OSError,
-        *RETRYABLE_TRANSIENT_EXCEPTIONS,
-    ) as exc:
-        output.warn(f"  WARNING: Could not refresh the never-synced local cache: {exc}")
-    finally:
-        if succeeded:
-            sync_state.complete_claim()
+        StatusLabel(candidate)
+    except ValueError:
+        return None
+    return candidate
+
+
+def _page_needs_hydration(
+    *, type_: str | None, topic: str | None, search: str | None, filter_by_key: dict[str, str] | None
+) -> bool:
+    """Whether this page's local predicates need hydrated body content (D2').
+
+    ``type_``/``topic`` are parsed-body metadata and ``search`` reads the full
+    searchable body, so both always need hydration. ``filter_by_key`` is
+    conservatively treated the same way, since it can target a
+    content-derived field (e.g. ``type``) as easily as a node-decidable one
+    (e.g. ``issue``) — a documented simplification that over-hydrates a
+    ``filter_by_key`` targeting only node fields.
+
+    Returns:
+        ``True`` when any content-dependent filter is active.
+    """
+    return bool(type_ or topic or search is not None or filter_by_key)
+
+
+def _page_status_map(provider: ProviderItem) -> dict[int, IssueStatus]:
+    """Build the one-row status map a request-shaped candidate's own labels/state give directly.
+
+    Returns:
+        A one-entry status map, or empty for a non-numeric reference.
+    """
+    number = parse_issue_number(provider.reference)
+    if number is None:
+        return {}
+    return {
+        number: IssueStatus(
+            status=pick_primary_status_label([
+                label for label in provider.labels if label.startswith(STATUS_LABEL_PREFIX)
+            ]),
+            milestone=provider.milestone,
+            state=provider.state,
+        )
+    }
+
+
+def _page_match(
+    item: BacklogItem,
+    provider: ProviderItem,
+    *,
+    label: str | None,
+    section: str | None,
+    title: str | None,
+    status: str | None,
+    type_: str | None,
+    topic: str | None,
+    include_closed: bool,
+    filter_by_key: dict[str, str] | None,
+    search: str | None,
+) -> bool:
+    """The one local predicate a request-shaped list candidate must pass.
+
+    Reuses ``_filter_open_items``/``_build_list_entry``/``apply_search_filter``
+    over a one-item slice, so the request-shaped path and the pre-existing
+    filter semantics can never silently diverge.
+
+    Returns:
+        ``True`` when *item* passes every active filter.
+    """
+    base_excluded = (
+        item.skip
+        or not item.section
+        or (not include_closed and item.status in _TERMINAL_STATUSES)
+        or (bool(label) and label not in item.metadata.labels)
+    )
+    if base_excluded:
+        return False
+    status_map = _page_status_map(provider)
+    matches = _filter_open_items(
+        [item],
+        section,
+        title,
+        status,
+        status_map,
+        type_=type_,
+        topic=topic,
+        status_live=True,
+        status_map_unavailable=False,
+    )
+    if not matches:
+        return False
+    if filter_by_key or search is not None:
+        entry = _build_list_entry(item, status_map, status_live=True)
+        if filter_by_key and not all(str(entry.get(key)) == value for key, value in filter_by_key.items()):
+            return False
+        if search is not None and not apply_search_filter([entry], search):
+            return False
+    return True
+
+
+def _read_list_page(
+    *,
+    backend: object,
+    refresh: bool,
+    allow_cached: bool,
+    repo: str,
+    output: Output,
+    label: str | None,
+    section: str | None,
+    title: str | None,
+    status: str | None,
+    type_: str | None,
+    topic: str | None,
+    include_closed: bool,
+    filter_by_key: dict[str, str] | None,
+    search: str | None,
+    offset: int,
+    limit: int,
+) -> ListPage:
+    """Read one request-shaped GitHub list page and write it through the cache.
+
+    Every successful live page writes exactly the rows it fetched through a
+    TARGETED reconcile (D7) — ``apply_local_patches`` follows *refresh*, so a
+    plain list acknowledges nothing while ``refresh=True`` also pushes local
+    intent for the listed rows only (D6). The checkpoint never moves: TARGETED
+    never advances it. A failed write-through is warned, not raised — the
+    read it is attached to has already succeeded.
+
+    Returns:
+        The request-shaped page (matched rows plus honest pagination facts).
+    """
+    context = _decision_context(repo=repo, allow_cached=allow_cached, output=output)
+    pushed_labels = [value for value in (label, _status_push_label(status)) if value]
+    request = ListPageRequest(
+        repo=repo, include_closed=include_closed, labels=pushed_labels, offset=offset, limit=limit
+    )
+    page = context.page(
+        request,
+        match=lambda item, provider: _page_match(
+            item,
+            provider,
+            label=label,
+            section=section,
+            title=title,
+            status=status,
+            type_=type_,
+            topic=topic,
+            include_closed=include_closed,
+            filter_by_key=filter_by_key,
+            search=search,
+        ),
+        force_hydration=_page_needs_hydration(type_=type_, topic=topic, search=search, filter_by_key=filter_by_key),
+    )
+    snapshot = page.provider_snapshot
+    if snapshot is not None and isinstance(backend, SyncProvider):
+        references = [item.reference for item in snapshot.items]
+        try:
+            result = backend.reconcile(
+                ReconcileRequest(
+                    scope=ReconcileScope.TARGETED, repo=repo, references=references, apply_local_patches=refresh
+                ),
+                snapshot=snapshot,
+            )
+        except (BackendUnavailableError, BacklogError) as exc:
+            output.warn(f"  WARNING: Could not write this page through to the local cache: {exc}")
         else:
-            sync_state.release_claim(previous_sync_state)
+            if refresh:
+                summary = (
+                    f"Reconciled {result.fetched_items} provider item(s): {result.local_updates} local updates, "
+                    f"{result.provider_patches} patches, {result.no_ops} no-ops, {result.conflicts} conflicts, "
+                    f"{result.failures} failures, {result.pending_mutations} pending mutation(s), "
+                    f"{result.rejected_mutations} rejected mutation(s)."
+                )
+                if result.conflicts or result.failures or result.pending_mutations or result.rejected_mutations:
+                    output.warn(summary)
+                else:
+                    output.info(summary)
+    return page
 
 
 class _ListStatusMapResolution(BaseModel):
@@ -2457,12 +2685,22 @@ def _listing_provenance(backend: object) -> tuple[bool, bool, bool, bool]:
 def _read_list_decision(
     *, backend: object, refresh: bool, allow_cached: bool, label: str | None, repo: str, output: Output
 ) -> CommandWorkItems:
-    """Read one command snapshot and optionally reconcile it in foreground.
+    """Read one command snapshot from a non-GitHub backend's own authoritative storage.
+
+    Non-GitHub backends have no provider-private cache and no GraphQL round
+    trip to shape — ``list_work_items()`` already reads the backend's own
+    authoritative storage directly, so there is nothing here for the
+    request-shaped GitHub path (``_read_list_page``) to improve on.
 
     Returns:
         The command-scoped provider observation.
     """
-    read = _decision_context(repo=repo, allow_cached=allow_cached, output=output).all()
+    del allow_cached  # Unused: non-GitHub backends have no cached fallback to opt into.
+    live_backend = get_config().backend
+    read = CommandWorkItems(
+        provider_items=live_backend.list_work_items(),
+        from_cache=bool(getattr(live_backend, "supports_cached_listing", False)),
+    )
     if refresh and isinstance(backend, SyncProvider):
         request = ReconcileRequest(
             scope=ReconcileScope.INCREMENTAL, repo=repo, label=label or "", apply_local_patches=True
@@ -2526,6 +2764,8 @@ def list_items(
     output: Output | None = None,
     filter_by_key: dict[str, str] | None = None,
     search: str | None = None,
+    offset: int = 0,
+    limit: int = 0,
 ) -> dict[str, int | bool | str | list[str] | list[dict[str, str | bool]] | None]:
     """List backlog items from one live provider observation when supported.
 
@@ -2561,19 +2801,52 @@ def list_items(
         search: Full-text search query (see backlog_core.search for syntax).
             Applied after filter_by_key, on the result item dicts. None skips
             search filtering entirely.
+        offset: For a GitHub-backed listing only, skip the first N matching
+            rows before the request-shaped walk starts collecting a page —
+            see ``_read_list_page``. Ignored for other backends, which have
+            no provider round trip to shape; their caller pages the full
+            result set instead.
+        limit: For a GitHub-backed listing only, the request-shaped walk
+            collects at most this many matching rows past *offset* (0 = walk
+            the whole requested state set). Ignored for other backends.
 
     Returns:
         Dict with items list (each item a dict with section, title, issue, plan, type, topic,
         file_path, groomed, status, and milestone fields for items with a GitHub issue),
         plus ``count``, ``from_cache`` and ``has_pending_writes``. A successful
         live read returns ``from_cache=False``; warned fallback returns
-        ``from_cache=True``.
+        ``from_cache=True``. For a GitHub-backed listing, also carries
+        ``total`` (``int | None`` — see ``ListPageResult``) and ``has_more``,
+        both exact to the request-shaped walk; other backends carry neither,
+        and the caller pages the full unpaginated result set itself.
     """
     out = output or Output()
     backend = get_config().backend
-    read = _read_list_decision(
-        backend=backend, refresh=refresh, allow_cached=allow_cached, label=label, repo=repo, output=out
-    )
+    page: ListPage | None = None
+    if getattr(backend, "supports_github_extras", False):
+        page = _read_list_page(
+            backend=backend,
+            refresh=refresh,
+            allow_cached=allow_cached,
+            repo=repo,
+            output=out,
+            label=label,
+            section=section,
+            title=title,
+            status=status,
+            type_=type_,
+            topic=topic,
+            include_closed=include_closed,
+            filter_by_key=filter_by_key,
+            search=search,
+            offset=offset,
+            limit=limit,
+        )
+        read: CommandWorkItems = page
+    else:
+        read = _read_list_decision(
+            backend=backend, refresh=refresh, allow_cached=allow_cached, label=label, repo=repo, output=out
+        )
     _, has_pending_writes, low_confidence, confirmed_complete = _listing_provenance(backend)
     from_cache = read.from_cache
     low_confidence = low_confidence and from_cache
@@ -2680,7 +2953,7 @@ def list_items(
     (status_source, unavailable_capabilities, filters_evaluated_against_unavailable_data) = _listing_status_metadata(
         status_resolution, [str(item.get("issue", "")) for item in result_items], status, filter_by_key
     )
-    return {
+    result = {
         "items": result_items,
         "count": len(result_items),
         "from_cache": from_cache,
@@ -2690,6 +2963,12 @@ def list_items(
         "filters_evaluated_against_unavailable_data": filters_evaluated_against_unavailable_data,
         **out.to_dict(),
     }
+    if page is not None:
+        # Already request-shaped and paginated (D3/D4) -- the caller (server.py)
+        # must not re-slice or re-count this page against a full local fetch.
+        result["total"] = page.total
+        result["has_more"] = page.has_more
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -2743,8 +3022,12 @@ def list_followups(
 ) -> dict[str, int | list[dict[str, str]] | list[str]]:
     """List backlog items linked as follow-ups to the given origin.
 
-    Scans all local backlog items and returns those whose
-    ``metadata.followup_to`` exactly matches *followup_to* (case-sensitive).
+    Scans the OPEN backlog item set (O3, request-shaped-reads design brief)
+    and returns those whose ``metadata.followup_to`` exactly matches
+    *followup_to* (case-sensitive). A follow-up linked from a since-closed
+    origin item no longer appears here — GitHub cannot filter on
+    ``followup_to``, so this scan reads bodies directly, and the repository
+    owner's O3 decision restricts that read to open issues only.
 
     Args:
         followup_to: Logical ID of the originating plan or task
@@ -2758,7 +3041,7 @@ def list_followups(
         ``issue``, ``followup_to``), ``count``, and output messages.
     """
     out = output or Output()
-    items = _decision_context(repo=repo, allow_cached=allow_cached, output=out).all().provider_items
+    items = _open_scan(_decision_context(repo=repo, allow_cached=allow_cached, output=out)).items
     matches = [it for it in items if not it.skip and it.metadata.followup_to == followup_to]
     result_items = [
         {"title": it.title, "section": it.section, "issue": it.issue, "followup_to": it.metadata.followup_to}
@@ -4979,14 +5262,20 @@ def normalize_items(
 ) -> dict[str, int | bool | list[str]]:
     """Normalize all work items through the configured backend.
 
+    Scans the OPEN backlog item set (O3, request-shaped-reads design brief)
+    plus queued pending intent. Rewritten references are reconciled through a
+    TARGETED pass over exactly those references (D6) — never the whole
+    ``INCREMENTAL`` scope: a partial (open-only) snapshot passed into an
+    ``INCREMENTAL`` reconcile would dishonestly advance the checkpoint as if
+    it had covered every item, including closed ones this scan never read.
+
     Returns:
         Dict with count of normalized items.
     """
     out = output or Output()
     context = _decision_context(repo=repo, allow_cached=allow_cached, output=out)
-    read = context.all()
-    by_reference = {item.reference: item for item in read.provider_items}
-    by_reference.update({item.reference: item for item in context.pending()})
+    scan = _open_scan(context)
+    by_reference = {item.reference: item for item in scan.items}
     items = list(by_reference.values())
     if not items:
         out.info("No backlog items found")
@@ -4995,9 +5284,12 @@ def normalize_items(
         for item in items:
             _put_work_item(item, repo)
         backend = get_config().backend
-        if isinstance(backend, SyncProvider) and read.provider_snapshot is not None:
+        rewritten_references = [reference for reference in by_reference if parse_issue_number(reference) is not None]
+        if isinstance(backend, SyncProvider) and rewritten_references:
             backend.reconcile(
-                ReconcileRequest(scope=ReconcileScope.INCREMENTAL, repo=repo), snapshot=read.provider_snapshot
+                ReconcileRequest(
+                    scope=ReconcileScope.TARGETED, repo=repo, references=rewritten_references, apply_local_patches=True
+                )
             )
     updated = len(items)
     out.info(f"Normalized {updated} item(s)" + (" [dry-run]" if dry_run else ""))
