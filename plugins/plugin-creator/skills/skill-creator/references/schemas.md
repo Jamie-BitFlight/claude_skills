@@ -58,7 +58,7 @@ Tracks version progression in Improve mode. Located at workspace root.
       "parent": "v0",
       "expectation_pass_rate": 0.75,
       "grading_result": "won",
-      "is_current_best": true
+      "is_current_best": false
     },
     {
       "version": "v2",
