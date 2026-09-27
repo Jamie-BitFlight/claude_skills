@@ -11,6 +11,7 @@ not install the repository's application and test dependencies.
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import os
 import re
@@ -86,12 +87,10 @@ LINT_CONFIG_NAMES = frozenset({
     ".gitignore",
     ".gitattributes",
 })
-# ponytail: the one plugin with lanes beyond its runner's fast default; a runner-declared
-# lane table replaces this once a second plugin needs one.
-DH = "development-harness"
 # Bump with every change to the Plan shape; .github/ci/run.py rejects any other version.
 PLAN_VERSION = 2
-DH_LANE_MARKERS = {"integration": "integration and not research_vault", "cross_backend": "cross_backend"}
+# Lanes a runner's ``LANES`` table may name, beyond its fast default; each has a matrix and a job.
+RUNNER_LANES = ("integration", "cross_backend")
 LANGUAGE_SUFFIXES = {
     "lint-python": {".py", ".pyi"},
     "lint-js": {".js", ".jsx", ".cjs", ".mjs", ".ts", ".tsx", ".mts", ".cts", ".json", ".jsonc", ".css"},
@@ -229,19 +228,25 @@ def marketplace_version_only(root: Path, base: str, head: str) -> bool:
     return values[0] == values[1]
 
 
-def dh_lanes(runner: str) -> dict[str, list[Shard]]:
-    """Build one development-harness shard per lane: its runner plus that lane's marker.
+def runner_lanes(root: Path, runner: str) -> dict[str, str]:
+    """Read a plugin runner's ``LANES`` table: lane name to the marker that selects it.
 
-    The runner owns the test paths, so no shard names any. The cross-backend tests
-    parametrize every backend themselves, so one shard covers them all.
+    The planner installs no test dependencies, so it parses the runner rather than
+    importing it. A runner without ``LANES`` has only its fast default.
 
     Returns:
-        Shards keyed by lane name from ``DH_LANE_MARKERS``.
+        The marker for each lane the runner declares.
+
+    Raises:
+        ValueError: The runner names a lane that has no CI job.
     """
-    return {
-        lane: [{"name": DH, "paths": [], "marker": marker, "runner": runner}]
-        for lane, marker in DH_LANE_MARKERS.items()
-    }
+    for node in ast.parse((root / runner).read_text(encoding="utf-8")).body:
+        if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "LANES" for t in node.targets):
+            lanes: dict[str, str] = ast.literal_eval(node.value)
+            if unknown := sorted(set(lanes) - set(RUNNER_LANES)):
+                raise ValueError(f"{runner} declares lanes with no CI job: {unknown}")
+            return lanes
+    return {}
 
 
 def build_plan(
@@ -279,8 +284,13 @@ def build_plan(
         # only that plugin's shard; the global shard runs in every plan.
         if full_checks or owner == "global" or owner in owners
     ]
-    lanes = dh_lanes(suites[DH][0]) if DH in suites and (full_checks or DH in owners) else {}
-    integration = lanes.get("integration", [])
+    # Each lane is the runner plus a marker, never a list of test files: the runner owns its roots.
+    lanes: dict[str, list[Shard]] = {lane: [] for lane in RUNNER_LANES}
+    for owner, targets in sorted(suites.items()):
+        if owner != "global" and (full_checks or owner in owners):
+            for lane, marker in runner_lanes(root, targets[0]).items():
+                lanes[lane].append({"name": owner, "paths": [], "marker": marker, "runner": targets[0]})
+    integration = lanes["integration"]
     if full_checks or any(under(path, "research") for path in changed):
         integration.append({
             "name": "research-backlinks",
@@ -313,7 +323,7 @@ def build_plan(
         "manifest-sync": full_checks or bool(owners) or ".claude-plugin/marketplace.json" in changed,
         "file-hygiene": True,
         "test-python": bool(unit),
-        "test-cross-backend": "cross_backend" in lanes,
+        "test-cross-backend": bool(lanes["cross_backend"]),
         "test-integration": bool(integration),
     })
     allowed_skips = ",".join(sorted(job for job, selected_job in checks.items() if not selected_job))
@@ -326,7 +336,7 @@ def build_plan(
         "head": head,
         "unit_matrix": {"include": unit},
         "integration_matrix": {"include": integration},
-        "cross_backend_matrix": {"include": lanes.get("cross_backend", [])},
+        "cross_backend_matrix": {"include": lanes["cross_backend"]},
         "validation_paths": validation,
         "checks": checks,
         "allowed_skips": allowed_skips,

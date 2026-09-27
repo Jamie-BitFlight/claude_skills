@@ -126,6 +126,17 @@ def test_runner_hands_pytest_its_own_isolated_configuration(runner: Path, monkey
     assert f"testpaths={shlex.join(module.TEST_PATHS)}" in args
     assert args[args.index("-m") + 1] == root_fast_marker() == module.FAST_MARKER
     assert not any(arg.startswith("python_files") for arg in args)
+    assert planner_lanes(runner) == getattr(module, "LANES", {})
+
+
+def planner_lanes(runner: Path) -> dict[str, str]:
+    """Return the lanes the CI planner reads from ``runner`` without importing it."""
+    spec = importlib.util.spec_from_file_location("ci_plan_for_runner_contract", REPO_ROOT / ".github/ci/plan.py")
+    assert spec is not None
+    assert spec.loader is not None
+    planner = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(planner)
+    return planner.runner_lanes(REPO_ROOT, runner.relative_to(REPO_ROOT).as_posix())
 
 
 def plugin_marker_lines() -> list[tuple[str, str]]:

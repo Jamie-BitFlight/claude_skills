@@ -27,6 +27,15 @@ if _spec and _spec.loader:
     _spec.loader.exec_module(file_metrics)
 
 
+def pytest_configure(config: pytest.Config) -> None:
+    """Register the markers these tests use; ``run_pytests.py`` reads no parent config.
+
+    Args:
+        config: The pytest config object.
+    """
+    config.addinivalue_line("markers", "integration: marks tests as integration tests")
+
+
 @pytest.fixture
 def text_file(tmp_path: Path) -> Path:
     """Create a small text file with known content.

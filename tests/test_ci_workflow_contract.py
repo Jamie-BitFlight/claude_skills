@@ -77,6 +77,15 @@ def test_matrix_executes_paths_via_json_not_shell(workflow: dict, name: str, lan
     assert [step["run"] for step in job["steps"] if "run" in step] == ["uv run --script .github/ci/run.py pytest"]
 
 
+@pytest.mark.parametrize("name", ["test-python", "test-integration", "test-cross-backend"])
+def test_pytest_shards_provide_node_24_for_plugin_owned_node_suites(workflow: dict, name: str) -> None:
+    """A plugin runner that executes ``node --test`` gets the repository's Node major, not the image default."""
+    steps = workflow["jobs"][name]["steps"]
+    setup = [step for step in steps if step.get("uses", "").startswith("actions/setup-node@")]
+    assert [step["with"]["node-version"] for step in setup] == ["24"]
+    assert steps.index(setup[0]) < next(index for index, step in enumerate(steps) if "run" in step)
+
+
 def test_scoped_linters_have_history_after_composite_checkout(workflow: dict) -> None:
     """The setup action's inner checkout must not shallow the required diff history."""
     for name in ("lint-python", "lint-js", "lint-markdown", "lint-shell", "file-hygiene", "manifest-sync"):
