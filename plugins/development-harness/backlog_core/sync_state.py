@@ -369,9 +369,10 @@ def _classify_github_exception(exc: GithubException) -> SyncErrorKind:
     if status in {_HTTP_UNAUTHORIZED, _HTTP_NOT_FOUND}:
         return SyncErrorKind.NON_RETRYABLE
     if status == _HTTP_FORBIDDEN:
-        headers: dict[str, str] = exc.headers or {}  # type: ignore[assignment]
         message = _github_exception_message_text(exc).casefold()
-        looks_retryable = "Retry-After" in headers or _SECONDARY_RATE_LIMIT_MARKER in message
+        # PyGithub lowercases header names, so look the hint up case-insensitively.
+        has_retry_after = parse_retry_after_header(exc.headers) is not None
+        looks_retryable = has_retry_after or _SECONDARY_RATE_LIMIT_MARKER in message
         return SyncErrorKind.RETRYABLE if looks_retryable else SyncErrorKind.NON_RETRYABLE
     if status == _HTTP_TOO_MANY_REQUESTS or status >= _HTTP_SERVER_ERROR_THRESHOLD:
         return SyncErrorKind.RETRYABLE

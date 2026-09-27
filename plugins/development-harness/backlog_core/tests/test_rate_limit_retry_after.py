@@ -18,7 +18,14 @@ from github import GithubException
 from backlog_core.models import BackendUnavailableError, GitHubRateLimitedError
 from backlog_core.server import mcp
 from backlog_core.sync_engine import _startup_sync_loop
-from backlog_core.sync_state import SyncState, get_sync_state, reset_sync_state, retry_after_seconds
+from backlog_core.sync_state import (
+    SyncErrorKind,
+    SyncState,
+    classify_sync_error,
+    get_sync_state,
+    reset_sync_state,
+    retry_after_seconds,
+)
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -169,3 +176,23 @@ class TestRestRateLimitRetryAfter:
         result = await _call("backlog_list_labels", {})
 
         assert result["retry_after"] == _RETRY_AFTER_SECONDS
+
+
+class TestA403WithRetryAfterIsRetryable:
+    """PyGithub lowercases header names, so the classifier must find ``retry-after`` in any case."""
+
+    def test_a_lowercased_header_without_the_secondary_marker_is_retryable(self) -> None:
+        exc = GithubException(403, {"message": "Forbidden"}, {"retry-after": "600"})
+
+        assert classify_sync_error(exc) is SyncErrorKind.RETRYABLE
+
+    async def test_the_mcp_error_never_pairs_retry_after_with_retryable_false(self, mocker: MockerFixture) -> None:
+        cause = GithubException(403, {"message": "Forbidden"}, {"retry-after": "600"})
+        # A wrapper that states no verdict of its own, so the answer comes from classifying the cause.
+        wrapped = BackendUnavailableError(f"GitHub request failed: {cause}", retryable=None)
+        wrapped.__cause__ = cause
+        mocker.patch("backlog_core.server.operations.list_labels", side_effect=wrapped)
+
+        result = await _call("backlog_list_labels", {})
+
+        assert (result["retryable"], result["retry_after"]) == (True, _RETRY_AFTER_SECONDS)
