@@ -1679,14 +1679,7 @@ def _probe_provider_liveness(context: WorkItemDecisionContext) -> bool:
         ``True`` once the provider genuinely answered (or the backend is not
         GitHub-backed, which has no such distinction).
     """
-    if not getattr(context.backend, "supports_github_extras", False):
-        return True
-    page = context.page(
-        ListPageRequest(repo=context.repo, include_closed=False, limit=1),
-        match=lambda item, provider: True,
-        force_hydration=False,
-    )
-    return page.provider_snapshot is not None
+    return context.provider_answers()
 
 
 def _duplicate_candidates_from(items: list[BacklogItem]) -> list[dict[str, str | bool]]:

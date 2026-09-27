@@ -153,6 +153,12 @@ class DecisionBackend(InMemoryBackend):
         self.search_requests.append(selector)
         return [_issue_node_from_provider(item) for item in self.live_items if selector.lower() in item.title.lower()]
 
+    def confirm_issues_reachable(self, repo: str) -> None:
+        """Fail exactly when a live page read would."""
+        del repo
+        if self.live_error is not None:
+            raise self.live_error
+
     def fetch_issue_titles(self, repo: str, *, open_only: bool = False) -> list[tuple[int, str]]:
         """Return every live item's ``(number, title)``, open only when *open_only*."""
         del repo

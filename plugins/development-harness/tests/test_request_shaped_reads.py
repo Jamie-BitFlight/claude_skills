@@ -1173,3 +1173,25 @@ def test_title_read_stays_search_first(fixture: FakeGitHubFixture) -> None:
     assert selected.provider is not None
     assert selected.provider.issue == "#1", selected.provider
     assert _title_scan_states(fixture) == [], fixture.requester.log
+
+
+def test_liveness_probe_reads_no_work_item_content(fixture: FakeGitHubFixture) -> None:
+    # The newest issue has no priority label, so any fetch_page walk would
+    # hydrate it during classification.
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+    from backlog_core.operations import _decision_context, _probe_provider_liveness
+
+    fixture.add_tracked_issue(1, "labelled", state="OPEN")
+    fixture.add_tracked_issue(2, "unlabelled", state="OPEN", labels=[])
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        assert _probe_provider_liveness(_decision_context(repo=f"{fixture.owner}/{fixture.name}")) is True
+    finally:
+        reset_config()
+
+    assert _hydration_reads(fixture) == ([], []), fixture.requester.log
+    list_calls = [entry for entry in fixture.requester.log if entry["operation"] == "ListIssues"]
+    assert len(list_calls) == 1, fixture.requester.log
+    assert list_calls[0]["variables"]["first"] == 1, list_calls

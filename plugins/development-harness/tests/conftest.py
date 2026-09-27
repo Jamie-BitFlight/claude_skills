@@ -198,6 +198,10 @@ class ProviderMemoryBackend(InMemoryBackend):
             if item.issue and selector.lower() in item.title.lower()
         ]
 
+    def confirm_issues_reachable(self, repo: str) -> None:
+        """Answer every reachability check; this double has no transport to fail."""
+        del repo
+
     def fetch_issue_titles(self, repo: str, *, open_only: bool = False) -> list[tuple[int, str]]:
         """Return every provider item's ``(number, title)``, open only when *open_only*."""
         del repo

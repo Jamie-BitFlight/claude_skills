@@ -147,6 +147,25 @@ class WorkItemDecisionContext:
             has_more=result.has_more,
         )
 
+    def provider_answers(self) -> bool:
+        """Confirm the provider answers, with one metadata-only request.
+
+        Returns:
+            ``True`` when it answered, ``False`` after a warned ``allow_cached``
+            fallback. Non-GitHub backends have no provider round trip and
+            always answer.
+        """
+        if not self._is_github:
+            return True
+        try:
+            self._pages.confirm_issues_reachable(self.repo)
+        except BackendUnavailableError as exc:
+            if not self.allow_cached:
+                raise
+            self._warn_cached_fallback(exc)
+            return False
+        return True
+
     def select(self, selector: str, *, purpose: Literal["read", "mutation"]) -> DecisionTarget:
         """Select live provider fact and separately indexed queued local intent.
 

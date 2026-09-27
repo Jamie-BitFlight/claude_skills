@@ -484,6 +484,27 @@ class GitHubBackend:
             )
             raise BackendUnavailableError(f"GitHub issue titles unavailable: {exc}", retryable=retryable) from exc
 
+    def confirm_issues_reachable(self, repo: str) -> None:
+        """Confirm GitHub answers an issues query, reading no work-item content.
+
+        Sends one light, one-row issues page and discards it: no body, head
+        record or audit comment is read, so no existing issue's tracked
+        content can fail the check. Converts a transport failure the same way
+        :meth:`search_issues_by_title` does.
+        """
+        try:
+            repository = self.get_github(repo)
+            owner, repo_name = repository.full_name.split("/", 1)
+            gh_client._fetch_issues_page_graphql(repository, owner, repo_name, states=["OPEN"], first=1, light=True)
+        except BacklogError:
+            raise
+        except (GithubException, *RETRYABLE_TRANSIENT_EXCEPTIONS) as exc:
+            kind = classify_sync_error(exc)
+            retryable = (
+                True if kind is SyncErrorKind.RETRYABLE else False if kind is SyncErrorKind.NON_RETRYABLE else None
+            )
+            raise BackendUnavailableError(f"GitHub issues unavailable: {exc}", retryable=retryable) from exc
+
     def _update_issue_graphql(
         self,
         repo: Repository,
