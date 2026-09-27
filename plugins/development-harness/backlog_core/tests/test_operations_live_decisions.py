@@ -511,6 +511,7 @@ def test_add_item_reports_refused_github_creation_and_keeps_the_item(tmp_path: P
 
     repository.requester.graphql_query.side_effect = graphql_query
     mocker.patch.object(backend, "try_get_github", return_value=repository)
+    mocker.patch.object(backend, "get_github", return_value=repository)
     mocker.patch.object(operations, "get_config", return_value=BacklogConfig(backend=backend))
 
     result = operations.add_item("new item", "new description", "P1", type_="Bug", force=True)

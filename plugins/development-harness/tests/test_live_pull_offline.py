@@ -3,8 +3,9 @@
 test_live_validation.py::test_live_crud_persists_changes_and_preserves_other_sections cannot run
 without live GitHub credentials. This exercises the same mechanism -- pull persisting a provider
 edit into the configured backend's own cache, then a provider-unavailable, allow_cached view
-reading that same cache back -- with a real GitHubBackend and FileCache and only fetch_snapshot
-monkeypatched to stand in for the provider.
+reading that same cache back -- with a real GitHubBackend and FileCache. Only the provider
+seams are monkeypatched: fetch_snapshot for the pull, and get_github for the title lookup,
+which resolves through GitHub search before any snapshot read.
 """
 
 from __future__ import annotations
@@ -49,11 +50,12 @@ def test_pull_then_offline_allow_cached_view_reads_writer_cache(tmp_path: Path) 
             m.setattr(backend, "fetch_snapshot", provider_edit)
             operations.pull_by_selector(reference)
 
-        def unavailable(request: ReconcileRequest) -> ProviderSnapshot:
+        def unavailable(*args: object, **kwargs: object) -> ProviderSnapshot:
             raise BackendUnavailableError("offline read-back after pull")
 
         with pytest.MonkeyPatch.context() as m:
             m.setattr(backend, "fetch_snapshot", unavailable)
+            m.setattr(backend, "get_github", unavailable)
             pulled = operations.view_item(changed_title, allow_cached=True)
 
         assert pulled.status_source == "cache", pulled
