@@ -6,6 +6,7 @@ configuration each runner hands to pytest is checked for every runner.
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import os
 import shlex
@@ -125,3 +126,40 @@ def test_runner_hands_pytest_its_own_isolated_configuration(runner: Path, monkey
     assert f"testpaths={shlex.join(module.TEST_PATHS)}" in args
     assert args[args.index("-m") + 1] == root_fast_marker() == module.FAST_MARKER
     assert not any(arg.startswith("python_files") for arg in args)
+
+
+def plugin_marker_lines() -> list[tuple[str, str]]:
+    """Return every marker line a plugin conftest registers, from ``_MARKERS`` or ``addinivalue_line``."""
+    found: list[tuple[str, str]] = []
+    for conftest in sorted((REPO_ROOT / "plugins").rglob("conftest.py")):
+        for node in ast.walk(ast.parse(conftest.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Assign) and any(
+                isinstance(t, ast.Name) and t.id == "_MARKERS" for t in node.targets
+            ):
+                found.extend((str(conftest.relative_to(REPO_ROOT)), line) for line in ast.literal_eval(node.value))
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "addinivalue_line"
+                and len(node.args) == 2
+                and isinstance(node.args[0], ast.Constant)
+                and node.args[0].value == "markers"
+                and isinstance(node.args[1], ast.Constant)
+                and isinstance(node.args[1].value, str)
+            ):
+                found.append((str(conftest.relative_to(REPO_ROOT)), node.args[1].value))
+    return found
+
+
+def test_plugin_marker_registrations_match_the_root_markers() -> None:
+    """A marker a plugin registers for its runner carries the root's exact description."""
+    root = {
+        line.split(":", 1)[0]: line
+        for line in tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["pytest"][
+            "ini_options"
+        ]["markers"]
+    }
+    registered = plugin_marker_lines()
+    assert registered, "no plugin conftest registers a marker, so this check examined nothing"
+    drift = [(source, line) for source, line in registered if root.get(line.split(":", 1)[0]) != line]
+    assert not drift, f"plugin marker registrations differ from root pyproject markers: {drift}"

@@ -201,7 +201,7 @@ _real_getaddrinfo = socket.getaddrinfo
 
 _MARKERS = (
     "allow_startup_sync: marks tests that must exercise the real backlog_core.server._startup_sync_enabled gate instead of the autouse override",
-    "critical: marks tests covering critical-path code requiring stronger correctness guarantees",
+    "critical: marks tests covering critical-path code requiring stronger correctness guarantees (e.g. round-trip property tests)",
     "cross_backend: marks tests that run only in the test-cross-backend CI matrix job",
     "e2e: marks tests as end-to-end tests",
     "integration: marks tests as integration tests",
