@@ -228,7 +228,7 @@ class TestAbandonedWorkersAreBounded:
 
     @pytest.fixture(autouse=True)
     def _cap_of_two(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(gh_client, "_MAX_ABANDONED_GRAPHQL_WORKERS", 2, raising=False)
+        monkeypatch.setattr(gh_client, "_MAX_LIVE_GRAPHQL_WORKERS", 2)
 
     def test_a_request_past_the_cap_is_refused_without_starting_a_worker(self) -> None:
         requester = _RecordingSlowRequester()
@@ -259,3 +259,73 @@ class TestAbandonedWorkersAreBounded:
         assert _graphql_request(_FakeRepo(_FastRequester()), "query ListIssues { viewer { login } }") == {
             "viewer": {"login": "octocat"}
         }
+
+
+@dataclass
+class _ConcurrencyRecordingRequester:
+    """Blocks like a stalled transport and records the most calls it ever held at once."""
+
+    lock: threading.Lock = field(default_factory=threading.Lock)
+    active: int = 0
+    peak: int = 0
+
+    def graphql_query(self, query: str, variables: dict[str, object]) -> tuple[dict, dict]:
+        """Count this call in, block past the deadline, count it out."""
+        with self.lock:
+            self.active += 1
+            self.peak = max(self.peak, self.active)
+        _RELEASE.wait(_FAKE_SLOW_RESPONSE_SECONDS)
+        with self.lock:
+            self.active -= 1
+        return {}, {"data": {}}
+
+
+class TestWorkerSlotsAreReservedBeforeStart:
+    """Concurrent callers must not all pass the cap check before any of them registers."""
+
+    @pytest.fixture(autouse=True)
+    def _cap_of_two(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(gh_client, "_MAX_LIVE_GRAPHQL_WORKERS", 2)
+
+    def test_concurrent_callers_cannot_overshoot_the_cap(self) -> None:
+        requester = _ConcurrencyRecordingRequester()
+        repo = _FakeRepo(requester)
+        callers = 6
+        start = threading.Barrier(callers)
+        outcomes: list[type[BaseException]] = []
+        outcomes_lock = threading.Lock()
+
+        def _call() -> None:
+            start.wait()
+            try:
+                _graphql_request(repo, "query ListIssues { viewer { login } }")
+            except BackendUnavailableError as exc:
+                with outcomes_lock:
+                    outcomes.append(type(exc))
+
+        threads = [threading.Thread(target=_call) for _ in range(callers)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(_FAKE_SLOW_RESPONSE_SECONDS)
+
+        assert requester.peak <= 2, f"{requester.peak} requests reached the transport at once; the cap is 2"
+        assert outcomes.count(GitHubRequestTimeoutError) == 2
+        assert outcomes.count(BackendUnavailableError) == callers - 2
+
+    def test_a_slot_is_released_when_the_thread_fails_to_start(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(gh_client, "_MAX_LIVE_GRAPHQL_WORKERS", 1)
+        real_start = threading.Thread.start
+        failures = iter([RuntimeError("can't start new thread")])
+
+        def _start_once_failing(thread: threading.Thread) -> None:
+            if thread.name == "gh-graphql-request" and (failure := next(failures, None)) is not None:
+                raise failure
+            real_start(thread)
+
+        monkeypatch.setattr(threading.Thread, "start", _start_once_failing)
+        repo = _FakeRepo(_FastRequester())
+        with pytest.raises(RuntimeError):
+            _graphql_request(repo, "query ListIssues { viewer { login } }")
+
+        assert _graphql_request(repo, "query ListIssues { viewer { login } }") == {"viewer": {"login": "octocat"}}

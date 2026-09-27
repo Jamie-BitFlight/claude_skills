@@ -618,14 +618,17 @@ class _DeadlineExceeded(Exception):
     """
 
 
-# ponytail: fixed process-wide ceiling of 4 abandoned workers; raise it if a slow but healthy
-# GitHub keeps tripping the refusal, or cancel the transport if one ever becomes cancellable.
-_MAX_ABANDONED_GRAPHQL_WORKERS: Final = 4
-"""Timed-out ``gh-graphql-request`` threads allowed to stay alive before new requests are refused.
-Each one holds a socket and can never be killed, so without a ceiling every retry adds another."""
+# ponytail: fixed process-wide ceiling of 4 live workers (running or abandoned); raise it if
+# legitimate concurrency or a slow but healthy GitHub keeps tripping the refusal, or cancel the
+# transport if it ever becomes cancellable.
+_MAX_LIVE_GRAPHQL_WORKERS: Final = 4
+"""``gh-graphql-request`` threads allowed alive at once. A slot is reserved before the thread starts,
+because any running request may go on to time out; an abandoned one holds a socket and can never be
+killed, so bounding only the abandoned ones would let concurrent callers overshoot."""
 
+_live_graphql_workers: set[threading.Thread] = set()
 _abandoned_graphql_workers: set[threading.Thread] = set()
-_abandoned_graphql_workers_lock = threading.Lock()
+_graphql_workers_lock = threading.Lock()
 
 
 def _call_with_deadline(fn: Callable[[], tuple[dict[str, Any], dict[str, Any]]], timeout: float) -> tuple[dict, dict]:
@@ -640,9 +643,9 @@ def _call_with_deadline(fn: Callable[[], tuple[dict[str, Any], dict[str, Any]]],
 
     The thread is started as a daemon and is not killed on timeout — Python has no safe way to
     kill a running thread. On timeout it is abandoned; being a daemon, it does not block process
-    exit, and its eventual (possibly very late) result is discarded. Abandoned threads are
-    counted until they finish; at ``_MAX_ABANDONED_GRAPHQL_WORKERS`` a new call is refused
-    before it starts a thread.
+    exit, and its eventual (possibly very late) result is discarded. Every thread holds a slot
+    from before it starts until it finishes; at ``_MAX_LIVE_GRAPHQL_WORKERS`` a new call is
+    refused without starting one.
 
     Args:
         fn: Zero-argument callable to run — the caller closes over its own arguments.
@@ -656,19 +659,11 @@ def _call_with_deadline(fn: Callable[[], tuple[dict[str, Any], dict[str, Any]]],
         _DeadlineExceeded: When ``timeout`` seconds elapsed with no result. The caller is
             expected to convert this into a typed, retryable error naming the operation and the
             timeout.
-        BackendUnavailableError: Retryable, without starting a thread, when the abandoned
-            worker count is at its ceiling.
+        BackendUnavailableError: Retryable, without starting a thread, when every worker slot
+            is taken.
     """
-    with _abandoned_graphql_workers_lock:
-        if len(_abandoned_graphql_workers) >= _MAX_ABANDONED_GRAPHQL_WORKERS:
-            msg = (
-                f"{len(_abandoned_graphql_workers)} earlier GitHub GraphQL requests timed out and are "
-                "still running; refusing new requests until one of them finishes"
-            )
-            raise BackendUnavailableError(msg, retryable=True)
     outcome: list[tuple[dict, dict]] = []
     failure: list[BaseException] = []
-    finished = threading.Event()
 
     def _run() -> None:
         try:
@@ -676,17 +671,30 @@ def _call_with_deadline(fn: Callable[[], tuple[dict[str, Any], dict[str, Any]]],
         except BaseException as exc:  # ruff: ignore[blind-except] — re-raised on the caller's thread below
             failure.append(exc)
         finally:
-            # Under the lock, so the caller's give-up check below sees either this worker
-            # finished or it already registered as abandoned — never neither.
-            with _abandoned_graphql_workers_lock:
-                finished.set()
+            with _graphql_workers_lock:
+                _live_graphql_workers.discard(threading.current_thread())
                 _abandoned_graphql_workers.discard(threading.current_thread())
 
     thread = threading.Thread(target=_run, daemon=True, name="gh-graphql-request")
-    thread.start()
+    with _graphql_workers_lock:
+        if len(_live_graphql_workers) >= _MAX_LIVE_GRAPHQL_WORKERS:
+            msg = (
+                f"{len(_live_graphql_workers)} GitHub GraphQL requests are still running "
+                f"({len(_abandoned_graphql_workers)} of them past their deadline); refusing new requests "
+                "until one of them finishes"
+            )
+            raise BackendUnavailableError(msg, retryable=True)
+        _live_graphql_workers.add(thread)
+    try:
+        thread.start()
+    except BaseException:
+        with _graphql_workers_lock:
+            _live_graphql_workers.discard(thread)
+        raise
     thread.join(timeout)
-    with _abandoned_graphql_workers_lock:
-        if not finished.is_set():
+    with _graphql_workers_lock:
+        # Still live means the worker has not reached its ``finally``; it removes itself later.
+        if thread in _live_graphql_workers:
             _abandoned_graphql_workers.add(thread)
             msg = f"total timeout of {timeout}s elapsed"
             raise _DeadlineExceeded(msg)
