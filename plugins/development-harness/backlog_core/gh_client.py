@@ -963,6 +963,32 @@ def sync_issues_graphql(
 # ---------------------------------------------------------------------------
 
 
+def _mutation_payload(data: dict[str, Any], *path: str) -> dict[str, Any]:
+    """Return the object a GraphQL mutation created, found at ``path`` inside ``data``.
+
+    GitHub answers a refused content-creating mutation with a null payload and no
+    ``errors`` entry -- observed for ``createIssue`` while the account was under a
+    secondary rate limit, when REST returned 403 for the same request.
+
+    Returns:
+        The created object.
+
+    Raises:
+        BackendUnavailableError: When any step of ``path`` is absent or null; retryable,
+            because the refusal is temporary.
+    """
+    node: object = data
+    for key in path:
+        node = node.get(key) if isinstance(node, dict) else None
+    if not isinstance(node, dict):
+        msg = (
+            f"GitHub answered {'.'.join(path)} with no object and no error; it does this when it "
+            "refuses content creation, such as under a secondary rate limit"
+        )
+        raise BackendUnavailableError(msg, retryable=True)
+    return node
+
+
 def _create_issue_graphql(
     repo: Repository, repo_node_id: str, title: str, body: str, label_ids: list[str]
 ) -> CreatedIssueNode:
@@ -979,11 +1005,11 @@ def _create_issue_graphql(
         Typed CreatedIssueNode with id, number, title, url.
 
     Raises:
-        BacklogError: On GraphQL errors.
+        BacklogError: On GraphQL errors, or a null payload (see ``_mutation_payload``).
     """
     variables: dict[str, object] = {"repositoryId": repo_node_id, "title": title, "body": body, "labelIds": label_ids}
     data = _graphql_request(repo, _CREATE_ISSUE_MUTATION, variables)
-    raw_issue = data.get("createIssue", {}).get("issue", {})
+    raw_issue = _mutation_payload(data, "createIssue", "issue")
     return {
         "id": str(raw_issue.get("id", "")),
         "number": int(raw_issue.get("number", 0)),
@@ -1095,10 +1121,10 @@ def _add_comment_graphql(repo: Repository, issue_node_id: str, body: str) -> Add
         AddedCommentNode carrying the GraphQL and REST identifiers.
 
     Raises:
-        BacklogError: On GraphQL errors.
+        BacklogError: On GraphQL errors, or a null payload (see ``_mutation_payload``).
     """
     data = _graphql_request(repo, _ADD_COMMENT_MUTATION, {"subjectId": issue_node_id, "body": body})
-    comment_node = data.get("addComment", {}).get("commentEdge", {}).get("node", {})
+    comment_node = _mutation_payload(data, "addComment", "commentEdge", "node")
     return AddedCommentNode(
         id=str(comment_node.get("id", "")), database_id=_parse_full_database_id(comment_node.get("fullDatabaseId"))
     )
