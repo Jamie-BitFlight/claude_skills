@@ -190,8 +190,8 @@ Load this checkout directly:
 claude --plugin-dir ./plugins/python-engineering
 ```
 
-Repository validation is defined by the repository's hooks and CI. Follow [the repository contribution guide](../../CONTRIBUTING.md) for development and submission requirements.
+Repository validation is defined by the repository's hooks and CI. Follow [the repository contribution guide](https://github.com/Jamie-BitFlight/claude_skills/blob/main/CONTRIBUTING.md) for development and submission requirements.
 
 ## License
 
-MIT. See [LICENSE](../../LICENSE).
+MIT. See [LICENSE](https://github.com/Jamie-BitFlight/claude_skills/blob/main/LICENSE).

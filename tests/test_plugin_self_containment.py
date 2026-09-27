@@ -4,14 +4,21 @@ A plugin distributed standalone into another repo (installed via the marketplace
 checkout) has no sibling `rules/`, `docs/`, or other plugin directories to resolve against. A
 relative markdown link that walks upward past the plugin root — e.g.
 `[x](../../../../rules/foo.md)` — silently 404s for that installer even though it resolves fine
-inside this monorepo. `plugins/agent-orchestration` had exactly this defect (fixed alongside this
-test); this guard keeps it from recurring there.
+inside this monorepo. The link guard runs over every directory under `plugins/`.
+
+plugin-creator's `skills/lint/scripts/audit_runtime_escapes.py` also reports escaping links, and
+neither check can replace the other. The audit ships inside the plugin for consumers to run, so it
+cannot depend on this repo's tests. It scans only runtime roots (`skills/`, `agents/`,
+`commands/`) and reports wider escape classes that still have open findings, so it cannot gate CI.
+This guard is the CI gate for one class across every plugin Markdown file, `README.md` and
+`docs/` included.
 
 A second guard catches leakage that isn't a markdown link at all: a runtime file (anything but
 `MAINTENANCE.md`/`SKILL-GOALS.md`, which are design-time and never load at runtime) naming this
 monorepo's own authoring-time locations by their repo-relative name (`rules/`, `.claude/hooks/`,
 `docs/`) or by an absolute path under a user-specific filesystem root (`/Users/...`, `/home/...`).
-Neither exists in an installed consumer's tree.
+Neither exists in an installed consumer's tree. It runs on `plugins/agent-orchestration` only:
+its hits across the other plugins are tracked by #3426 and #3440 to #3443.
 
 Both guards resolve paths via `Path.resolve()`, which fully dereferences symlinks; a plugin that
 symlinks in shared content (a pattern this repo does use elsewhere) could produce misleading
@@ -24,6 +31,7 @@ import re
 from pathlib import Path
 
 import marko
+import pytest
 from marko import inline
 from marko.element import Element
 
@@ -33,6 +41,8 @@ _ABS_PATH_PATTERN = re.compile(r"(?<![\w/{])/(?:Users|home|root)/[\w./-]*")
 _AUTHORING_DIR_TOKENS = ("rules/", ".claude/hooks/", "docs/")
 _DESIGN_TIME_FILENAMES = {"MAINTENANCE.md", "SKILL-GOALS.md"}
 _EXCLUDED_LINK_PREFIXES = ("http://", "https://", "mailto:", "#", "${", "//")
+
+_PLUGIN_DIRS = sorted(p for p in (_REPO_ROOT / "plugins").iterdir() if p.is_dir())
 
 _markdown = marko.Markdown()
 
@@ -107,9 +117,9 @@ def find_self_containment_violations(plugin_dir: Path) -> list[tuple[Path, int, 
     return violations
 
 
-def test_agent_orchestration_has_no_links_outside_plugin() -> None:
-    """Every markdown link under `plugins/agent-orchestration/` resolves inside the plugin."""
-    plugin_dir = _REPO_ROOT / "plugins" / "agent-orchestration"
+@pytest.mark.parametrize("plugin_dir", _PLUGIN_DIRS, ids=lambda p: p.name)
+def test_plugin_has_no_links_outside_plugin(plugin_dir: Path) -> None:
+    """Every markdown link under each `plugins/<name>/` resolves inside that plugin."""
     violations = find_self_containment_violations(plugin_dir)
 
     assert not violations, "\n".join(
