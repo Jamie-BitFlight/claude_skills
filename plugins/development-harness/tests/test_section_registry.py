@@ -804,7 +804,6 @@ def test_handle_update_groomed_ac_overlap_check_fires_for_every_ac_spelling(
     """
     item = BacklogItem(description="- [ ] Looks like an AC checkbox", reference="p1-demo")
     monkeypatch.setattr(ops, "_write_groomed_to_reference", lambda *_a, **_k: None)
-    monkeypatch.setattr(ops, "_reconcile_item", lambda *_a, **_k: None)
     out = Output()
 
     ops._handle_update_groomed(item, "AC content", section_name, "owner/repo", output=out)
@@ -830,7 +829,6 @@ def test_handle_update_groomed_ac_overlap_check_fires_for_recoverable_spellings(
     """
     item = BacklogItem(description="- [ ] Looks like an AC checkbox", reference="p1-demo")
     monkeypatch.setattr(ops, "_write_groomed_to_reference", lambda *_a, **_k: None)
-    monkeypatch.setattr(ops, "_reconcile_item", lambda *_a, **_k: None)
     out = Output()
 
     ops._handle_update_groomed(item, "AC content", section_name, "owner/repo", output=out)

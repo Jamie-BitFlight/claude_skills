@@ -201,6 +201,24 @@ def test_apply_patches_propagates_instead_of_recording_a_replayable_error(mocker
         sync.apply_patches([ProviderPatch(provider_id="I_1", reference="p1-t", expected_revision="r1", body="new")])
 
 
+def test_a_timed_out_label_mirror_propagates_instead_of_recording_a_replayable_error(mocker: MockerFixture) -> None:
+    """The item-fields label write runs first in a patch; its unknown outcome must not become an error result."""
+    issues = Mock()
+    issues.get_github.return_value = Mock(full_name="o/r")
+    issues._fetch_targeted_issues.return_value = {"p1-t": _ISSUE}
+    sync = _GitHubWorkItemSync(issues, Mock)
+    mocker.patch.object(
+        sync, "work_item_version", return_value=(SimpleNamespace(revision="r1", body="old"), None, "root")
+    )
+    mocker.patch.object(gh_client, "mirror_work_item_labels", side_effect=_outcome_unknown)
+    patch = ProviderPatch(provider_id="I_1", reference="p1-t", expected_revision="r1", body="new", fields={})
+
+    with pytest.raises(GitHubMutationOutcomeUnknownError):
+        sync.apply_patches([patch])
+
+    issues._add_comment_graphql.assert_not_called()
+
+
 def test_migrate_task_propagates(mocker: MockerFixture) -> None:
     import migrate_tasks_to_github as migrate
 
@@ -259,21 +277,14 @@ class TestReconcileReportsTheUnknownOutcomeNotQueued:
         mocker.patch.object(operations, "get_config", return_value=BacklogConfig(backend=backend))
         return backend
 
-    def test_reconcile_item_surfaces_the_error(self, backend: GitHubBackend) -> None:
+    def test_publish_surfaces_the_error(self, backend: GitHubBackend) -> None:
+        """``_publish`` is the one publish step for every mutating command, strikes included."""
         out = Output()
-        snapshot = ProviderSnapshot(items=[], sync_started_at="2026-09-27T00:00:00+00:00")
+        context = Mock()
+        context.snapshot_for.return_value = ProviderSnapshot(items=[], sync_started_at="2026-09-27T00:00:00+00:00")
 
         with pytest.raises(GitHubMutationOutcomeUnknownError):
-            operations._reconcile_item(BacklogItem(title="t", issue="#5"), out, repo="o/r", snapshot=snapshot)
-
-        assert not any("Queued" in message for message in out.to_dict().get("messages", []))
-
-    def test_reconcile_strike_surfaces_the_error(self, backend: GitHubBackend) -> None:
-        out = Output()
-        snapshot = ProviderSnapshot(items=[], sync_started_at="2026-09-27T00:00:00+00:00")
-
-        with pytest.raises(GitHubMutationOutcomeUnknownError):
-            operations._reconcile_strike(BacklogItem(title="t", issue="#5"), snapshot, out, repo="o/r")
+            operations._publish(BacklogItem(title="t", issue="#5"), context, None, out, repo="o/r")
 
         assert not any("Queued" in message for message in out.to_dict().get("messages", []))
 

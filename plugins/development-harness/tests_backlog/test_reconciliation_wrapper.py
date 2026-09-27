@@ -25,17 +25,17 @@ from backlog_core.models import (
     Section,
 )
 from backlog_core.operations import (
-    _handle_batch_groomed,
-    _handle_update_groomed,
     list_items,
     pull_by_selector,
     pull_items,
     refresh_local_cache_from_github,
     sync_items,
+    update_item,
     view_item,
 )
 from backlog_core.parsing import build_issue_body
 from backlog_core.reconciliation import provider_item_to_backlog_item
+from backlog_core.work_item_decisions import DecisionTarget
 
 
 class _SyncProviderStub(InMemoryBackend):
@@ -241,6 +241,12 @@ def test_selector_pull_wrapper_reconciles_one_target(sync_provider, monkeypatch:
 
 
 def test_grooming_persists_before_targeted_reconciliation(sync_provider) -> None:
+    """update_item(section=, content=) persists locally before its one targeted reconcile (design D4).
+
+    _handle_update_groomed itself no longer reconciles inline -- the caller
+    (update_item) publishes once at the end of the command. This test now
+    drives that public entry point instead of the private helper directly.
+    """
     # Given: a linked item owned by a remote-capable provider
     item = _linked_item()
     sync_provider.put_work_item(item)
@@ -261,7 +267,7 @@ def test_grooming_persists_before_targeted_reconciliation(sync_provider) -> None
     sync_provider.reconcile = record_reconcile
 
     # When: one grooming section is changed
-    _handle_update_groomed(item, "First step", "Plan", repo="unused")
+    update_item(selector=item.title, section="Plan", content="First step", repo="unused")
 
     # Then: the provider-owned record is durable before one targeted reconcile
     assert events == ["put", "reconcile"]
@@ -271,17 +277,18 @@ def test_grooming_persists_before_targeted_reconciliation(sync_provider) -> None
 
 
 def test_batch_grooming_reconciles_once(sync_provider) -> None:
+    """update_item(sections=...) publishes the whole batch exactly once (design D4)."""
     # Given: a linked item and two grooming mutations in one batch
     item = _linked_item()
     sync_provider.put_work_item(item)
 
     # When: both sections are persisted
-    written = _handle_batch_groomed(item, {"Plan": "First", "Research": "Second"}, repo="unused")
+    result = update_item(selector=item.title, sections={"Plan": "First", "Research": "Second"}, repo="unused")
 
     # Then: one targeted reconciliation covers the complete backend-owned mutation
     # "Plan" is not a canonical section name, so it normalises to an unknown__ key.
     # "Research" IS canonical (see rendering.SECTION_HEADING).
-    assert written == ["unknown__plan", "research"]
+    assert result["sections_written"] == ["unknown__plan", "research"]
     assert sync_provider.requests == [ReconcileRequest(scope=ReconcileScope.TARGETED, repo="unused", references=["#7"])]
 
 
@@ -294,7 +301,7 @@ def test_local_grooming_uses_native_storage_without_sync(monkeypatch: pytest.Mon
     monkeypatch.setattr("backlog_core.operations.try_get_github", lambda *args, **kwargs: pytest.fail("network used"))
 
     # When: grooming mutates the item
-    _handle_update_groomed(item, "Native only", "Plan", repo="unused")
+    update_item(selector=item.title, section="Plan", content="Native only", repo="unused")
 
     # Then: the native record contains the change without a sync capability or cache
     stored_section = next(iter(provider.get_work_item("#9").sections.values()))
@@ -322,8 +329,19 @@ def test_offline_github_grooming_queues_one_pending_mutation(tmp_path: Path, mon
     set_config(BacklogConfig(backend=backend))
     monkeypatch.setattr(backend, "get_github", lambda *args, **kwargs: (_ for _ in ()).throw(BackendUnavailableError()))
 
-    # When: grooming writes through the configured backend
-    _handle_update_groomed(item, "Durable offline", "Plan", repo="unused")
+    # When: grooming writes through the configured backend. Supplying _target
+    # directly (as groom_item does internally) bypasses update_item's own
+    # live-first selection -- this test is about what happens after selection,
+    # same as the private helper it replaces, which took an already-resolved
+    # item; going through full live selection instead would exercise a
+    # different, unrelated cached-fallback path this test is not about.
+    update_item(
+        selector="#12",
+        section="Plan",
+        content="Durable offline",
+        repo="unused",
+        _target=DecisionTarget(mutation_base=item),
+    )
 
     # Then: one complete work-item mutation remains queued for reconciliation
     pending = cache._pending_work_item_mutations()

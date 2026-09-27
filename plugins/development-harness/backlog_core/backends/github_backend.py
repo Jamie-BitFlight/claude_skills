@@ -45,7 +45,12 @@ from backlog_core.backends.github_content_stores import (
     _GitHubPlanPersistence,
 )
 from backlog_core.backends.github_contents import _GitHubContentsStore
-from backlog_core.backends.github_work_items import _TARGET_BATCH_SIZE, _GitHubReconciliation, _GitHubWorkItemSync
+from backlog_core.backends.github_work_items import (
+    _TARGET_BATCH_SIZE,
+    ComplianceReport,
+    _GitHubReconciliation,
+    _GitHubWorkItemSync,
+)
 from backlog_core.file_cache import FileCache
 from backlog_core.models import (
     BackendUnavailableError,
@@ -357,6 +362,49 @@ class GitHubBackend:
             Patch results indexed by the stable provider reference.
         """
         return self._work_items.apply_patches(patches, repo)
+
+    def check_work_item_compliance(self, issue_ref: str, repo: str = "") -> ComplianceReport:
+        """Check one live issue's labels and head record against the current standard.
+
+        For the future migrate command (design doc, "one new requirement").
+        See :meth:`_GitHubWorkItemSync.check_compliance_for_issue` and
+        :func:`~backlog_core.backends.github_work_items.check_work_item_compliance`
+        for the contract.
+
+        Returns:
+            A report naming every applicable defect, or a compliant report.
+
+        Raises:
+            BacklogError: If *issue_ref* does not resolve to a real issue.
+        """
+        repository = self.get_github(repo)
+        owner, repo_name = repository.full_name.split("/", 1)
+        resolved = self._fetch_targeted_issues(repository, owner, repo_name, [issue_ref])
+        issue = resolved.get(issue_ref)
+        if issue is None:
+            raise BacklogError(f"Issue not found: {issue_ref!r}")
+        return self._work_items.check_compliance_for_issue(repository, owner, repo_name, issue)
+
+    def upgrade_work_item(self, issue_ref: str, fields: dict[str, str], repo: str = "") -> PatchResult:
+        """Bring one issue's labels and head record to the current standard.
+
+        For the future migrate command (design doc, "one new requirement").
+        See :meth:`_GitHubWorkItemSync.upgrade_work_item` for the write-order
+        and idempotency contract.
+
+        Returns:
+            The single outcome for this issue.
+
+        Raises:
+            BacklogError: If *issue_ref* does not resolve to a real issue.
+        """
+        repository = self.get_github(repo)
+        owner, repo_name = repository.full_name.split("/", 1)
+        resolved = self._fetch_targeted_issues(repository, owner, repo_name, [issue_ref])
+        issue = resolved.get(issue_ref)
+        if issue is None:
+            raise BacklogError(f"Issue not found: {issue_ref!r}")
+        return self._work_items.upgrade_work_item(repository, owner, repo_name, issue, fields=fields)
 
     # ------------------------------------------------------------------
     # GraphQL utilities

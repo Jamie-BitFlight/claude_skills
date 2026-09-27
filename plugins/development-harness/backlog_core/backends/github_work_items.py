@@ -21,8 +21,12 @@ remains the single composition root and the substitutable seam.
 
 from __future__ import annotations
 
+import json
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+
+from github import GithubException
 
 from backlog_core import gh_client, rendering
 from backlog_core.backend_types import ListPageResult
@@ -40,6 +44,7 @@ from backlog_core.backends._github_work_item_versions import (
 from backlog_core.backends.github_content_stores import _CONTENT_PAGE_SIZE, _ContentPersistence, _list_all_content
 from backlog_core.file_cache import _ProviderSnapshotCheckpoint
 from backlog_core.models import (
+    HEAD_FIELDS,
     BacklogError,
     BacklogItem,
     ContentConflictError,
@@ -88,6 +93,115 @@ _PRIORITY_LABEL_PREFIX = "priority:"
 # Bounded aliased GraphQL batch size for issue-node and comment-node batches,
 # which carry small metadata fields rather than full content bodies.
 _TARGET_BATCH_SIZE = 100
+
+# ---------------------------------------------------------------------------
+# Compliance -- contract for the future migrate command (design doc §"one
+# new requirement"). check_work_item_compliance is a pure function: given
+# one issue's labels and head record, it reports whether they meet the
+# current item-fields-in-head-record standard, with no I/O of its own.
+# _GitHubWorkItemSync.check_compliance_for_issue and .upgrade_work_item are
+# the live counterparts a migrate command drives directly.
+# ---------------------------------------------------------------------------
+
+#: No head record exists for this issue at all (or the stored record is
+#: malformed/rejected by ``parse_work_item_head`` -- fail-closed the same way
+#: ``parse_work_item_head`` itself does), or the live wrapper found an
+#: existing head that no longer matches the issue's current root (D5's
+#: "stale head" case) -- either way there is no head to validate the audit
+#: comment against, so the two are reported identically.
+NO_HEAD = "no_head"
+#: A head exists but its raw stored JSON has no ``"fields"`` key at all --
+#: the shape an older plugin version (predating this design) writes. Checked
+#: against the raw dict, not the parsed ``WorkItemHead``, because pydantic's
+#: ``extra="ignore"`` default makes an absent key and an explicit ``{}``
+#: indistinguishable once parsed (see design doc R1).
+HEAD_WITHOUT_FIELDS_MAP = "head_without_fields_map"
+#: The head has a ``fields`` map, but it is missing at least one of the
+#: current ``models.HEAD_FIELDS`` keys (a partial/incomplete write).
+FIELDS_MISSING = "fields_missing"
+#: The issue's current priority:/type:/status: labels do not match the set
+#: ``gh_client._desired_label_set`` would compute from the head's field
+#: values -- i.e. a human or an out-of-band write moved a label without the
+#: head (or vice versa) catching up.
+LABELS_OUT_OF_STEP = "labels_out_of_step"
+#: The head's referenced audit comment cannot be resolved and validated
+#: against it (deleted, edited, or otherwise fails ``parse_work_item_comment``).
+MISSING_AUDIT_COMMENT = "missing_audit_comment"
+
+
+@dataclass(frozen=True)
+class ComplianceReport:
+    """Whether one GitHub issue's labels and head record meet the current standard.
+
+    ``defects`` is empty if and only if ``compliant`` is True. Every
+    applicable defect is reported -- this does not short-circuit on the
+    first one -- so a caller (the migrate command) can plan a single
+    corrective write that addresses everything at once.
+    """
+
+    compliant: bool
+    defects: tuple[str, ...]
+
+
+def check_work_item_compliance(
+    *, labels: Sequence[str], head_content: str | None, comment_resolved: bool
+) -> ComplianceReport:
+    """Report whether one issue's labels and head record meet the current standard.
+
+    Pure function: no I/O, no exceptions raised for any input shape --
+    every failure mode this function itself needs to distinguish is
+    expressed as a defect in the returned report, not an exception. See
+    :meth:`_GitHubWorkItemSync.check_compliance_for_issue` for the live
+    counterpart that fetches these three inputs for one real issue.
+
+    Args:
+        labels: The issue's current label names.
+        head_content: The head record's raw stored JSON (``ContentRecord.content``),
+            or ``None`` when the issue has no head record at all, or when the
+            live caller found one but it no longer matches the issue's
+            current root (see ``NO_HEAD``'s docstring) -- pass the raw
+            string, not a pre-parsed ``WorkItemHead``: distinguishing
+            :data:`HEAD_WITHOUT_FIELDS_MAP` from :data:`FIELDS_MISSING`
+            requires inspecting the raw dict for whether the ``"fields"``
+            key is present at all, which the parsed model cannot tell you
+            (pydantic's ``extra="ignore"`` default hides it).
+        comment_resolved: Whether the caller has already confirmed, via
+            ``parse_work_item_comment``, that the head's referenced audit
+            comment still exists and validates. A caller uninterested in
+            this particular defect may pass ``False`` unconditionally --
+            that only ever adds a false-positive :data:`MISSING_AUDIT_COMMENT`,
+            never masks a real compliance gap, so it is a safe default.
+
+    Returns:
+        A report naming every applicable defect, or ``compliant=True`` with
+        an empty ``defects`` tuple.
+    """
+    if head_content is None:
+        return ComplianceReport(compliant=False, defects=(NO_HEAD,))
+    try:
+        raw = json.loads(head_content)
+        head = parse_work_item_head(head_content)
+    except (json.JSONDecodeError, ContentUnavailableError):
+        return ComplianceReport(compliant=False, defects=(NO_HEAD,))
+    if not isinstance(raw, dict):
+        return ComplianceReport(compliant=False, defects=(NO_HEAD,))
+
+    defects: list[str] = []
+    if "fields" not in raw:
+        defects.append(HEAD_WITHOUT_FIELDS_MAP)
+    elif set(HEAD_FIELDS) - set(head.fields):
+        defects.append(FIELDS_MISSING)
+
+    desired = gh_client._desired_label_set(
+        list(labels), head.fields.get("priority", ""), head.fields.get("item_type", ""), head.fields.get("status", "")
+    )
+    if set(desired) != set(labels):
+        defects.append(LABELS_OUT_OF_STEP)
+
+    if not comment_resolved:
+        defects.append(MISSING_AUDIT_COMMENT)
+
+    return ComplianceReport(compliant=not defects, defects=tuple(defects))
 
 
 @runtime_checkable
@@ -422,17 +536,9 @@ class _GitHubWorkItemSync:
                     )
                 )
                 continue
-            if current.body.replace("\r\n", "\n") == patch.body.replace("\r\n", "\n"):
-                results.append(
-                    PatchResult(
-                        provider_id=patch.provider_id,
-                        reference=patch.reference,
-                        status="applied",
-                        revision=current.revision,
-                    )
-                )
-                continue
-            results.append(self._write_patch(repository, issue, patch, current.revision, head_record, root))
+            results.append(
+                self._apply_one_patch(repository, owner, repo_name, patch, issue, current, head_record, root)
+            )
         return results
 
     def _audit_comment_id(self, repository: Repository, issue: IssueNode, revision: str, body: str) -> str:
@@ -453,39 +559,110 @@ class _GitHubWorkItemSync:
             return existing.id
         return self._issues._add_comment_graphql(repository, issue["id"], render_work_item_comment(revision, body)).id
 
-    def _write_patch(
+    def _apply_one_patch(
         self,
         repository: Repository,
-        issue: IssueNode,
+        owner: str,
+        repo_name: str,
         patch: ProviderPatch,
-        revision: str,
+        issue: IssueNode,
+        current: WorkItemVersion,
         head_record: ContentRecord | None,
         root: str,
     ) -> PatchResult:
-        """Post one patch's audit comment and advance its head record.
+        """Mirror labels, then write the audit comment and/or head for one patch (design D3).
+
+        Split out of ``apply_patches`` to keep that loop's complexity within
+        the project's ceiling -- this is the per-patch body of steps 1-3, run
+        only once ``apply_patches`` has confirmed *patch* is still current
+        (``expected_revision`` matched the freshly fetched issue).
 
         Returns:
-            The patch outcome: ``applied`` with the new head revision, ``conflict`` when the head
-            moved, or ``error`` for any other recorded failure.
+            The patch's outcome: ``error``/``conflict`` from either the label
+            mirror or the comment/head write, or ``applied`` (including the
+            no-op case where neither the body nor the fields actually changed).
 
         Raises:
-            GitHubMutationOutcomeUnknownError: When the audit comment timed out. Recording an
-                error instead would let a later reconcile post the same comment again.
+            GitHubMutationOutcomeUnknownError: When a label or audit-comment write timed out.
+                Recording an error instead would let a later reconcile repeat the write.
         """
-        try:
-            comment_id = self._audit_comment_id(repository, issue, revision, patch.body)
-            if not comment_id:
+        # patch.fields is None means "do not touch fields" (see ProviderPatch's
+        # docstring) -- distinct from an empty dict, which is a caller-supplied
+        # fields map that happens to be empty. Neither the label mirror nor the
+        # fields_changed check below run for a body-only patch that never set
+        # fields at all (e.g. one built directly rather than through
+        # reconciliation._candidate, which always sets it when a patch is
+        # emitted).
+        touches_fields = patch.fields is not None
+        patch_fields = patch.fields or {}
+        if touches_fields:
+            # Design D3 step 1: labels first, before either the comment or the
+            # head are touched. A label write failure here leaves the head
+            # untouched and the mutation queued for retry -- see the ordering
+            # rationale in the design doc's D3 section.
+            try:
+                gh_client.mirror_work_item_labels(
+                    repository,
+                    owner,
+                    repo_name,
+                    issue,
+                    priority=patch_fields.get("priority", ""),
+                    item_type=patch_fields.get("item_type", ""),
+                    status=patch_fields.get("status", ""),
+                )
+            except GitHubMutationOutcomeUnknownError:
+                raise
+            except (GithubException, BacklogError) as exc:
                 return PatchResult(
                     provider_id=patch.provider_id,
                     reference=patch.reference,
                     status="error",
-                    message="GitHub work-item audit comment response was invalid",
+                    message=f"GitHub work-item label mirror failed: {exc}",
                 )
-            head = WorkItemHead.create(patch.reference, revision, root, patch.body, comment_id)
+
+        current_head = parse_work_item_head(head_record.content) if head_record is not None else None
+        body_changed = current.body.replace("\r\n", "\n") != patch.body.replace("\r\n", "\n")
+        fields_changed = touches_fields and (current_head is None or current_head.fields != patch_fields)
+        if not body_changed and not fields_changed:
+            return PatchResult(
+                provider_id=patch.provider_id, reference=patch.reference, status="applied", revision=current.revision
+            )
+
+        # Design D3 step 2/3: reuse the existing head's body/digest/comment_id
+        # verbatim for a field-only change on a valid (non-stale) head -- no
+        # new audit comment, so a plan/status/etc. update never floods the
+        # issue with comments. A body change, or no valid head to reuse,
+        # uses an audit comment -- reusing one already posted for this exact
+        # revision and body (see _audit_comment_id) before posting a fresh one.
+        try:
+            if (
+                current_head is not None
+                and head_record is not None
+                and current.revision == head_record.revision
+                and not body_changed
+            ):
+                new_head = current_head.model_copy(update={"fields": patch_fields})
+            else:
+                comment_id = self._audit_comment_id(repository, issue, current.revision, patch.body)
+                if not comment_id:
+                    return PatchResult(
+                        provider_id=patch.provider_id,
+                        reference=patch.reference,
+                        status="error",
+                        message="GitHub work-item audit comment response was invalid",
+                    )
+                # A body-only patch (touches_fields False) carries forward the
+                # existing head's fields unchanged, rather than wiping them to
+                # {} -- "do not touch fields" applies here too, not only to
+                # the fields_changed/label-mirror checks above.
+                carried_fields = patch_fields if touches_fields else (current_head.fields if current_head else {})
+                new_head = WorkItemHead.create(
+                    patch.reference, current.revision, root, patch.body, comment_id, fields=carried_fields
+                )
             written = self._contents().put(
                 ContentWrite(
                     reference=work_item_head_ref(patch.reference),
-                    content=head.model_dump_json(),
+                    content=new_head.model_dump_json(),
                     expected_revision=head_record.revision if head_record is not None else "",
                     create_only=head_record is None,
                 )
@@ -504,6 +681,91 @@ class _GitHubWorkItemSync:
             provider_id=patch.provider_id, reference=patch.reference, status="applied", revision=written.revision
         )
 
+    def check_compliance_for_issue(
+        self, repo: Repository, owner: str, repo_name: str, issue: IssueNode
+    ) -> ComplianceReport:
+        """Check one live issue's labels and head record against the current standard.
+
+        Live counterpart of :func:`check_work_item_compliance` -- resolves
+        the three inputs that function needs (labels, raw head content,
+        whether the audit comment validates) for one real issue, then
+        delegates the actual judgement to it.
+
+        Returns:
+            See :func:`check_work_item_compliance`. A head that exists but no
+            longer matches the issue's current root (D5's "stale head" case)
+            is reported identically to :data:`NO_HEAD` -- its fields are
+            still readable by ``_compose`` (D2), but its audit comment cannot
+            be validated against a root it no longer matches, so treating it
+            as compliant here would understate what a migrate command still
+            needs to do.
+        """
+        reference = f"#{issue['number']}"
+        labels = [label["name"] for label in issue["labels"]]
+        root = root_revision(reference, issue["id"], issue["body"])
+        try:
+            head_record = self._contents().get(work_item_head_ref(reference))
+        except ContentNotFoundError:
+            return check_work_item_compliance(labels=labels, head_content=None, comment_resolved=False)
+        try:
+            head = parse_work_item_head(head_record.content)
+        except ContentUnavailableError:
+            return check_work_item_compliance(labels=labels, head_content=None, comment_resolved=False)
+        if head.issue_reference != reference or head.root_revision != root:
+            return check_work_item_compliance(labels=labels, head_content=None, comment_resolved=False)
+        try:
+            comment = self._issues._fetch_comment_by_id_graphql(repo, head.comment_id)
+            parse_work_item_comment(head, comment)
+        except (BacklogError, ContentUnavailableError):
+            comment_resolved = False
+        else:
+            comment_resolved = True
+        return check_work_item_compliance(
+            labels=labels, head_content=head_record.content, comment_resolved=comment_resolved
+        )
+
+    def upgrade_work_item(
+        self, repo: Repository, owner: str, repo_name: str, issue: IssueNode, *, fields: dict[str, str]
+    ) -> PatchResult:
+        """Bring one issue's labels and head record to the current standard.
+
+        For the future migrate command (design doc, "one new requirement").
+        Writes in exactly ``apply_patches``'s order -- labels, then an audit
+        comment only if one is actually needed, then the head record -- by
+        building a :class:`~backlog_core.models.ProviderPatch` whose body is
+        the issue's own current (unaudited-if-none) body and delegating to
+        :meth:`_apply_one_patch`, the same per-patch step ``apply_patches``
+        uses. Idempotent: run against an issue :meth:`check_compliance_for_issue`
+        already reports compliant for these *fields*, this makes zero writes
+        -- the body is unchanged (so no new comment), the fields already
+        match (so no head write), and ``mirror_work_item_labels`` only writes
+        when the desired label set actually differs from the current one.
+
+        Args:
+            repo: PyGithub Repository to operate on.
+            owner: Repository owner login.
+            repo_name: Repository name.
+            issue: The issue's current IssueNode (already fetched by the caller).
+            fields: The full desired head-field map (see
+                :data:`~backlog_core.models.HEAD_FIELDS`) this issue should
+                carry -- the migrate command derives this from whatever
+                source it trusts (the existing head, or the D6 label-derived
+                legacy fallback for an issue with none).
+
+        Returns:
+            The single outcome for this issue, exactly like one entry of
+            ``apply_patches``'s return value.
+        """
+        current, head_record, root = self.work_item_version(repo, owner, repo_name, issue)
+        patch = ProviderPatch(
+            provider_id=issue["id"],
+            reference=f"#{issue['number']}",
+            expected_revision=current.revision,
+            body=current.body,
+            fields=fields,
+        )
+        return self._apply_one_patch(repo, owner, repo_name, patch, issue, current, head_record, root)
+
     def provider_item_from_issue(
         self,
         repo: Repository,
@@ -518,7 +780,11 @@ class _GitHubWorkItemSync:
         Returns:
             The normalized provider item.
         """
-        version, _head_record, _root = self.work_item_version(repo, owner, repo_name, issue, heads, comments)
+        version, head_record, _root = self.work_item_version(repo, owner, repo_name, issue, heads, comments)
+        # A stale head (root_revision no longer matches, per work_item_version)
+        # still carries its last-known head fields -- see design D1/D2: a human
+        # body rewrite invalidates the head's *body*, not its structured fields.
+        fields = parse_work_item_head(head_record.content).fields if head_record is not None else None
         return ProviderItem(
             provider_id=issue["id"],
             reference=f"#{issue['number']}",
@@ -528,6 +794,8 @@ class _GitHubWorkItemSync:
             labels=[label["name"] for label in issue["labels"]],
             revision=version.revision,
             milestone=issue["milestone"]["title"] if issue["milestone"] else "",
+            fields=fields,
+            created_at=issue["createdAt"],
         )
 
     def work_item_version(
@@ -902,7 +1170,7 @@ class _GitHubReconciliation:
             if item.sections:
                 item = item.model_copy(update={"sections": rendering.normalize_unknown_sections(item.sections)})
             records_by_reference[mutation.item.reference] = LogicalCacheRecord(
-                key=snapshot.key if snapshot is not None else mutation.key, item=item
+                key=snapshot.key if snapshot is not None else mutation.key, item=item, pending=True
             )
         return list(records_by_reference.values())
 

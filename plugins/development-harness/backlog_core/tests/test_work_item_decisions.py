@@ -587,6 +587,17 @@ def test_snapshot_for_targeted_slices_and_adds_absent_tombstones() -> None:
     assert backend.snapshot_requests[0].scope is ReconcileScope.TARGETED
 
 
+def test_snapshot_for_observes_a_reference_created_after_the_context_was_built() -> None:
+    """The add_item case: an issue created during the command is observed live, not as a tombstone."""
+    backend = DecisionBackend(live_items=[provider_item("#7", "live title")])
+    context = WorkItemDecisionContext(backend)
+    backend.live_items.append(provider_item("#8", "just created"))
+
+    snapshot = context.snapshot_for(ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#8"]))
+
+    assert [(item.reference, item.exists) for item in snapshot.items] == [("#8", True)]
+
+
 def test_provider_pagination_failure_returns_no_partial_page(mocker: MockerFixture) -> None:
     page_one = {
         "repository": {

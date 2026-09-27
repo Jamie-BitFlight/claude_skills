@@ -200,7 +200,15 @@ class BacklogItem(BaseModel):
 
 # Notes:
 # - `metadata` owns provider reference/revision, sync fingerprint, status, priority, plan address,
-#   and other durable logical fields.
+#   and other durable logical fields. On the GitHub backend, every `BacklogItemMetadata` field
+#   belongs to exactly one of three classes (`models.py`'s `PROVIDER_NATIVE_METADATA_FIELDS`,
+#   `LOCAL_BOOKKEEPING_METADATA_FIELDS`, `HEAD_FIELDS`): provider-native fields (`issue`, `labels`,
+#   `milestone`, `milestone_info`, `assignees`) live on the GitHub issue itself; local-bookkeeping
+#   fields (`last_synced`, `updated_at`, `sync_fingerprint`) never leave the private FileCache; every
+#   other field is a head field, carried on the work-item head record (see "GitHub writable records"
+#   below) so a fresh reader with no local cache still recovers it. `HEAD_FIELDS` is the complement
+#   of the other two sets, not an explicit list, so a newly added metadata field lands there by
+#   default unless it is added to one of the other two classes.
 # - `file_path` and `skip` are runtime-only fields excluded by FileCache serialisation.
 # - `sections` holds Entry-bearing sections ("fact_check", "rt_ica", "issue_classification")
 #   plus a "groomed" key (GroomedData). Populated by github_sync.parse_issue_body.
@@ -988,6 +996,33 @@ concurrency guarantees:
   posting, a writer reuses an audit comment already on the issue for the same parent revision and
   digest, so a retry after a timed-out comment post does not duplicate it. Edited, deleted,
   malformed, forged, or digest-mismatched projection comments fail closed.
+  - The head also carries `fields: dict[str, str]` (`WorkItemHead.fields`), keyed by
+    `BacklogItemMetadata` field name, one entry per `models.HEAD_FIELDS` member (plan, topic,
+    source, added, priority, item_type, status, groomed, research_first, files,
+    suggested_location, close_reason, close_reference, close_comment, layer, language, stack,
+    followup_to). `provider_item_from_issue` fills `ProviderItem.fields` from the head whenever
+    `head.issue_reference` matches, including a stale head whose `root_revision` no longer matches
+    the issue's current body — the head's fields survive a human body rewrite even though its body
+    does not (see the precedence table below). `apply_patches` writes labels, then an audit comment
+    only when the body changed or no valid head exists, then the head, in that fixed order — a
+    label write failure leaves the head untouched and the mutation queued for retry, and a
+    field-only change (the body is unchanged) reuses the existing head's body/digest/comment_id
+    verbatim under a new `fields` map, so it advances the head with no new audit comment. An older
+    plugin version's head write has no `fields` key at all (pydantic's `extra="ignore"` default
+    tolerates the read, but drops those fields for that item until the next current-version write).
+  - Live-read precedence (`reconciliation._compose`), for an OPEN issue: `priority`/`item_type`
+    take the mirrored `priority:`/`type:` label (preferring whichever matches the head's value, if
+    several such labels are present) over the head over the legacy body's `backlog-metadata` block
+    over a default; `status` takes the primary `status:` label (`pick_primary_status_label`) as a
+    bare token over a non-terminal, non-`open` head value over `"open"`; every other head field
+    takes the head (valid or stale) over the local cached value over its default. For a CLOSED
+    issue: `priority` additionally takes a head value of `"completed"` first; `status` takes a
+    head value in `{done, closed, resolved}` over `"closed"`; `item_type` is unchanged. `added`
+    takes the head over the legacy body block over the issue's `createdAt` date, regardless of
+    state. Labels win over the head for the three mirrored fields deliberately: a human's label
+    edit on the GitHub UI must show immediately and never be silently reverted by the next agent
+    write, and a write publishes labels first so both stay in step (see `gh_client.mirror_work_item_labels`,
+    `gh_client._desired_label_set`, and `status_registry` for the exact label tables).
 
 GitHub deployments require repository Contents read/write and Issues read/write permissions. The
 provider rejects an encoded envelope above 1 MiB before network I/O; larger artifacts require a

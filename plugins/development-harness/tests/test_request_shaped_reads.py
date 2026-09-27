@@ -13,10 +13,12 @@ pattern in ``tests/test_github_contents.py``.
 
 from __future__ import annotations
 
+import re
 from collections import UserList
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
@@ -175,6 +177,12 @@ class FakeRequester:
         elif "mutation AddComment(" in query:
             operation = "AddComment"
             data = self._add_comment(variables)
+        elif "query ResolveLabelIds(" in query:
+            operation = "ResolveLabelIds"
+            data = self._resolve_label_ids(query)
+        elif "mutation UpdateIssue(" in query:
+            operation = "UpdateIssue"
+            data = self._update_issue(variables)
         else:
             raise AssertionError(f"FakeRequester does not understand this query shape:\n{query}")
         self.log.append({"operation": operation, "variables": dict(variables), "query": query})
@@ -259,6 +267,20 @@ class FakeRequester:
         comment_id = str(variables.get("id", ""))
         return {"node": self._fixture.comment_nodes.get(comment_id)}
 
+    def _resolve_label_ids(self, query: str) -> dict[str, object]:
+        """Every label exists; its node id is ``L_<name>``, matching ``FakeIssue.as_node``."""
+        aliases = re.findall(r'(label\d+): label\(name: "([^"]+)"\)', query)
+        return {"repository": {alias: {"id": f"L_{name}", "name": name} for alias, name in aliases}}
+
+    def _update_issue(self, variables: dict[str, object]) -> dict[str, object]:
+        """Apply a label write (the item-fields label mirror) to the fake issue."""
+        number = int(str(variables["id"]).removeprefix("I_"))
+        issue = self._fixture.issues[number]
+        label_ids = variables.get("labelIds")
+        if isinstance(label_ids, list):
+            issue.labels = [str(label_id).removeprefix("L_") for label_id in label_ids]
+        return {"updateIssue": {"issue": {"id": variables["id"], "number": number, "state": issue.state}}}
+
     def _add_comment(self, variables: dict[str, object]) -> dict[str, object]:
         new_id = f"IC_new_{len(self._fixture.comment_nodes) + 1}"
         body = str(variables.get("body", ""))
@@ -299,6 +321,13 @@ class FakeRepository:
         self.full_name = f"{owner}/{name}"
         self.node_id = "R_1"
         self.requester = FakeRequester(fixture)
+
+    def get_label(self, name: str) -> SimpleNamespace:
+        """Every label exists (REST probe the item-fields label mirror sends for a missing one)."""
+        return SimpleNamespace(name=name)
+
+    def create_label(self, name: str, color: str = "") -> SimpleNamespace:
+        return SimpleNamespace(name=name, color=color)
 
 
 class FakeGitHubFixture:
@@ -1117,14 +1146,18 @@ def test_open_scan_writes_its_live_rows_through_to_the_cache(fixture: FakeGitHub
 
 
 def test_section_filter_matches_the_tracked_head_priority(fixture: FakeGitHubFixture) -> None:
-    # The label and raw issue body say P1; the tracked head moved the item to P2.
+    # The raw issue body says P1; the tracked head moved the item to P2, and that head write
+    # mirrored P2 onto the priority label (item-fields D3: labels are written first, and a label
+    # wins over the head for priority, so an agent write keeps the two in step).
     from backlog_core import operations
     from backlog_core.backend_protocol import reset_config, set_config
     from backlog_core.backend_types import BacklogConfig
     from backlog_core.github_sync import render_issue_body
 
     moved = BacklogItem(title="moved to P2", issue="#1", priority="P2")
-    fixture.add_tracked_issue(1, "moved to P2", state="OPEN", tracked_body=render_issue_body(moved))
+    fixture.add_tracked_issue(
+        1, "moved to P2", state="OPEN", labels=["priority:p2"], tracked_body=render_issue_body(moved)
+    )
     fixture.add_tracked_issue(2, "still P1", state="OPEN")
 
     set_config(BacklogConfig(backend=fixture.backend))
