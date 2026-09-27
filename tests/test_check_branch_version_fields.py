@@ -76,6 +76,26 @@ def test_branch_version_change_fails(tmp_path: Path) -> None:
     assert f"{CATALOG}: metadata.version '1.0.0' -> '1.0.1'" in result.stderr
 
 
+def test_renamed_manifest_version_change_fails(tmp_path: Path) -> None:
+    """Moving a plugin directory does not hide a version edit made in the same branch."""
+    repo = fixture(tmp_path)
+    manifest = {"name": "tool", "version": "1.0.0", "description": "d", "author": {"name": "a"}, "skills": []}
+    (repo / PLUGIN).write_text(json.dumps(manifest, indent=2) + "\n")
+    commit(repo, "multi-line manifest, as every real plugin.json is")
+    git(repo, "switch", "-q", "main")
+    git(repo, "merge", "-q", "--ff-only", "branch")
+    git(repo, "switch", "-q", "branch")
+    git(repo, "mv", "plugins/tool", "plugins/renamed")
+    renamed = "plugins/renamed/.claude-plugin/plugin.json"
+    (repo / renamed).write_text(json.dumps({**manifest, "name": "renamed", "version": "9.9.9"}, indent=2) + "\n")
+    commit(repo, "rename plugin and bump")
+
+    result = check(repo)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert f"{renamed}: version '1.0.0' -> '9.9.9'" in result.stderr
+
+
 def test_branch_behind_main_bump_and_new_plugin_pass(tmp_path: Path) -> None:
     """Non-version edits pass, as do new manifests, even when main bumped versions after the fork."""
     repo = fixture(tmp_path)

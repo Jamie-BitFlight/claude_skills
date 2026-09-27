@@ -11,7 +11,9 @@ from a conflict resolution) would ship uncorrected.
 
 Compares each manifest at the merge base of --base and --head with --head, so
 changes that reached main after the branch point are not attributed to the
-branch. Manifests added or deleted by the branch are not checked.
+branch. A manifest moved by the branch (e.g. a renamed plugin directory) is
+compared with its old path, using git's rename detection; manifests added or
+deleted by the branch are not checked.
 
 Exit codes: 0 when no version field changed, 1 when one did, 2 on a git error.
 """
@@ -68,11 +70,13 @@ def main() -> int:
     args = parser.parse_args()
     try:
         fork_point = git("merge-base", args.base, args.head).strip()
-        changed = git("diff", "--name-only", "--diff-filter=M", fork_point, args.head, "--", *MANIFESTS).split()
+        status = git("diff", "--name-status", "-M", "--diff-filter=MR", fork_point, args.head, "--", *MANIFESTS)
+        # "M\tpath" or "R<score>\told\tnew": compare the old path at the fork point with the head path.
+        pairs = [(fields[1], fields[-1]) for fields in (line.split("\t") for line in status.splitlines())]
         offences = [
-            f"{path}: {key} {before[key]!r} -> {after.get(key)!r}"
-            for path in changed
-            for before, after in [(versions(fork_point, path), versions(args.head, path))]
+            f"{path}: {key} {before.get(key)!r} -> {after.get(key)!r}"
+            for old_path, path in pairs
+            for before, after in [(versions(fork_point, old_path), versions(args.head, path))]
             for key in sorted(before.keys() | after.keys())
             if before.get(key) != after.get(key)
         ]
