@@ -1,7 +1,7 @@
 name: Bump Plugin and Marketplace Versions
 
-# Plugin versions are assigned here, once, after changes land on main. Feature
-# branches never change version fields. `repair` bumps every plugin whose files
+# Patch versions are assigned here, once, after changes land on main. The
+# pre-commit hook never bumps. `repair` bumps every plugin whose files
 # changed after its last version bump, so one run covers any number of merged
 # PRs, and rerunning after the bump commit changes nothing.
 on:

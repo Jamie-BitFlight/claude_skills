@@ -1,8 +1,8 @@
 # Marketplace versioning
 
-Plugin and marketplace versions are assigned once, by CI, after changes land on `main`.
-Feature branches and pull requests never change a `version` field. This keeps open PRs that touch
-the same plugin from conflicting on the `version` line of its manifests.
+Patch bumps are assigned once, by CI, after changes land on `main`. The pre-commit hook never
+bumps a version, so open PRs that touch the same plugin no longer conflict on the `version` line of
+its manifests. A PR may still set a deliberate version, such as a minor or major bump.
 
 The repository uses the stock hook and GitHub Action from
 [agent-marketplace-versioner](https://github.com/Jamie-BitFlight/agent-marketplace-versioner),
@@ -17,20 +17,14 @@ that exists on disk (or lists one that does not), or when a marketplace catalog
 (`.claude-plugin/marketplace.json`, `.agents/plugins/marketplace.json`) lacks an entry for a plugin
 directory under `plugins/`, has a local (`./`) entry for a directory that does not exist, or names a
 local entry differently from its `plugin.json`. Entries with an external source (`github`,
-`git-subdir`) are not checked; keep them. Fix the reported entry by hand. Do not edit
-`version` fields. The `Local / Manifest sync` CI job runs the same hook on every PR that touches
-plugins. It also runs [check_branch_version_fields.py](../scripts/check_branch_version_fields.py),
-which fails when the branch changed any plugin or marketplace `version` field since it forked from
-`main`. `repair` would treat such an edit, including a downgrade from a conflict resolution, as that
-plugin's last bump and never correct it. Restore the listed fields to the values the check prints.
+`git-subdir`) are not checked; keep them. Fix the reported entry by hand. The `Local / Manifest sync` CI job runs the same hook on every PR
+that touches plugins.
 
-The check identifies a manifest by its kind (for example `.claude-plugin/plugin.json`) and its
-`name`, not by its path. A plugin that is moved or rewritten is still compared with its
-merge-base version. A name that did not exist at the merge base counts as a new plugin, and its
-version is not checked. Known limit: changing a plugin's `name` and its version in the same PR is
-treated as adding a new plugin, so that version change is not reported.
+To release a minor or major version, set it in the PR. `repair` counts a version change as that
+plugin's bump, so it adds no further patch bump after merge. Set a version above `main`'s current
+value: `repair` does not correct a lower one.
 
-Branch commits no longer change a plugin's version, so the plugin cache keyed on that version does
+Branch commits no longer bump a plugin's version automatically, so the plugin cache keyed on that version does
 not refresh from branch work. To exercise a plugin from your working copy, load it directly:
 `claude --plugin-dir plugins/<name>`.
 

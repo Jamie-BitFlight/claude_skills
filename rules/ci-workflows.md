@@ -14,7 +14,7 @@ The `quality-gate` summary job requires ALL of these to pass:
 | `lint-markdown` | markdownlint-cli2 |
 | `lint-shell` | shellcheck + shfmt |
 | `validate-plugins` | skilllint (plugin/skill structure) |
-| `manifest-sync` | Versioner hook in check-only mode (component arrays, marketplace membership), its pinned integration test, and on PRs `scripts/check_branch_version_fields.py` rejecting any branch-side version change — `bump-marketplace.yml` assigns versions on `main` |
+| `manifest-sync` | Versioner hook in check-only mode (component arrays, marketplace membership) and its pinned integration test — `bump-marketplace.yml` assigns patch versions on `main` |
 | `file-hygiene` | trailing whitespace, line endings, large files, merge conflicts |
 | `test-python` | pytest fast suite (default addopts filter) |
 | `test-cross-backend` | development-harness cross-backend lane; shards from `dh_lanes()` in `.github/ci/plan.py` |

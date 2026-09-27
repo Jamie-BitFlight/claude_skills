@@ -200,9 +200,8 @@ jobs:
   # Local hooks: manifest sync (via prek)
   # Blocking. The hook runs `agent-marketplace-versioner reconcile --dry-run`:
   # it fails when plugin.json component arrays or marketplace membership drift
-  # from plugins/, and never changes version fields. On a PR, a second step
-  # fails when the branch changed any version field: bump-marketplace.yml
-  # assigns versions after merge to main.
+  # from plugins/, and never changes version fields. bump-marketplace.yml
+  # assigns patch versions after merge to main.
   # =============================================================================
   manifest-sync:
     needs: changes
@@ -224,13 +223,6 @@ jobs:
 
       - name: Exercise pinned remote versioner integration
         run: uv run --locked pytest -m integration tests/test_marketplace_versioner_integration.py --no-cov
-
-      - name: Reject version field changes on the branch
-        if: github.event_name == 'pull_request'
-        env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-          HEAD: ${{ github.event.pull_request.head.sha }}
-        run: ./scripts/check_branch_version_fields.py --base "$BASE" --head "$HEAD"
 
   # =============================================================================
   # File hygiene: trailing whitespace, line endings, etc.
