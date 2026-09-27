@@ -156,7 +156,7 @@ repos:
         types: [shell]
 
   - repo: https://github.com/Jamie-BitFlight/agent-marketplace-versioner
-    rev: v1
+    rev: 4726d7c64b50e7d71ec3d7352afa54f9fd584a2d
     hooks:
       # Check only: the hook never bumps versions;
       # .github/workflows/bump-marketplace.yml assigns them on main. It fails when
