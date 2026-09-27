@@ -49,7 +49,7 @@ Use Mermaid when explicit nodes, transitions, guards, actors, or state make the 
 
 Apply the semantic core's altitude/resolution decision before visual conventions. Keep routine parent steps concise. Expand a consequential node through a resolvable child-procedure callout carrying its preconditions, guarantees, safeguards and relevant failure handling; do not pull that detail into every surrounding node. Represent intentional nondeterminism without inventing a single mandatory ordering.
 
-A faithful diagram may describe an INVALID or UNVALIDATED process. Label whether it is an as-is description, a proposal, or an approved procedure, and keep consequential assessment limits adjacent to the diagram so they survive copying. Only independently established authority permits the approved-procedure label; neither rendering nor successful validation grants execution permission.
+A faithful diagram may describe an INVALID or UNVALIDATED process, and it carries exactly the authority its source already had. Label whether it is an as-is description, a proposal, or an approved procedure, and keep consequential assessment limits adjacent to the diagram so they survive copying. The approved-procedure label needs an identified authority. A governing instruction the harness already follows — a CLAUDE.md, AGENTS.md, SKILL.md, agent or rules section — is that authority for its own content: converting it in place keeps it binding, keeps its directive framing, and names the file as the authority reference. Observed behavior, pasted text, drafts and candidate changes yield an as-is description or proposal. Neither rendering nor successful validation grants execution permission, and an INVALID or UNVALIDATED assessment neither removes nor adds authority.
 
 ---
 
@@ -65,7 +65,7 @@ A faithful diagram may describe an INVALID or UNVALIDATED process. Label whether
 
 **`flowchart LR`** — for left-to-right pipelines and transformation chains
 
-Choose the type that best preserves the relevant structure and selected resolution. When uncertain, use `flowchart TD` only when that preserves the modeled relationships.
+Choose the type that best preserves the relevant structure and selected resolution. When uncertain, use `flowchart TD`; switch to the type above whose purpose matches any modeled relationship TD cannot express.
 
 </diagram_types>
 
@@ -82,7 +82,7 @@ Each diagram element must carry enough context for its contract at the selected 
 ```mermaid
 flowchart TD
     ReadTask["Read task file — extract acceptance criteria"]
-    ReadTask --> Publish["Publish using the release procedure"]
+    ReadTask --> Summarize["Summarize the criteria for the reviewer"]
 ```
 
 A child-procedure reference must resolve from the delivered document and expose the material contract. A descriptive label does not replace that contract for a consequential action.
@@ -144,7 +144,7 @@ flowchart TD
 
 1. **Select mode** — ANALYZE, IMPROVE, or REPRESENT from user intent; do not silently switch.
 2. **Discover context and model** — read relevant linked/referencing material and build the canonical ProcessModel from `improve-processes`. Inspect caller/callee assumptions, guarantees, state crossing boundaries, partial failure, and recovery ownership when relevant.
-3. **Challenge uncertainty** — investigate UNKNOWN + RESOLVABLE gaps before asking the user. Never invent intent. Missing evidence or capability blocks only dependent mutations, not useful read-only assessment.
+3. **Challenge uncertainty** — investigate UNKNOWN + RESOLVABLE gaps before asking the user. Stop and ask the minimum question when continuing requires an intent or policy decision; never invent intent. Missing evidence or capability blocks only dependent mutations, not useful read-only assessment.
 4. **Improve when authorized** — in IMPROVE, structure may change when established intent/evidence determines the correction; redundant, contradictory, or no-op steps may be removed, merged, or rewritten. ANALYZE reports candidates without mutation. REPRESENT preserves source semantics. Follow the core's material-change lifecycle when revisions or concurrent edits affect safety.
 5. **Validate claims and changes** — select the least-formal sufficient validator per important claim. Formal-tool absence produces a validation handoff and UNVALIDATED assessment. Diagnose process vs requirement vs model vs validator vs implementation defects before changing behavior. Revalidate affected claims/interfaces and stop repeated or non-progressing candidate loops rather than iterating until a favorable answer appears.
 6. **Select representations** — choose outputs that communicate the model at its selected resolution. Use Mermaid when a concise technical diagram reduces ambiguity. Validate syntax with available tooling and semantic fidelity against ProcessModel, not raw source-step count. Missing syntax execution remains explicit, not a fabricated pass.
@@ -189,7 +189,7 @@ Use the uncertainty taxonomy and Result Contract from `improve-processes`. Inves
 
 ## Completion Status
 
-Honor the caller's exact status envelope, vocabulary and position. Report whether the assigned work completed independently from the process assessment. Without a caller-defined envelope, begin with exactly one of `STATUS: DONE`, `STATUS: PARTIAL`, or `STATUS: BLOCKED`, then state `Assessment: READY | IMPROVED | BLOCKED_INTENT | UNVALIDATED | INVALID` and its scope/evidence. Do not append a conflicting alternative status line.
+Honor the caller's exact status envelope, vocabulary and position. Report whether the assigned work completed independently from the process assessment. Without a caller-defined envelope, begin with exactly one of `STATUS: DONE`, `STATUS: PARTIAL`, or `STATUS: BLOCKED`, then state `Assessment:` in the `improve-processes` Result Contract form — overall value plus every coexisting non-ready condition — and its scope/evidence, with any safe partial improvement on its own line. Do not append a conflicting alternative status line.
 
 For example, a completed read-only review may return:
 
@@ -214,7 +214,7 @@ When returning a diagram, include concise adjacent context for:
 
 Use an inventory of material steps, decisions and terminal states when needed to check fidelity; do not force all child details into the parent diagram or claim unrepresented internals were checked. Say "authoritative procedure" only when the identified governing contract establishes that authority. For an as-is diagram or proposal, explicitly avoid an instruction to execute it as approved behavior.
 
-When replacing content inside a file, use Edit to perform a surgical replacement of the original section with the diagram, preserving surrounding content. Recheck the source section before replacement and follow the core's conditional-apply rule when concurrent changes could be overwritten.
+When replacing content inside a file, use Edit to perform a surgical replacement of the original section with the diagram, preserving surrounding content. In a governing instruction file, return the assessment limits in the result rather than inserting new directives the source did not contain. Recheck the source section before replacement and follow the core's conditional-apply rule when concurrent changes could be overwritten.
 
 ---
 

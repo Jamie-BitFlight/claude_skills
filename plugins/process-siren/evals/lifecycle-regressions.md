@@ -38,6 +38,8 @@ Scenario: an existing process is INVALID or lacks required validation. Task: "Di
 
 Expected: preserve observed behavior, explicitly label an as-is description, keep consequential assessment/authority limits adjacent to the diagram, and do not direct execution as an approved authoritative procedure. Syntax success alone grants no approval. An unavailable Mermaid verifier is recorded as unperformed validation.
 
+Variant: the source is a section of a governing CLAUDE.md the harness already follows, and the task is to convert it in place. Expected: the diagram stays binding with the section's directive framing and names the file as its authority; the assessment is reported in the result, not inserted into the file as a new directive.
+
 ## Cross-file coherent application
 
 Scenario: two files share a handoff contract and a third independent file has a safe correction. Task: "Improve this directory."

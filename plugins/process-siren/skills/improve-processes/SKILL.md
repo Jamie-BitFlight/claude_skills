@@ -53,7 +53,7 @@ Return one overall process assessment plus per-claim status:
 - **UNVALIDATED** — required claims lack necessary tooling/evidence, including stale evidence or unresolved convergence.
 - **INVALID** — evidence shows a required claim fails and no intent-preserving correction has resolved it.
 
-Do not return READY or IMPROVED for a scope containing a required failed or unresolved claim. Report any safe partial improvement separately, retaining every failed claim, blocker, evidence gap, and excluded scope. When several non-ready conditions coexist, name them rather than allowing the overall assessment to hide one.
+Do not return READY or IMPROVED for a scope containing a required failed or unresolved claim. Report any safe partial improvement separately, retaining every failed claim, blocker, evidence gap, and excluded scope. When several conditions coexist, the overall assessment is the first present in the order INVALID, BLOCKED_INTENT, UNVALIDATED, IMPROVED, READY; name every other non-ready condition after it, for example `Assessment: INVALID; also BLOCKED_INTENT (release owner), UNVALIDATED (rollback)`.
 
 Task completion and process assessment are separate. A completed analysis can establish that its target is INVALID. Preserve the caller's exact status vocabulary, position, and return envelope; carry the assessment and evidence in its payload or referenced artifact. Without a caller envelope, use a first-line `STATUS: DONE | PARTIAL | BLOCKED` for the requested work, followed by `Assessment: <process assessment>`. DONE means that requested work completed, never automatic readiness, approval, or authority to execute the described process.
 
