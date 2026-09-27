@@ -318,3 +318,14 @@ class TestARetriedCloseDoesNotRepostItsComment:
         assert add_comment.call_count == 1
         assert update.call_count == 2
         assert update.call_args.kwargs["state"] == "CLOSED"
+
+
+def test_apply_status_in_progress_propagates_past_its_outer_handler(mocker: MockerFixture) -> None:
+    """The public wrapper must not turn an unknown label write into a warning and a normal return."""
+    _gh_client_issue_setup(mocker, "_update_issue_graphql")
+    out = Output()
+
+    with pytest.raises(GitHubMutationOutcomeUnknownError):
+        gh_client.apply_status_in_progress(BacklogItem(title="t", issue="#5"), repo="o/r", output=out)
+
+    assert not out.warnings

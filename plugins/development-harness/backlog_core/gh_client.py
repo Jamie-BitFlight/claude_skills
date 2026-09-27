@@ -2075,6 +2075,8 @@ def apply_status_in_progress(item: BacklogItem, repo: str = "", output: Output |
             applied_message="  Status: in-progress",
             output=out,
         )
+    except GitHubMutationOutcomeUnknownError:
+        raise  # outcome unknown; reporting it as a warning would let the caller claim in-progress
     except BacklogError as e:
         out.warn(f"  WARNING: Could not set status: {e}")
 
