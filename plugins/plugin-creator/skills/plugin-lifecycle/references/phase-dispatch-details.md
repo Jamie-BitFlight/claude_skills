@@ -72,17 +72,11 @@ For agent-frontmatter decisions during agent creation, also load `/plugin-creato
 
 Semantic skill refinement is owned by Skill Lapidary, not Plugin Creator.
 
-Before Phase 6 skill optimization, check for the `skill-lapidary` skill. If unavailable and installation is permitted, install the repository:
-
-```bash
-npx -y skills@latest add https://github.com/Jamie-BitFlight/skill-lapidary --all
-```
-
-For a private repository, the environment must already have GitHub access. If installation/loading is unavailable, mark semantic refinement BLOCKED; do not substitute Plugin Creator goal extraction or tightening heuristics.
+Before Phase 6 skill optimization, check for the `/skill-lapidary:skill-lapidary` skill. If unavailable and installation is permitted, install it for the current harness as Skill Lapidary's [packaging README](https://github.com/Jamie-BitFlight/skill-lapidary/blob/main/packaging/README.md) documents. If installation/loading is unavailable, mark semantic refinement BLOCKED; do not substitute Plugin Creator goal extraction or tightening heuristics.
 
 Routing by concern:
 
-1. **Skill semantic refinement** — activate Skill Lapidary's `skill-lapidary` entrypoint for each skill requiring goal recovery, authority resolution, semantic conservation, tightening, or instruction optimization. Preserve its native result/evidence. If it blocks on consequential intent/authority, stop dependent optimization for that skill and present the blocker.
+1. **Skill semantic refinement** — activate `/skill-lapidary:skill-lapidary` for each skill requiring goal recovery, authority resolution, semantic conservation, tightening, or instruction optimization. Preserve its native result/evidence. If it blocks on consequential intent/authority, stop dependent optimization for that skill and present the blocker.
 2. **Structural plugin improvement** — activate `plugin-creator:refactor-plugin` only after any required Lapidary refinement has completed or the structural work is demonstrably independent of the blocked semantic decision.
 3. **Prose quality** — activate `plugin-creator:optimize-claude-md` only for surviving content. For SKILL.md targets, pass the applicable Lapidary result/contract identity when available; do not independently rediscover goals.
 4. **Audit quality** — dispatch `plugin-creator:skill-auditor`.

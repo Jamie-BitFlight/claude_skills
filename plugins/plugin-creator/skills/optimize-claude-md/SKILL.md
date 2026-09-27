@@ -52,7 +52,7 @@ Recognize these file types: `CLAUDE.md`, `AGENTS.md`, `SKILL.md`, agent definiti
 - Run completeness score evaluation (8-category assessment from /plugin-creator:audit-skill-completeness)
 - Record baseline completeness score (format: X/24)
 - Require semantic refinement by Skill Lapidary before optimizing content whose existence, goal alignment, or semantic conservation is in question. Use an applicable Lapidary result/contract supplied by the caller when available; do not independently derive an authoritative goal set from the target prose or `SKILL-GOALS.md`.
-- If Skill Lapidary is unavailable, direct the caller to install `https://github.com/Jamie-BitFlight/skill-lapidary` with `npx -y skills@latest add https://github.com/Jamie-BitFlight/skill-lapidary --all`. If it still cannot be loaded, block semantic optimization rather than recreating its refinement logic. Pure wording optimization may continue only when the surviving content boundary is already established independently.
+- If Skill Lapidary is unavailable, direct the caller to install it for the current harness as Skill Lapidary's [packaging README](https://github.com/Jamie-BitFlight/skill-lapidary/blob/main/packaging/README.md) documents. If it still cannot be loaded, block semantic optimization rather than recreating its refinement logic. Pure wording optimization may continue only when the surviving content boundary is already established independently.
 
 **For CLAUDE.md and AGENTS.md files** — run index discipline audit (6 binary checks):
 
@@ -110,8 +110,7 @@ Report in your defined output structure.
 SOURCE (three CLAUDE.md-specific constraints above): OpenAI Harness Engineering, "Harness engineering: leveraging Codex in an agent-first world" (<https://openai.com/index/harness-engineering/>, accessed 2026-06-04) — empirically validated failure modes: P1 map-not-manual, P2 docs-as-system-of-record, P4 versioned-local-auditable, P5 mechanical-enforcement. P3 (progressive disclosure) is already enforced by this skill's iterative passes and SK006 extraction threshold.
 
 Routing by concern:
-- Establish what a skill exists to achieve, before judging any of its content → `/plugin-creator:skill-goal-extractor`
-- Remove content that does not serve those goals (decides whether text exists) → `/plugin-creator:evaluate-and-tighten-skills` — run before optimizing
+- Recover a skill's goals, resolve their authority, and remove content that does not serve them (decides whether text exists) → `/skill-lapidary:skill-lapidary` — run before optimizing
 - Optimize existing content (decides how surviving text reads — clarity, structure, Anthropic prompt engineering principles) → `plugin-creator:ai-doc-optimizer` (this skill uses this path)
 - Audit quality (read-only, no writes, score against completeness categories) → `plugin-creator:skill-auditor`
 - Sync content against upstream docs (add NEW/fix STALE from live sources) → `plugin-creator:skill-content-updater`

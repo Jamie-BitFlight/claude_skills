@@ -121,7 +121,7 @@ Identify behavioral instructions replaceable with hooks, scripts, or architectur
 [2-4 specific issues with principle violations]
 
 ## Tightening Candidates
-[Content serving no resolved goal — recommend evaluate-and-tighten-skills; not rewritten here]
+[Content serving no resolved goal — recommend a Skill Lapidary refinement pass; not rewritten here]
 [State "None" when nothing qualifies]
 
 ## Optimized Content

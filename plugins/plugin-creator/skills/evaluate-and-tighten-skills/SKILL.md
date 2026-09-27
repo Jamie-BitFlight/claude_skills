@@ -9,17 +9,11 @@ Skill Lapidary owns semantic skill refinement. Plugin Creator does not implement
 
 ## Route
 
-1. Check whether the `skill-lapidary` skill is available in the current harness.
+1. Check whether the `/skill-lapidary:skill-lapidary` skill is available in the current harness.
 2. If available, activate it against the requested skill/directory and preserve its native contract, evidence, and result. Do not translate its goal authority into a Plugin Creator `SKILL-GOALS.md` convention or substitute Plugin Creator heuristics.
-3. If unavailable and installation is permitted, install the Skill Lapidary repository with:
+3. If unavailable and installation is permitted, install Skill Lapidary for the current harness as its [packaging README](https://github.com/Jamie-BitFlight/skill-lapidary/blob/main/packaging/README.md) documents.
 
-```bash
-npx -y skills@latest add https://github.com/Jamie-BitFlight/skill-lapidary --all
-```
-
-The Skills CLI accepts GitHub repository sources and installs discovered skills for supported agents. For a private repository, installation requires the environment to already have access to that GitHub repository.
-
-4. After installation, activate `skill-lapidary` and restart the requested refinement from that skill's entrypoint.
+4. After installation, activate `/skill-lapidary:skill-lapidary` and restart the requested refinement from that skill's entrypoint.
 5. If Skill Lapidary cannot be loaded or installed, return `BLOCKED` for semantic tightening. Do not fall back to locally inferred goals or recreate its authority/refinement logic.
 
 ## Boundary

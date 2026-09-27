@@ -237,15 +237,15 @@ Entry condition: Debug gate passed OR Assess gate passed with no errors.
 
 Optimize improves quality — descriptions, progressive disclosure, agent prompts, documentation. This phase is not about fixing errors (that is Debug) but about raising quality.
 
-Execute five dispatches in order: (1) skill goal resolution via `skill-goal-extractor`, (2) pre-optimization tightening via `evaluate-and-tighten-skills`, (3) structural plugin improvement via `refactor-plugin`, (4) content quality optimization via `optimize-claude-md`, (5) agent prompt optimization via `subagent-refactorer`, preceded by loading `subagent-refactoring-methodology`. Full task specs in `references/phase-dispatch-details.md` → "Phase 6 — Optimize".
+Execute dispatches in order: (1) semantic skill refinement via `/skill-lapidary:skill-lapidary`, (2) structural plugin improvement via `refactor-plugin`, (3) content quality optimization via `optimize-claude-md`, (4) agent prompt optimization via `subagent-refactorer`, preceded by loading `subagent-refactoring-methodology`. Full task specs in `references/phase-dispatch-details.md` → "Phase 6 — Optimize".
 
-After structural plugin improvement, re-resolve and approve goals for every skill that was created,
-renamed, split, merged, or materially changed before content optimization. Reuse the initial goals
+After structural plugin improvement, rerun Skill Lapidary on every skill that was created,
+renamed, split, merged, or materially changed before content optimization. Reuse the initial Lapidary result
 only for unchanged skills.
 
-Enter each step through its skill where one exists. `optimize-claude-md` owns baseline measurement, goal resolution, agent delegation, independent verification, and reporting — dispatching `ai-doc-optimizer` directly skips all of it and yields an unmeasured, unverified rewrite.
+Enter each step through its skill where one exists. `optimize-claude-md` owns baseline measurement, agent delegation, independent verification, and reporting — dispatching `ai-doc-optimizer` directly skips all of it and yields an unmeasured, unverified rewrite.
 
-Order is load-bearing: goals are the standard every later dispatch judges content against, and tightening runs before structural and content work because removing dead weight can drop a skill back under the split threshold and stops later passes from polishing prose that should have been deleted.
+Order is load-bearing: the Lapidary result is the standard every later dispatch judges content against, and semantic refinement runs before structural and content work because removing dead weight can drop a skill back under the split threshold and stops later passes from polishing prose that should have been deleted.
 
 The following diagram is the authoritative procedure for Phase 6 Optimize completion gate. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
 
