@@ -58,7 +58,7 @@ Tracks version progression in Improve mode. Located at workspace root.
       "parent": "v0",
       "expectation_pass_rate": 0.75,
       "grading_result": "won",
-      "is_current_best": false
+      "is_current_best": true
     },
     {
       "version": "v2",
@@ -73,9 +73,9 @@ Tracks version progression in Improve mode. Located at workspace root.
 
 **Fields:**
 - `started_at`: ISO timestamp of when improvement started
-- `skill_name`: Name of the skill being improved
+- `skill_name`: Name of the skill
 - `current_best`: Version identifier of the best performer
-- `iterations[].version`: Version identifier (v0, v1, ...)
+- `iterations[].version`: Version identifier
 - `iterations[].parent`: Parent version this was derived from
 - `iterations[].expectation_pass_rate`: Pass rate from grading
 - `iterations[].grading_result`: "baseline", "won", "lost", or "tie"
@@ -189,22 +189,24 @@ Output from the executor agent. Located at `<run-dir>/outputs/metrics.json`.
 - `total_steps`: Number of major execution steps
 - `files_created`: List of output files created
 - `errors_encountered`: Number of errors during execution
-- `output_chars`: Total character count of output files
+- `output_chars`: Total character count of output files, never a token estimate
 - `transcript_chars`: Character count of transcript
+
+The grader copies these execution metrics into `grading.json.execution_metrics`. An unavailable value is omitted or null, not manufactured as zero. The legacy `<run-dir>/metrics.json` timing carrier is supported by the aggregator only when it supplies the same explicit timing/token fields as `timing.json`; this is distinct from `outputs/metrics.json`.
 
 ---
 
 ## timing.json
 
-Wall clock timing for a run. Located at `<run-dir>/timing.json`.
+Measured timing and token usage for one run. Located at `<run-dir>/timing.json` beside its `grading.json`.
 
-**How to capture:** When a subagent task completes, the task notification includes `total_tokens` and `duration_ms`. Save these immediately — they are not persisted anywhere else and cannot be recovered after the fact.
+Capture the host's measured values when available. Record the model, environment, and measurement boundary with the run so comparisons use equivalent observations. Do not assume every harness exposes token counts or that missing values can be recovered from character counts.
 
 ```json
 {
   "total_tokens": 84852,
-  "duration_ms": 23332,
-  "total_duration_seconds": 23.3,
+  "duration_ms": 191000,
+  "total_duration_seconds": 191.0,
   "executor_start": "2026-01-15T10:30:00Z",
   "executor_end": "2026-01-15T10:32:45Z",
   "executor_duration_seconds": 165.0,
@@ -214,11 +216,13 @@ Wall clock timing for a run. Located at `<run-dir>/timing.json`.
 }
 ```
 
+Here `total_duration_seconds` measures the sum of executor and grader durations, not the one-second gap between them. An executor-only experiment must identify that narrower boundary instead. `total_tokens` is an actual nonnegative integer token measurement over the recorded boundary. Unknown measurements are null or omitted; measured zero is valid. When multiple carriers provide different values for the same metric, the aggregator retains the source conflict and leaves that metric unavailable rather than choosing the cheaper one.
+
 ---
 
 ## benchmark.json
 
-Output from Benchmark mode. Located at `benchmarks/<timestamp>/benchmark.json`.
+Output from Benchmark mode. Located at `benchmarks/<timestamp>/benchmark.json`. Existing workspace and legacy `runs/` layouts are supported.
 
 ```json
 {
@@ -228,81 +232,83 @@ Output from Benchmark mode. Located at `benchmarks/<timestamp>/benchmark.json`.
     "executor_model": "claude-sonnet-4-20250514",
     "analyzer_model": "most-capable-model",
     "timestamp": "2026-01-15T10:30:00Z",
-    "evals_run": [1, 2, 3],
-    "runs_per_configuration": 3
+    "evals_run": [1],
+    "runs_per_configuration": 1,
+    "run_counts": [
+      {"eval_id": 1, "configuration": "with_skill", "observed_runs": 1}
+    ],
+    "coverage": "observed-directories-only",
+    "grading_status": "COMPLETE",
+    "units": {"time_seconds": "seconds", "tokens": "tokens", "output_chars": "characters"}
   },
-
   "runs": [
     {
       "eval_id": 1,
-      "eval_name": "Ocean",
       "configuration": "with_skill",
       "run_number": 1,
       "result": {
-        "pass_rate": 0.85,
-        "passed": 6,
-        "failed": 1,
-        "total": 7,
+        "pass_rate": 1.0,
+        "passed": 1,
+        "failed": 0,
+        "total": 1,
         "time_seconds": 42.5,
-        "tokens": 3800,
+        "tokens": null,
+        "output_chars": 12450,
         "tool_calls": 18,
         "errors": 0
       },
-      "expectations": [
-        {"text": "...", "passed": true, "evidence": "..."}
-      ],
-      "notes": [
-        "Used 2023 data, may be stale",
-        "Fell back to text overlay for non-fillable fields"
-      ]
+      "measurement_sources": {"time_seconds": ["timing.json"], "tokens": []},
+      "measurement_gaps": [],
+      "expectations": [{"text": "Required output exists", "passed": true, "evidence": "Observed artifact"}],
+      "notes": []
     }
   ],
-
   "run_summary": {
     "with_skill": {
-      "pass_rate": {"mean": 0.85, "stddev": 0.05, "min": 0.80, "max": 0.90},
-      "time_seconds": {"mean": 45.0, "stddev": 12.0, "min": 32.0, "max": 58.0},
-      "tokens": {"mean": 3800, "stddev": 400, "min": 3200, "max": 4100}
+      "pass_rate": {"mean": 1.0, "stddev": 0.0, "min": 1.0, "max": 1.0, "observed": 1, "missing": 0},
+      "time_seconds": {"mean": 42.5, "stddev": 0.0, "min": 42.5, "max": 42.5, "observed": 1, "missing": 0},
+      "tokens": {"mean": null, "stddev": null, "min": null, "max": null, "observed": 0, "missing": 1}
     },
-    "without_skill": {
-      "pass_rate": {"mean": 0.35, "stddev": 0.08, "min": 0.28, "max": 0.45},
-      "time_seconds": {"mean": 32.0, "stddev": 8.0, "min": 24.0, "max": 42.0},
-      "tokens": {"mean": 2100, "stddev": 300, "min": 1800, "max": 2500}
-    },
-    "delta": {
-      "pass_rate": "+0.50",
-      "time_seconds": "+13.0",
-      "tokens": "+1700"
-    }
+    "delta": {"pass_rate": null, "time_seconds": null, "tokens": null}
   },
-
-  "notes": [
-    "Assertion 'Output is a PDF file' passes 100% in both configurations - may not differentiate skill value",
-    "Eval 3 shows high variance (50% ± 40%) - may be flaky or model-dependent",
-    "Without-skill runs consistently fail on table extraction expectations",
-    "Skill adds 13s average execution time but improves pass rate by 50%"
-  ]
+  "notes": ["Token usage was unavailable; character counts were not substituted."]
 }
 ```
 
 **Fields:**
 - `metadata`: Information about the benchmark run
-  - `skill_name`: Name of the skill
-  - `timestamp`: When the benchmark was run
-  - `evals_run`: List of eval names or IDs
-  - `runs_per_configuration`: Number of runs per config (e.g. 3)
-- `runs[]`: Individual run results
-  - `eval_id`: Numeric eval identifier
-  - `eval_name`: Human-readable eval name (used as section header in the viewer)
-  - `configuration`: Must be `"with_skill"` or `"without_skill"` (the viewer uses this exact string for grouping and color coding)
-  - `run_number`: Integer run number (1, 2, 3...)
-  - `result`: Nested object with `pass_rate`, `passed`, `total`, `time_seconds`, `tokens`, `errors`
-- `run_summary`: Statistical aggregates per configuration
-  - `with_skill` / `without_skill`: Each contains `pass_rate`, `time_seconds`, `tokens` objects with `mean` and `stddev` fields
-  - `delta`: Difference strings like `"+0.50"`, `"+13.0"`, `"+1700"`
-- `notes`: Freeform observations from the analyzer
+  - `skill_name`, `skill_path`, model identities and timestamp: provenance; replace placeholders only with known values
+  - `evals_run`: Observed eval identifiers
+  - `runs_per_configuration`: Observed repetition count when every observed eval/configuration group has that same count, otherwise null; never an assumed default
+  - `run_counts`: Actual observed counts per eval/configuration
+  - `coverage`: `observed-directories-only`; the caller must separately account for expected directories that never appeared
+  - `grading_status`: `COMPLETE` when every observed run has usable grading counts, otherwise `INCOMPLETE`; not a claim that every task passed or all planned work occurred
+  - `units`: Units for numeric metrics; tokens and characters remain distinct
+- `runs[]`: One result per observed run directory, including missing/invalid grader returns
+  - `eval_id`, `configuration`, `run_number`: Stable observed grouping; preserve exact configuration names such as `with_skill` and `without_skill`
+  - `eval_name`: Optional human-readable label for the viewer
+  - `result`: Nested counts and metrics; unknown values are null, measured zero remains zero
+  - `pass_rate`: Derived from usable nonnegative integer `passed`, `failed`, `total` counts with a positive total and `passed + failed == total`; missing/inconsistent grading leaves it null
+  - `measurement_sources`: Carriers used for each timing/token metric
+  - `measurement_gaps`: Invalid/missing grader records, malformed or conflicting measurements
+  - `expectations`, `notes`: Retained grader observations
+- `run_summary`: Statistics per configuration, calculated from available values only
+  - `observed` and `missing`: Per-metric denominators; missing values are not zero-cost successes
+  - `mean`, `stddev`, `min`, `max`: Null when no observations are available
+  - `delta`: First configuration minus second, only for exactly two matching observed eval/run sets with complete values for that metric; otherwise null. No absent baseline is invented.
+- `notes`: Additional observations and limits from the analyzer
 
-**Important:** The viewer reads these field names exactly. Using `config` instead of `configuration`, or putting `pass_rate` at the top level of a run instead of nested under `result`, will cause the viewer to show empty/zero values. Always reference this schema when generating benchmark.json manually.
+The viewer displays unavailable metrics as N/A. Preserve these field names and nesting; a renamed or omitted field cannot be treated as successful evidence. The aggregator does not establish semantic correctness, model independence, or environment comparability.
+
+---
+
+## Trigger evaluation and description selection
+
+`run_eval.py` accepts a nonempty list of unique nonempty `query` strings with boolean `should_trigger` labels. Repeated executions use `runs_per_query`, not duplicate records.
+
+Each result retains `runs` (attempted), `valid_runs` (completed behavioral observations), `errors`, `triggers`, and `observations` with `run` and `status: TRIGGERED | NOT_TRIGGERED | ERROR`; errors also retain their diagnostic. `trigger_rate` divides by valid runs or is null when none exist. `pass` is boolean only when every requested repetition has a valid observation; otherwise null. The summary separates `passed`, `failed`, and `inconclusive`. A positive records invocation selection, not successful skill execution.
+
+`run_loop.py` keeps legacy `test_*` fields for the candidate-selection partition. `holdout_role` explicitly records `candidate-selection` or `none`; `final_generalization_test` remains `NOT_RUN`. Incomplete iterations cannot select a winner or drive another description change. `best_description` and `best_iteration` are null when no recommendation is admissible. Selection scores are not untouched final-test results. The returned `environment` identifies disposable sample projects and inherited user-level context; it is not proof of clean-room isolation.
 
 ---
 
@@ -383,7 +389,7 @@ Output from blind comparator. Located at `<grading-dir>/comparison-N.json`.
 
 ## analysis.json
 
-Output from post-hoc analyzer. Located at `<grading-dir>/analysis.json`.
+Output from post-hoc analyzer. Located at `<grading-dir>/analysis-N.json`.
 
 ```json
 {
@@ -391,40 +397,16 @@ Output from post-hoc analyzer. Located at `<grading-dir>/analysis.json`.
     "winner": "A",
     "winner_skill": "path/to/winner/skill",
     "loser_skill": "path/to/loser/skill",
-    "comparator_reasoning": "Brief summary of why comparator chose winner"
+    "comparator_reasoning": "Brief summary of why one version beat another"
   },
-  "winner_strengths": [
-    "Clear step-by-step instructions for handling multi-page documents",
-    "Included validation script that caught formatting errors"
-  ],
-  "loser_weaknesses": [
-    "Vague instruction 'process the document appropriately' led to inconsistent behavior",
-    "No script for validation, agent had to improvise"
-  ],
-  "instruction_following": {
-    "winner": {
-      "score": 9,
-      "issues": ["Minor: skipped optional logging step"]
-    },
-    "loser": {
-      "score": 6,
-      "issues": [
-        "Did not use the skill's formatting template",
-        "Invented own approach instead of following step 3"
-      ]
-    }
-  },
+  "loser_weaknesses": ["Missing required behavior"],
   "improvement_suggestions": [
     {
       "priority": "high",
       "category": "instructions",
-      "suggestion": "Replace 'process the document appropriately' with explicit steps",
-      "expected_impact": "Would eliminate ambiguity that caused inconsistent behavior"
+      "suggestion": "Clarify the material decision",
+      "expected_impact": "Reduce the observed contract violation"
     }
-  ],
-  "transcript_insights": {
-    "winner_execution_pattern": "Read skill -> Followed 5-step process -> Used validation script",
-    "loser_execution_pattern": "Read skill -> Unclear on approach -> Tried 3 different methods"
-  }
+  ]
 }
 ```
