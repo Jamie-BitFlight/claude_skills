@@ -45,6 +45,7 @@ __all__ = ["load_cycle", "load_snapshot"]
 app = typer.Typer(
     help="Review-state operations through a validated provider interface.",
     context_settings={"terminal_width": 800},
+    add_completion=False,
     rich_markup_mode=None,
     pretty_exceptions_enable=False,
 )

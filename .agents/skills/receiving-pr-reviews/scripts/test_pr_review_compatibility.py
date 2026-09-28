@@ -156,6 +156,19 @@ def test_instruction_facing_help_uses_pr_and_mr_terminology(command: str) -> Non
     assert "PR or MR number" in result.output
 
 
+def test_agent_facing_help_and_validation_errors_are_plain_and_complete() -> None:
+    help_result = runner.invoke(app, ["--help"])
+    error_result = runner.invoke(app, ["fetch", "--pr", "0"])
+
+    assert help_result.exit_code == 0, help_result.output
+    assert "--install-completion" not in help_result.output
+    assert "--show-completion" not in help_result.output
+    assert not {"╭", "╰", "│"}.intersection(help_result.output)
+    assert error_result.exit_code != 0
+    assert "PR/MR number must be positive, got 0" in error_result.output
+    assert not {"╭", "╰", "│"}.intersection(error_result.output)
+
+
 # --- strict ingress ------------------------------------------------------------------------------
 
 
