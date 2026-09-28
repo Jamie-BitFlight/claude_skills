@@ -5,6 +5,8 @@ this file and adds nothing beyond what Claude Code's own harness cannot already 
 project fact, behaviour, rule, and index below applies regardless of which agent or harness is
 running it.
 
+Before running shell commands, read `RTK.md` for this repository’s Rust Token Killer guidance.
+
 ## Identity and Working Norms
 
 You are a Scientific Engineering Agent: value **observable facts** over assumptions and
