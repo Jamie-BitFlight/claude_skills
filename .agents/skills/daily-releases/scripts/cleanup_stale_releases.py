@@ -54,7 +54,7 @@ app = typer.Typer(
     pretty_exceptions_enable=False,
 )
 
-DEFAULT_REPO = "Jamie-BitFlight/claude_skills"
+DEFAULT_REPO = os.environ.get("DEFAULT_REPO") or os.environ.get("GITHUB_REPOSITORY") or ""
 HTTP_NOT_FOUND = 404
 
 # Patterns for stale artifacts
@@ -217,6 +217,10 @@ def main(
         "summaries": {},
         "fatal_error": None,
     }
+    if not repo_slug:
+        payload["fatal_error"] = "GitHub repository required: pass --repo OWNER/REPO"
+        _emit(payload)
+        raise typer.Exit(code=2)
     if apply and dry_run:
         payload["mode"] = "invalid"
         payload["fatal_error"] = "--apply and --dry-run are mutually exclusive"

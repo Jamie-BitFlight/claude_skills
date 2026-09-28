@@ -59,7 +59,7 @@ if TYPE_CHECKING:
 # Constants
 # ---------------------------------------------------------------------------
 
-DEFAULT_REPO: str = os.environ.get("DEFAULT_REPO") or "Jamie-BitFlight/claude_skills"
+DEFAULT_REPO: str = os.environ.get("DEFAULT_REPO") or os.environ.get("GITHUB_REPOSITORY") or ""
 EMPTY_TREE_SHA: str = os.environ.get("EMPTY_TREE_SHA") or "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
 #: Source file extensions to include in the dataset.
@@ -73,6 +73,7 @@ SOURCE_EXTENSIONS: frozenset[str] = frozenset({
     ".sh",
     ".md",
     ".json",
+    ".toml",
     ".yaml",
     ".yml",
 })
@@ -559,9 +560,7 @@ def main(
     output_dir: Annotated[
         Path, typer.Argument(help="Directory under which dataset/ subdirectory will be created", writable=True)
     ],
-    repo_slug: Annotated[
-        str, typer.Option("--repo", "-R", help="GitHub OWNER/REPO slug (default from DEFAULT_REPO env var)")
-    ] = DEFAULT_REPO,
+    repo_slug: Annotated[str, typer.Option("--repo", "-R", help="GitHub OWNER/REPO slug")] = DEFAULT_REPO,
 ) -> None:
     """Collect per-file diffs, commit metadata, and GitHub issues into dataset/.
 
@@ -576,6 +575,9 @@ def main(
     Uses the GitHub REST API — no local git repository is required.
     GITHUB_TOKEN must be set in the environment.
     """
+    if not repo_slug:
+        raise AppExit(code=1, message="GitHub repository required: pass --repo OWNER/REPO")
+
     err_console.print(f"[bold]collect_day_dataset[/bold] {base_ref[:8]}..{head_ref[:8]} -> {output_dir}")
 
     token = os.environ.get("GITHUB_TOKEN")

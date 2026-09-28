@@ -54,7 +54,7 @@ if TYPE_CHECKING:
     from github.Repository import Repository
 
 EMPTY_TREE_SHA: str = os.environ.get("EMPTY_TREE_SHA") or "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
-DEFAULT_REPO: str = os.environ.get("DEFAULT_REPO") or "Jamie-BitFlight/claude_skills"
+DEFAULT_REPO: str = os.environ.get("DEFAULT_REPO") or os.environ.get("GITHUB_REPOSITORY") or ""
 _MIN_PARENT_PARTS = 2
 
 # Must match GENERATOR_VERSION in publish_daily_release.py.
@@ -377,6 +377,9 @@ def main(
         end = date.fromisoformat(end_date) if end_date else datetime.now(tz=UTC).date()
     except ValueError as e:
         raise AppExit(code=1, message=f"Invalid date: {e}") from e
+
+    if not repo_slug:
+        raise AppExit(code=1, message="GitHub repository required: pass --repo OWNER/REPO")
 
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
