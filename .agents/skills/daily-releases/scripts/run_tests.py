@@ -20,8 +20,10 @@ from pathlib import Path
 
 import pytest
 
+TEST_PATHS = (".",)
+
 if __name__ == "__main__":
     script_dir = Path(__file__).parent
     raise SystemExit(
-        pytest.main(["-q", "-c", str(script_dir / "pytest.ini"), str(script_dir / "test_daily_releases.py")])
+        pytest.main(["-q", "-c", str(script_dir / "pytest.ini"), *(str(script_dir / path) for path in TEST_PATHS)])
     )
