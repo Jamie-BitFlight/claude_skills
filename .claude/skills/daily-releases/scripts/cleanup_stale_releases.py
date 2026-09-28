@@ -14,7 +14,7 @@
 # [tool.ty.environment]
 # extra-paths = ["./daily_releases_lib"]
 # ///
-"""Delete stale GitHub releases and tags left by prior daily-release script runs.
+"""Preview or delete stale GitHub releases and tags from prior daily releases.
 
 Removes two categories:
   1. daily-YYYY-MM-DD format releases+tags — old naming convention, superseded
@@ -29,124 +29,107 @@ All operations use the GitHub REST API via PyGithub — no local git required.
 
 from __future__ import annotations
 
+import json
 import os
 import re
-import sys
-from dataclasses import dataclass, field
-from io import TextIOWrapper
-
-# Ensure UTF-8 output on Windows (cp1252 default cannot encode emoji/spinner chars).
-# reconfigure() is available on Python 3.7+ when stdout is a TextIOWrapper.
-if isinstance(sys.stdout, TextIOWrapper):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-if isinstance(sys.stderr, TextIOWrapper):
-    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+from typing import TYPE_CHECKING, Annotated, TypedDict
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from typing import TYPE_CHECKING, Annotated
-
 import typer
 from daily_releases_lib.github_utils import make_github_client
 from github import GithubException
-from rich.console import Console
-from rich.table import Table
 
 if TYPE_CHECKING:
     from github.Repository import Repository
 
 app = typer.Typer(
     name="cleanup_stale_releases",
-    help="Delete stale GitHub releases and tags from prior daily-release script runs",
+    help="Preview or delete stale GitHub releases and tags from prior daily-release script runs",
     add_completion=False,
+    context_settings={"terminal_width": 800},
+    rich_markup_mode=None,
+    pretty_exceptions_enable=False,
 )
-console = Console()
-err_console = Console(stderr=True)
 
 DEFAULT_REPO = "Jamie-BitFlight/claude_skills"
 HTTP_NOT_FOUND = 404
-TABLE_EXAMPLE_LIMIT = 3
 
 # Patterns for stale artifacts
 DAILY_TAG_RE = re.compile(r"^daily-\d{4}-\d{2}-\d{2}$")
 REVISION_TAG_RE = re.compile(r"^v\d{4}\.\d{2}\.\d{2}-r\d+$")
 
 
-@dataclass
-class CleanupResult:
-    """Accumulator for cleanup operation statistics.
+class CleanupAction(TypedDict):
+    """One independently observed release or tag operation."""
 
-    Attributes:
-        deleted_releases: Number of releases successfully deleted.
-        deleted_tags: Number of tags successfully deleted.
-        errors: Number of operations that failed with an error.
-    """
-
-    deleted_releases: int = field(default=0)
-    deleted_tags: int = field(default=0)
-    errors: int = field(default=0)
+    category: str
+    resource: str
+    name: str
+    operation: str
+    status: str
+    error: str | None
 
 
-def delete_release_for_tag(gh_repo: Repository, tag: str, *, dry_run: bool) -> bool:
-    """Delete a GitHub release for the given tag.
+class CleanupPayload(TypedDict):
+    """Complete machine-readable cleanup result."""
 
-    Args:
-        gh_repo: PyGithub Repository object to operate on.
-        tag: Tag name identifying the release to delete.
-        dry_run: When True, print what would happen without making changes.
+    mode: str
+    repository: str
+    selected_categories: dict[str, bool]
+    actions: list[CleanupAction]
+    summaries: dict[str, object]
+    fatal_error: str | None
+
+
+def _action(category: str, resource: str, name: str, status: str, error: str | None = None) -> CleanupAction:
+    """Build one complete action record.
 
     Returns:
-        True if the release was deleted (or would be in dry-run mode),
-        False if no release exists for the tag.
+        The action record.
+    """
+    return {
+        "category": category,
+        "resource": resource,
+        "name": name,
+        "operation": "delete",
+        "status": status,
+        "error": error,
+    }
 
-    Raises:
-        GithubException: If the API returns an error other than 404 Not Found.
+
+def _operate_release(gh_repo: Repository, tag: str, *, apply: bool) -> CleanupAction:
+    """Observe or delete one release without affecting its tag operation.
+
+    Returns:
+        The independently observed release action.
     """
     try:
         release = gh_repo.get_release(tag)
+        if apply:
+            release.delete_release()
     except GithubException as exc:
-        if exc.status == HTTP_NOT_FOUND:
-            return False
-        raise
-    else:
-        if dry_run:
-            console.print(f"  [dim]DRY RUN[/dim] would delete release: {tag}")
-            return True
-        release.delete_release()
-        console.print(f"  [red]Deleted release[/red]: {tag}")
-        return True
+        status = "not_found" if exc.status == HTTP_NOT_FOUND else "error"
+        return _action("daily", "release", tag, status, None if status == "not_found" else str(exc))
+    return _action("daily", "release", tag, "deleted" if apply else "would_delete")
 
 
-def delete_tag_ref(gh_repo: Repository, tag: str, *, dry_run: bool) -> bool:
-    """Delete a git tag ref from the remote repository.
-
-    Args:
-        gh_repo: PyGithub Repository object to operate on.
-        tag: Tag name to delete.
-        dry_run: When True, print what would happen without making changes.
+def _operate_tag(gh_repo: Repository, tag: str, category: str, *, apply: bool) -> CleanupAction:
+    """Observe or delete one tag independently.
 
     Returns:
-        True if the tag was deleted (or would be in dry-run mode),
-        False if the tag ref does not exist.
-
-    Raises:
-        GithubException: If the API returns an error other than 404 Not Found.
+        The independently observed tag action.
     """
     try:
         ref = gh_repo.get_git_ref(f"tags/{tag}")
+        if apply:
+            ref.delete()
     except GithubException as exc:
-        if exc.status == HTTP_NOT_FOUND:
-            return False
-        raise
-    else:
-        if dry_run:
-            console.print(f"  [dim]DRY RUN[/dim] would delete tag:    {tag}")
-            return True
-        ref.delete()
-        console.print(f"  [red]Deleted tag[/red]:    {tag}")
-        return True
+        status = "not_found" if exc.status == HTTP_NOT_FOUND else "error"
+        return _action(category, "tag", tag, status, None if status == "not_found" else str(exc))
+    return _action(category, "tag", tag, "deleted" if apply else "would_delete")
 
 
 def _init_github_client(repo_slug: str) -> Repository:
@@ -162,19 +145,15 @@ def _init_github_client(repo_slug: str) -> Repository:
         Authenticated PyGithub Repository object.
 
     Raises:
-        typer.Exit: If GITHUB_TOKEN is missing or the repo is inaccessible.
+        RuntimeError: If GITHUB_TOKEN is missing.
+        GithubException: If the repository is inaccessible.
     """
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
-        err_console.print("[red]GITHUB_TOKEN environment variable not set[/red]")
-        raise typer.Exit(code=1)
+        raise RuntimeError("GITHUB_TOKEN environment variable not set")
 
     gh = make_github_client(token)
-    try:
-        return gh.get_repo(repo_slug)
-    except GithubException as exc:
-        err_console.print(f"[red]Cannot access repo '{repo_slug}': {exc}[/red]")
-        raise typer.Exit(code=1) from exc
+    return gh.get_repo(repo_slug)
 
 
 def _collect_stale_tags(gh_repo: Repository) -> tuple[list[str], list[str]]:
@@ -195,143 +174,74 @@ def _collect_stale_tags(gh_repo: Repository) -> tuple[list[str], list[str]]:
     return daily_tags, revision_tags
 
 
-def _format_examples(tags: list[str]) -> str:
-    """Format a truncated list of tag names for table display.
-
-    Args:
-        tags: Non-empty list of tag name strings.
+def _summaries(actions: list[CleanupAction]) -> dict[str, object]:
+    """Count every status overall and per resource.
 
     Returns:
-        Comma-separated tag names, truncated with "..." when the list
-        exceeds TABLE_EXAMPLE_LIMIT entries.
+        Complete counters for all action statuses.
     """
-    examples = ", ".join(tags[:TABLE_EXAMPLE_LIMIT])
-    if len(tags) > TABLE_EXAMPLE_LIMIT:
-        return examples + "..."
-    return examples
+    statuses = ("would_delete", "deleted", "not_found", "error", "not_attempted")
+    return {
+        "total": len(actions),
+        "by_status": {status: sum(action["status"] == status for action in actions) for status in statuses},
+        "by_resource": {
+            resource: {
+                status: sum(action["resource"] == resource and action["status"] == status for action in actions)
+                for status in statuses
+            }
+            for resource in ("release", "tag")
+        },
+    }
 
 
-def _display_summary_table(daily_tags: list[str], revision_tags: list[str]) -> bool:
-    """Display a summary table of stale artifacts found.
-
-    Args:
-        daily_tags: List of daily-format tag names.
-        revision_tags: List of revision-format tag names.
-
-    Returns:
-        True if artifacts were found and displayed, False if nothing
-        to clean up.
-    """
-    if not daily_tags and not revision_tags:
-        console.print("[green]Nothing to clean up.[/green]")
-        return False
-
-    table = Table(title="Stale artifacts to remove")
-    table.add_column("Category", style="cyan")
-    table.add_column("Count", justify="right")
-    table.add_column("Examples")
-    if daily_tags:
-        table.add_row("daily-* releases+tags", str(len(daily_tags)), _format_examples(daily_tags))
-    if revision_tags:
-        table.add_row("v*-rN revision tags", str(len(revision_tags)), _format_examples(revision_tags))
-    console.print(table)
-    return True
-
-
-def _cleanup_daily_tags(gh_repo: Repository, daily_tags: list[str], *, dry_run: bool, result: CleanupResult) -> None:
-    """Delete releases and tags for all daily-format stale entries.
-
-    Args:
-        gh_repo: PyGithub Repository object to operate on.
-        daily_tags: List of daily-format tag names to clean up.
-        dry_run: When True, print what would happen without making changes.
-        result: Accumulator for tracking deletion statistics.
-    """
-    console.print(f"\n[bold]Removing {len(daily_tags)} daily-* releases and tags[/bold]")
-    for tag in daily_tags:
-        try:
-            had_release = delete_release_for_tag(gh_repo, tag, dry_run=dry_run)
-            had_tag = delete_tag_ref(gh_repo, tag, dry_run=dry_run)
-        except GithubException as exc:
-            err_console.print(f"  [red]ERROR[/red] processing {tag}: {exc}")
-            result.errors += 1
-        else:
-            if had_release:
-                result.deleted_releases += 1
-            if had_tag:
-                result.deleted_tags += 1
-
-
-def _cleanup_revision_tags(
-    gh_repo: Repository, revision_tags: list[str], *, dry_run: bool, result: CleanupResult
-) -> None:
-    """Delete orphaned revision tag refs (no releases attached).
-
-    Args:
-        gh_repo: PyGithub Repository object to operate on.
-        revision_tags: List of revision-format tag names to clean up.
-        dry_run: When True, print what would happen without making changes.
-        result: Accumulator for tracking deletion statistics.
-    """
-    console.print(f"\n[bold]Removing {len(revision_tags)} v*-rN revision tags[/bold]")
-    for tag in revision_tags:
-        try:
-            had_tag = delete_tag_ref(gh_repo, tag, dry_run=dry_run)
-        except GithubException as exc:
-            err_console.print(f"  [red]ERROR[/red] deleting tag {tag}: {exc}")
-            result.errors += 1
-        else:
-            if had_tag:
-                result.deleted_tags += 1
-
-
-def _print_report(result: CleanupResult) -> None:
-    """Print the final cleanup summary.
-
-    Args:
-        result: Accumulated cleanup statistics to report.
-    """
-    console.print(
-        f"\n[bold]Done.[/bold] Deleted {result.deleted_releases} releases, "
-        f"{result.deleted_tags} tags. Errors: {result.errors}"
-    )
+def _emit(payload: CleanupPayload) -> None:
+    """Emit the single compact machine-readable result."""
+    payload["summaries"] = _summaries(payload["actions"])
+    typer.echo(json.dumps(payload, separators=(",", ":")))
 
 
 @app.command()
 def main(
-    dry_run: Annotated[bool, typer.Option(help="Print what would happen without making changes")] = False,
+    dry_run: Annotated[bool, typer.Option("--dry-run", help="Preview without making changes")] = False,
+    apply: Annotated[bool, typer.Option("--apply", help="Delete the selected stale resources")] = False,
     repo_slug: Annotated[str, typer.Option("--repo", "-R", help="GitHub repo OWNER/REPO")] = DEFAULT_REPO,
     skip_daily: Annotated[bool, typer.Option(help="Skip cleanup of daily-* releases")] = False,
     skip_revisions: Annotated[bool, typer.Option(help="Skip cleanup of v*-rN revision tags")] = False,
 ) -> None:
-    """Delete stale GitHub releases and tags from prior daily-release script runs."""
-    if dry_run:
-        console.print("[yellow]DRY RUN mode — no changes will be made[/yellow]")
+    """Preview by default; delete only when ``--apply`` is explicit."""
+    payload: CleanupPayload = {
+        "mode": "apply" if apply else "preview",
+        "repository": repo_slug,
+        "selected_categories": {"daily": not skip_daily, "revisions": not skip_revisions},
+        "actions": [],
+        "summaries": {},
+        "fatal_error": None,
+    }
+    if apply and dry_run:
+        payload["mode"] = "invalid"
+        payload["fatal_error"] = "--apply and --dry-run are mutually exclusive"
+        _emit(payload)
+        raise typer.Exit(code=2)
 
-    gh_repo = _init_github_client(repo_slug)
+    try:
+        gh_repo = _init_github_client(repo_slug)
+        daily_tags, revision_tags = _collect_stale_tags(gh_repo)
+    except Exception as exc:
+        payload["fatal_error"] = str(exc)
+        _emit(payload)
+        raise typer.Exit(code=1) from exc
 
-    console.print(f"\nFetching all tags from [bold]{repo_slug}[/bold]...")
-    daily_tags, revision_tags = _collect_stale_tags(gh_repo)
+    if not skip_daily:
+        for tag in daily_tags:
+            payload["actions"].append(_operate_release(gh_repo, tag, apply=apply))
+            payload["actions"].append(_operate_tag(gh_repo, tag, "daily", apply=apply))
+    if not skip_revisions:
+        for tag in revision_tags:
+            payload["actions"].append(_operate_tag(gh_repo, tag, "revision", apply=apply))
 
-    has_work = _display_summary_table(daily_tags, revision_tags)
-    if not has_work:
-        return
-
-    if not dry_run:
-        confirm = typer.confirm("\nProceed with deletion?", default=False)
-        if not confirm:
-            console.print("Aborted.")
-            raise typer.Exit(code=0)
-
-    result = CleanupResult()
-
-    if not skip_daily and daily_tags:
-        _cleanup_daily_tags(gh_repo, daily_tags, dry_run=dry_run, result=result)
-
-    if not skip_revisions and revision_tags:
-        _cleanup_revision_tags(gh_repo, revision_tags, dry_run=dry_run, result=result)
-
-    _print_report(result)
+    _emit(payload)
+    if any(action["status"] in {"error", "not_attempted"} for action in payload["actions"]):
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":
