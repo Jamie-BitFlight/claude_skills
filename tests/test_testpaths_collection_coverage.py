@@ -1,11 +1,11 @@
 """Guard that the declared test roots and the test files on disk stay in agreement.
 
 Two authorities declare test roots. Root ``testpaths`` covers repository-owned tests,
-collected by a bare ``uv run pytest``. Each ``plugins/<name>/run_pytests.py`` declares
-its plugin's roots in a literal ``TEST_PATHS`` constant, collected by that runner. A test
-file outside every root never runs anywhere and reports no failure while it rots; a root
-naming a directory that no longer exists collects nothing while looking like coverage.
-Both directions are checked here.
+collected by a bare ``uv run pytest``. Plugin runners and self-contained repo-skill
+runners declare their roots in a literal ``TEST_PATHS`` constant. A test file outside
+every root never runs anywhere and reports no failure while it rots; a root naming a
+directory that no longer exists collects nothing while looking like coverage. Both
+directions are checked here.
 
 Every input is derived, never transcribed. Root ``testpaths`` and ``python_files`` come
 from the live pytest config, the values a bare run obeys. Runner roots come from each
@@ -74,18 +74,24 @@ def unreachable_test_files(
     # The trailing slash is load-bearing: a bare ``startswith("tests")`` would treat
     # ``tests_backlog/`` as living inside ``tests/``, which is how 635 tests stayed
     # uncollected while looking covered.
-    roots = tuple(f"{entry.rstrip('/')}/" for entry in testpaths)
+    entries = tuple(entry.rstrip("/") for entry in testpaths)
+    roots = tuple(f"{entry}/" for entry in entries)
     excluded = set(exclusions)
-    return sorted(path for path in test_files if path not in excluded and not path.startswith(roots))
+    return sorted(
+        path for path in test_files if path not in excluded and path not in entries and not path.startswith(roots)
+    )
 
 
-def _runner_plugins() -> tuple[str, ...]:
-    """Return the repository-relative directories of plugins that own a runner, with a trailing slash."""
+def _runner_roots() -> tuple[str, ...]:
+    """Return the repository-relative directories of runner-owned tests, with a trailing slash."""
     return tuple(f"{runner.parent.relative_to(_REPO_ROOT).as_posix()}/" for runner in _runners())
 
 
 def _runners() -> list[Path]:
-    return sorted((_REPO_ROOT / "plugins").glob("*/run_pytests.py"))
+    return sorted([
+        *(_REPO_ROOT / "plugins").glob("*/run_pytests.py"),
+        *(_REPO_ROOT / ".agents/skills").glob("*/scripts/run_tests.py"),
+    ])
 
 
 def _tracked_test_files(root_patterns: Iterable[str]) -> set[str]:
@@ -98,17 +104,17 @@ def _tracked_test_files(root_patterns: Iterable[str]) -> set[str]:
         ["git", "ls-files", "-z", "*.py"], cwd=_REPO_ROOT, capture_output=True, text=True, check=True
     ).stdout.split("\0")
     root_patterns = tuple(root_patterns)
-    plugins = _runner_plugins()
+    runner_roots = _runner_roots()
 
     def is_test(path: str) -> bool:
-        patterns = _RUNNER_PYTHON_FILES if path.startswith(plugins) else root_patterns
+        patterns = _RUNNER_PYTHON_FILES if path.startswith(runner_roots) else root_patterns
         return any(fnmatch.fnmatch(Path(path).name, pat) for pat in patterns)
 
     return {path for path in tracked if path and is_test(path)}
 
 
-def _plugin_runner_testpaths() -> list[str]:
-    """Return plugin test roots declared by each runner's module-level literal ``TEST_PATHS``."""
+def _runner_testpaths() -> list[str]:
+    """Return test roots declared by each runner's module-level literal ``TEST_PATHS``."""
     roots: list[str] = []
     for runner in _runners():
         tree = ast.parse(runner.read_text(encoding="utf-8"), filename=str(runner))
@@ -132,8 +138,8 @@ def _plugin_runner_testpaths() -> list[str]:
         values = ast.literal_eval(value)
         assert isinstance(values, (list, tuple))
         assert values
-        plugin = runner.parent.relative_to(_REPO_ROOT)
-        roots.extend((plugin / value).as_posix() for value in values)
+        runner_root = runner.parent.relative_to(_REPO_ROOT)
+        roots.extend((runner_root / value).as_posix() for value in values)
     return roots
 
 
@@ -144,7 +150,7 @@ def _derived_inputs(config: pytest.Config) -> tuple[list[str], set[str]]:
     below would succeed while having examined nothing. "All clear" and "I could not
     look" must not produce the same verdict.
     """
-    testpaths = [*config.getini("testpaths"), *_plugin_runner_testpaths()]
+    testpaths = [*config.getini("testpaths"), *_runner_testpaths()]
     patterns = list(config.getini("python_files"))
     assert testpaths, "pytest and plugin runners report no test roots, so nothing here can judge collection coverage"
     assert patterns, "pytest reports no python_files patterns, so no file can be recognised as a test"

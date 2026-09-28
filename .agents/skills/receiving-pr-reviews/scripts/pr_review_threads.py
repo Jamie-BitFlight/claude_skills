@@ -42,7 +42,13 @@ from pr_review_state import load_cycle, load_snapshot, save_snapshot
 
 __all__ = ["load_cycle", "load_snapshot"]
 
-app = typer.Typer(help="Review-state operations through a validated provider interface.")
+app = typer.Typer(
+    help="Review-state operations through a validated provider interface.",
+    context_settings={"terminal_width": 800},
+    add_completion=False,
+    rich_markup_mode=None,
+    pretty_exceptions_enable=False,
+)
 
 DEFAULT_WATCH_INTERVAL_SECONDS = 90
 DEFAULT_WATCH_TIMEOUT_SECONDS = 270

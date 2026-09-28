@@ -54,7 +54,7 @@ if TYPE_CHECKING:
     from github.Repository import Repository
 
 EMPTY_TREE_SHA: str = os.environ.get("EMPTY_TREE_SHA") or "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
-DEFAULT_REPO: str = os.environ.get("DEFAULT_REPO") or "Jamie-BitFlight/claude_skills"
+DEFAULT_REPO: str = os.environ.get("DEFAULT_REPO") or os.environ.get("GITHUB_REPOSITORY") or ""
 _MIN_PARENT_PARTS = 2
 
 # Must match GENERATOR_VERSION in publish_daily_release.py.
@@ -63,6 +63,7 @@ GENERATOR_VERSION: str = os.environ.get("GENERATOR_VERSION") or "1.0"
 # GitHub's API returns the Markdown-escaped form "<\!--" instead of "<!--" for HTML
 # comments in release bodies.  Match both to avoid false-positive needs_update.
 _MARKER_RE = re.compile(r"<\\?!-- created-by-release-generator: v([\d.]+) -->")
+_DAILY_RELEASE_TAG_RE = re.compile(r"^v(\d{4}\.\d{2}\.\d{2})(?:-r\d+)?$")
 
 app = typer.Typer(
     name="list_daily_ranges", help="List daily commit ranges for release pipeline processing", add_completion=False
@@ -308,6 +309,28 @@ def _check_day_release_status(gh_repo: Repository, tag: str, newest_commit: str)
     return True, version_outdated
 
 
+def _resolve_start_date(explicit_start: date | None, gh_repo: Repository) -> date | None:
+    """Use an explicit start date or the newest existing daily release date.
+
+    Returns:
+        The inclusive start date, or None when no daily release exists.
+    """
+    if explicit_start is not None:
+        return explicit_start
+
+    latest: date | None = None
+    for release in gh_repo.get_releases():
+        match = _DAILY_RELEASE_TAG_RE.fullmatch(release.tag_name)
+        if not match:
+            continue
+        try:
+            release_date = date.fromisoformat(match.group(1).replace(".", "-"))
+        except ValueError:
+            continue
+        latest = max(latest, release_date) if latest else release_date
+    return latest
+
+
 def _build_day_range(
     day_str: str, all_by_day: dict[str, list[str]], non_merge_by_day: dict[str, list[str]], gh_repo: Repository
 ) -> DayRange:
@@ -350,10 +373,13 @@ def main(
     repository is required.
     """
     try:
-        start = date.fromisoformat(start_date) if start_date else None
+        explicit_start = date.fromisoformat(start_date) if start_date else None
         end = date.fromisoformat(end_date) if end_date else datetime.now(tz=UTC).date()
     except ValueError as e:
         raise AppExit(code=1, message=f"Invalid date: {e}") from e
+
+    if not repo_slug:
+        raise AppExit(code=1, message="GitHub repository required: pass --repo OWNER/REPO")
 
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
@@ -364,6 +390,7 @@ def main(
 
     gh = make_github_client(token)
     gh_repo = get_github_repo(gh, repo_slug)
+    start = _resolve_start_date(explicit_start, gh_repo)
 
     all_by_day, non_merge_by_day = get_commits_by_day(token, repo_slug, branch, verify=ssl_verify, base_url=base_url)
 

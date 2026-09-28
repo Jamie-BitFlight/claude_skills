@@ -60,7 +60,7 @@ app = typer.Typer(
 console = Console()
 err_console = Console(stderr=True)
 
-DEFAULT_REPO = "Jamie-BitFlight/claude_skills"
+DEFAULT_REPO = os.environ.get("DEFAULT_REPO") or os.environ.get("GITHUB_REPOSITORY") or ""
 
 # Bump this to force regeneration of all existing releases on next run.
 GENERATOR_VERSION = "1.0"
@@ -133,6 +133,9 @@ def main(
     All tag operations are performed via the GitHub REST API — no local git
     push required.
     """
+    if not repo_slug:
+        raise AppExit(code=1, message="GitHub repository required: pass --repo OWNER/REPO")
+
     if not notes_file.exists():
         raise AppExit(code=1, message=f"Notes file not found: {notes_file}")
 

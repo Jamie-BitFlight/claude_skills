@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["typer>=0.21.0", "rich>=14.0.0"]
+# dependencies = ["typer>=0.21.0"]
 # ///
 """MR description formatter - formats AI analysis into markdown description.
 
@@ -18,13 +18,14 @@ from pathlib import Path
 from typing import Annotated, Any
 
 import typer
-from rich.console import Console
-from rich.markdown import Markdown
-from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn
 
 app = typer.Typer(
-    name="format_mr_description", help="Format AI analysis into markdown MR description", add_completion=False
+    name="format_mr_description",
+    help="Format AI analysis into markdown MR description",
+    add_completion=False,
+    context_settings={"terminal_width": 800},
+    rich_markup_mode=None,
+    pretty_exceptions_enable=False,
 )
 
 # Ensure UTF-8 output on Windows (cp1252 default cannot encode emoji/spinner chars).
@@ -33,10 +34,6 @@ if isinstance(sys.stdout, TextIOWrapper):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 if isinstance(sys.stderr, TextIOWrapper):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-
-# legacy_windows=False forces Rich to use ANSI escape sequences instead of the
-# Windows Console API, avoiding charmap encoding failures on legacy consoles.
-console = Console(legacy_windows=False)
 
 
 class FormatError(Exception):
@@ -342,11 +339,11 @@ def format_non_functional(non_functional: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def format_breaking_changes(breaking_changes: list[dict[str, Any]]) -> str:
+def format_breaking_changes(breaking_changes: list[dict[str, Any] | str]) -> str:
     """Format breaking changes section.
 
     Args:
-        breaking_changes: List of breaking change dictionaries
+        breaking_changes: List of breaking change dictionaries or descriptions
 
     Returns:
         Formatted markdown string
@@ -357,6 +354,9 @@ def format_breaking_changes(breaking_changes: list[dict[str, Any]]) -> str:
     lines = ["### ⚠️ Breaking Changes\n"]
 
     for change in breaking_changes:
+        if isinstance(change, str):
+            lines.append(f"- **{change}**")
+            continue
         lines.append(f"- **{change.get('change', 'Breaking Change')}**")
 
         if change.get("migration"):
@@ -410,7 +410,7 @@ def format_statistics(stats: dict[str, Any]) -> str:
     lines = ["## Statistics\n"]
 
     lines.extend((
-        f"- **Commits**: {stats.get('commits', 0)}",
+        f"- **Commits**: {stats.get('commits', stats.get('commit_count', 0))}",
         f"- **Files Changed**: {stats.get('files_changed', 0)}",
         f"- **Lines Added**: +{stats.get('lines_added', 0)}",
         f"- **Lines Deleted**: -{stats.get('lines_deleted', 0)}",
@@ -511,54 +511,20 @@ def format_description(
     merge request description following the template standards.
     """
     try:
-        with Progress(
-            SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console
-        ) as progress:
-            # Load analysis file
-            task = progress.add_task("Loading analysis file...", total=None)
-            analysis = load_analysis_file(analysis_file)
-            progress.update(task, description=":white_check_mark: Analysis loaded")
-
-            # Generate description
-            progress.update(task, description="Generating markdown description...")
-            description = generate_mr_description(analysis)
-            progress.update(task, description=":white_check_mark: Description generated")
-
-            # Write output
-            progress.update(task, description="Writing output file...")
-            output_file.parent.mkdir(parents=True, exist_ok=True)
-            output_file.write_text(description, encoding="utf-8")
-            progress.update(task, description=":white_check_mark: Output written")
-
-            progress.remove_task(task)
-
-        # Display success message
-        console.print()
-        console.print(
-            Panel.fit(
-                f"MR description written to [cyan]{output_file.absolute()}[/cyan]",
-                title=":white_check_mark: Success",
-                border_style="green",
-            )
-        )
-
-        # Preview if requested
+        analysis = load_analysis_file(analysis_file)
+        description = generate_mr_description(analysis)
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        output_file.write_text(description, encoding="utf-8")
+        result = {"output_file": str(output_file.absolute())}
         if preview:
-            console.print()
-            console.print(
-                Panel(
-                    Markdown(description),
-                    title=":page_facing_up: MR Description Preview",
-                    border_style="blue",
-                    expand=False,
-                )
-            )
+            result["description"] = description
+        print(json.dumps(result, ensure_ascii=False))
 
     except FormatError as e:
-        console.print(Panel.fit(f"[red]{e}[/red]", title=":cross_mark: Error", border_style="red"))
+        print(json.dumps({"error": str(e)}, ensure_ascii=False), file=sys.stderr)
         raise typer.Exit(code=1) from e
     except KeyboardInterrupt:
-        console.print("\n[yellow]Operation cancelled by user[/yellow]")
+        print(json.dumps({"error": "Operation cancelled by user"}), file=sys.stderr)
         raise typer.Exit(code=130) from None
 
 
