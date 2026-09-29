@@ -11,7 +11,7 @@ Run configured quality gates and treat diagnostics as evidence to diagnose, not 
 
 Start from explicitly requested files/directories, or task-changed files when no scope was supplied. Do not broaden into repository-wide cleanup unless requested or required by an authoritative configured gate.
 
-Inspect repository configuration read-only. Prefer an aggregate hook/task command when repository configuration makes it authoritative; preserve unknown/custom configured hooks rather than silently reducing them to a known-tool allowlist.
+Inspect repository configuration read-only. When prek/pre-commit configuration is authoritative, run one aggregate `prek run --files <changed files>` invocation; name a hook only when reproducing or diagnosing that hook's failure. Preserve unknown/custom configured hooks rather than silently reducing them to a known-tool allowlist.
 
 When `.pre-commit-config.yaml` is authoritative, [detect_hook_tool.py](./scripts/detect_hook_tool.py) may assist runner selection. Resolve the script from this installed skill directory, not the caller's working directory. Its answer is evidence about runner selection, not proof that all configured gates were discovered.
 
