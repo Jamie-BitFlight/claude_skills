@@ -15,34 +15,6 @@ uv run --locked --script plugins/development-harness/run_pytests.py tests/test_m
 
 Coverage (`--cov=scripts --cov=plugins`) is always on via root addopts — passing `--cov` again is redundant. Plugin runners read no root config, so they run without coverage unless you pass it. Each runner's own arguments set its parallelism; read `plugins/<name>/run_pytests.py`.
 
-## Test creation policy
-
-A changed file does not by itself require a new test. Before authoring a maintained regression test,
-apply the [DH test admission gate](../plugins/development-harness/docs/testing-principles.md#test-admission-gate)
-or load [Test Designer](../plugins/development-harness/skills/test-designer/SKILL.md). A new test must
-add independent protection for a meaningful behavior, invariant, interface, failure mode, or
-machine-consumed contract that existing protection does not already cover adequately. `NO NEW TEST
-JUSTIFIED` is a valid design outcome.
-
-Do not add tests merely to enforce intentional source wording or structure. In particular, prose in
-`SKILL.md`, `AGENTS.md`, READMEs, reference Markdown, prompts, or documentation does not earn a
-regression test because words, headings, sentences, counts, or examples changed. A keyword-presence
-assertion proves only that the keyword is present; it does not prove that an agent follows the
-instruction. Test exact text only when the text itself is a machine-consumed contract.
-
-Keep machine-readable form separate from semantic behavior. Frontmatter, schemas, manifests,
-generated inventories, and parsable metadata may justify structural validation when software
-consumes that structure. Agent-instruction effectiveness requires representative behavioral
-evaluation of consequential actions, routing, side effects, or outcomes rather than phrase matching.
-Lint, schema validation, link checking, and other deterministic validation can verify an edit without
-creating another long-lived regression test.
-
-Every retained test has lifecycle cost: future readers must understand it, agents must spend context
-on it, maintainers must update it, CI must run it, and failures must be diagnosed. Compare that cost
-with the test's unique protection. Cost alone never justifies deleting required protection, but a
-test with no unique useful protection should not be created or retained merely to increase test
-count or coverage.
-
 ## Testing policy: maintenance-adjusted value
 
 Tests are maintained software. Every retained test consumes recurring reading/reasoning context,
