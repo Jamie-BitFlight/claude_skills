@@ -28,6 +28,20 @@ acceptance and verification cases. Task Worker loads it before test authoring, a
 reviewer loads the reviewer for test evidence. Test plans and
 review findings stay in the caller's existing handoff instead of introducing new task-schema fields.
 
+## Validation and retention are separate decisions
+
+Every claimed fix requires direct validation before closure. Validate the behavior the change was
+intended to correct, not merely nearby code or the existence of the edit. Prefer the same
+discriminating observation before and after the change when practical: establish the incorrect
+baseline, apply the fix, and observe the corrected result. When the original failure cannot be
+reproduced, state that limitation and report only what the available validation establishes.
+
+Validation evidence may be temporary. A targeted command, one-off probe, isolated scenario,
+existing system/contract test, static validator, parser, compiler, or direct inspection of the
+relevant outcome can establish the change without creating a new permanent test. After validation is
+defined, make the retention decision independently through the admission gate below. Do not convert
+every piece of close evidence into recurring suite ownership.
+
 ## Test admission gate
 
 Every maintained test has lifecycle cost. Do not create one merely because code, configuration, or
@@ -50,6 +64,30 @@ mirror words, sentences, headings, counts, or other intentional prose unless exa
 is consumed programmatically. For machine-readable frontmatter, schemas, manifests, and metadata,
 test the parser/consumer contract. For semantic agent behavior, evaluate representative actions,
 routing, side effects, and outcomes; keyword presence is not behavioral evidence.
+
+## Contract altitude
+
+Use contract altitude to choose what a maintained test should observe. Higher altitude means closer
+to the durable goal and farther from incidental implementation:
+
+```text
+holistic/system outcome
+  -> user/public/cross-component contract
+    -> component/interface contract
+      -> TDD-sized unit behavior
+        -> private implementation detail
+```
+
+Prefer the highest stable altitude that still discriminates the consequential failure with acceptable
+execution cost and diagnostics. Trace lower-level tests upward to the contract or holistic goal they
+help protect. A test that only proves an implementation fact exists, without a supported behavioral
+claim above it, has weak retention value.
+
+Keep unit tests at TDD scale. Use the smallest executable example needed to drive or clarify one
+behavioral slice; do not expand unit coverage to mirror every helper, branch, constant, call count,
+internal ordering, or decomposition choice. A behavior-preserving refactor should normally leave the
+unit test green. Retain lower-level tests when they protect a stable local contract or uniquely
+distinguish an important fault that broader evidence cannot catch cheaply.
 
 ## Principles
 
@@ -88,17 +126,18 @@ valuable when that is its explicit contract; classify its limited scope instead 
 
 ### 5. Prefer the highest-value faithful boundary
 
-Choose the boundary from the consequential behavior and failure mechanism, not from a testing pyramid
-or a preference for isolated functions. When one system, integration, contract, or lifecycle test can
-protect the same externally meaningful behavior as many implementation-level tests, prefer the
-broader stable boundary if it remains diagnosable and maintainable. Exercise real component
-composition when cross-component behavior is the guarantee.
+Choose the boundary from contract altitude, consequential behavior, and failure mechanism, not from a
+testing-pyramid quota or a preference for isolated functions. When one system, integration, contract,
+or lifecycle test can protect the same meaningful behavior as many implementation-level tests,
+prefer the broader stable boundary if it remains discriminating, diagnosable, and maintainable.
+Exercise real component composition when cross-component behavior is the guarantee.
 
-Use a function/unit boundary when that boundary is itself a stable supported contract, when broader
-tests cannot cheaply distinguish an important fault, or when the smaller test materially improves
-diagnosis without duplicating the same protection. A private helper's edge cases do not earn tests
-merely because the helper exists. Protocol, transaction, packaging, hardware, startup, persistence,
-authorization, and recovery guarantees need the relevant real seam [4], [5].
+Use a function/unit boundary for a TDD-sized behavioral slice when that boundary is itself stable,
+when broader tests cannot cheaply distinguish an important fault, or when the smaller test materially
+improves diagnosis without duplicating the same protection. A private helper's edge cases, constants,
+or current branches do not earn tests merely because they exist. Protocol, transaction, packaging,
+hardware, startup, persistence, authorization, and recovery guarantees need the relevant real seam
+[4], [5].
 
 Inspect what fixtures, mocks, fakes, and bypassed adapters remove from observation. Check a double's
 relevant assumptions against the real dependency where needed. Architect controllable clocks,

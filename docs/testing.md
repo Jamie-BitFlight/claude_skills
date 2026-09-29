@@ -22,19 +22,31 @@ execution resources, failure-investigation effort, and modification work. Optimi
 maintainable suite that gives strong confidence in consequential system behavior, not for test count,
 coverage percentage, a conventional test pyramid, or the appearance of thoroughness.
 
-Before adding a maintained test, apply the
-[DH test admission gate](../plugins/development-harness/docs/testing-principles.md#test-admission-gate)
-or load [Test Designer](../plugins/development-harness/skills/test-designer/SKILL.md). A new test must
-add independent protection for a meaningful behavior, invariant, interface, failure mode, or
-machine-consumed contract that existing protection does not already cover adequately. `NO NEW TEST
-JUSTIFIED` is a valid design result.
+Validation and permanent regression protection are separate decisions. Every claimed fix must have
+direct validation before closure against the behavior it was meant to change. Prefer a discriminating
+before/after observation when practical: reproduce the incorrect behavior, apply the fix, then run
+the same observation and show the corrected result. A one-time command, probe, isolated scenario,
+existing contract/system test, linter, parser, compiler, or other direct evidence may satisfy this
+close criterion. Necessary validation does not automatically become a permanent test.
 
-Prefer observable system, integration, contract, and lifecycle behavior over implementation-level
-unit detail when both can protect the same failure. A small lifecycle test that crosses the real
-consumer/provider boundary is preferable to many tests of private helpers or function decomposition
-when it supplies equivalent or stronger protection at lower maintenance cost. Keep a unit test when
-the smaller boundary itself is a stable supported contract or it provides unique, consequential
-fault discrimination that broader tests do not.
+After deciding how the change will be validated, apply the
+[DH test admission gate](../plugins/development-harness/docs/testing-principles.md#test-admission-gate)
+or load [Test Designer](../plugins/development-harness/skills/test-designer/SKILL.md) to decide whether
+new regression protection should be retained. A maintained test must add independent protection for a
+meaningful behavior, invariant, interface, failure mode, or machine-consumed contract that existing
+protection does not already cover adequately. `NO NEW TEST JUSTIFIED` is a valid retention result.
+
+Prefer higher contract altitude when it gives useful fault discrimination at acceptable cost:
+holistic/system outcome -> user/public/cross-component contract -> component/interface contract ->
+TDD-sized unit behavior -> private implementation detail. The last level is not a test contract by
+default. A retained test should be traceable upward to a meaningful system goal or supported
+contract, even when it runs at a smaller boundary.
+
+Keep unit tests at TDD scale: small executable examples that drive one meaningful behavior and remain
+green across behavior-preserving refactors. Do not turn unit tests into mirrors of private helpers,
+branches, hard-coded constants, incidental call counts, internal ordering, or current decomposition
+unless one of those details is itself an authoritative contract. When a small lifecycle/contract test
+protects the same consequential failure, prefer it to many implementation-coupled unit tests.
 
 Do not add tests merely to freeze intentional wording or structure. In particular, prose in
 `SKILL.md`, `AGENTS.md`, READMEs, reference Markdown, prompts, comments, or documentation does not
@@ -114,10 +126,12 @@ null until the validation runner records an observed result. It is not a passing
   `tests/` runs in CI but is invisible to that plugin's standalone runner, so its coverage
   silently disappears for anyone who installs the plugin on its own. Move a misplaced test file
   to the correct location rather than leaving it and noting the exception.
-- **Close criteria**: passing pre-existing tests proves no regression, not correctness. Require
-  specific validation of the new/fixed behavior, but create a maintained regression test only when
-  the admission gate justifies its recurring cost. A deterministic validator, contract/system run,
-  or other direct evidence may be the correct close evidence when no new test is warranted.
+- **Close criteria**: passing pre-existing tests proves no regression, not correctness. A fix does
+  not close without direct evidence that the targeted behavior changed as intended. Prefer the same
+  discriminating observation before and after the fix when practical. If the original failure cannot
+  be reproduced, report that evidence limit rather than treating a green unrelated suite as proof.
+  Retention is a separate decision: create a maintained regression test only when the admission gate
+  justifies its recurring cost. One-time validation can be the correct close evidence.
 - **SAM/backlog MCP error contract**: `sam_schema/server.py` tool handlers let exceptions
   (`PlanNotFoundError`, `TaskNotFoundError`, etc.) propagate rather than returning
   `{"error": ...}` dicts — FastMCP converts them to `isError=true` responses. Tests for

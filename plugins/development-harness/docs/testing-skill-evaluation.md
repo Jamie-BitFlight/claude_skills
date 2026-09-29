@@ -17,11 +17,14 @@ Compare equivalent baseline and candidate conditions. The pre-change review entr
 parent PR #3900 commit `a53bc7f234770507e47fc290320911188ce70271`. For test design, the baseline is
 the same task without the new designer. Preserve other relevant project instructions in both arms.
 
-Grade test-admission decisions, observable claim selection, independent oracle justification,
-boundary fidelity, maintenance-adjusted protection, risk prioritization, read-only behavior, and
-accurate evidence status. Reward explicit no-new-test decisions when a change adds no independently
-useful protection, and prefer contract/lifecycle protection over duplicated implementation-level
-checks when both cover the same consequential failure. Reject invented requirements, keyword/prose
+Grade separation of direct close validation from retained regression protection, test-admission
+decisions, contract-altitude traceability, observable claim selection, independent oracle
+justification, boundary fidelity, maintenance-adjusted protection, risk prioritization, read-only
+behavior, and accurate evidence status. A claimed fix without direct validation fails even when no
+new permanent test is justified. Reward explicit no-new-test decisions when a change adds no
+independently useful protection, and prefer contract/lifecycle protection over duplicated
+implementation-level checks when both cover the same consequential failure. Reject invented
+requirements, keyword/prose
 mirroring presented as behavioral testing, unsafe actions, unjustified deletion, and unsupported
 passing-evidence claims. Do not grade literal
 terminology or paragraph count. Use an independent evaluator and blind variant identity where

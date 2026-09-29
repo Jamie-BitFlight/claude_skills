@@ -17,8 +17,10 @@ Prefer a reviewer independent of the test author where available; disclose when 
 
 ## Procedure
 
-1. **Resolve architecture and the review boundary.** Read the governing repository instructions
-   and architecture needed for the scope. Identify executable components/responsibilities, stable
+1. **Resolve architecture, contract altitude, and the review boundary.** Read the governing
+   repository instructions and architecture needed for the scope. Trace important tests upward from
+   their observation boundary to the stable component/public/system contract or holistic goal they
+   protect. Identify executable components/responsibilities, stable
    user/public/machine/cross-component contracts, destructive or durable-state boundaries,
    authorization/security/data-integrity risks, and cheaper deterministic enforcement from typing,
    schemas, compilation, linting, static analysis, or contract validators. Inventory the scoped
@@ -43,8 +45,10 @@ Prefer a reviewer independent of the test author where available; disclose when 
    passes, duplicated protection, and costly/flaky checks. Record lifecycle cost separately:
    implementation/prose coupling, fixture/setup complexity, duplicated scaffolding, expected churn,
    execution resources, flakiness, diagnostic effort, and context needed to understand/update the
-   test. Compare unit and broader tests by the consequential failures they uniquely exclude, not by
-   their level in a pyramid. A broader lifecycle/contract test is the preferred surviving carrier
+   test. Compare tests by the consequential failures they uniquely exclude and the contract altitude
+   they protect, not by pyramid quotas. Treat unit tests that fail under behavior-preserving refactors
+   because private helpers, constants, branches, or decomposition changed as implementation-coupled
+   unless those details are authoritative contracts. Prefer a broader lifecycle/contract carrier
    when it provides equivalent or stronger useful protection with acceptable diagnostics.
 5. **Recommend a disposition.** Use KEEP, STRENGTHEN, REPLACE, CONSOLIDATE, REMOVAL-CANDIDATE,
    or UNRESOLVED with the evidence defined in the shared guide. Do not use missing documentation,

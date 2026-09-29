@@ -70,6 +70,12 @@
       "prompt": "A subsystem has 18 unit tests covering private helpers in a create-read-update lifecycle. One integration test can create the object through the public API, read the durable representation through the real consumer, perform the update, and prove identity plus unrelated state are preserved. The helper decomposition is expected to change. Design the maintained protection.",
       "expected_output": "Prefer the stable integration/lifecycle test as the primary carrier when it distinguishes the consequential failures with acceptable diagnostics. Add or retain unit tests only for unique stable contracts or important faults the lifecycle test cannot distinguish cheaply; do not reproduce the 18-helper structure.",
       "files": []
+    },
+    {
+      "id": 12,
+      "prompt": "A bug report says a CLI status label is wrong. You can reproduce the wrong label and a one-line constant change corrects it. The label is for humans only, no machine consumer parses it, and existing CLI lifecycle tests already prove the command starts and returns the right status code. What validation and permanent tests are required?",
+      "expected_output": "Require direct before/after validation of the reported label before calling the fix complete, preferably the same CLI observation. Treat that close evidence separately from retention. Do not require a permanent exact-string regression test unless the wording is an authoritative machine/user contract whose future regression risk justifies ownership; NO NEW TEST JUSTIFIED is valid after successful one-time validation.",
+      "files": []
     }
   ]
 }
