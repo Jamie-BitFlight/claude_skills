@@ -53,6 +53,9 @@ def test_validation_error() -> None:
 
 ## Coverage Configuration
 
+Preserve an existing project's coverage gate. When none exists, configure measurement without
+inventing a threshold:
+
 ```toml
 [tool.coverage.run]
 branch = true
@@ -60,7 +63,7 @@ source = ["src"]
 omit = ["**/tests/**", "**/__pycache__/**"]
 
 [tool.coverage.report]
-fail_under = 80
+show_missing = true
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",

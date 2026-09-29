@@ -15,6 +15,66 @@ uv run --locked --script plugins/development-harness/run_pytests.py tests/test_m
 
 Coverage (`--cov=scripts --cov=plugins`) is always on via root addopts — passing `--cov` again is redundant. Plugin runners read no root config, so they run without coverage unless you pass it. Each runner's own arguments set its parallelism; read `plugins/<name>/run_pytests.py`.
 
+## Testing policy: maintenance-adjusted value
+
+Tests are maintained software. Every retained test consumes recurring reading/reasoning context,
+execution resources, failure-investigation effort, and modification work. Optimize for the smallest
+maintainable suite that gives strong confidence in consequential system behavior, not for test count,
+coverage percentage, a conventional test pyramid, or the appearance of thoroughness.
+
+Use the economic rule `retained-test value = expected protection benefit - expected ownership cost`
+qualitatively, not as a fabricated numeric score. Protection benefit comes from consequential faults
+uniquely detected, their plausible recurrence, detection effectiveness, contract durability, and
+useful feedback. Ownership cost accumulates through human/agent context, implementation-coupled churn,
+fixtures/data, execution/CI resources, diagnosis, flakiness, environment/dependency upkeep, refactor
+drag, duplicated protection, and review/merge coordination. A fast test can still be expensive to own.
+
+Validation and permanent regression protection are separate decisions. Every claimed fix must have
+direct validation before closure against the behavior it was meant to change. Prefer a discriminating
+before/after observation when practical: reproduce the incorrect behavior, apply the fix, then run
+the same observation and show the corrected result. A one-time command, probe, isolated scenario,
+existing contract/system test, linter, parser, compiler, or other direct evidence may satisfy this
+close criterion. Necessary validation does not automatically become a permanent test.
+
+After deciding how the change will be validated, apply the
+[DH test admission gate](../plugins/development-harness/docs/testing-principles.md#test-admission-gate)
+or load [Test Designer](../plugins/development-harness/skills/test-designer/SKILL.md) to decide whether
+new regression protection should be retained. A maintained test must add independent protection for a
+meaningful behavior, invariant, interface, failure mode, or externally observable contract that existing
+protection does not already cover adequately. `NO NEW TEST JUSTIFIED` is a valid retention result.
+
+Prefer higher contract altitude when it gives useful fault discrimination at acceptable cost:
+holistic/system outcome -> user/public/cross-component contract -> component/interface contract ->
+TDD-sized unit behavior -> private implementation detail. The last level is not a test contract by
+default. A retained test should be traceable upward to a meaningful system goal or supported
+contract, even when it runs at a smaller boundary.
+
+Keep unit tests at TDD scale: small executable examples that drive one meaningful behavior and remain
+green across behavior-preserving refactors. Do not turn unit tests into mirrors of private helpers,
+branches, hard-coded constants, incidental call counts, internal ordering, or current decomposition
+unless one of those details is itself an authoritative contract. When a small lifecycle/contract test
+protects the same consequential failure, prefer it to many implementation-coupled unit tests.
+
+Do not add tests merely to freeze intentional wording or structure. Judge text assertions by the
+behavior they discriminate. Exact text is legitimate when the observed text proves a consequential
+path/outcome or is itself an authoritative externally observable contract; an expected error message,
+for example, can prove that the intended error path was reached. A keyword-presence assertion over
+`SKILL.md`, `AGENTS.md`, README/reference prose, prompts, comments, headings, examples, or phrases
+does not prove behavioral value merely because the text exists.
+
+For instruction text, require evidence that changing/removing the instruction adversely affects the
+desired agent behavior before retaining a presence assertion as regression protection. Otherwise use
+representative behavioral evaluation of consequential actions, routing, side effects, or outcomes.
+Machine-readable frontmatter, schemas, manifests, generated inventories, and parsable metadata may
+receive structural validation through their actual parser/consumer contract. Lint, schema validation,
+link checking, typing, compilation, and other deterministic mechanisms can validate an edit without
+creating another long-lived regression test.
+
+Coverage is diagnostic evidence in this repository, not a quality target or merge gate. Continue
+collecting it where inexpensive, but do not create tests solely to cover lines and do not reject a
+change merely because its percentage decreases. Any future threshold requires a documented,
+subsystem-specific reason that percentage coverage is a useful proxy for a demonstrated risk.
+
 ## Failure investigation and test effectiveness
 
 For a CI failure, use
@@ -74,8 +134,12 @@ null until the validation runner records an observed result. It is not a passing
   `tests/` runs in CI but is invisible to that plugin's standalone runner, so its coverage
   silently disappears for anyone who installs the plugin on its own. Move a misplaced test file
   to the correct location rather than leaving it and noting the exception.
-- **Close criteria**: passing pre-existing tests proves no regression, not correctness — do not
-  mark a fix or issue closed without a test that specifically demonstrates the new/fixed behavior
+- **Close criteria**: passing pre-existing tests proves no regression, not correctness. A fix does
+  not close without direct evidence that the targeted behavior changed as intended. Prefer the same
+  discriminating observation before and after the fix when practical. If the original failure cannot
+  be reproduced, report that evidence limit rather than treating a green unrelated suite as proof.
+  Retention is a separate decision: create a maintained regression test only when the admission gate
+  justifies its recurring cost. One-time validation can be the correct close evidence.
 - **SAM/backlog MCP error contract**: `sam_schema/server.py` tool handlers let exceptions
   (`PlanNotFoundError`, `TaskNotFoundError`, etc.) propagate rather than returning
   `{"error": ...}` dicts — FastMCP converts them to `isError=true` responses. Tests for

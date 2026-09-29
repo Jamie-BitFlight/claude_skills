@@ -1,6 +1,6 @@
 ---
 name: test-reviewer
-description: Review existing tests against the software and contracts they actually exercise. Use to assess whether a test has a justified purpose, detects important faults, tolerates valid refactors, or deserves strengthening, replacement, consolidation, or removal consideration. Reviews are read-only and evidence-backed, including TDD and regression tests.
+description: Review existing tests against the software and contracts they actually exercise. Use to assess whether a test has justified unique protection, detects consequential faults, tolerates valid refactors, earns its lifecycle cost, or deserves strengthening, replacement, consolidation, or removal consideration. Reviews are read-only and evidence-backed, including TDD and regression tests.
 ---
 
 # Test Reviewer
@@ -17,27 +17,46 @@ Prefer a reviewer independent of the test author where available; disclose when 
 
 ## Procedure
 
-1. **Resolve the review boundary.** Inventory the scoped tests, parameter families, fixtures,
-   helpers, production entry points, relevant callers, contracts, and CI selection. Read each
-   material dependency, or mark the coverage gap. Establish product purpose and supported
-   environments. Reuse existing investigation evidence instead of starting the same inquiry again.
-2. **Trace each material test.** Map setup -> production path -> observation -> assertion.
+1. **Resolve architecture, contract altitude, and the review boundary.** Read the governing
+   repository instructions and architecture needed for the scope. Trace important tests upward from
+   their observation boundary to the stable component/public/system contract or holistic goal they
+   protect. Identify executable components/responsibilities, stable
+   user/public/machine/cross-component contracts, destructive or durable-state boundaries,
+   authorization/security/data-integrity risks, and cheaper deterministic enforcement from typing,
+   schemas, compilation, linting, static analysis, or contract validators. Inventory the scoped
+   tests, fixtures, production entry points/consumers, and CI selection, then map tests into
+   provisional protection families by claim, boundary, and relevant failure mechanism. Read only
+   the dependencies needed to decide a disposition; carry remaining scope as an explicit gap.
+2. **Trace at the resolution that can change the decision.** Deep-trace high-consequence,
+   suspicious, high-cost, or uncertain families first. For each disposition-relevant test or
+   representative family member, map setup -> production path -> observation -> assertion.
    Identify its intended claim and authority, the failure consequence, what it actually observes,
-   and what can remain broken while it passes. Separate characterization from approved intent.
-   Do not infer importance from names, test counts, or covered lines.
+   and what can remain broken while it passes. Split a family whenever variants, boundaries,
+   forbidden effects, diagnostics, or fault mechanisms differ materially. Separate characterization
+   from approved intent. Do not infer importance from names, test counts, or covered lines.
 3. **Challenge effectiveness.** Apply the shared oracle, fault-sensitivity, refactor-tolerance,
-   fidelity, isolation, and diagnostic criteria. Select the cheapest relevant positive/negative
-   controls for important or changed guarantees. Confirm the original defect or seeded fault
-   reaches the intended assertion, not a collection/setup error. Do not require mutation execution
-   for every test or call static inspection an observed fault-detection result.
-4. **Assess suite value.** Identify missing high-consequence protection, misleading passes,
-   redundant cases, and costly/flaky checks. Compare claim, input variants, boundary, failure
-   mechanism, and diagnostics before treating overlap as duplication. Apply project conventions
-   and established coverage gates. Keep correctness, qualitative value, and runtime cost separate.
+   fidelity, isolation, and diagnostic criteria. Prefer evidence from stable
+   system/integration/contract/lifecycle behavior over implementation details when both address the
+   same risk. Select relevant controls only when they materially improve confidence. Confirm any
+   original defect or seeded fault reaches the intended observation, not collection/setup failure.
+   Do not require mutation execution for every test or call static inspection observed fault
+   detection.
+4. **Assess maintenance-adjusted value.** Apply the shared economic model to each
+   disposition-relevant test/family. Record expected protection benefit separately from expected
+   ownership cost. Benefit includes consequence avoided, regression exposure, detection
+   effectiveness, unique protection, contract durability, and feedback value. Ownership cost
+   includes human/agent context, implementation/prose coupling and churn, fixtures/data, execution,
+   diagnosis, flakiness, environment/dependencies, refactor drag, duplication, and
+   review/coordination. Compare tests by the consequential failures they uniquely exclude and the contract altitude
+   they protect, not by pyramid quotas. Treat unit tests that fail under behavior-preserving refactors
+   because private helpers, constants, branches, or decomposition changed as implementation-coupled
+   unless those details are authoritative contracts. Prefer a broader lifecycle/contract carrier
+   when it provides equivalent or stronger useful protection with acceptable diagnostics.
 5. **Recommend a disposition.** Use KEEP, STRENGTHEN, REPLACE, CONSOLIDATE, REMOVAL-CANDIDATE,
-   or UNRESOLVED with the evidence defined in the shared guide. Do not use missing documentation
-   or unmeasured sensitivity as proof of uselessness. For any material replacement/removal,
-   account for the original guarantees, their surviving carriers, and unacceptable regressions.
+   or UNRESOLVED with the evidence defined in the shared guide. Do not use missing documentation,
+   high cost, or unmeasured sensitivity alone as proof of uselessness. For consolidation/removal,
+   answer: if this test disappeared, which plausible important regression could now pass undetected?
+   Identify the surviving carrier for every required guarantee and any residual risk.
 6. **Specify the next validation.** Distinguish product, requirement, oracle, boundary/interface,
    and test/CI-harness defects. For a proposed change, define success and protected behavior before
    its implementation; compare baseline and candidate under equivalent relevant conditions, adding
@@ -46,12 +65,12 @@ Prefer a reviewer independent of the test author where available; disclose when 
 
 ## Report
 
-Return scope/revision, sources read, and uncovered scope before the findings. For each test or
-explicitly bounded equivalent family, use a row containing:
+Return scope/revision, sources read, and uncovered scope before the findings. For each
+disposition-relevant test or explicitly bounded protection family, use a row containing:
 
 ```text
 Test/location | intended claim + authority | actual observation/boundary
-Importance/failure excluded | effectiveness + evidence | disposition
+Protection benefit | ownership cost | effectiveness + evidence | disposition
 Correction category | surviving protection / gap | next discriminating validation
 ```
 

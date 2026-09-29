@@ -1,186 +1,91 @@
 ---
 name: python3-test-design
-description: Guides pytest test suite architecture and coverage strategy for Python 3.11+ projects. Activates when designing test architecture, planning test pyramid distribution, choosing between unit/integration/property-based/BDD strategies, structuring fixture hierarchies, configuring branch coverage thresholds, or applying mutation testing to critical code paths.
+description: Guides pytest test architecture for Python 3.11+ using behavioral contracts, risk, and maintenance-adjusted value. Use when choosing unit/integration/property/e2e boundaries, fixture strategy, coverage measurement, or mutation testing. Preserves existing project gates but does not invent test-pyramid ratios, coverage percentages, mutation-score targets, or tests for implementation detail.
 ---
 
 # Python Test Design Skill
 
-Guidance for designing pytest test suites with modern Python 3.11+ patterns.
+Design Python tests under the shared rules in
+`/python-engineering:standards-for-python-development`. Repository requirements and established
+project gates take precedence. This skill adds Python/pytest-specific boundary and fixture guidance;
+it does not create a second testing philosophy.
 
-## When to Use This Skill
+## Decision order
 
-Use this skill for test **design** decisions:
+1. Establish the supported behavior, contract, callers/consumers, existing protection, and relevant
+   failure consequence before deciding what test to retain.
+2. Separate direct validation of the current change from permanent regression protection.
+3. Prefer the highest stable contract boundary that still discriminates the consequential failure
+   with acceptable cost and diagnostics.
+4. Keep unit tests TDD-sized: one small behavioral slice that survives behavior-preserving refactors.
+5. Do not mirror private helpers, branches, constants, incidental call counts, or decomposition unless
+   those details are themselves authoritative contracts.
+6. Preserve an existing repository coverage/mutation gate. When none exists, do not invent one.
 
-- Planning test suite architecture
-- Choosing testing strategies (unit, integration, e2e)
-- Designing fixture hierarchies
-- Determining coverage strategies
-- Planning property-based testing approach
+## Boundary selection
 
-For test **implementation**, use the `python-engineering:python-pytest-architect` agent instead.
+### Unit / function
 
-## Test Design Principles
+Use when a small boundary is itself stable, drives the next TDD behavior, or uniquely distinguishes
+an important fault more cheaply than broader evidence. Pure functions and algorithms often fit here,
+but their implementation branches do not automatically become permanent test obligations.
 
-Load and follow the standards in `/python-engineering:standards-for-python-development` when aligning test strategy with shared plugin testing norms. The strategies below supplement those standards; they do not replace them.
+### Integration / contract / lifecycle
 
-### Test Pyramid
+Use when the guarantee depends on component composition: databases, filesystems, protocols,
+serialization consumers, packaging/startup, transactions, persistence, authorization, retries,
+recovery, or multi-step state transitions. Prefer this boundary over duplicated white-box unit tests
+when it protects the same externally meaningful failure and remains diagnosable.
 
-Structure test suites following the test pyramid:
+### Property-based / stateful
 
-```text
-        /\
-       /  \     E2E (few, slow, high confidence)
-      /----\
-     /      \   Integration (moderate, medium speed)
-    /--------\
-   /          \ Unit (many, fast, focused)
-  /------------\
-```
-
-**Distribution targets:**
-
-- Unit tests: 70-80% of test count
-- Integration tests: 15-25% of test count
-- E2E tests: 5-10% of test count
-
-### Test Naming Convention
-
-Use behavioral naming that describes what is being tested:
-
-```python
-# Pattern: test_{function}_{scenario}_{expected_result}
-
-
-def test_validate_email_with_invalid_format_raises_validation_error():
-    """Validate that malformed emails are rejected."""
-    ...
-
-
-def test_process_payment_when_insufficient_funds_returns_declined():
-    """Payment processing declines when balance is insufficient."""
-    ...
-```
-
-### AAA Pattern (Arrange-Act-Assert)
-
-Structure every test with clear sections:
-
-```python
-def test_user_registration_creates_account():
-    # Arrange
-    user_data = {"email": "test@example.com", "name": "Test User"}
-    repository = InMemoryUserRepository()
-    service = UserService(repository)
-
-    # Act
-    result = service.register(user_data)
-
-    # Assert
-    assert result.success is True
-    assert repository.count() == 1
-```
-
-## Test Strategy Selection
-
-### When to Use Unit Tests
-
-- Pure functions with no side effects
-- Business logic validation
-- Data transformation
-- Algorithm correctness
-
-### When to Use Integration Tests
-
-- Database interactions
-- External API calls
-- File system operations
-- Multi-component workflows
-
-### When to Use Property-Based Tests
-
-- Functions with mathematical properties (commutativity, associativity)
-- Parsers and serializers (round-trip property)
-- Data validation (valid inputs always accepted)
-- State machines (invariants maintained)
+Use Hypothesis when a justified invariant spans many inputs or action sequences and examples would
+poorly represent the state space. Justify the invariant independently; round trips alone can preserve
+paired bugs.
 
 ```python
 from hypothesis import given, strategies as st
 
 
 @given(st.lists(st.integers()))
-def test_sort_maintains_length(data):
-    """Sorting preserves all elements."""
-    result = sorted(data)
-    assert len(result) == len(data)
+def test_sort_preserves_elements(data: list[int]) -> None:
+    assert sorted(sorted(data)) == sorted(data)
 ```
 
-### When to Use BDD Tests
+### BDD / acceptance
 
-- User-facing features with acceptance criteria
-- Requirements traceability needed
-- Non-technical stakeholder visibility
-- Complex user workflows
+Use when user-visible workflow requirements benefit from scenario language or stakeholder-readable
+acceptance evidence. Do not add a BDD layer merely to duplicate an existing contract test.
 
-## Fixture Design
+## Fixtures and doubles
 
-### Fixture Hierarchy
+Use the smallest fixture structure that keeps scenario, action, observation, and cleanup legible.
+Prefer factories/builders when they reduce genuine repeated setup; do not build a parallel fixture
+framework that reproduces production complexity.
 
-Organize fixtures by scope and purpose:
+Use fakes/mocks at real seams. State what a double removes from observation and do not mock away the
+mechanism the test is intended to challenge. For important integration assumptions, validate the
+double against the real dependency where practical.
 
-```text
-conftest.py (root)
-├── Session fixtures (db connections, servers)
-├── Module fixtures (shared test data)
-└── Function fixtures (isolated per-test data)
+## Coverage
 
-tests/
-├── conftest.py              # Shared fixtures
-├── unit/
-│   └── conftest.py          # Unit-specific fixtures
-└── integration/
-    └── conftest.py          # Integration-specific fixtures
-```
+Coverage is measurement, not a universal quality score.
 
-### Factory Pattern for Test Data
+- Respect a repository's existing `fail_under` or equivalent gate when one is configured.
+- When no gate exists, enable useful branch/missing-line reporting without inventing a percentage.
+- Inspect uncovered changed behavior for risk; do not create tests solely to raise the number.
+- Do not infer suite value from test counts or unit/integration/e2e ratios.
 
-Use factories for complex test objects:
-
-```python
-import factory
-from datetime import datetime, UTC
-
-
-class UserFactory(factory.Factory):
-    class Meta:
-        model = User
-
-    id = factory.Sequence(lambda n: n)
-    email = factory.LazyAttribute(lambda o: f"user{o.id}@example.com")
-    created_at = factory.LazyFunction(lambda: datetime.now(UTC))
-```
-
-## Coverage Strategy
-
-### Minimum Coverage Requirements
-
-| Code Type         | Minimum Coverage       |
-| ----------------- | ---------------------- |
-| Business logic    | 90%                    |
-| Standard code     | 80%                    |
-| Scripts/utilities | 70%                    |
-| Critical paths    | 95% + mutation testing |
-
-### Coverage Configuration
+Example measurement configuration without a new threshold:
 
 ```toml
-# pyproject.toml
 [tool.coverage.run]
 branch = true
-source = ["packages"]
+source = ["src"]
 omit = ["**/tests/**", "**/__pycache__/**"]
 
 [tool.coverage.report]
-fail_under = 80
+show_missing = true
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",
@@ -188,42 +93,37 @@ exclude_lines = [
 ]
 ```
 
-## Mutation Testing for Critical Code
+## Mutation testing
 
-Apply mutation testing to security-critical and payment-related code:
+Use mutation testing only when it materially strengthens confidence in important logic and the
+mutations reach the intended behavioral observation. Preserve a project mutation gate if one exists;
+otherwise do not invent a mutation-score target.
 
 ```bash
-# Run mutation tests on auth module
 uv run mutmut run --paths-to-mutate=packages/auth/
-
-# View surviving mutants
 uv run mutmut results
 ```
 
-**Target: >90% mutation score for critical code paths**
+A mutant killed by import/collection/setup failure does not prove that the intended test detects the
+relevant defect.
 
-## Test Directory Structure
+## Test organization
+
+Follow the existing project's layout. For a new pytest project, separate boundaries only when the
+distinction improves execution or ownership, for example:
 
 ```text
 tests/
-├── conftest.py              # Shared fixtures, pytest plugins
-├── unit/                    # Fast, isolated tests
-│   ├── test_validators.py
-│   └── test_models.py
-├── integration/             # Tests with external dependencies
-│   ├── test_database.py
-│   └── test_api_client.py
-├── e2e/                     # End-to-end workflows
-│   └── test_user_flows.py
-├── fixtures/                # Test data files
-│   ├── sample_config.yaml
-│   └── test_data.json
-└── conftest.py              # Root-level configuration
+├── conftest.py
+├── unit/
+├── integration/
+└── e2e/
 ```
 
-## Related Resources
+Do not create directories or test categories merely to satisfy a pyramid shape.
 
-- **Agent**: Use `python-engineering:python-pytest-architect` for test implementation
-- **Skill**: `python-engineering:standards-for-python-development` for the shared Python rules
-- **Skill**: `python-engineering:python3-testing` for test implementation patterns
-- **Command**: `/python-engineering:modernpython` for modern Python syntax reference
+## Related resources
+
+- **Agent**: `python-engineering:python-pytest-architect` for implementation
+- **Skill**: `python-engineering:standards-for-python-development` for shared Python rules
+- **Skill**: `python-engineering:python3-testing` for pytest implementation patterns
