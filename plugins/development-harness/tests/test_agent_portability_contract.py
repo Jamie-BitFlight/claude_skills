@@ -8,9 +8,7 @@ from pathlib import Path
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 _AGENTS_ROOT = _PLUGIN_ROOT / "agents"
 
-_REPO_FLAG_RE = re.compile(
-    r"(?:^|\s)(?:-R|--repo)(?:=|\s+)(?P<slug>[A-Za-z0-9][\w.-]*/[A-Za-z0-9][\w.-]*)"
-)
+_REPO_FLAG_RE = re.compile(r"(?:^|\s)(?:-R|--repo)(?:=|\s+)(?P<slug>[A-Za-z0-9][\w.-]*/[A-Za-z0-9][\w.-]*)")
 _PLUGIN_ROOT_VAR_RE = re.compile(r"\$\{(?:[A-Z]+_)?PLUGIN_ROOT\}")
 _PLUGIN_SKILL_PATH_RE = re.compile(r"plugins/[\w.-]+/skills/[\w.-]+/SKILL\.md")
 
