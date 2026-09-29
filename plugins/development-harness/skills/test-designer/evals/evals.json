@@ -64,6 +64,12 @@
       "prompt": "A README example and explanatory comments changed, but the executable command, parsed metadata, and public behavior are unchanged. Existing schema and link checks already validate the file. Decide what new regression tests to add.",
       "expected_output": "Apply the admission gate and add no maintained regression test absent a new meaningful behavior or machine-consumed contract. Reuse the existing deterministic checks and distinguish one-time validation from long-lived test ownership.",
       "files": []
+    },
+    {
+      "id": 11,
+      "prompt": "A subsystem has 18 unit tests covering private helpers in a create-read-update lifecycle. One integration test can create the object through the public API, read the durable representation through the real consumer, perform the update, and prove identity plus unrelated state are preserved. The helper decomposition is expected to change. Design the maintained protection.",
+      "expected_output": "Prefer the stable integration/lifecycle test as the primary carrier when it distinguishes the consequential failures with acceptable diagnostics. Add or retain unit tests only for unique stable contracts or important faults the lifecycle test cannot distinguish cheaply; do not reproduce the 18-helper structure.",
+      "files": []
     }
   ]
 }
