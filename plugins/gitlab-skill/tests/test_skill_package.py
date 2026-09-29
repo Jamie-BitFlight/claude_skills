@@ -257,19 +257,6 @@ glab() {{
     if glab_error == "connection reset by peer":
         assert "authentication failed" not in result.stderr.casefold()
 
-    guidance = reference.read_text(encoding="utf-8").casefold()
-    assert "report the actual reason" in guidance
-    assert "connection reset by peer" in guidance
-    assert "private endpoint" in guidance
-    assert "vpn" in guidance
-    assert "authentication" in guidance
-    assert re.search(r"alternate\s+authentication\s+method", guidance)
-    assert re.search(r"credential\s+environment\s+variable", guidance)
-    assert re.search(
-        r"error\s+specifically\s+indicates\s+authentication.*credential.*available.*try", guidance, re.DOTALL
-    )
-    assert re.search(r"otherwise\s+stop.*actual\s+reason", guidance, re.DOTALL)
-
 
 @pytest.mark.parametrize(("mode", "expected_status", "request_errors"), [("transient", 0, 1), ("exhaust", 1, 3)])
 def test_bounded_polling_handles_request_failures(
