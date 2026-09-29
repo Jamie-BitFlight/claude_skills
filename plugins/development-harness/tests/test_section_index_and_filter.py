@@ -434,3 +434,22 @@ class TestYamlSectionFilterAddressability:
         result = self._filtered(item, "Nonexistent")
         assert "Description" not in result.section_filter_valid_names
         assert self._filtered(item, "Description").section_filter_miss is True
+
+
+def test_filtered_section_preserves_nested_content_without_duplicate_heading() -> None:
+    """A filtered structured section owns its top-level heading exactly once."""
+    content = """SCOPE_EXPANSION: None.
+IMPACT_RADIUS_COMPLETE: Written to item example. Overall risk: LOW. Highest-risk: None.
+
+### Change Frame
+- Baseline: unchanged
+"""
+    item = BacklogItem(
+        title="Impact analysis render contract",
+        sections={"impact_radius": Section(entries=[Entry(id="2026-09-20T00:00:00Z", content=content)])},
+    )
+
+    rendered = render_sections_as_body(item, section="Impact Radius")
+
+    assert rendered.splitlines().count("## Impact Radius") == 1
+    assert "### Change Frame" in rendered

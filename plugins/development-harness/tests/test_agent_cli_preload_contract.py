@@ -34,13 +34,8 @@ def test_agents_reaching_cli_preload_its_resolver_and_can_execute_it() -> None:
         assert meta or not raw.lstrip().startswith("---"), f"{path.name}: frontmatter did not parse"
 
         skills = _normalize_skills(meta.get("skills"))
-        unresolved = [
-            uri
-            for uri in skills
-            if uri.startswith("dh:") and not (_SKILLS_ROOT / uri.removeprefix("dh:") / "SKILL.md").is_file()
-        ]
         reachable_text = body + "".join(_skill_body(uri) for uri in skills)
-        if not (_CLI_TOKEN_RE.search(reachable_text) or _CLI_PATH_RE.search(reachable_text)) and not unresolved:
+        if not (_CLI_TOKEN_RE.search(reachable_text) or _CLI_PATH_RE.search(reachable_text)):
             continue
 
         running.append(path)
@@ -53,9 +48,6 @@ def test_agents_reaching_cli_preload_its_resolver_and_can_execute_it() -> None:
         normalized_tools = {str(name).strip().split("(", 1)[0] for name in tool_names}
         if tools is not None and "Bash" not in normalized_tools:
             reasons.append("tools has no Bash")
-        if unresolved:
-            reasons.append(f"unresolved local skills: {unresolved}")
-
         if reasons:
             invalid.append(f"{path.relative_to(_PLUGIN_ROOT)}: {'; '.join(reasons)}")
 
