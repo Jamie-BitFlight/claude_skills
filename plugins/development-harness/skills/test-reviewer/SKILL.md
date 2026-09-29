@@ -17,12 +17,14 @@ Prefer a reviewer independent of the test author where available; disclose when 
 
 ## Procedure
 
-1. **Resolve the review boundary.** Inventory the scoped tests, parameter families, fixtures,
-   helpers, production entry points, relevant callers, contracts, and CI selection. Map tests first
-   into provisional protection families by claim, boundary, and relevant failure mechanism. Read
-   each dependency needed to decide a disposition, or mark the coverage gap. Establish product
-   purpose and supported environments. Reuse existing investigation evidence instead of starting
-   the same inquiry again.
+1. **Resolve architecture and the review boundary.** Read the governing repository instructions
+   and architecture needed for the scope. Identify executable components/responsibilities, stable
+   user/public/machine/cross-component contracts, destructive or durable-state boundaries,
+   authorization/security/data-integrity risks, and cheaper deterministic enforcement from typing,
+   schemas, compilation, linting, static analysis, or contract validators. Inventory the scoped
+   tests, fixtures, production entry points/consumers, and CI selection, then map tests into
+   provisional protection families by claim, boundary, and relevant failure mechanism. Read only
+   the dependencies needed to decide a disposition; carry remaining scope as an explicit gap.
 2. **Trace at the resolution that can change the decision.** Deep-trace high-consequence,
    suspicious, high-cost, or uncertain families first. For each disposition-relevant test or
    representative family member, map setup -> production path -> observation -> assertion.
