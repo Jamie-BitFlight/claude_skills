@@ -222,19 +222,28 @@ lint_existing_ref test-ref "$EXPECTED"
 
 
 @pytest.mark.parametrize(
-    ("credential_mode", "glab_status"), [("environment", 0), ("persisted", 0), ("environment", 23), ("persisted", 24)]
+    ("credential_mode", "glab_status", "glab_error"),
+    [
+        ("environment", 0, ""),
+        ("persisted", 0, ""),
+        ("environment", 23, "connection reset by peer"),
+        ("persisted", 24, "authentication failed"),
+    ],
 )
-def test_auth_probe_uses_resolved_credentials_and_preserves_failure(credential_mode: str, glab_status: int) -> None:
-    """Execute the documented auth probe for both glab credential modes."""
+def test_preflight_preserves_failure_without_inventing_an_auth_diagnosis(
+    credential_mode: str, glab_status: int, glab_error: str
+) -> None:
+    """Execute the preflight with successful, network, and authentication outcomes."""
     reference = SKILL_ROOT / "references" / "glab-cli.md"
-    probe = next(block for block in bash_blocks(reference) if "glab api --silent user" in block)
+    (probe,) = bash_blocks(reference)
     script = f"""
 glab() {{
+  [ -z "$GLAB_ERROR" ] || printf '%s\\n' "$GLAB_ERROR" >&2
   return "$GLAB_STATUS"
 }}
 {probe}
 """
-    environment: dict[str, str] = {**os.environ, "GLAB_STATUS": str(glab_status)}
+    environment: dict[str, str] = {**os.environ, "GLAB_ERROR": glab_error, "GLAB_STATUS": str(glab_status)}
     if credential_mode == "environment":
         environment["GITLAB_TOKEN"] = "redacted-test-token"
     else:
@@ -244,9 +253,22 @@ glab() {{
 
     assert result.returncode == glab_status
     if glab_status:
-        error = result.stderr.casefold()
-        assert "ask the user" in error
-        assert "authenticate" in error or "credential" in error
+        assert glab_error in result.stderr
+    if glab_error == "connection reset by peer":
+        assert "authentication failed" not in result.stderr.casefold()
+
+    guidance = reference.read_text(encoding="utf-8").casefold()
+    assert "report the actual reason" in guidance
+    assert "connection reset by peer" in guidance
+    assert "private endpoint" in guidance
+    assert "vpn" in guidance
+    assert "authentication" in guidance
+    assert re.search(r"alternate\s+authentication\s+method", guidance)
+    assert re.search(r"credential\s+environment\s+variable", guidance)
+    assert re.search(
+        r"error\s+specifically\s+indicates\s+authentication.*credential.*available.*try", guidance, re.DOTALL
+    )
+    assert re.search(r"otherwise\s+stop.*actual\s+reason", guidance, re.DOTALL)
 
 
 @pytest.mark.parametrize(("mode", "expected_status", "request_errors"), [("transient", 0, 1), ("exhaust", 1, 3)])
