@@ -75,18 +75,6 @@
     },
     {
       "id": 12,
-      "prompt": "Review a test that reads a SKILL.md and asserts it contains the sentence \"Always verify permissions before writing\". No software parses that sentence. The skill has separate behavioral evals covering whether the agent actually checks permissions before writes. The wording changes frequently during prompt tuning.",
-      "expected_output": "Identify prose mirroring and lifecycle churn with no unique behavioral protection. Treat the behavioral evals and any structural frontmatter validation as the relevant carriers. Recommend REMOVAL-CANDIDATE or consolidation only after confirming no machine consumer requires the exact text; do not preserve the keyword assertion merely because it currently passes.",
-      "files": []
-    },
-    {
-      "id": 13,
-      "prompt": "Review a directory with 600 tests. About 400 appear generated from the same contract table and use the same public boundary; 20 cover security/recovery behavior; the rest span several integration boundaries. Full individual tracing is expensive. Explain how you will review the suite and where maintenance cost affects dispositions.",
-      "expected_output": "Group provisionally by claim, boundary, variants and failure mechanism; deep-trace high-consequence, suspicious, high-cost and equivalence-uncertain families rather than mechanically tracing all 600. Split families when protection differs, report unread/unsampled uncertainty, and compare lifecycle cost only against unique surviving protection rather than using cost as an automatic deletion rule.",
-      "files": []
-    },
-    {
-      "id": 12,
       "prompt": "Review a test that reads a SKILL.md and asserts it contains the sentence \"Always verify permissions before writing\". No software parses that sentence. Separate behavioral evals exercise whether the agent checks permissions before writes. The wording changes frequently during prompt tuning.",
       "expected_output": "Identify prose mirroring and recurring churn with no unique behavioral protection. Confirm no machine consumer requires exact text, then recommend REMOVAL-CANDIDATE or consolidation in favor of behavioral evals plus structural validators; do not keep a keyword assertion merely because it passes.",
       "files": []
