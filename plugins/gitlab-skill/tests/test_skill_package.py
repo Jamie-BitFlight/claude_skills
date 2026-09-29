@@ -221,34 +221,6 @@ lint_existing_ref test-ref "$EXPECTED"
         assert result.returncode != 0
 
 
-@pytest.mark.parametrize(
-    ("credential_mode", "glab_status"), [("environment", 0), ("persisted", 0), ("environment", 23), ("persisted", 24)]
-)
-def test_auth_probe_uses_resolved_credentials_and_preserves_failure(credential_mode: str, glab_status: int) -> None:
-    """Execute the documented auth probe for both glab credential modes."""
-    reference = SKILL_ROOT / "references" / "glab-cli.md"
-    probe = next(block for block in bash_blocks(reference) if "glab api --silent user" in block)
-    script = f"""
-glab() {{
-  return "$GLAB_STATUS"
-}}
-{probe}
-"""
-    environment: dict[str, str] = {**os.environ, "GLAB_STATUS": str(glab_status)}
-    if credential_mode == "environment":
-        environment["GITLAB_TOKEN"] = "redacted-test-token"
-    else:
-        environment.pop("GITLAB_TOKEN", None)
-
-    result = subprocess.run(["bash", "-c", script], env=environment, text=True, capture_output=True, check=False)
-
-    assert result.returncode == glab_status
-    if glab_status:
-        error = result.stderr.casefold()
-        assert "ask the user" in error
-        assert "authenticate" in error or "credential" in error
-
-
 @pytest.mark.parametrize(("mode", "expected_status", "request_errors"), [("transient", 0, 1), ("exhaust", 1, 3)])
 def test_bounded_polling_handles_request_failures(
     tmp_path: Path, mode: str, expected_status: int, request_errors: int

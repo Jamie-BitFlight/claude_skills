@@ -8,11 +8,15 @@ another installed version.
 Run this from the target repository. `glab` infers the GitLab host from repository context and uses
 the credential selected by its normal resolution. Every downstream glab/API branch uses that same
 resolved credential unless the task explicitly requires a named environment variable. On failure,
-request that the user authenticate or correct the credential selected for this repository and
-preserve the probe status.
+preserve and display glab's error, stop, and report the actual reason to the user: resolution may
+require changing networks, signing in, regenerating a token, or loading a token into the shell.
+`connection reset by peer` may mean a private endpoint has no route, such as an enterprise VPN
+being disconnected. When the actual error specifically indicates authentication and an alternate
+authentication method or relevant credential environment variable is available, try it first;
+otherwise stop and report the actual reason.
 
 ```bash
-glab api --silent user >/dev/null || { rc=$?; printf '%s\n' 'glab authentication failed: ask the user to authenticate or correct the credential selected for this repository' >&2; exit "$rc"; }
+glab api --silent user >/dev/null || exit $?
 ```
 
 - Self-managed raw API calls use a bare hostname and external `jq`; encode namespaced project paths
