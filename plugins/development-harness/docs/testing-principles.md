@@ -1,7 +1,9 @@
 # Contract-driven test architecture
 
-Use this shared contract when designing tests or evaluating whether existing tests protect useful
-behavior. Apply it at the smallest resolution that can change the testing decision. It is a
+Use this shared contract when deciding whether a test should exist, designing justified tests, or
+evaluating whether existing tests protect useful behavior. Apply it at the smallest resolution that
+can change the testing decision. Optimize for maintenance-adjusted protection: the smallest
+maintainable suite that gives strong confidence in consequential system behavior. It is a
 language-independent design policy, not a replacement for the target project's requirements,
 framework conventions, safety controls, or established CI gates. The principles below synthesize
 engineering guidance [1]-[9]; the design card and review dispositions operationalize them for DH.
@@ -84,14 +86,23 @@ authorization, ordering, prohibited writes, or another interaction is itself the
 One coherent behavior may require several assertions. Even a crash/exit-code smoke check can be
 valuable when that is its explicit contract; classify its limited scope instead of banning it.
 
-### 5. Use the smallest faithful boundary
+### 5. Prefer the highest-value faithful boundary
 
-Choose the boundary from the failure mechanism, not a preferred test pyramid ratio. Pure logic may
-need a function test; protocol, transaction, packaging, hardware, or startup guarantees need the
-relevant real seam [4], [5]. Inspect what fixtures, mocks, fakes, and bypassed adapters remove from
-observation. Check a double's relevant assumptions against the real dependency where needed.
-Architect controllable clocks, storage, network, and hardware seams without mocking away the very
-mechanism the test must challenge.
+Choose the boundary from the consequential behavior and failure mechanism, not from a testing pyramid
+or a preference for isolated functions. When one system, integration, contract, or lifecycle test can
+protect the same externally meaningful behavior as many implementation-level tests, prefer the
+broader stable boundary if it remains diagnosable and maintainable. Exercise real component
+composition when cross-component behavior is the guarantee.
+
+Use a function/unit boundary when that boundary is itself a stable supported contract, when broader
+tests cannot cheaply distinguish an important fault, or when the smaller test materially improves
+diagnosis without duplicating the same protection. A private helper's edge cases do not earn tests
+merely because the helper exists. Protocol, transaction, packaging, hardware, startup, persistence,
+authorization, and recovery guarantees need the relevant real seam [4], [5].
+
+Inspect what fixtures, mocks, fakes, and bypassed adapters remove from observation. Check a double's
+relevant assumptions against the real dependency where needed. Architect controllable clocks,
+storage, network, and hardware seams without mocking away the mechanism the test must challenge.
 
 ### 6. Allocate rigor by consequence and uncertainty
 
@@ -131,7 +142,8 @@ complexity or hides the oracle [2]. Follow the project's applicable typing and f
 Adjudicate failures as product, requirement, oracle, or harness/environment defects before editing
 expectations. Compare a material rewrite against its original protection and unacceptable regressions.
 Account for every meaningful guarantee when deleting or consolidating tests. Overlap across unit,
-contract, and integration boundaries is not automatically redundancy [1], [5].
+contract, and integration boundaries is not automatically redundancy [1], [5], but neither does each
+boundary deserve its own copy of the same assertion.
 
 Evaluate unique protection against lifecycle cost: coupling to implementation or prose, fixture and
 setup complexity, duplicated scaffolding, expected edit churn, runtime/resources, flakiness,
@@ -141,8 +153,10 @@ already caught by a simpler surviving carrier, or when the test protects no just
 all. Ask explicitly: if this test disappeared, which plausible important regression could now pass
 undetected?
 
-Place fast high-signal checks early; schedule expensive fidelity checks where their evidence is
-needed. Moving a check later changes the detection window, not the need for the guarantee.
+When valuable externally observable behavior remains correct through a refactor, prefer deleting or
+generalizing a brittle implementation-coupled test over teaching it the new internals. Place
+high-signal checks where their evidence is useful; moving a check later changes the detection window,
+not the need for the guarantee.
 
 ## Compact test card
 
@@ -189,6 +203,17 @@ those faults. Record the baseline revision, verify isolation from live services,
 the experiment-owned resources. The reviewer never changes the original target. If execution is
 unavailable or unsafe, return the proposed probe with an unvalidated result. Do not weaken project
 gates to make verification convenient.
+
+## Coverage policy
+
+Coverage is diagnostic evidence, not a universal quality target. Use it to locate unexercised code
+for consequence review, not to create work mechanically. Do not infer value from a percentage and do
+not add tests solely to raise it.
+
+When reviewing another repository, obey its active merge gate while separately identifying whether
+that gate has an evidence-backed purpose. When auditing testing policy, recommend removing a
+repository-wide threshold that has no documented relationship to a demonstrated risk; a genuinely
+useful threshold should be scoped to the subsystem and rationale it protects.
 
 ## Generated artifacts and agent instructions
 
