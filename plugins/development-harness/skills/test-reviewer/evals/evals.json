@@ -76,7 +76,7 @@
     {
       "id": 12,
       "prompt": "Review a test that reads a SKILL.md and asserts it contains the sentence \"Always verify permissions before writing\". No software parses that sentence. Separate behavioral evals exercise whether the agent checks permissions before writes. The wording changes frequently during prompt tuning.",
-      "expected_output": "Identify prose mirroring and recurring churn with no unique behavioral protection. Confirm no machine consumer requires exact text, then recommend REMOVAL-CANDIDATE or consolidation in favor of behavioral evals plus structural validators; do not keep a keyword assertion merely because it passes.",
+      "expected_output": "Identify prose mirroring and recurring churn with no demonstrated behavioral protection. Ask what undesirable behavior could occur if the assertion vanished while other tests stayed green. Unless changing/removing the instruction has evidence of degrading desired agent behavior, recommend removal/consolidation in favor of behavioral evals plus structural validators.",
       "files": []
     },
     {
@@ -95,6 +95,12 @@
       "id": 15,
       "prompt": "Compare two tests protecting the same supported behavior. Test A is a 5 ms unit test coupled to three private helpers and a hard-coded constant; it typically needs edits during refactors. Test B is a 700 ms black-box contract test through the public API, has been stable across redesigns, and catches the same externally meaningful failure. Neither has unique additional assertions. Which protection should survive?",
       "expected_output": "Compare lifetime economics rather than runtime alone. Test A has lower execution cost but higher comprehension/churn/refactor/coordination cost and no unique protection; Test B has higher runtime but durable black-box protection. Prefer B as the surviving carrier when its diagnostics and CI cost remain acceptable, and classify A for consolidation/removal rather than preserving it because it is faster.",
+      "files": []
+    },
+    {
+      "id": 16,
+      "prompt": "Review a test for invalid credentials that invokes the real CLI error path and asserts stderr == \"Authentication failed\". The public contract documents that message for authentication rejection, and different failures emit different diagnostics.",
+      "expected_output": "Treat the text assertion as potentially valuable because it is an observable discriminator for a consequential error path and an authoritative external contract. Assess boundary/oracle fidelity and ownership cost, but do not classify it as brittle prose-presence testing merely because it asserts exact text.",
       "files": []
     }
   ]

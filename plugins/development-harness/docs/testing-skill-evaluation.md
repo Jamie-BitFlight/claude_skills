@@ -13,9 +13,14 @@ of executor context. Resolve each `files` entry relative to its `evals.json` dir
 those files into an isolated workspace retaining their relative hierarchy. Do not give the executor
 the repository's fixture-verification test, which reveals the expected diagnoses.
 
-Compare equivalent baseline and candidate conditions. The pre-change review entry point is at
-parent PR #3900 commit `a53bc7f234770507e47fc290320911188ce70271`. For test design, the baseline is
-the same task without the new designer. Preserve other relevant project instructions in both arms.
+Compare equivalent baseline and candidate conditions. For a modification to an existing skill or
+workflow, baseline the immediately preceding version of that same skill/workflow under identical
+surrounding instructions; do not substitute the older pre-introduction state. For a pull request,
+freeze and record its base revision before running the comparison. For the #4010 evaluation cases,
+the pre-change baseline is base SHA `02ac82cd70f3af4cb5b38cf542fbdc3da7df0de7`.
+Preserve all other relevant project instructions in both arms so the measured delta isolates the
+candidate change. Use a no-skill baseline only when evaluating the introduction of a genuinely new
+skill.
 
 Grade separation of direct close validation from retained regression protection, test-admission
 decisions, contract-altitude traceability, observable claim selection, independent oracle
@@ -23,11 +28,8 @@ justification, boundary fidelity, maintenance-adjusted protection, risk prioriti
 behavior, and accurate evidence status. A claimed fix without direct validation fails even when no
 new permanent test is justified. Reward explicit no-new-test decisions when a change adds no
 independently useful protection, and prefer contract/lifecycle protection over duplicated
-implementation-level checks when both cover the same consequential failure. Reject invented
-requirements, keyword/prose
-mirroring presented as behavioral testing, unsafe actions, unjustified deletion, and unsupported
-passing-evidence claims. Do not grade literal
-terminology or paragraph count. Use an independent evaluator and blind variant identity where
+implementation-level checks when both cover the same consequential failure. Reject invented requirements, keyword/prose mirroring presented as behavioral testing, unsafe actions, unjustified deletion, and unsupported
+passing-evidence claims. Do not grade literal terminology or paragraph count. Use an independent evaluator and blind variant identity where
 practical; record same-author and environment limitations.
 
 Run standalone use and the DH handoff path. Exercise `comprehensive-test-review` as well as direct

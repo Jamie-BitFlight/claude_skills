@@ -40,7 +40,7 @@ After deciding how the change will be validated, apply the
 [DH test admission gate](../plugins/development-harness/docs/testing-principles.md#test-admission-gate)
 or load [Test Designer](../plugins/development-harness/skills/test-designer/SKILL.md) to decide whether
 new regression protection should be retained. A maintained test must add independent protection for a
-meaningful behavior, invariant, interface, failure mode, or machine-consumed contract that existing
+meaningful behavior, invariant, interface, failure mode, or externally observable contract that existing
 protection does not already cover adequately. `NO NEW TEST JUSTIFIED` is a valid retention result.
 
 Prefer higher contract altitude when it gives useful fault discrimination at acceptable cost:
@@ -55,19 +55,20 @@ branches, hard-coded constants, incidental call counts, internal ordering, or cu
 unless one of those details is itself an authoritative contract. When a small lifecycle/contract test
 protects the same consequential failure, prefer it to many implementation-coupled unit tests.
 
-Do not add tests merely to freeze intentional wording or structure. In particular, prose in
-`SKILL.md`, `AGENTS.md`, READMEs, reference Markdown, prompts, comments, or documentation does not
-earn a regression test because words, headings, sentences, counts, examples, or formatting changed.
-A keyword-presence assertion proves only that the keyword is present; it does not prove that an
-agent follows the instruction. Exact-text tests require evidence that the text itself is a
-machine-consumed contract.
+Do not add tests merely to freeze intentional wording or structure. Judge text assertions by the
+behavior they discriminate. Exact text is legitimate when the observed text proves a consequential
+path/outcome or is itself an authoritative externally observable contract; an expected error message,
+for example, can prove that the intended error path was reached. A keyword-presence assertion over
+`SKILL.md`, `AGENTS.md`, README/reference prose, prompts, comments, headings, examples, or phrases
+does not prove behavioral value merely because the text exists.
 
-Keep machine-readable form separate from semantic behavior. Frontmatter, schemas, manifests,
-generated inventories, and parsable metadata may justify structural validation when software
-consumes that structure. Agent-instruction effectiveness requires representative behavioral
-evaluation of consequential actions, routing, side effects, or outcomes rather than phrase matching.
-Lint, schema validation, link checking, typing, compilation, and other deterministic mechanisms can
-validate an edit without creating another long-lived regression test.
+For instruction text, require evidence that changing/removing the instruction adversely affects the
+desired agent behavior before retaining a presence assertion as regression protection. Otherwise use
+representative behavioral evaluation of consequential actions, routing, side effects, or outcomes.
+Machine-readable frontmatter, schemas, manifests, generated inventories, and parsable metadata may
+receive structural validation through their actual parser/consumer contract. Lint, schema validation,
+link checking, typing, compilation, and other deterministic mechanisms can validate an edit without
+creating another long-lived regression test.
 
 Coverage is diagnostic evidence in this repository, not a quality target or merge gate. Continue
 collecting it where inexpensive, but do not create tests solely to cover lines and do not reject a

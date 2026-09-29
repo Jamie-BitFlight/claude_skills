@@ -1210,10 +1210,10 @@ def process(self) -> None:  # pragma: no cover
 
 **Related Standards**:
 
-- MANDATORY 80% general code
-- MANDATORY 95%+ critical code
-- Pattern: Testing pyramid distribution
-- Source: Coverage gates in validation pipeline
+- Preserve an existing repository coverage gate when configured
+- Do not invent universal coverage, mutation-score, or test-distribution targets
+- Select test boundaries by behavioral contract, risk, and maintenance-adjusted value
+- Use mutation testing for critical logic only when it materially strengthens confidence
 
 **Source**: pattern-extraction.md Section 1.3, taxonomy.md Section 6.2
 

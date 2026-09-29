@@ -17,32 +17,33 @@ Do not require a SAM plan, a specific framework, or another plugin for standalon
 
 ## Procedure
 
-1. **Define close validation separately from retention.** For a fix or other claimed behavior change,
-   identify the direct observation that will show the targeted outcome changed as intended. Prefer
-   the same discriminating observation before and after the change when practical. This evidence may
-   be a one-time probe, command, scenario, existing contract/system test, or deterministic validator;
-   it does not have to become a permanent test. If the original failure cannot be reproduced, state
-   that evidence limit rather than substituting an unrelated green suite.
-2. **Admit or reject a retained test economically.** Apply the shared test-economics model. State
-   the meaningful contract/failure, expected protection benefit, recurring ownership cost, and
-   whether existing evidence already catches the failure more cheaply. Include consequence,
-   recurrence exposure, detection effectiveness, unique protection, and contract durability on the
-   benefit side; include context, churn, fixtures, execution, diagnosis, flakiness, environment,
-   refactor drag, duplication, and coordination on the cost side at the resolution that can change
-   the decision. A changed file, line, keyword, heading, constant, or implementation detail is not
-   sufficient. Reject phrase/prose-presence tests unless exact text is itself a machine-consumed
-   contract. If additional protection does not materially exceed recurring ownership cost, return
-   `NO NEW TEST JUSTIFIED` for retention while preserving the required close-validation plan.
-3. **Establish intent.** Read the scoped requirement, architecture/interface contract, relevant
-   callers, existing tests/fixtures, and test configuration. Use implementation evidence to locate
-   the real seams, not to invent expected behavior. Mark observed, derived, assumed, and proposed
-   interpretations where authority differs. Resolve only consequential missing decisions with the
-   owner; carry other evidence gaps explicitly.
-4. **Select obligations by consequence.** Prioritize stable external/user/machine contracts,
+1. **Establish intent.** Read the scoped requirement, architecture/interface contract, relevant
+   callers, existing tests/fixtures, and test configuration before deciding what evidence is worth
+   retaining. Use implementation evidence to locate the real seams, not to invent expected behavior.
+   Mark observed, derived, assumed, and proposed interpretations where authority differs. Resolve only
+   consequential missing decisions with the owner; carry other evidence gaps explicitly.
+2. **Select obligations by consequence.** Identify the stable behavior, system goal, supported
+   contract, realistic failure mechanisms, and consequence if each obligation regresses. Prioritize
    destructive or durable state transitions, authorization/security/data-integrity boundaries,
    cross-component invariants, recovery/fail-closed behavior, and evidenced high-impact regressions.
-   Reuse adequate existing tests. Do not build an edge-case matrix around a function merely because
-   it changed; a unit-level obligation needs unique justified protection.
+   Reuse adequate existing protection. Do not invent obligations from implementation shape.
+3. **Define close validation separately from retention.** For a fix or other claimed behavior
+   change, identify the direct observation that will show the targeted outcome changed as intended.
+   Prefer the same discriminating observation before and after the change when practical. This
+   evidence may be a one-time probe, command, scenario, existing contract/system test, or
+   deterministic validator; it does not have to become a permanent test. If the original failure
+   cannot be reproduced, state that evidence limit rather than substituting an unrelated green suite.
+4. **Admit or reject retained protection economically.** Apply the shared test-economics model to
+   the obligations established above. State expected protection benefit, recurring ownership cost,
+   and whether existing evidence catches the same important failure more cheaply. A changed file,
+   line, keyword, heading, constant, helper, or branch is not sufficient justification. For text,
+   ask what consequential behavior the assertion discriminates. Text can be a valid oracle when its
+   observed value proves a meaningful path/outcome, but do not retain assertions whose only claim is
+   that prose, instructions, headings, examples, or phrases still exist. For instruction text,
+   require evidence that changing/removing it adversely affects the desired agent behavior before
+   treating presence as regression protection. If added protection does not materially exceed
+   recurring ownership cost, return `NO NEW TEST JUSTIFIED` for retention while preserving the
+   required close-validation plan.
 5. **Choose contract altitude and boundary.** Prefer the highest stable contract altitude that still
    discriminates the consequential failure with acceptable cost and diagnostics. Trace retained
    lower-level tests upward to the system goal or supported contract they help protect. Keep unit
@@ -55,12 +56,14 @@ Do not require a SAM plan, a specific framework, or another plugin for standalon
    prerequisites, cleanup, diagnostics, and negative controls where justified. Follow the shared
    safety rules; propose rather than execute unavailable or unsafe checks. Keep product expectations
    separate from generated-artifact freshness and consumer/agent execution evidence.
-7. **Check the plan before authoring.** Confirm that every proposed test has a point, each
-   important scoped obligation has protection or an explicit gap, and no oracle merely repeats
-   production logic or mutable prose. Check existing project gates without replacing them with
-   invented ones. For TDD, design only the next useful increment, state its intended red, and hand
-   the design back before writing the test; missing API/setup is not yet behavioral sensitivity
-   evidence.
+7. **Check the plan before authoring.** Confirm that every proposed test has a point, each important
+   scoped obligation has protection or an explicit gap, and no oracle merely repeats production logic
+   or mutable source. Ask: what undesirable behavior could occur if this assertion disappeared while
+   all other tests remained green? If the answer is only that implementation/prose could change, the
+   test has no demonstrated regression protection. Check existing project gates without replacing
+   them with invented ones. For TDD, design only the next useful increment, state its intended red,
+   and hand the design back before writing the test; missing API/setup is not yet behavioral
+   sensitivity evidence.
 
 ## Result
 

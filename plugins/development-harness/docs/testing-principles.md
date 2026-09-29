@@ -48,7 +48,7 @@ Every maintained test has lifecycle cost. Do not create one merely because code,
 documentation changed. Admit a new test only when all of the following can be stated at useful
 resolution:
 
-- the meaningful behavior, invariant, interface, failure mode, or machine-consumed contract it
+- the meaningful behavior, invariant, interface, failure mode, or externally observable contract it
   protects, and the authority for that obligation;
 - a plausible regression or failure that the test can independently distinguish;
 - why existing protection does not already catch that failure adequately; and
@@ -58,12 +58,21 @@ resolution:
 When those answers do not justify another maintained test, return `NO NEW TEST JUSTIFIED`. Validation
 may still be required; refusing a regression test does not mean skipping appropriate checks.
 
-Treat prose and agent instructions specially. A Markdown edit, instruction rewrite, heading change,
-example update, or keyword addition is not itself a behavioral contract. Do not create tests that
-mirror words, sentences, headings, counts, or other intentional prose unless exact text or structure
-is consumed programmatically. For machine-readable frontmatter, schemas, manifests, and metadata,
-test the parser/consumer contract. For semantic agent behavior, evaluate representative actions,
-routing, side effects, and outcomes; keyword presence is not behavioral evidence.
+Treat text assertions by what behavior they discriminate, not by whether the text is machine- or
+human-facing. Exact text is a valid oracle when the observed value demonstrates a consequential path,
+outcome, or authoritative externally observable contract. For example, an expected error message can
+prove that the intended error path was reached for the scenario.
+
+Do not retain assertions whose only claim is that prose, instructions, headings, examples, comments,
+or phrases continue to exist. For agent instructions, phrase presence is not behavioral evidence:
+require evidence that changing or removing the instruction adversely affects a desired agent outcome
+before treating its presence as regression protection. Use behavioral evaluation for that causal
+claim. Machine-readable frontmatter, schemas, manifests, and metadata remain eligible for structural
+validation through their actual parser/consumer contract.
+
+Admission question: **What undesirable behavior can occur if this assertion is removed while all
+other tests remain green?** If the answer is only that someone could rewrite/remove a sentence or
+implementation detail, the assertion has no demonstrated protection benefit.
 
 ## Contract altitude
 
