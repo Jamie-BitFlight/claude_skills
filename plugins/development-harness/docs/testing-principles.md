@@ -26,6 +26,29 @@ acceptance and verification cases. Task Worker loads it before test authoring, a
 reviewer loads the reviewer for test evidence. Test plans and
 review findings stay in the caller's existing handoff instead of introducing new task-schema fields.
 
+## Test admission gate
+
+Every maintained test has lifecycle cost. Do not create one merely because code, configuration, or
+documentation changed. Admit a new test only when all of the following can be stated at useful
+resolution:
+
+- the meaningful behavior, invariant, interface, failure mode, or machine-consumed contract it
+  protects, and the authority for that obligation;
+- a plausible regression or failure that the test can independently distinguish;
+- why existing protection does not already catch that failure adequately; and
+- why a maintained automated test is better evidence than an existing lint/schema/static check,
+  generated-artifact validation, behavioral evaluation, or one-time verification.
+
+When those answers do not justify another maintained test, return `NO NEW TEST JUSTIFIED`. Validation
+may still be required; refusing a regression test does not mean skipping appropriate checks.
+
+Treat prose and agent instructions specially. A Markdown edit, instruction rewrite, heading change,
+example update, or keyword addition is not itself a behavioral contract. Do not create tests that
+mirror words, sentences, headings, counts, or other intentional prose unless exact text or structure
+is consumed programmatically. For machine-readable frontmatter, schemas, manifests, and metadata,
+test the parser/consumer contract. For semantic agent behavior, evaluate representative actions,
+routing, side effects, and outcomes; keyword presence is not behavioral evidence.
+
 ## Principles
 
 ### 1. Protect a stable behavioral contract
@@ -37,10 +60,12 @@ behavior rather than mirroring the current implementation [1], [9].
 
 ### 2. Discriminate against plausible defects
 
-Name a realistic fault that must make the test fail. For changed regression protection, demonstrate
-the original defect or a relevant safe negative control where practical. Check that execution reaches
-the intended observation: an unrelated import, collection, or setup failure does not establish fault
-detection. Coverage records execution; mutation testing challenges detection [3]. Neither a surviving
+For each material test, name a realistic fault that its observation should distinguish. For changed
+regression protection, demonstrate the original defect or a relevant safe negative control when that
+evidence can materially change confidence. Do not manufacture mutations or fault-injection ceremony
+for trivial behavior merely to satisfy a template. Check that execution reaches the intended
+observation: an unrelated import, collection, or setup failure does not establish fault detection.
+Coverage records execution; mutation testing challenges detection [3]. Neither a surviving
 equivalent/unreachable mutant nor a failing test at the wrong stage establishes an oracle defect.
 Mutation tooling is optional; fault sensitivity must remain an explicit evidence question.
 
@@ -106,9 +131,18 @@ complexity or hides the oracle [2]. Follow the project's applicable typing and f
 Adjudicate failures as product, requirement, oracle, or harness/environment defects before editing
 expectations. Compare a material rewrite against its original protection and unacceptable regressions.
 Account for every meaningful guarantee when deleting or consolidating tests. Overlap across unit,
-contract, and integration boundaries is not automatically redundancy [1], [5]. Place fast high-signal
-checks early; schedule expensive fidelity checks where their evidence is needed. Moving a check
-later changes the detection window, not the need for the guarantee.
+contract, and integration boundaries is not automatically redundancy [1], [5].
+
+Evaluate unique protection against lifecycle cost: coupling to implementation or prose, fixture and
+setup complexity, duplicated scaffolding, expected edit churn, runtime/resources, flakiness,
+diagnostic effort, and the human/agent context required to understand and safely update the test.
+High cost alone never removes a required guarantee. It matters when the same important failure is
+already caught by a simpler surviving carrier, or when the test protects no justified contract at
+all. Ask explicitly: if this test disappeared, which plausible important regression could now pass
+undetected?
+
+Place fast high-signal checks early; schedule expensive fidelity checks where their evidence is
+needed. Moving a check later changes the detection window, not the need for the guarantee.
 
 ## Compact test card
 
@@ -170,6 +204,18 @@ Keep the following evidence separate:
 A valid file, matched phrase, unexecuted scenario, or mapped activation entry cannot establish
 runtime behavior. Predeclare permitted outcomes and critical invariants for agent evaluations;
 keep repeated-run uncertainty visible.
+
+## Review at protection-family resolution
+
+Do not make large-suite review cost proportional to raw test count. First group tests that appear to
+protect the same claim at the same boundary against the same relevant failure mechanism. Deep-trace
+individual tests only where the disposition can change: high-consequence guarantees, suspicious or
+circular oracles, uncertain family equivalence, implementation/prose coupling, high lifecycle cost,
+flaky or expensive execution, or uncovered behavior.
+
+A family is an analysis convenience, not evidence of redundancy. Split it whenever variants,
+boundaries, forbidden effects, diagnostics, or fault mechanisms differ materially. Report the
+unexamined remainder when sampling or representative tracing leaves uncertainty.
 
 ## Review dispositions
 

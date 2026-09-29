@@ -1,6 +1,6 @@
 ---
 name: test-reviewer
-description: Review existing tests against the software and contracts they actually exercise. Use to assess whether a test has a justified purpose, detects important faults, tolerates valid refactors, or deserves strengthening, replacement, consolidation, or removal consideration. Reviews are read-only and evidence-backed, including TDD and regression tests.
+description: Review existing tests against the software and contracts they actually exercise. Use to assess whether a test has justified unique protection, detects important faults, tolerates valid refactors, earns its lifecycle cost, or deserves strengthening, replacement, consolidation, or removal consideration. Reviews are read-only and evidence-backed, including TDD and regression tests.
 ---
 
 # Test Reviewer
@@ -18,26 +18,36 @@ Prefer a reviewer independent of the test author where available; disclose when 
 ## Procedure
 
 1. **Resolve the review boundary.** Inventory the scoped tests, parameter families, fixtures,
-   helpers, production entry points, relevant callers, contracts, and CI selection. Read each
-   material dependency, or mark the coverage gap. Establish product purpose and supported
-   environments. Reuse existing investigation evidence instead of starting the same inquiry again.
-2. **Trace each material test.** Map setup -> production path -> observation -> assertion.
+   helpers, production entry points, relevant callers, contracts, and CI selection. Map tests first
+   into provisional protection families by claim, boundary, and relevant failure mechanism. Read
+   each dependency needed to decide a disposition, or mark the coverage gap. Establish product
+   purpose and supported environments. Reuse existing investigation evidence instead of starting
+   the same inquiry again.
+2. **Trace at the resolution that can change the decision.** Deep-trace high-consequence,
+   suspicious, high-cost, or uncertain families first. For each disposition-relevant test or
+   representative family member, map setup -> production path -> observation -> assertion.
    Identify its intended claim and authority, the failure consequence, what it actually observes,
-   and what can remain broken while it passes. Separate characterization from approved intent.
-   Do not infer importance from names, test counts, or covered lines.
+   and what can remain broken while it passes. Split a family whenever variants, boundaries,
+   forbidden effects, diagnostics, or fault mechanisms differ materially. Separate characterization
+   from approved intent. Do not infer importance from names, test counts, or covered lines.
 3. **Challenge effectiveness.** Apply the shared oracle, fault-sensitivity, refactor-tolerance,
    fidelity, isolation, and diagnostic criteria. Select the cheapest relevant positive/negative
-   controls for important or changed guarantees. Confirm the original defect or seeded fault
-   reaches the intended assertion, not a collection/setup error. Do not require mutation execution
-   for every test or call static inspection an observed fault-detection result.
-4. **Assess suite value.** Identify missing high-consequence protection, misleading passes,
-   redundant cases, and costly/flaky checks. Compare claim, input variants, boundary, failure
-   mechanism, and diagnostics before treating overlap as duplication. Apply project conventions
-   and established coverage gates. Keep correctness, qualitative value, and runtime cost separate.
+   controls for important or changed guarantees when they materially improve confidence. Confirm
+   the original defect or seeded fault reaches the intended assertion, not a collection/setup
+   error. Do not require mutation execution for every test or call static inspection an observed
+   fault-detection result.
+4. **Assess suite value and ownership cost.** Identify missing high-consequence protection,
+   misleading passes, redundant protection, and costly/flaky checks. Compare claim, input variants,
+   boundary, failure mechanism, and diagnostics before treating overlap as duplication. Record
+   lifecycle cost separately: implementation/prose coupling, fixture/setup complexity, duplicated
+   scaffolding, expected churn, execution resources, flakiness, diagnostic effort, and context
+   required to understand/update the test. Apply project conventions and established coverage gates.
+   Keep correctness, qualitative value, lifecycle cost, and runtime cost separate.
 5. **Recommend a disposition.** Use KEEP, STRENGTHEN, REPLACE, CONSOLIDATE, REMOVAL-CANDIDATE,
-   or UNRESOLVED with the evidence defined in the shared guide. Do not use missing documentation
-   or unmeasured sensitivity as proof of uselessness. For any material replacement/removal,
-   account for the original guarantees, their surviving carriers, and unacceptable regressions.
+   or UNRESOLVED with the evidence defined in the shared guide. Do not use missing documentation,
+   high cost, or unmeasured sensitivity alone as proof of uselessness. For consolidation/removal,
+   answer: if this test disappeared, which plausible important regression could now pass undetected?
+   Identify the surviving carrier for every required guarantee and any residual risk.
 6. **Specify the next validation.** Distinguish product, requirement, oracle, boundary/interface,
    and test/CI-harness defects. For a proposed change, define success and protected behavior before
    its implementation; compare baseline and candidate under equivalent relevant conditions, adding
@@ -46,12 +56,12 @@ Prefer a reviewer independent of the test author where available; disclose when 
 
 ## Report
 
-Return scope/revision, sources read, and uncovered scope before the findings. For each test or
-explicitly bounded equivalent family, use a row containing:
+Return scope/revision, sources read, and uncovered scope before the findings. For each
+disposition-relevant test or explicitly bounded protection family, use a row containing:
 
 ```text
 Test/location | intended claim + authority | actual observation/boundary
-Importance/failure excluded | effectiveness + evidence | disposition
+Importance/failure excluded | effectiveness + evidence | lifecycle cost | disposition
 Correction category | surviving protection / gap | next discriminating validation
 ```
 

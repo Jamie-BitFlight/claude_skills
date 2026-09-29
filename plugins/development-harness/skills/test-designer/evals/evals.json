@@ -48,6 +48,18 @@
       "prompt": "Use /dh:add-new-feature to plan the queue API described in the supplied requirement in this isolated evaluation workspace. Produce the normal plan and its verification cases; do not implement the feature.",
       "expected_output": "In a fixture-backed isolated DH environment, follow the normal architecture and swarm-planning dispatch. Reach test-designer through the planner loading clear-cove-task-design, not an evaluator-injected skill. Carry contract, oracle, boundary, failure case and gaps into existing acceptance/verification fields. Preserve stage altitude, authorized backend, and normal artifact/STATUS protocols. Missing harness/backend prerequisites mean an unvalidated route, never a passing activation claim.",
       "files": ["fixtures/queue-contract.md"]
+    },
+    {
+      "id": 9,
+      "prompt": "I rewrote several paragraphs and renamed a heading in a SKILL.md to make the instructions clearer. No parser consumes the body text or heading. An agent proposes adding pytest assertions that the new heading and the words \"verify permissions\" remain present. Design the tests for this change.",
+      "expected_output": "Return NO NEW TEST JUSTIFIED for phrase/heading regression tests. Explain that the prose edit can receive normal Markdown/link/frontmatter validation, while semantic instruction effectiveness requires behavioral evaluation if that claim matters. Do not turn intentional wording into a duplicated test contract.",
+      "files": []
+    },
+    {
+      "id": 10,
+      "prompt": "A README example and explanatory comments changed, but the executable command, parsed metadata, and public behavior are unchanged. Existing schema and link checks already validate the file. Decide what new regression tests to add.",
+      "expected_output": "Apply the admission gate and add no maintained regression test absent a new meaningful behavior or machine-consumed contract. Reuse the existing deterministic checks and distinguish one-time validation from long-lived test ownership.",
+      "files": []
     }
   ]
 }
