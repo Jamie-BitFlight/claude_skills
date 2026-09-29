@@ -43,6 +43,46 @@ with the test's unique protection. Cost alone never justifies deleting required 
 test with no unique useful protection should not be created or retained merely to increase test
 count or coverage.
 
+## Testing policy: maintenance-adjusted value
+
+Tests are maintained software. Every retained test consumes recurring reading/reasoning context,
+execution resources, failure-investigation effort, and modification work. Optimize for the smallest
+maintainable suite that gives strong confidence in consequential system behavior, not for test count,
+coverage percentage, a conventional test pyramid, or the appearance of thoroughness.
+
+Before adding a maintained test, apply the
+[DH test admission gate](../plugins/development-harness/docs/testing-principles.md#test-admission-gate)
+or load [Test Designer](../plugins/development-harness/skills/test-designer/SKILL.md). A new test must
+add independent protection for a meaningful behavior, invariant, interface, failure mode, or
+machine-consumed contract that existing protection does not already cover adequately. `NO NEW TEST
+JUSTIFIED` is a valid design result.
+
+Prefer observable system, integration, contract, and lifecycle behavior over implementation-level
+unit detail when both can protect the same failure. A small lifecycle test that crosses the real
+consumer/provider boundary is preferable to many tests of private helpers or function decomposition
+when it supplies equivalent or stronger protection at lower maintenance cost. Keep a unit test when
+the smaller boundary itself is a stable supported contract or it provides unique, consequential
+fault discrimination that broader tests do not.
+
+Do not add tests merely to freeze intentional wording or structure. In particular, prose in
+`SKILL.md`, `AGENTS.md`, READMEs, reference Markdown, prompts, comments, or documentation does not
+earn a regression test because words, headings, sentences, counts, examples, or formatting changed.
+A keyword-presence assertion proves only that the keyword is present; it does not prove that an
+agent follows the instruction. Exact-text tests require evidence that the text itself is a
+machine-consumed contract.
+
+Keep machine-readable form separate from semantic behavior. Frontmatter, schemas, manifests,
+generated inventories, and parsable metadata may justify structural validation when software
+consumes that structure. Agent-instruction effectiveness requires representative behavioral
+evaluation of consequential actions, routing, side effects, or outcomes rather than phrase matching.
+Lint, schema validation, link checking, typing, compilation, and other deterministic mechanisms can
+validate an edit without creating another long-lived regression test.
+
+Coverage is diagnostic evidence in this repository, not a quality target or merge gate. Continue
+collecting it where inexpensive, but do not create tests solely to cover lines and do not reject a
+change merely because its percentage decreases. Any future threshold requires a documented,
+subsystem-specific reason that percentage coverage is a useful proxy for a demonstrated risk.
+
 ## Failure investigation and test effectiveness
 
 For a CI failure, use
@@ -102,8 +142,10 @@ null until the validation runner records an observed result. It is not a passing
   `tests/` runs in CI but is invisible to that plugin's standalone runner, so its coverage
   silently disappears for anyone who installs the plugin on its own. Move a misplaced test file
   to the correct location rather than leaving it and noting the exception.
-- **Close criteria**: passing pre-existing tests proves no regression, not correctness — do not
-  mark a fix or issue closed without a test that specifically demonstrates the new/fixed behavior
+- **Close criteria**: passing pre-existing tests proves no regression, not correctness. Require
+  specific validation of the new/fixed behavior, but create a maintained regression test only when
+  the admission gate justifies its recurring cost. A deterministic validator, contract/system run,
+  or other direct evidence may be the correct close evidence when no new test is warranted.
 - **SAM/backlog MCP error contract**: `sam_schema/server.py` tool handlers let exceptions
   (`PlanNotFoundError`, `TaskNotFoundError`, etc.) propagate rather than returning
   `{"error": ...}` dicts — FastMCP converts them to `isError=true` responses. Tests for
