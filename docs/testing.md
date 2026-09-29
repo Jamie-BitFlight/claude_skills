@@ -22,6 +22,13 @@ execution resources, failure-investigation effort, and modification work. Optimi
 maintainable suite that gives strong confidence in consequential system behavior, not for test count,
 coverage percentage, a conventional test pyramid, or the appearance of thoroughness.
 
+Use the economic rule `retained-test value = expected protection benefit - expected ownership cost`
+qualitatively, not as a fabricated numeric score. Protection benefit comes from consequential faults
+uniquely detected, their plausible recurrence, detection effectiveness, contract durability, and
+useful feedback. Ownership cost accumulates through human/agent context, implementation-coupled churn,
+fixtures/data, execution/CI resources, diagnosis, flakiness, environment/dependency upkeep, refactor
+drag, duplicated protection, and review/merge coordination. A fast test can still be expensive to own.
+
 Validation and permanent regression protection are separate decisions. Every claimed fix must have
 direct validation before closure against the behavior it was meant to change. Prefer a discriminating
 before/after observation when practical: reproduce the incorrect behavior, apply the fix, then run

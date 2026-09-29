@@ -23,13 +23,16 @@ Do not require a SAM plan, a specific framework, or another plugin for standalon
    be a one-time probe, command, scenario, existing contract/system test, or deterministic validator;
    it does not have to become a permanent test. If the original failure cannot be reproduced, state
    that evidence limit rather than substituting an unrelated green suite.
-2. **Admit or reject a retained test.** State the meaningful contract or failure the proposed test
-   would independently protect and whether existing tests already catch it. A changed file, line,
-   keyword, heading, constant, or implementation detail is not sufficient. Prefer deterministic
-   lint/schema/static validation for machine-readable form and behavioral evaluation for
-   agent-instruction semantics. Reject phrase/prose-presence tests unless exact text is itself a
-   machine-consumed contract. If no additional useful protection is justified, return `NO NEW TEST
-   JUSTIFIED` for retention while preserving the required close-validation plan.
+2. **Admit or reject a retained test economically.** Apply the shared test-economics model. State
+   the meaningful contract/failure, expected protection benefit, recurring ownership cost, and
+   whether existing evidence already catches the failure more cheaply. Include consequence,
+   recurrence exposure, detection effectiveness, unique protection, and contract durability on the
+   benefit side; include context, churn, fixtures, execution, diagnosis, flakiness, environment,
+   refactor drag, duplication, and coordination on the cost side at the resolution that can change
+   the decision. A changed file, line, keyword, heading, constant, or implementation detail is not
+   sufficient. Reject phrase/prose-presence tests unless exact text is itself a machine-consumed
+   contract. If additional protection does not materially exceed recurring ownership cost, return
+   `NO NEW TEST JUSTIFIED` for retention while preserving the required close-validation plan.
 3. **Establish intent.** Read the scoped requirement, architecture/interface contract, relevant
    callers, existing tests/fixtures, and test configuration. Use implementation evidence to locate
    the real seams, not to invent expected behavior. Mark observed, derived, assumed, and proposed
@@ -65,7 +68,7 @@ Return a concise test plan in the current response or caller's existing authoriz
 
 - scope, revision, authoritative behavior, and unresolved intent;
 - direct close validation for the claimed change, explicitly separate from retained regression protection;
-- test cards or a compact matrix, with existing coverage reused and each new case's purpose;
+- test cards or a compact matrix, with each retained case's protection benefit, ownership cost, and unique purpose;
 - highest-consequence missing guarantees, justified boundary choices, and execution order;
 - expected red for TDD and any risk-justified fault/negative control, positive behavior, and protected refactor behavior;
 - proposed versus executed checks, commands/results when observed, and evidence limitations.

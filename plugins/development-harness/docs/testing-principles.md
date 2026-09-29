@@ -89,6 +89,58 @@ internal ordering, or decomposition choice. A behavior-preserving refactor shoul
 unit test green. Retain lower-level tests when they protect a stable local contract or uniquely
 distinguish an important fault that broader evidence cannot catch cheaply.
 
+## Test economics
+
+Treat every retained test as a recurring liability purchased for future protection. Use this decision
+model qualitatively; do not manufacture numerical scores when the evidence does not support them:
+
+```text
+retained-test value = expected protection benefit - expected ownership cost
+```
+
+Retain or add the test when its expected protection benefit materially exceeds its recurring
+ownership cost and no cheaper evidence provides equivalent protection. Consolidate, replace, or omit
+it when the same important failures are protected more cheaply elsewhere. High cost never justifies
+dropping a required guarantee without a surviving carrier.
+
+Assess **expected protection benefit** from:
+
+- **consequence avoided** — severity of the failure the test can prevent from escaping;
+- **regression exposure** — how plausibly that failure can recur as the system changes;
+- **detection effectiveness** — how reliably the test would fail for that relevant defect;
+- **unique protection** — what important failure this test catches that surviving evidence does not;
+- **contract durability** — whether the protected behavior is expected to remain stable through
+  implementation redesign;
+- **feedback value** — whether the failure arrives early enough and clearly enough to change action.
+
+Assess **expected ownership cost** across the test's remaining lifetime, not only its runtime:
+
+- **comprehension/context cost** — human and agent tokens/time needed to understand the test,
+  fixtures, helpers, and its relationship to the product;
+- **change-coupling cost** — expected churn when private helpers, constants, branches, ordering,
+  file layout, prose, generated text, or other noncontractual implementation details change;
+- **fixture/data upkeep** — maintaining builders, snapshots, golden files, mocks, seeds, test data,
+  environment setup, and cleanup;
+- **execution cost** — CI latency, compute, external resources, hardware, services, and local feedback
+  time;
+- **diagnostic cost** — effort to determine whether a failure is product, test, fixture, environment,
+  or expectation drift;
+- **flakiness/noise cost** — reruns, false alarms, quarantines, intermittent failures, and lost trust
+  in the suite;
+- **dependency/environment cost** — toolchain, service, platform, version, credential, and
+  compatibility maintenance required only by the test;
+- **refactor drag** — valid redesign constrained or slowed because the test encodes implementation
+  rather than behavior;
+- **duplication cost** — repeated protection whose maintenance and failures add little information
+  beyond a stronger surviving test;
+- **review/coordination cost** — extra diff, merge-conflict, review, and update burden every time
+  related code or documentation changes.
+
+Do not use cheap execution as evidence of cheap ownership: a millisecond assertion over a hard-coded
+constant can cost more over its lifetime than a slower black-box contract test if it churns on every
+valid refactor. Conversely, an expensive end-to-end test still needs enough unique protection to
+justify its infrastructure and diagnostic burden.
+
 ## Principles
 
 ### 1. Protect a stable behavioral contract
@@ -184,13 +236,12 @@ Account for every meaningful guarantee when deleting or consolidating tests. Ove
 contract, and integration boundaries is not automatically redundancy [1], [5], but neither does each
 boundary deserve its own copy of the same assertion.
 
-Evaluate unique protection against lifecycle cost: coupling to implementation or prose, fixture and
-setup complexity, duplicated scaffolding, expected edit churn, runtime/resources, flakiness,
-diagnostic effort, and the human/agent context required to understand and safely update the test.
-High cost alone never removes a required guarantee. It matters when the same important failure is
-already caught by a simpler surviving carrier, or when the test protects no justified contract at
+Apply the test-economics model above: compare expected protection benefit with expected ownership
+cost over the test's remaining lifetime. Do not collapse that decision to runtime, coverage, or test
+count. High cost alone never removes a required guarantee. It matters when the same important failure
+is already caught by a cheaper surviving carrier, or when the test protects no justified contract at
 all. Ask explicitly: if this test disappeared, which plausible important regression could now pass
-undetected?
+undetected, and what recurring ownership cost disappears with it?
 
 When valuable externally observable behavior remains correct through a refactor, prefer deleting or
 generalizing a brittle implementation-coupled test over teaching it the new internals. Place
@@ -205,7 +256,8 @@ for an implementer and reviewer to agree on what the test demonstrates:
 
 ```text
 Claim and authority: required behavior, source, unresolved interpretation
-Consequence: important failure and impact if undetected
+Protection benefit: consequence, recurrence exposure, unique detection, durability, feedback value
+Ownership cost: context/churn/fixtures/execution/diagnosis/flakiness/dependencies/refactor drag/duplication
 Scenario: inputs, prior state, environment, action
 Oracle: independently justified expected result / permitted outcomes
 Boundary: production path exercised; real dependencies and justified doubles

@@ -90,6 +90,12 @@
       "prompt": "A service has 25 unit tests for internal parser/helper branches and one end-to-end test that sends a supported document through the public service, persists it, reads it through the real downstream consumer, and verifies the required values. A refactor keeps the end-to-end behavior but changes most helpers, causing 16 unit tests to fail. Review the protection.",
       "expected_output": "Treat behavior-preserving helper churn as evidence of implementation coupling. Prefer the end-to-end/contract carrier when it covers the consequential supported behavior, identify any unique important failures the unit tests still protect, and recommend removing/generalizing brittle unit tests rather than mechanically updating them to the new internals.",
       "files": []
+    },
+    {
+      "id": 15,
+      "prompt": "Compare two tests protecting the same supported behavior. Test A is a 5 ms unit test coupled to three private helpers and a hard-coded constant; it typically needs edits during refactors. Test B is a 700 ms black-box contract test through the public API, has been stable across redesigns, and catches the same externally meaningful failure. Neither has unique additional assertions. Which protection should survive?",
+      "expected_output": "Compare lifetime economics rather than runtime alone. Test A has lower execution cost but higher comprehension/churn/refactor/coordination cost and no unique protection; Test B has higher runtime but durable black-box protection. Prefer B as the surviving carrier when its diagnostics and CI cost remain acceptable, and classify A for consolidation/removal rather than preserving it because it is faster.",
+      "files": []
     }
   ]
 }

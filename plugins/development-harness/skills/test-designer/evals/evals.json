@@ -76,6 +76,12 @@
       "prompt": "A bug report says a CLI status label is wrong. You can reproduce the wrong label and a one-line constant change corrects it. The label is for humans only, no machine consumer parses it, and existing CLI lifecycle tests already prove the command starts and returns the right status code. What validation and permanent tests are required?",
       "expected_output": "Require direct before/after validation of the reported label before calling the fix complete, preferably the same CLI observation. Treat that close evidence separately from retention. Do not require a permanent exact-string regression test unless the wording is an authoritative machine/user contract whose future regression risk justifies ownership; NO NEW TEST JUSTIFIED is valid after successful one-time validation.",
       "files": []
+    },
+    {
+      "id": 13,
+      "prompt": "A proposed regression test runs in 2 ms and asserts a private mapping constant has 14 entries. The mapping changes several times a month as implementation evolves. A black-box contract test already exercises the supported inputs and fails if the externally required mapping behavior is wrong. The new test would be easy to write. Should it be retained?",
+      "expected_output": "Reject the new test unless it adds unique consequential protection. Apply the economic model over lifetime: near-zero runtime does not offset recurring context, edit churn, review noise, diagnosis, refactor drag, and duplicated protection. Prefer the existing black-box contract carrier when it discriminates the meaningful failure; cheap-to-run is not cheap-to-own.",
+      "files": []
     }
   ]
 }

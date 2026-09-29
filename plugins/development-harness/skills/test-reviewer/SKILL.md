@@ -41,11 +41,13 @@ Prefer a reviewer independent of the test author where available; disclose when 
    original defect or seeded fault reaches the intended observation, not collection/setup failure.
    Do not require mutation execution for every test or call static inspection observed fault
    detection.
-4. **Assess maintenance-adjusted value.** Identify missing high-consequence protection, misleading
-   passes, duplicated protection, and costly/flaky checks. Record lifecycle cost separately:
-   implementation/prose coupling, fixture/setup complexity, duplicated scaffolding, expected churn,
-   execution resources, flakiness, diagnostic effort, and context needed to understand/update the
-   test. Compare tests by the consequential failures they uniquely exclude and the contract altitude
+4. **Assess maintenance-adjusted value.** Apply the shared economic model to each
+   disposition-relevant test/family. Record expected protection benefit separately from expected
+   ownership cost. Benefit includes consequence avoided, regression exposure, detection
+   effectiveness, unique protection, contract durability, and feedback value. Ownership cost
+   includes human/agent context, implementation/prose coupling and churn, fixtures/data, execution,
+   diagnosis, flakiness, environment/dependencies, refactor drag, duplication, and
+   review/coordination. Compare tests by the consequential failures they uniquely exclude and the contract altitude
    they protect, not by pyramid quotas. Treat unit tests that fail under behavior-preserving refactors
    because private helpers, constants, branches, or decomposition changed as implementation-coupled
    unless those details are authoritative contracts. Prefer a broader lifecycle/contract carrier
@@ -68,7 +70,7 @@ disposition-relevant test or explicitly bounded protection family, use a row con
 
 ```text
 Test/location | intended claim + authority | actual observation/boundary
-Importance/failure excluded | effectiveness + evidence | lifecycle cost | disposition
+Protection benefit | ownership cost | effectiveness + evidence | disposition
 Correction category | surviving protection / gap | next discriminating validation
 ```
 
