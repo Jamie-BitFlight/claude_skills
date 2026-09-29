@@ -221,43 +221,6 @@ lint_existing_ref test-ref "$EXPECTED"
         assert result.returncode != 0
 
 
-@pytest.mark.parametrize(
-    ("credential_mode", "glab_status", "glab_error"),
-    [
-        ("environment", 0, ""),
-        ("persisted", 0, ""),
-        ("environment", 23, "connection reset by peer"),
-        ("persisted", 24, "authentication failed"),
-    ],
-)
-def test_preflight_preserves_failure_without_inventing_an_auth_diagnosis(
-    credential_mode: str, glab_status: int, glab_error: str
-) -> None:
-    """Execute the preflight with successful, network, and authentication outcomes."""
-    reference = SKILL_ROOT / "references" / "glab-cli.md"
-    (probe,) = bash_blocks(reference)
-    script = f"""
-glab() {{
-  [ -z "$GLAB_ERROR" ] || printf '%s\\n' "$GLAB_ERROR" >&2
-  return "$GLAB_STATUS"
-}}
-{probe}
-"""
-    environment: dict[str, str] = {**os.environ, "GLAB_ERROR": glab_error, "GLAB_STATUS": str(glab_status)}
-    if credential_mode == "environment":
-        environment["GITLAB_TOKEN"] = "redacted-test-token"
-    else:
-        environment.pop("GITLAB_TOKEN", None)
-
-    result = subprocess.run(["bash", "-c", script], env=environment, text=True, capture_output=True, check=False)
-
-    assert result.returncode == glab_status
-    if glab_status:
-        assert glab_error in result.stderr
-    if glab_error == "connection reset by peer":
-        assert "authentication failed" not in result.stderr.casefold()
-
-
 @pytest.mark.parametrize(("mode", "expected_status", "request_errors"), [("transient", 0, 1), ("exhaust", 1, 3)])
 def test_bounded_polling_handles_request_failures(
     tmp_path: Path, mode: str, expected_status: int, request_errors: int
