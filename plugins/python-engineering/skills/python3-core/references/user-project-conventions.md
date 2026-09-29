@@ -574,10 +574,11 @@ omit = ["*/tests/*"]
 
 [tool.coverage.report]
 show_missing = true
-fail_under = 70
+fail_under = 70  # Observed project value; preserve the target project's gate rather than copying 70.
 ```
 
-**Evidence**: All projects follow this pattern with minor marker variations.
+**Evidence**: All projects follow this pattern with minor marker variations. Numeric values in this
+evidence record describe the observed projects; they are not defaults for new projects.
 
 ## 9. Formatting Configuration Files
 

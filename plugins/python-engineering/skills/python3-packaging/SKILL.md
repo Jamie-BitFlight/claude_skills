@@ -184,13 +184,14 @@ branch = true
 omit = ["tests/*"]
 
 [tool.coverage.report]
+show_missing = true
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",
     "if __name__ == .__main__.:",
     "raise NotImplementedError",
 ]
-fail_under = 80
+# Preserve an existing project fail_under gate; do not invent one for a new project.
 ```
 
 ---

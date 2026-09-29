@@ -28,7 +28,7 @@
     {
       "id": 5,
       "prompt": "A unit test checks encode(record) field values. An integration test passes the encoded record to the real downstream parser and checks the consumed values. Their names sound similar. Should one be deleted?",
-      "expected_output": "Differentiate encoding correctness from consumer compatibility; no automatic duplicate classification. Require comparable claims/variants/boundaries/fault mechanisms and surviving protection before a removal recommendation.",
+      "expected_output": "Compare unique protection rather than preserving both levels automatically. If the real-consumer integration test observes all consequential encoding behavior the unit test uniquely claims, consider the unit test a consolidation/removal candidate; retain it only when it supplies distinct stable-contract protection or materially better fault discrimination.",
       "files": []
     },
     {
@@ -58,7 +58,7 @@
     {
       "id": 10,
       "prompt": "Review these isolated tests before a refactor: A and B have identical inputs, boundary, independent expected output and no additional assertions; C covers the same requirement through a real network adapter. No runtime measurements or fault controls have been run.",
-      "expected_output": "Consider A/B consolidation with explicit evidence and residual sensitivity uncertainty, preserve C distinct boundary, avoid claiming measured cost/fault sensitivity or deleting files. Account for missing execution evidence.",
+      "expected_output": "Consider A/B consolidation with explicit surviving protection and residual sensitivity uncertainty; preserve C only if its real network boundary protects a distinct consequential failure, and otherwise prefer the broader useful carrier. Do not claim measured cost/fault sensitivity or delete files without evidence.",
       "files": []
     },
     {
@@ -72,6 +72,36 @@
         "fixtures/review_project/pytest.ini",
         "fixtures/review_project/CONTRACT.md"
       ]
+    },
+    {
+      "id": 12,
+      "prompt": "Review a test that reads a SKILL.md and asserts it contains the sentence \"Always verify permissions before writing\". No software parses that sentence. Separate behavioral evals exercise whether the agent checks permissions before writes. The wording changes frequently during prompt tuning.",
+      "expected_output": "Identify prose mirroring and recurring churn with no demonstrated behavioral protection. Ask what undesirable behavior could occur if the assertion vanished while other tests stayed green. Unless changing/removing the instruction has evidence of degrading desired agent behavior, recommend removal/consolidation in favor of behavioral evals plus structural validators.",
+      "files": []
+    },
+    {
+      "id": 13,
+      "prompt": "Review a directory with 600 tests. About 400 appear generated from one contract table through the same public boundary; 20 cover security/recovery behavior; the rest span several integration boundaries. Full individual tracing is expensive. Explain how you review the suite and where maintenance cost affects dispositions.",
+      "expected_output": "Group provisionally by claim, boundary, variants and failure mechanism; deep-trace high-consequence, suspicious, high-cost and equivalence-uncertain families rather than mechanically tracing all 600. Split families when protection differs, report unexamined uncertainty, and compare lifecycle cost only against unique surviving protection.",
+      "files": []
+    },
+    {
+      "id": 14,
+      "prompt": "A service has 25 unit tests for internal parser/helper branches and one end-to-end test that sends a supported document through the public service, persists it, reads it through the real downstream consumer, and verifies the required values. A refactor keeps the end-to-end behavior but changes most helpers, causing 16 unit tests to fail. Review the protection.",
+      "expected_output": "Treat behavior-preserving helper churn as evidence of implementation coupling. Prefer the end-to-end/contract carrier when it covers the consequential supported behavior, identify any unique important failures the unit tests still protect, and recommend removing/generalizing brittle unit tests rather than mechanically updating them to the new internals.",
+      "files": []
+    },
+    {
+      "id": 15,
+      "prompt": "Compare two tests protecting the same supported behavior. Test A is a 5 ms unit test coupled to three private helpers and a hard-coded constant; it typically needs edits during refactors. Test B is a 700 ms black-box contract test through the public API, has been stable across redesigns, and catches the same externally meaningful failure. Neither has unique additional assertions. Which protection should survive?",
+      "expected_output": "Compare lifetime economics rather than runtime alone. Test A has lower execution cost but higher comprehension/churn/refactor/coordination cost and no unique protection; Test B has higher runtime but durable black-box protection. Prefer B as the surviving carrier when its diagnostics and CI cost remain acceptable, and classify A for consolidation/removal rather than preserving it because it is faster.",
+      "files": []
+    },
+    {
+      "id": 16,
+      "prompt": "Review a test for invalid credentials that invokes the real CLI error path and asserts stderr == \"Authentication failed\". The public contract documents that message for authentication rejection, and different failures emit different diagnostics.",
+      "expected_output": "Treat the text assertion as potentially valuable because it is an observable discriminator for a consequential error path and an authoritative external contract. Assess boundary/oracle fidelity and ownership cost, but do not classify it as brittle prose-presence testing merely because it asserts exact text.",
+      "files": []
     }
   ]
 }

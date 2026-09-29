@@ -22,7 +22,7 @@
     {
       "id": 4,
       "prompt": "We need a function that returns the uppercase spelling of an ASCII status, rejecting an empty string. No external state exists. Plan tests before code.",
-      "expected_output": "Produce a short independently justified normal/rejection design with realistic wrong-result control. Do not demand benchmark suites, fixed coverage ratios, mocks, per-method tests, or an elaborate design artifact.",
+      "expected_output": "First establish whether the function is itself a supported contract worth a maintained test. If it is, design only the minimal normal/rejection behavior needed; do not create an edge-case matrix, benchmark suite, mocks, per-method quota, or coverage-driven tests. If broader existing behavior already protects it adequately, NO NEW TEST JUSTIFIED is valid.",
       "files": []
     },
     {
@@ -34,7 +34,7 @@
     {
       "id": 6,
       "prompt": "Plan validation for new agent instructions. We have a JSON fixture listing scenarios and a test asserting the instruction file contains \"verify permissions\". No agent scenario has been executed.",
-      "expected_output": "Distinguish structural fixture/link/phrase checks from observed agent behavior. Propose safe representative execution with relevant permission outcomes and explicit NOT RUN evidence. Do not report behavioral success from text assertions.",
+      "expected_output": "Reject phrase presence as behavioral protection. Distinguish structural frontmatter/schema/link checks from observed agent behavior, and propose representative execution only if semantic instruction effectiveness is a consequential claim. Explicitly allow NO NEW TEST JUSTIFIED for the keyword assertion.",
       "files": []
     },
     {
@@ -48,6 +48,42 @@
       "prompt": "Use /dh:add-new-feature to plan the queue API described in the supplied requirement in this isolated evaluation workspace. Produce the normal plan and its verification cases; do not implement the feature.",
       "expected_output": "In a fixture-backed isolated DH environment, follow the normal architecture and swarm-planning dispatch. Reach test-designer through the planner loading clear-cove-task-design, not an evaluator-injected skill. Carry contract, oracle, boundary, failure case and gaps into existing acceptance/verification fields. Preserve stage altitude, authorized backend, and normal artifact/STATUS protocols. Missing harness/backend prerequisites mean an unvalidated route, never a passing activation claim.",
       "files": ["fixtures/queue-contract.md"]
+    },
+    {
+      "id": 9,
+      "prompt": "I rewrote several paragraphs and renamed a heading in a SKILL.md to make the instructions clearer. No parser consumes the body text or heading. An agent proposes adding pytest assertions that the new heading and the words \"verify permissions\" remain present. Design the tests for this change.",
+      "expected_output": "Return NO NEW TEST JUSTIFIED for phrase/heading regression tests. Explain that the prose edit can receive normal Markdown/link/frontmatter validation, while semantic instruction effectiveness requires behavioral evaluation if that claim matters. Do not turn intentional wording into a duplicated test contract.",
+      "files": []
+    },
+    {
+      "id": 10,
+      "prompt": "A README example and explanatory comments changed, but the executable command, parsed metadata, and public behavior are unchanged. Existing schema and link checks already validate the file. Decide what new regression tests to add.",
+      "expected_output": "Apply the admission gate and add no maintained regression test absent a new meaningful behavior or machine-consumed contract. Reuse the existing deterministic checks and distinguish one-time validation from long-lived test ownership.",
+      "files": []
+    },
+    {
+      "id": 11,
+      "prompt": "A subsystem has 18 unit tests covering private helpers in a create-read-update lifecycle. One integration test can create the object through the public API, read the durable representation through the real consumer, perform the update, and prove identity plus unrelated state are preserved. The helper decomposition is expected to change. Design the maintained protection.",
+      "expected_output": "Prefer the stable integration/lifecycle test as the primary carrier when it distinguishes the consequential failures with acceptable diagnostics. Add or retain unit tests only for unique stable contracts or important faults the lifecycle test cannot distinguish cheaply; do not reproduce the 18-helper structure.",
+      "files": []
+    },
+    {
+      "id": 12,
+      "prompt": "A bug report says a CLI status label is wrong. You can reproduce the wrong label and a one-line constant change corrects it. The label is for humans only, no machine consumer parses it, and existing CLI lifecycle tests already prove the command starts and returns the right status code. What validation and permanent tests are required?",
+      "expected_output": "Require direct before/after validation of the reported label before calling the fix complete, preferably the same CLI observation. Treat close evidence separately from retention. Retain exact-text protection only when the observed text materially discriminates a consequential path/outcome or exact wording is itself an authoritative externally observable contract; otherwise NO NEW TEST JUSTIFIED is valid after successful one-time validation.",
+      "files": []
+    },
+    {
+      "id": 13,
+      "prompt": "A proposed regression test runs in 2 ms and asserts a private mapping constant has 14 entries. The mapping changes several times a month as implementation evolves. A black-box contract test already exercises the supported inputs and fails if the externally required mapping behavior is wrong. The new test would be easy to write. Should it be retained?",
+      "expected_output": "Reject the new test unless it adds unique consequential protection. Apply the economic model over lifetime: near-zero runtime does not offset recurring context, edit churn, review noise, diagnosis, refactor drag, and duplicated protection. Prefer the existing black-box contract carrier when it discriminates the meaningful failure; cheap-to-run is not cheap-to-own.",
+      "files": []
+    },
+    {
+      "id": 14,
+      "prompt": "A login test submits invalid credentials and asserts stderr is exactly \"Authentication failed\". That message is the documented observable that distinguishes the authentication-failure path from parser, network, and internal-error paths. Review the proposed assertion before implementation.",
+      "expected_output": "Accept text as a legitimate oracle when this exact observable discriminates the consequential authentication-failure behavior/path and its authority is established. Do not reject it merely because it is an exact string; the protected claim is the error-path behavior, not the continued existence of arbitrary prose.",
+      "files": []
     }
   ]
 }
