@@ -1,6 +1,6 @@
 ---
 name: test-designer
-description: Decide whether a new test is justified, then design contract-driven tests before writing them, including each TDD increment. Use when planning acceptance or regression tests, selecting test boundaries and oracles, or deciding what evidence a software change needs. Produces a risk-proportionate test plan or an explicit no-new-test decision, not production code or a passing-test claim.
+description: Decide whether a new test is justified, then design maintenance-adjusted contract tests before writing them, including each TDD increment. Use when planning acceptance or regression evidence, selecting system/integration/unit boundaries and oracles, or deciding what evidence a software change needs. Produces a risk-proportionate test plan or an explicit no-new-test decision, not production code or a passing-test claim.
 ---
 
 # Test Designer
@@ -28,14 +28,17 @@ Do not require a SAM plan, a specific framework, or another plugin for standalon
    the real seams, not to invent expected behavior. Mark observed, derived, assumed, and proposed
    interpretations where authority differs. Resolve only consequential missing decisions with the
    owner; carry other evidence gaps explicitly.
-3. **Select obligations.** Identify changed and protected behavior, realistic failure mechanisms,
-   and their consequence. Reuse adequate existing tests. Add success, rejection, boundary,
-   transition, and forbidden-effect cases where the claim requires them, not by a universal quota.
-4. **Choose evidence.** For each material test/family, write or reuse a compact test card. Justify
-   its oracle independently; select the smallest boundary that retains the failure mechanism.
-   State what doubles omit, what must be real, and which plausible fault should reach which failing
-   observation when that control materially increases confidence. Include a behavior-preserving
-   variation the test should accept when implementation coupling is a risk.
+3. **Select obligations by consequence.** Prioritize stable external/user/machine contracts,
+   destructive or durable state transitions, authorization/security/data-integrity boundaries,
+   cross-component invariants, recovery/fail-closed behavior, and evidenced high-impact regressions.
+   Reuse adequate existing tests. Do not build an edge-case matrix around a function merely because
+   it changed; a unit-level obligation needs unique justified protection.
+4. **Choose the maintenance-adjusted boundary.** Prefer an observable system, integration, contract,
+   or lifecycle boundary when it protects consequential behavior across real components and can
+   replace lower-level duplication. Use a unit/function boundary when it is itself a stable contract
+   or gives unique important fault discrimination more cheaply. For each material test/family,
+   justify its oracle independently, state what doubles omit and what must be real, and include a
+   behavior-preserving variation when implementation coupling is a risk.
 5. **Plan execution.** Discover the actual project command and CI lane. Record isolation,
    prerequisites, cleanup, diagnostics, and negative controls where justified. Follow the shared
    safety rules; propose rather than execute unavailable or unsafe checks. Keep product expectations
