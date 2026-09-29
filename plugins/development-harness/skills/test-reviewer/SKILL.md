@@ -1,6 +1,6 @@
 ---
 name: test-reviewer
-description: Review existing tests against the software and contracts they actually exercise. Use to assess whether a test has justified unique protection, detects important faults, tolerates valid refactors, earns its lifecycle cost, or deserves strengthening, replacement, consolidation, or removal consideration. Reviews are read-only and evidence-backed, including TDD and regression tests.
+description: Review existing tests against the software and contracts they actually exercise. Use to assess whether a test has justified unique protection, detects consequential faults, tolerates valid refactors, earns its lifecycle cost, or deserves strengthening, replacement, consolidation, or removal consideration. Reviews are read-only and evidence-backed, including TDD and regression tests.
 ---
 
 # Test Reviewer
@@ -31,18 +31,19 @@ Prefer a reviewer independent of the test author where available; disclose when 
    forbidden effects, diagnostics, or fault mechanisms differ materially. Separate characterization
    from approved intent. Do not infer importance from names, test counts, or covered lines.
 3. **Challenge effectiveness.** Apply the shared oracle, fault-sensitivity, refactor-tolerance,
-   fidelity, isolation, and diagnostic criteria. Select the cheapest relevant positive/negative
-   controls for important or changed guarantees when they materially improve confidence. Confirm
-   the original defect or seeded fault reaches the intended assertion, not a collection/setup
-   error. Do not require mutation execution for every test or call static inspection an observed
-   fault-detection result.
-4. **Assess suite value and ownership cost.** Identify missing high-consequence protection,
-   misleading passes, redundant protection, and costly/flaky checks. Compare claim, input variants,
-   boundary, failure mechanism, and diagnostics before treating overlap as duplication. Record
-   lifecycle cost separately: implementation/prose coupling, fixture/setup complexity, duplicated
-   scaffolding, expected churn, execution resources, flakiness, diagnostic effort, and context
-   required to understand/update the test. Apply project conventions and established coverage gates.
-   Keep correctness, qualitative value, lifecycle cost, and runtime cost separate.
+   fidelity, isolation, and diagnostic criteria. Prefer evidence from stable
+   system/integration/contract/lifecycle behavior over implementation details when both address the
+   same risk. Select relevant controls only when they materially improve confidence. Confirm any
+   original defect or seeded fault reaches the intended observation, not collection/setup failure.
+   Do not require mutation execution for every test or call static inspection observed fault
+   detection.
+4. **Assess maintenance-adjusted value.** Identify missing high-consequence protection, misleading
+   passes, duplicated protection, and costly/flaky checks. Record lifecycle cost separately:
+   implementation/prose coupling, fixture/setup complexity, duplicated scaffolding, expected churn,
+   execution resources, flakiness, diagnostic effort, and context needed to understand/update the
+   test. Compare unit and broader tests by the consequential failures they uniquely exclude, not by
+   their level in a pyramid. A broader lifecycle/contract test is the preferred surviving carrier
+   when it provides equivalent or stronger useful protection with acceptable diagnostics.
 5. **Recommend a disposition.** Use KEEP, STRENGTHEN, REPLACE, CONSOLIDATE, REMOVAL-CANDIDATE,
    or UNRESOLVED with the evidence defined in the shared guide. Do not use missing documentation,
    high cost, or unmeasured sensitivity alone as proof of uselessness. For consolidation/removal,
