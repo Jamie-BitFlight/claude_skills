@@ -21,7 +21,8 @@ from backlog_core.backends.beads_backend import BeadsBackend
 from backlog_core.backends.github_backend import GitHubBackend
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.backends.sqlite_backend import SQLiteBackend
-from backlog_core.models import GroomedData
+from backlog_core.models import BacklogItem, Entry, GroomedData, Section
+from backlog_core.operations import render_sections_as_body
 
 if TYPE_CHECKING:
     from backlog_core.backend_types import WorkItemBackend
@@ -251,3 +252,22 @@ class TestSectionDisplayTitleConsistency:
             f"{type(backend_instance).__name__}.section_display_title({key!r}, {groomed_date!r}) "
             f"returned {result!r}; expected {expected!r}"
         )
+
+
+def test_filtered_section_preserves_nested_content_without_duplicate_heading() -> None:
+    """A filtered structured section owns its top-level heading exactly once."""
+    content = """SCOPE_EXPANSION: None.
+IMPACT_RADIUS_COMPLETE: Written to item example. Overall risk: LOW. Highest-risk: None.
+
+### Change Frame
+- Baseline: unchanged
+"""
+    item = BacklogItem(
+        title="Impact analysis render contract",
+        sections={"impact_radius": Section(entries=[Entry(id="2026-09-20T00:00:00Z", content=content)])},
+    )
+
+    rendered = render_sections_as_body(item, section="Impact Radius")
+
+    assert rendered.splitlines().count("## Impact Radius") == 1
+    assert "### Change Frame" in rendered
