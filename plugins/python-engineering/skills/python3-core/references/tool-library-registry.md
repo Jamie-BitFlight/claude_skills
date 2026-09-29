@@ -866,7 +866,7 @@ alternatives:
 - MANDATORY for all Python testing
 - NEVER use unittest
 - Layer 4 of validation pipeline
-- Minimum 80% code coverage required
+- Preserve an existing repository coverage gate; otherwise measure coverage without inventing a threshold
 
 **Basic Usage**:
 
@@ -927,7 +927,6 @@ addopts = [
     "--cov=packages",
     "--cov-report=term-missing",
     "--cov-report=html",
-    "--cov-fail-under=80",
 ]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
@@ -980,7 +979,7 @@ def test_edge_case_handling() -> None:
 
 **Related Standards**:
 
-- MANDATORY 80% coverage minimum
+- No universal coverage minimum; preserve project-specific gates
 - AAA pattern required
 - Type hints on all test functions
 - Comprehensive docstrings
@@ -1125,8 +1124,8 @@ alternatives:
 **When to Use**:
 
 - MANDATORY for all Python projects
-- Minimum 80% coverage required
-- Critical code: 95%+ coverage required
+- Preserve the repository's configured coverage gate when one exists
+- Use stronger behavioral evidence for critical code based on risk, not a universal percentage
 - Layer 4 validation with pytest
 
 **Basic Usage**:
@@ -1154,7 +1153,6 @@ addopts = [
     "--cov=packages",
     "--cov-report=term-missing",
     "--cov-report=html:htmlcov",
-    "--cov-fail-under=80",
 ]
 
 [tool.coverage.run]
@@ -1167,7 +1165,6 @@ omit = [
 branch = true
 
 [tool.coverage.report]
-fail_under = 80
 show_missing = true
 skip_covered = false
 exclude_lines = [
@@ -1188,8 +1185,8 @@ directory = "htmlcov"
 **Coverage Standards**:
 
 ```python
-# General code: 80% minimum
-# Critical code: 95%+ required
+# Preserve a project-specific gate when configured.
+# Do not invent a universal threshold for general or critical code.
 
 # Coverage excludes
 def __repr__(self) -> str:  # pragma: no cover
@@ -1370,7 +1367,7 @@ alternatives:
   - Regulatory compliance code
   - Complex algorithms
   - Core libraries
-- Target: 100% mutation score (kill all mutants)
+- Use mutation testing only when it materially strengthens confidence; no universal score target
 
 **Basic Usage**:
 
@@ -1457,18 +1454,18 @@ def test_calculate_total_precision() -> None:
     assert total == Decimal("11.87")  # Rounds correctly
 ```
 
-**Mutation Score Interpretation**:
+**Mutation result interpretation**:
 
-- 100%: All mutants killed (perfect)
-- 90-99%: Excellent test coverage
-- 80-89%: Good, some gaps
-- <80%: Insufficient testing for critical code
+Inspect surviving and killed mutants by whether they exercise a relevant behavioral contract.
+Equivalent/unreachable mutants and failures during import/collection/setup are not useful sensitivity
+evidence. Preserve an existing project mutation gate if one exists; otherwise do not invent a score
+target.
 
 **Related Standards**:
 
-- MANDATORY for critical code
-- Target: 100% mutation score
-- Pattern: Complements code coverage
+- Use for important logic when the result can materially change confidence
+- No universal mutation-score target
+- Complements behavioral testing and coverage measurement
 
 **Source**: pattern-extraction.md Section 2.7, pytest-architect-analysis.md
 
@@ -4046,7 +4043,7 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/validate_pep723.py check script.py
 """Test suite for authentication module.
 
 Tests: User authentication system
-Coverage: 95%+ (critical business logic)
+Coverage: risk- and contract-driven
 """
 
 from typing import Generator
@@ -4149,7 +4146,7 @@ def test_authenticate_invalid_input(invalid_input: str | None, mock_database: Mo
 
 **Coverage**:
 
-Coverage thresholds configured in `pyproject.toml` (95%+ for critical code like auth).
+Coverage measurement and any threshold follow the target project's configuration; no universal target is implied.
 
 ---
 
