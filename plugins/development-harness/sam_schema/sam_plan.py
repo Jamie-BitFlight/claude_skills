@@ -1654,13 +1654,24 @@ def renew(
 def finish(
     address: Annotated[str, typer.Option("--address")],
     attempt: Annotated[int, typer.Option("--attempt", min=1)],
-    result: Annotated[str, typer.Option("--result")],
+    result: Annotated[str | None, typer.Option("--result")] = None,
     note: Annotated[str | None, typer.Option("--note")] = None,
 ) -> None:
-    """Close an attempt with its outcome; the runner's last command."""
+    """Close an attempt with its outcome; the runner's last command.
+
+    Args:
+        address: The task address, ``P/T``.
+        attempt: The attempt the runner holds.
+        result: One of ``ledger_spec``'s ``finish --result`` values. Omit it to record
+            ``complete`` -- the default, since a bash-guard in some harness sessions reads the
+            bare word ``complete`` as the ``complete`` builtin and refuses the command; the other
+            outcomes carry an explanatory ``--note`` and stay explicit.
+        note: Free text stored on the row.
+    """
     plan_ref, task_ref = _task_of(address)
+    resolved_result = result if result is not None else ledger_spec.Status.COMPLETE.value
     with _ledger() as conn:
-        _emit_transition(ledger.finish(conn, plan_ref, task_ref, attempt=attempt, result=result, note=note))
+        _emit_transition(ledger.finish(conn, plan_ref, task_ref, attempt=attempt, result=resolved_result, note=note))
 
 
 @app.command("settle")

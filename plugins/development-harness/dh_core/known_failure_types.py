@@ -339,7 +339,7 @@ KNOWN_FAILURE_TYPES: tuple[FailureTypeRow, ...] = (
         category=FailureCategory.OUTPUT_UNUSABLE,
         specific="false-completion",
         description=(
-            "A step reported success -- a DONE status, `finish --result complete` -- having produced nothing usable "
+            "A step reported success -- a DONE status, an unqualified `finish` (whose default result is `complete`) -- having produced nothing usable "
             "against its criteria. Named by whichever step detects it, never by the step that reported the success: "
             "the success channel is exactly what fails to carry this."
         ),

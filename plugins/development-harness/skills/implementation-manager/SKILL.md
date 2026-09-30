@@ -218,7 +218,7 @@ ran.
 | Field           | Added By                                                              | When                                    |
 | --------------- | ---------------------------------------------------------------------- | --------------------------------------- |
 | `**Started**`   | `plan dispatch`, when the orchestrator opens the attempt               | When the worker is launched             |
-| `**Completed**` | `plan finish --result complete`, or `plan accept` on a returned task   | When the runner or the judge closes it  |
+| `**Completed**` | `plan finish` (default result `complete`), or `plan accept` on a returned task | When the runner or the judge closes it  |
 
 ## Hook Runtime Controls
 

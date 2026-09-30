@@ -375,12 +375,7 @@ class LoopDriver:
         )
         for section in REPORT_SECTIONS:
             self.append_report_section(task, attempt, section)
-        finished = self.sam(
-            "finish",
-            self.address_argument(task),
-            Argument(name="--attempt", value=str(attempt)),
-            Argument(name="--result", value="complete"),
-        )
+        finished = self.sam("finish", self.address_argument(task), Argument(name="--attempt", value=str(attempt)))
         self.log.record_equal(
             Check.FINISH_COMPLETE, key, f"finish completes {task}", "complete", str(finished.status or "")
         )

@@ -99,13 +99,15 @@ your last ledger command:
 <sam_cli/> plan update --plan-address P --task-id T --attempt N \
   --append-section "Verification Results" --section-content "<one line per verification step, or none>"
 <sam_cli/> plan finish --address P/T --attempt N \
-  --result complete|failed|blocked|needs-input --note "<what stopped you, what you need, or your question>"
+  --note "<what stopped you, what you need, or your question>"
 ```
 
-`finish --result complete` answers `report-missing` until this attempt carries both a `Completion
-Report` section and a `Verification Results` section, so append both before you finish. The other
-results close the attempt without them. Sections are recorded against the attempt that appended
-them, so an attempt following a send-back appends its own.
+`finish` closes the attempt as `complete` when `--result` is omitted; pass
+`--result failed|blocked|needs-input` for the other outcomes. An omitted `--result` answers
+`report-missing` until this attempt carries both a `Completion Report` section and a
+`Verification Results` section, so append both before you finish. The other results close the
+attempt without them. Sections are recorded against the attempt that appended them, so an
+attempt following a send-back appends its own.
 
 Send the `STATUS:` line and `finish` both. They carry different things and neither substitutes for
 the other: the `STATUS:` line is what your caller reads out of your response, and the orchestrator

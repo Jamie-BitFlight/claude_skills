@@ -462,7 +462,7 @@ def test_appending_a_report_section_emits_a_task_section_event(
 
 @pytest.mark.parametrize(("task", "attempt"), RUNNER_ATTEMPTS, ids=ATTEMPT_IDS)
 def test_finish_completes_the_task(loop_record: LoopRecord, task: str, attempt: int) -> None:
-    """``finish --result complete`` is the runner's last ledger command and leaves the task complete."""
+    """``finish`` with no ``--result`` is the runner's last ledger command and leaves the task complete."""
     assert_satisfied(loop_record.observation(Check.FINISH_COMPLETE, task=task, attempt=attempt))
 
 

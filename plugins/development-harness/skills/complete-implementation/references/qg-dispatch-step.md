@@ -97,7 +97,7 @@ Afterwards, append the two report sections for that attempt and close it:
   --plan-address "{qg_plan_address}" --task-id T0 --attempt {A} \
   --append-section "Verification Results" --section-content "{per-perspective verdicts, or none}"
 <sam_cli/> plan finish \
-  --address "{qg_plan_address}/T0" --attempt {A} --result complete --note "{the verdict}"
+  --address "{qg_plan_address}/T0" --attempt {A} --note "{the verdict}"
 ```
 
 Then continue to Step 3 of the Dispatch Loop exactly as for any other completed task. Moving the status directly

@@ -7,6 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from dh_core import ledger
 from dh_core.known_failure_types import KNOWN_FAILURE_TYPES
 from ruamel.yaml import YAML
 from sam_schema.cli import app
@@ -626,6 +627,96 @@ def test_state_output_shows_old_and_new_status(plan_dir: Path) -> None:
     assert result.exit_code == 0
     data = json.loads(result.stdout)
     assert data == {"id": "T3", "status": "complete"}
+
+
+# ---------------------------------------------------------------------------
+# sam finish
+# ---------------------------------------------------------------------------
+
+
+def _dispatch_ledger_task(task_id: str) -> str:
+    """Create a one-task ledger plan and open an attempt on it.
+
+    Args:
+        task_id: The task id to create and dispatch.
+
+    Returns:
+        The canonical plan id the task was created under.
+    """
+    conn = ledger.open_ledger()
+    try:
+        plan_id = str(
+            ledger.create(
+                conn, slug=f"finish-{task_id.lower()}", goal="goal", tasks=[{"id": task_id, "title": "one"}]
+            ).plan
+        )
+        ledger.dispatch(conn, plan_id, task_id)
+    finally:
+        conn.close()
+    return plan_id
+
+
+def _append_report_sections(plan_id: str, task_id: str) -> None:
+    """Append the two sections a ``complete`` finish requires, whether ``--result`` is typed or not."""
+    conn = ledger.open_ledger()
+    try:
+        ledger.update(conn, plan_id, task_id, attempt=1, section="Completion Report", section_content="did it")
+        ledger.update(conn, plan_id, task_id, attempt=1, section="Verification Results", section_content="passed")
+    finally:
+        conn.close()
+
+
+def test_finish_without_result_records_complete() -> None:
+    """Omitting --result closes the attempt as complete, so a bash guard never sees that word.
+
+    A harness bash guard in some sessions reads the bare word ``complete`` as the ``complete``
+    shell builtin and refuses the command; the success path must not need to type it.
+    """
+    plan_id = _dispatch_ledger_task("T1")
+    _append_report_sections(plan_id, "T1")
+
+    result = runner.invoke(app, ["plan", "finish", "--address", f"{plan_id}/T1", "--attempt", "1"])
+
+    assert result.exit_code == 0
+    assert json.loads(result.stdout)["status"] == "complete"
+
+
+def test_finish_with_explicit_result_complete_still_works() -> None:
+    """A caller that still passes an explicit --result of complete keeps working."""
+    plan_id = _dispatch_ledger_task("T1")
+    _append_report_sections(plan_id, "T1")
+
+    result = runner.invoke(
+        app, ["plan", "finish", "--address", f"{plan_id}/T1", "--attempt", "1", "--result", "complete"]
+    )
+
+    assert result.exit_code == 0
+    assert json.loads(result.stdout)["status"] == "complete"
+
+
+def test_finish_with_explicit_failed_result_needs_no_report_sections() -> None:
+    """A non-success --result stays explicit and does not require the report sections."""
+    plan_id = _dispatch_ledger_task("T1")
+
+    result = runner.invoke(
+        app,
+        ["plan", "finish", "--address", f"{plan_id}/T1", "--attempt", "1", "--result", "failed", "--note", "gates red"],
+    )
+
+    assert result.exit_code == 0
+    assert json.loads(result.stdout)["status"] == "failed"
+
+
+def test_finish_with_invalid_result_is_rejected() -> None:
+    """A --result value the ledger does not recognize is refused, not silently accepted."""
+    plan_id = _dispatch_ledger_task("T1")
+
+    result = runner.invoke(
+        app, ["plan", "finish", "--address", f"{plan_id}/T1", "--attempt", "1", "--result", "bananas"]
+    )
+
+    assert result.exit_code == 1
+    assert "must be one of" in result.stderr
 
 
 # ---------------------------------------------------------------------------

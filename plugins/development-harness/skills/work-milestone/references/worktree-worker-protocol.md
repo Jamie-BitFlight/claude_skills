@@ -110,7 +110,7 @@ orchestrator reads the moment your launch returns, and it records it against you
 attempt's return text; `plan finish --result` is the durable outcome the orchestrator queries, and
 the only thing that moves the task. Send both: `finish` as your last ledger command, and the report
 as your response. Where a plan exists, append the same body as this attempt's `Completion Report`
-section before you finish, since `finish --result complete` requires it.
+section before you finish, since `finish` with no `--result` (the default, `complete`) requires it.
 
 Output this as the final response. Everything below the `STATUS:` line is report body — field
 names, not status tokens:
@@ -118,7 +118,7 @@ names, not status tokens:
 ```text
 STATUS: DONE
 BRANCH: {worktree branch name — from git branch --show-current, or 'none' if no commits exist}
-TASKS_COMPLETED: {count, and the IDs finished with --result complete}
+TASKS_COMPLETED: {count, and the IDs finished with no --result (the default, complete)}
 TASKS_BLOCKED: {count and IDs closed with --result blocked or needs-input, or 'none'}
 BLOCKER: {what blocked each one — omit the field when TASKS_BLOCKED is none}
 FILES_CHANGED: {list of files modified, one per line}
@@ -150,7 +150,8 @@ For each task:
 3. After the work and its verification: append `Completion Report` and `Verification Results` for
    this attempt with `plan update --plan-address P{N} --task-id T{M} --attempt {n}
    --append-section … --section-content …`, then close it once with
-   `plan finish --address P{N}/T{M} --attempt {n} --result complete|failed|blocked|needs-input`.
+   `plan finish --address P{N}/T{M} --attempt {n}`, adding `--result failed|blocked|needs-input`
+   for anything other than success (an omitted `--result` records `complete`).
 
 There is nothing to claim: `dispatch` opened your attempt and set the task in-progress before you
 were launched. The CLI's `plan claim` command writes to the content store rather than the ledger,

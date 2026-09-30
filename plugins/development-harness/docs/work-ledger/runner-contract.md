@@ -33,9 +33,9 @@ run. Yours are `read`, `update`, `renew` and `finish`, each on your own task; `d
    - `Verification Results`, one line per entry of the task's `verification_steps`, each
      `<step> — passed|failed: <evidence>`, or the single word `none` when the task has none.
 5. Finish once, as your last ledger command:
-   `finish --address P/T --attempt N --result complete|failed|blocked|needs-input`, with `--note`
-   carrying what stopped you for `failed`, what you need for `blocked`, and the question for
-   `needs-input`.
+   `finish --address P/T --attempt N`, adding `--result failed|blocked|needs-input` for anything
+   other than success (an omitted `--result` records `complete`), with `--note` carrying what
+   stopped you for `failed`, what you need for `blocked`, and the question for `needs-input`.
 6. Return the `STATUS:` line of `/dh:subagent-contract` as your first line: `STATUS: DONE` once
    `finish` was recorded, whatever its `--result`.
 

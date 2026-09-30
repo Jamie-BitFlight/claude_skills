@@ -45,18 +45,18 @@ outcome as well as the status:
 
 ```bash
 <sam_cli/> plan finish \
-  --address P{N}/T{M} --attempt {n} --result complete --note "{what was done}"
+  --address P{N}/T{M} --attempt {n} --note "{what was done}"
 ```
 
-`finish --result complete` answers `report-missing` until this attempt has both a `Completion
-Report` and a `Verification Results` section. Append them first (see "Close the Attempt" below),
-then run `finish` again.
+`finish` records `complete` when `--result` is omitted, and answers `report-missing` until this
+attempt has both a `Completion Report` and a `Verification Results` section. Append them first
+(see "Close the Attempt" below), then run `finish` again.
 
 Without an attempt number, no runner is closing anything, so move the status directly and say why:
 
 ```bash
 <sam_cli/> plan state \
-  --address P{N}/T{M} --new-status complete --reason "{why this moved without a runner}"
+  --address P{N}/T{M} --new-status=complete --reason "{why this moved without a runner}"
 ```
 
 `--reason` is required — the ledger records why a status moved with no runner behind it.
@@ -265,20 +265,20 @@ its own.
 
    ```bash
    <sam_cli/> plan finish \
-     --address P{N}/T{M} --attempt {n} --result complete --note "{summary}"
+     --address P{N}/T{M} --attempt {n} --note "{summary}"
    ```
 
-   Choose the result that matches what happened, and let `--note` carry what the orchestrator needs
-   in order to decide:
+   Omit `--result` for the outcome that matches what happened, or pass it explicitly, and let
+   `--note` carry what the orchestrator needs in order to decide:
 
    | result | when | what `--note` carries |
    |---|---|---|
-   | `complete` | acceptance criteria met, verification steps run | what was done |
+   | `complete` (default, omit `--result`) | acceptance criteria met, verification steps run | what was done |
    | `failed` | the work cannot be finished as written | what stopped you |
    | `blocked` | something outside the task must change first | what must change |
    | `needs-input` | a decision is needed before you can continue | the question |
 
-   `finish --result complete` answers `report-missing` until this attempt has both a `Completion
+   An omitted `--result` answers `report-missing` until this attempt has both a `Completion
    Report` and a `Verification Results` section. Append whichever is missing with `--attempt {n}`,
    then run `finish` again. The other results — `failed`, `blocked`, `needs-input` — close the
    attempt without either section, so a report you cannot honestly write is not what keeps you from
