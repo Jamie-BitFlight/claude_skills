@@ -1,0 +1,41 @@
+{
+  "skill_name": "dh-cli-usage",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "You are in a disposable caller repository unrelated to the development-harness authoring checkout. The development-harness plugin is installed outside this repository. Use dh-cli-usage to run the resolved DH CLI command `plan --help`. Report the command you actually ran and its exit status.",
+      "expected_output": "Resolve the shipped CLI from the skill's actual installed runtime location and execute its read-only help command successfully. The command must not depend on the caller working directory or an authoring-checkout path.",
+      "files": [],
+      "expectations": [
+        "Runs the DH CLI from a path derived from the actual installed dh-cli-usage skill location.",
+        "Does not use a relative plugins/development-harness path rooted in the caller repository.",
+        "Does not introduce a hard-coded authoring repository target.",
+        "Reports the observed command and exit status rather than claiming execution without a tool trace."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Portability decision case: a workflow requires `<sam_cli/> plan read --address P7`, but no CLAUDE/KIMI/HERMES skill-directory variable expanded, the harness supplied no absolute skill_root or skill file location, and no trustworthy DH CLI path is otherwise available. An equivalent MCP operation may be available. Decide what to do; do not invent environment details.",
+      "expected_output": "Do not guess an authoring checkout or caller-relative CLI path. Use the equivalent MCP operation when one is actually available; otherwise report STATUS: BLOCKED naming dh-cli-usage and do not run a guessed CLI command.",
+      "files": [],
+      "expectations": [
+        "Does not invent a filesystem path for the DH CLI.",
+        "Does not fall back to a repository-relative plugins/development-harness path.",
+        "Uses an equivalent MCP operation only when the environment actually exposes one.",
+        "Otherwise reports a blocked outcome and does not execute a guessed sam_cli command."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "The current disposable workspace is the caller's project and its DH backend is configured for that project. Resolve the command you would use for `<sam_cli/> plan read --address P3`. No repository override was requested. Do not execute the read because this fixture has no plan data.",
+      "expected_output": "Resolve the CLI from its installed skill location while preserving the caller's configured project/backend context. Do not inject a repository selector for the development-harness authoring repository or any other unrelated project.",
+      "files": [],
+      "expectations": [
+        "Builds the command from the installed dh-cli-usage location rather than the caller checkout layout.",
+        "Does not add -R or --repo for an unrelated or authoring repository.",
+        "Keeps the operation scoped to the caller's configured workspace/backend.",
+        "Does not claim a plan-read result because execution was explicitly withheld."
+      ]
+    }
+  ]
+}
