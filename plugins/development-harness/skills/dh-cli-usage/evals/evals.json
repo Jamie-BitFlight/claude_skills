@@ -3,7 +3,7 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "You are in a disposable caller repository unrelated to the development-harness authoring checkout. The development-harness plugin is installed outside this repository. Use dh-cli-usage to run the resolved DH CLI command `plan --help`. Report the command you actually ran and its exit status.",
+      "prompt": "You are in a disposable caller repository unrelated to the development-harness authoring checkout. The development-harness plugin is installed outside this repository. Use the installed DH resolver to run the DH CLI command `plan --help`. Report the command you actually ran and its exit status.",
       "expected_output": "Resolve the shipped CLI from the skill's actual installed runtime location and execute its read-only help command successfully. The command must not depend on the caller working directory or an authoring-checkout path.",
       "files": [],
       "expectations": [
@@ -35,6 +35,30 @@
         "Does not add -R or --repo for an unrelated or authoring repository.",
         "Keeps the operation scoped to the caller's configured workspace/backend.",
         "Does not claim a plan-read result because execution was explicitly withheld."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "You are in a disposable caller repository unrelated to the development-harness authoring checkout. The development-harness plugin is installed outside this repository. Use the installed DH resolver to run the shipped `run_bounded.py --help` from DH's scripts directory. Report the command you actually ran and its exit status.",
+      "expected_output": "Resolve the shipped scripts directory from the skill's actual installed runtime location and execute run_bounded.py's help successfully without relying on the caller repository layout.",
+      "files": [],
+      "expectations": [
+        "Runs the development-harness copy of run_bounded.py from the actual installed plugin location.",
+        "Does not use a relative plugins/development-harness/scripts path rooted in the caller repository.",
+        "Reports an observed zero exit status and the command that produced it.",
+        "Does not claim script execution from source inspection alone."
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Native-route preload check: in a disposable caller repository with the complete candidate development-harness plugin installed outside the repository, invoke the installed context-refinement agent with plan_address P999999-portability-probe. Do not preload dh-cli-usage, provide its instructions, or resolve any CLI path for the agent. Do not create plan data. Preserve the agent and tool trace through its first plan-status attempt.",
+      "expected_output": "The native context-refinement route obtains its shipped resolver through the agent's own runtime preload, resolves the DH CLI from the installed plugin location, attempts the required read-only plan status command, and then reports the genuine missing-plan/blocking result. The evaluator must not supply the resolver out of band.",
+      "files": [],
+      "expectations": [
+        "The context-refinement agent is invoked through its native installed profile without evaluator-injected dh-cli-usage context.",
+        "Its first plan-status CLI attempt resolves through the installed development-harness location rather than the caller checkout or authoring repository.",
+        "The trace contains the actual CLI attempt and its missing-plan failure or blocking result.",
+        "No plan, task, artifact, or other durable test data is created to make the scenario pass."
       ]
     }
   ]
