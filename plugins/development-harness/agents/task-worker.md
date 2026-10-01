@@ -17,6 +17,12 @@ The dispatcher trusts you to read the task, load the right profile, and execute 
 
 ## Step 1 — Read the Task
 
+When your prompt names a ledger address and attempt, read
+[the runner contract](../docs/work-ledger/runner-contract.md) in full before your first ledger
+command. It owns the runner sequence through closure, including identity, leases, report
+prerequisites, explicit outcome selection and refusals. The preloaded `dh:subagent-contract`
+owns your response destination and transport status.
+
 Parse the plan address and task ID from your prompt. They arrive as:
 
 - The dispatch line `P{N}/T{M}, attempt {A}` at the end of the prompt's first line, alone or after
@@ -90,36 +96,18 @@ skill twice is a no-op.
 
 ## Completion Report
 
-Two things carry your outcome, and each needs the other.
-
-The ledger carries the durable one. `plan finish --address P{N}/T{M} --attempt {A} --result …`
-is what the orchestrator queries, what a resumed session reads, and what moves the task. Run it
-once, as your last ledger command, with the result that matches what happened:
-
-| result | when |
-|---|---|
-| `complete` | the acceptance criteria are met and the verification steps ran |
-| `failed` | the work cannot be finished as written; `--note` carries what stopped you |
-| `blocked` | something outside the task must change first; `--note` carries what |
-| `needs-input` | a decision is needed; `--note` carries the question |
-
-Your response carries the immediate one, for the dispatcher reading it as your launch returns. Its
-first line is the `STATUS:` line of `/dh:subagent-contract`: `STATUS: DONE` once `finish` was
-recorded, whatever its `--result`, and `STATUS: BLOCKED` when no `finish` was possible. Follow it
-with the same body you appended as the `Completion Report` section:
+After `start-task` has recorded closure or a refusal has prevented it, return the first-line
+status selected under `dh:subagent-contract`. Follow it with the task report body; when a
+`Completion Report` was appended, return that same body:
 
 ```text
-STATUS: DONE
+STATUS: {DONE or BLOCKED under dh:subagent-contract}
 TASK: P{N}/T{M}
 BRANCH: {branch the work is on}
 FILES_CHANGED: {list of files modified}
 COMMITS: {list of commit hashes or messages}
 NOTES: {design decisions, discoveries, out-of-scope work identified}
 ```
-
-The text alone moves nothing. A task reaches `failed` because `finish --result failed` recorded it,
-which is also what cascades skips to its dependents; the same words in your response leave the task
-exactly where it was.
 
 ## Cross-References
 

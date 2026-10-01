@@ -7,6 +7,11 @@ stdout and diagnostics are on stderr. `--format` is not supported. In a Beads wo
 directly for Beads-native CRUD, status, dependencies, and readiness; use this CLI only for structured
 plans and workflow operations.
 
+Before executing a dispatched attempt, read
+[the runner contract](../../../docs/work-ledger/runner-contract.md) for the complete runner
+sequence, including report prerequisites and explicit outcome selection. Before returning or
+interpreting a dispatched agent's response, load `dh:subagent-contract` for transport semantics.
+
 ```text
 plan list
 plan read --address Pc7d8e9f0

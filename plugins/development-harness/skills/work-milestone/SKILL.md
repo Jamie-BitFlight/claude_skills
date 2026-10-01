@@ -21,6 +21,10 @@ Run `/groom-milestone {N}` first if the dispatch plan is missing or stale.
 
 ## Main Workflow
 
+The diagram's plan queries and ledger-row outcome checks apply to items with SAM plans. For
+items without one, use the text-only branch of Agent Result Handling in place of those checks
+for outcomes and unresolved scope; keep the milestone setup, execution and merge gates.
+
 ```mermaid
 flowchart TD
     Start(["Input: milestone number N"]) --> LoadPlan["Step 1: Load Dispatch Plan<br>Call dispatch_read(milestone_number=N)<br>Output: waves, conflict groups, quality gates"]
@@ -205,11 +209,15 @@ Auto-stash ref {ref} pending; run 'git stash pop {ref}' to restore.
 
 ## Agent Result Handling
 
-Branch on the ledger, not on the returned text. The `STATUS:` line an agent returns says only
-whether it closed its attempts (`/dh:subagent-contract`); `plan status --plan-address {plan_ref}`
-says how each one turned out, and it answers the same way for a session that resumed after the
-launch was long gone. Read the ledger first and use the returned text as the evidence that explains
-what it shows.
+Before interpreting a returned response, load `dh:subagent-contract`. When self-discovery found
+a SAM plan, query `plan status --plan-address {plan_ref}` first and branch on the durable rows;
+use the returned report as evidence for judging them. The diagram below applies to that branch.
+
+When no SAM plan exists, skip the plan query and judge the report against the item's acceptance
+criteria and quality gates. Apply the contract's nonledger status rules: use completed work and
+its evidence to judge what can be merged, and carry any unmet scope into a backlog item with the
+observed failure or blocker and the action needed to proceed. Escalate when no acceptable work
+can be recovered. A text-only response does not imply an attempt was closed.
 
 ```mermaid
 flowchart TD
@@ -230,14 +238,14 @@ After all wave agents return, the orchestrator builds a relay document from thei
 ### Wave 1 Results
 
 #### Item: #{issue1} — {title1}
-- Status: {from the item's plan rows — 'all complete', or the IDs left blocked or failed}
+- Status: {from plan rows when present; otherwise the judged item criteria and unresolved scope}
 - Files changed: {file_list}
 - Key commits:
   - {hash}: {message}
 - Design notes: {notes_if_any}
 
 #### Item: #{issue2} — {title2}
-- Status: {from the item's plan rows — 'all complete', or the IDs left blocked or failed}
+- Status: {from plan rows when present; otherwise the judged item criteria and unresolved scope}
 - Files changed: {file_list}
 - Key commits:
   - {hash}: {message}

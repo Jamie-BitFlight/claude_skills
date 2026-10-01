@@ -2,6 +2,11 @@
 
 Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
 
+Before consuming a delegated return, load `dh:subagent-contract` for transport status and
+durable-outcome semantics. When running T0 yourself, read
+[the runner contract](../../../docs/work-ledger/runner-contract.md) in full before opening its
+attempt; follow its identity, lease, report, closure and refusal requirements.
+
 Step 2 of the SAM Dispatch Loop in `complete-implementation`: how one quality-gate task is opened,
 run, settled and judged. Steps 1 and 3 stay in the skill body.
 
@@ -43,7 +48,7 @@ When the delegated run returns, record what came back and judge it:
 
 Accept when the phase's criteria hold — `plan accept --address "{qg_plan_address}/{task_id}"
 --note "{why}"` — and send it back otherwise with `plan reclaim --reason judge --response "{what to
-change}"`. The full judge table is [the work loop](../../docs/work-ledger/work-loop.md).
+change}"`. The full judge table is [the work loop](../../../docs/work-ledger/work-loop.md).
 
 **T0 — run it directly, in your own context; do not delegate it.** Its agent is
 `dh:multi-perspective-review (orchestrated)` — a workflow that already dispatches its own
@@ -77,28 +82,24 @@ reviewers, so a delegated worker would only add a hop to reach the same call.
    ```
 
    Do not proceed to Step 1 (no QG plan is created); do not apply `status:verified`.
-3. Run the workflow (name it in prose) with `--diff "<sha>..HEAD"`, adding `--issue {item_ref}`
+3. Open its attempt before running the workflow; this sets the task in-progress and holds it
+   against a second dispatch:
+
+   ```bash
+   <sam_cli/> plan dispatch --address "{qg_plan_address}/T0"
+   ```
+
+   Take the printed attempt as `{A}`, then act as its runner: begin with the runner contract's
+   task read, and renew its lease before work that may outrun it.
+4. Run the workflow (name it in prose) with `--diff "<sha>..HEAD"`, adding `--issue {item_ref}`
    when known.
 
-You are the runner for this task, so open and close its attempt yourself. `dispatch` before the
-workflow runs — it is what sets the task in-progress and holds it against a second dispatch:
-
-```bash
-<sam_cli/> plan dispatch --address "{qg_plan_address}/T0"
-```
-
-Afterwards, append the two report sections for that attempt and close it:
-
-```bash
-<sam_cli/> plan update \
-  --plan-address "{qg_plan_address}" --task-id T0 --attempt {A} \
-  --append-section "Completion Report" --section-content "{the review summary}"
-<sam_cli/> plan update \
-  --plan-address "{qg_plan_address}" --task-id T0 --attempt {A} \
-  --append-section "Verification Results" --section-content "{per-perspective verdicts, or none}"
-<sam_cli/> plan finish \
-  --address "{qg_plan_address}/T0" --attempt {A} --note "{the verdict}"
-```
+Afterwards, follow the runner contract's completion steps for `{qg_plan_address}/T0`, attempt
+`{A}`. Use its required task report fields, putting the review summary in `NOTES:` and the
+per-perspective verdicts in the evidence for the task's verification steps. Carry the review
+verdict in `--note`. Select the durable result against T0's execution criteria: a review that
+finished and found defects can have a negative domain verdict while its review task completed;
+a review that could not be performed must record the corresponding non-success outcome.
 
 Then continue to Step 3 of the Dispatch Loop exactly as for any other completed task. Moving the status directly
 is not a shortcut here: `plan state --new-status in-progress` is refused as `status-invalid`,

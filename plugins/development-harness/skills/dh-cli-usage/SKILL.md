@@ -41,4 +41,9 @@ report the exact command and its stderr as `STATUS: BLOCKED`, and run no other `
 
 For the grouped commands and their options, read [command reference](./references/command-reference.md).
 
+When a dispatch names a ledger address and attempt, read
+[the runner contract](../../docs/work-ledger/runner-contract.md) before its first ledger command.
+When returning or consuming an agent's response, load `dh:subagent-contract` for response
+destination and transport status.
+
 When an `mcp__plugin_dh_*` server failed to connect, read [MCP connection check](./references/mcp-connection-check.md).

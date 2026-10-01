@@ -2,6 +2,12 @@
 
 Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
 
+When self-discovery finds a SAM plan and your dispatch names an attempt, read
+[the runner contract](../../../docs/work-ledger/runner-contract.md) in full before your first task
+ledger command. It owns attempt identity, leases, reports, outcome selection, closure and
+refusals. Before reporting your return, load `dh:subagent-contract` for response destination and
+ledger versus text-only status semantics.
+
 Each worktree worker is spawned by the milestone orchestrator as an isolated `Agent(isolation: "worktree")` subagent branched from the integration branch. This protocol governs the full lifecycle from setup through completion reporting.
 
 **Critical constraint**: Worktree workers have NO Agent tool. All work is executed directly — no delegation to subagents or the SAM pipeline. Workers self-discover task lists, acceptance criteria, and skills after spawning: the backlog item through `backlog_view`, and the plan and its tasks through the SAM CLI's `plan` group.
@@ -83,43 +89,29 @@ Worktree workers cannot message the orchestrator mid-flight. When a blocker is e
 
 1. Complete as many tasks as possible, skipping only the blocked task
 2. Commit all completed work with conventional commit messages
-3. Close the blocked task on the ledger — `plan finish --address P{N}/T{M} --attempt {n} --result
-   blocked --note "<what blocks it, and what would unblock it>"`, or `--result needs-input` when
-   what you need is an answer rather than a change
+3. For a ledger task, follow the runner contract's closure steps with result `blocked`, or
+   `needs-input` when an answer is needed rather than a change. For a text-only item, include
+   the blocker and what would unblock it in the response.
 4. Report as below
-
-A mixed outcome needs no token of its own. Each task carries its own `finish --result`, so "three
-complete, one blocked" is already recorded, one row per task, and the orchestrator reads it from
-the ledger rather than parsing a count out of your prose. There is no `--result partial` — see
-`dh_core/ledger_spec.py` for the values `finish --result` accepts — and inventing a `STATUS:`
-token for a state the ledger cannot hold would put the outcome somewhere no later session can
-query.
 
 Do not wait for resolution. Do not stop all work because one task is blocked — complete everything
 else and report.
 
 ## Completion Report Format
 
-The `STATUS:` line follows `/dh:subagent-contract` unchanged: `STATUS: DONE` once `finish` was
-recorded, whatever its `--result`, and `STATUS: BLOCKED` when no `finish` was possible at all — a
-setup failure, an unreachable ledger, a worktree that never came up. It reports whether you closed
-your attempts, not how they turned out.
-
-This report and the ledger carry different things, and each needs the other. The report is what the
-orchestrator reads the moment your launch returns, and it records it against your attempt as the
-attempt's return text; `plan finish --result` is the durable outcome the orchestrator queries, and
-the only thing that moves the task. Send both: `finish` as your last ledger command, and the report
-as your response. Where a plan exists, append the same body as this attempt's `Completion Report`
-section before you finish, since `finish` with no `--result` (the default, `complete`) requires it.
+Use the first-line status selected under `dh:subagent-contract`. For each ledger task, append its
+task-specific report under the runner contract, including `TASK:` identity; include the item-level
+fields below in that report body too. Return the aggregate body below to the milestone caller.
+When no plan exists, return this body as text only, with the nonledger status from that contract.
 
 Output this as the final response. Everything below the `STATUS:` line is report body — field
 names, not status tokens:
 
 ```text
-STATUS: DONE
+STATUS: {DONE or BLOCKED under dh:subagent-contract}
 BRANCH: {worktree branch name — from git branch --show-current, or 'none' if no commits exist}
-TASKS_COMPLETED: {count, and the IDs finished with no --result (the default, complete)}
-TASKS_BLOCKED: {count and IDs closed with --result blocked or needs-input, or 'none'}
+TASKS_COMPLETED: {count, and the IDs whose durable result is complete, or work meeting the item criteria when no plan exists}
+TASKS_BLOCKED: {count and IDs with durable result blocked or needs-input; unresolved work when no plan exists; or 'none'}
 BLOCKER: {what blocked each one — omit the field when TASKS_BLOCKED is none}
 FILES_CHANGED: {list of files modified, one per line}
 COMMITS: {list of commit hashes and messages, one per line}
@@ -139,19 +131,8 @@ and the CLI resolves the same ledger from a linked worktree as from the main che
 Your prompt names an address `P{N}/T{M}` and the attempt number the orchestrator opened. Carry the
 attempt on every command; it is what proves the command belongs to this dispatch.
 
-For each task:
-
-1. Read it, naming the attempt. This is also what pushes out your lease:
-   `plan read --address P{N}/T{M} --attempt {n}`. Act on any `Orchestrator Response` first.
-2. Before anything long — a full test suite, a build — push the lease out again:
-   `plan renew --address P{N}/T{M} --attempt {n}`. It prints `renew_by`, the instant the lease next
-   expires. A lease left to run out lets the orchestrator hand the task to another runner, and your
-   later commands are then refused with `stale-attempt`.
-3. After the work and its verification: append `Completion Report` and `Verification Results` for
-   this attempt with `plan update --plan-address P{N} --task-id T{M} --attempt {n}
-   --append-section … --section-content …`, then close it once with
-   `plan finish --address P{N}/T{M} --attempt {n}`, adding `--result failed|blocked|needs-input`
-   for anything other than success (an omitted `--result` records `complete`).
+For each task, run the full runner-contract sequence using that task's address and dispatched
+attempt. The aggregate item report does not replace the attempt's required task report.
 
 There is nothing to claim: `dispatch` opened your attempt and set the task in-progress before you
 were launched. The CLI's `plan claim` command writes to the content store rather than the ledger,
