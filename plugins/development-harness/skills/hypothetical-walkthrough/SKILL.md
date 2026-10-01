@@ -9,6 +9,6 @@ Use the requested effort, defaulting to medium: **Low** gives a concise, focused
 When no scenario or user story is supplied, state the contextual interpretation and ask whether to proceed; when no interpretation is supportable, ask which scenario or user story to simulate.
 When the target under test is absent or unclear, ask which system or process to trace.
 Begin the walkthrough only after both the scenario or user story and target under test are clear.
-Walk the configured system from entry to completion, following how its parts, actors, and state interact. Let the goals and evidence direct attention rather than a fixed checklist.
+Trace the configured system in ordered, step-by-step form from entry to completion, following how its parts, actors, and state interact. Let the goals and evidence direct attention rather than a fixed checklist.
 Contrast the expected flow with repository and runtime evidence. Mark facts, inferences, and unknowns; this is a simulation, not an observed end-to-end demonstration.
 Report process, system, or transactional frictions, tensions, contradictions, and outcomes unexpected from the stated goals. Give each finding's evidence, impact, and a concrete validation check. End every report by offering to address, backlog, or discuss/split the findings.
