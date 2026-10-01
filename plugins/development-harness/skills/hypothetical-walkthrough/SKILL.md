@@ -5,8 +5,10 @@ description: Use when the user asks for a hypothetical walkthrough of a system t
 
 # Hypothetical Walkthrough
 
-Hypothetically walk the given system from entry to completion at situation-appropriate depth. Consider skills, tools, logic, subagents, functions, state/evidence, failure paths, and handoffs.
-
-Contrast the expected flow with repository and runtime evidence. Mark facts, inferences, and unknowns; never present a static trace as observed execution.
-
-For every tension, friction, gap, or contradiction, provide its evidence, impact, and a concrete validation check. Combine findings into a user report and offer to address selected findings in an isolated worktree and PR, backlog some or all, or discuss/split them.
+Use the requested effort, defaulting to medium: **Low** gives a concise, focused end-to-end scenario; **Medium** uses representative end-to-end scenarios to reveal interactions and transitions; **High** simulates agent-generated user stories step by step across every relevant change and reaction.
+When no scenario or user story is supplied, state the contextual interpretation and ask whether to proceed; when no interpretation is supportable, ask which scenario or user story to simulate.
+When the target under test is absent or unclear, ask which system or process to trace.
+Begin the walkthrough only after both the scenario or user story and target under test are clear.
+Walk the configured system from entry to completion, following how its parts, actors, and state interact. Let the goals and evidence direct attention rather than a fixed checklist.
+Contrast the expected flow with repository and runtime evidence. Mark facts, inferences, and unknowns; this is a simulation, not an observed end-to-end demonstration.
+Report process, system, or transactional frictions, tensions, contradictions, and outcomes unexpected from the stated goals. Give each finding's evidence, impact, and a concrete validation check. End every report by offering to address, backlog, or discuss/split the findings.
