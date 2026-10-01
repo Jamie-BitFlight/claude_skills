@@ -339,9 +339,10 @@ KNOWN_FAILURE_TYPES: tuple[FailureTypeRow, ...] = (
         category=FailureCategory.OUTPUT_UNUSABLE,
         specific="false-completion",
         description=(
-            "A step reported success -- a DONE status, an unqualified `finish` (whose default result is `complete`) -- having produced nothing usable "
+            "A step claimed its criteria were met -- for example, `finish --result=complete` -- having produced nothing usable "
             "against its criteria. Named by whichever step detects it, never by the step that reported the success: "
-            "the success channel is exactly what fails to carry this."
+            "the success channel is exactly what fails to carry this. A work-ledger runner's DONE response only says "
+            "its attempt end was recorded; it does not assert a complete result."
         ),
         recovery=RecoveryDisposition.AUTOMATIC,
         suggested_routes=(

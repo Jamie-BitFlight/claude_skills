@@ -859,11 +859,11 @@ COMMANDS: list[Command] = [
         flags=[
             ADDRESS,
             Flag(name="--attempt", required=True, value="N"),
-            Flag(name="--result", value="complete|failed|blocked|needs-input"),
+            Flag(name="--result", required=True, value="complete|failed|blocked|needs-input"),
             NOTE,
         ],
         key="attempt",
-        summary="task.finished; the runner's last command; omitted --result means complete",
+        summary="task.finished; the runner's last command",
     ),
     Command(
         name="settle",
@@ -1119,7 +1119,7 @@ TRANSITIONS: list[Transition] = [
             CASCADE,
         ],
         events=["task.finished", "task.state"],
-        to_status="complete when --result is complete or omitted; failed when failed; blocked when blocked or needs-input",
+        to_status="complete when --result is complete; failed when failed; blocked when blocked or needs-input",
         note="task.state rows only for the cascade; expires keeps its value",
     ),
     *[
