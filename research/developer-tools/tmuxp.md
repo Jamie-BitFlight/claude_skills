@@ -446,3 +446,4 @@ Concrete applications:
 | [agent-deck](./agent-deck.md) | developer-tools | referenced by agent-deck (developer-tools) |
 | [emqutiti](./emqutiti.md) | developer-tools | referenced by emqutiti (developer-tools) |
 | [sidecar](./sidecar.md) | developer-tools | referenced by sidecar (developer-tools) |
+| [omnyssh](./omnyssh.md) | developer-tools | referenced by omnyssh (developer-tools) |

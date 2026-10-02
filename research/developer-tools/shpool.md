@@ -230,3 +230,4 @@ action = "detach"
 | [abtop](./abtop.md) | developer-tools | referenced by abtop (developer-tools) |
 | [emqutiti](./emqutiti.md) | developer-tools | referenced by emqutiti (developer-tools) |
 | [tessera](../security-tools/tessera.md) | security-tools | referenced by tessera (security-tools) |
+| [omnyssh](./omnyssh.md) | developer-tools | referenced by omnyssh (developer-tools) |

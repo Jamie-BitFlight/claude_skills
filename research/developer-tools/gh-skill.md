@@ -257,6 +257,7 @@ Source: SKILL.md line 224
 |-------|----------|--------------|
 | [backlog skill](./../task-management/backlog-skill.md) | task-management | `gh` provides GitHub Issue CRUD for backlog sync and project management |
 | [research-curator skill](./../developer-tools/research-curator-skill.md) | developer-tools | Both are utility skills supporting repository and project operations |
+| [gh-aw](./gh-aw.md) | developer-tools | referenced by gh-aw (developer-tools) |
 
 ---
 

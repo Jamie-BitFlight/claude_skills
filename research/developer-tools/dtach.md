@@ -195,3 +195,9 @@ dtach -a /tmp/my-session -e '^A'
 - [GitHub API — repo metadata](https://api.github.com/repos/crigler/dtach) (accessed 2026-03-01)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [omnyssh](./omnyssh.md) | developer-tools | referenced by omnyssh (developer-tools) |
