@@ -182,5 +182,6 @@ homebutler install <app-template>
 |-------|----------|--------------|
 | [Model Context Protocol](./model-context-protocol.md) | mcp-ecosystem | Core protocol implementation |
 | [wigolo](./wigolo.md) | mcp-ecosystem | referenced by wigolo (mcp-ecosystem) |
+| [gitdiagram](./gitdiagram.md) | mcp-ecosystem | referenced by gitdiagram (mcp-ecosystem) |
 
 ---

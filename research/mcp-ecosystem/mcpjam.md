@@ -311,3 +311,4 @@ MCPJam fills a testing and development tooling gap:
 | [agentscope](../agent-frameworks/agentscope.md) | agent-frameworks | referenced by agentscope (agent-frameworks) |
 | [samuraizer](../ai-research-tools/samuraizer.md) | ai-research-tools | referenced by samuraizer (ai-research-tools) |
 | [wigolo](./wigolo.md) | mcp-ecosystem | referenced by wigolo (mcp-ecosystem) |
+| [gitdiagram](./gitdiagram.md) | mcp-ecosystem | referenced by gitdiagram (mcp-ecosystem) |

@@ -344,3 +344,4 @@ This fills a gap in the research directory's MCP ecosystem coverage:
 | [repowise](./repowise.md) | mcp-ecosystem | referenced by repowise (mcp-ecosystem) |
 | [claude-scientific-skills](../skill-generation-tools/claude-scientific-skills.md) | skill-generation-tools | referenced by claude-scientific-skills (skill-generation-tools) |
 | [wigolo](./wigolo.md) | mcp-ecosystem | referenced by wigolo (mcp-ecosystem) |
+| [gitdiagram](./gitdiagram.md) | mcp-ecosystem | referenced by gitdiagram (mcp-ecosystem) |

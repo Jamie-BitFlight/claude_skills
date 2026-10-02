@@ -435,3 +435,4 @@ Both navigation tools are anchored by symbol *and* location, not by symbol alone
 | [mcpskills-cli](./mcpskills-cli.md) | mcp-ecosystem | referenced by mcpskills-cli (mcp-ecosystem) |
 | [screenpipe](./screenpipe.md) | mcp-ecosystem | referenced by screenpipe (mcp-ecosystem) |
 | [wigolo](./wigolo.md) | mcp-ecosystem | referenced by wigolo (mcp-ecosystem) |
+| [gitdiagram](./gitdiagram.md) | mcp-ecosystem | referenced by gitdiagram (mcp-ecosystem) |
