@@ -3,51 +3,75 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "Can you give me a hypothetical walkthrough?",
-      "expected_output": "Requests the missing scenario or user story and the target system or process before starting a walkthrough.",
-      "files": [],
+      "prompt": "$hypothetical-walkthrough Target: the current repository's real `/dh:work-backlog-item create` route. Scenario: the user's report is \"a small typo 'teh' instead of 'the' in an error message from the scientific-thinking plugin CLI tool.\"",
+      "expected_output": "Separates the unverified typo report from source evidence and traces the real create route through its interactive, duplicate, response-selector, and create-only terminal branches using symbolic values.",
+      "files": [
+        "../../work-backlog-item/SKILL.md",
+        "../../work-backlog-item/scripts/parser/parse.schema.json",
+        "../../work-backlog-item/scripts/parser/command-routes.json",
+        "../../work-backlog-item/references/workflows/create/scope.md",
+        "../../work-backlog-item/references/workflows/create/start.md",
+        "../../dh-cli-usage/references/command-reference.md",
+        "../../../sam_schema/cli.py",
+        "../../../backlog_core/server.py",
+        "../../../backlog_core/operations.py",
+        "../../../backlog_core/tool_responses.py",
+        "../../../sam_schema/backlog.py"
+      ],
       "expectations": [
-        "Does not invent a scenario, target, or completed walkthrough.",
-        "Asks for both the scenario or user story and the system or process to trace.",
-        "Defers any walkthrough until both inputs are supplied."
+        "Derives the create route and keeps it terminal after creation rather than inventing automatic grooming.",
+        "Preserves interactive required-field and duplicate branches without claiming a live write or duplicate outcome.",
+        "Carries the declared response selector symbolically, including the empty `item_ref` plus non-empty `reference` fallback.",
+        "Does not invent a scientific-thinking CLI, error message, typo location, or reproduction result when source evidence does not establish one."
       ]
     },
     {
-      "id": 2,
-      "prompt": "Give a Low-effort hypothetical walkthrough of the password-reset flow for this customer portal. Scenario: a customer has a valid account, requests a reset, follows the email link, chooses a new password, and then signs in. Evidence available: the support runbook says reset links expire after 15 minutes; the API contract says the link is invalidated after a successful reset; the monitoring dashboard records only reset-request and reset-success events. Identify tensions and useful validation checks.",
-      "expected_output": "Provides a concise ordered trace from request through sign-in, contrasts the supplied expectations with the evidence, identifies the missing visibility around expiry or invalid-link outcomes, and labels the result as a simulation rather than an observed end-to-end run.",
-      "files": [],
+      "id": 5,
+      "prompt": "$hypothetical-walkthrough Target: the current repository's real `/dh:work-backlog-item groom` route. Scenario: the user's report is \"a small typo 'teh' instead of 'the' in an error message from the scientific-thinking plugin CLI tool.\"",
+      "expected_output": "Separates the unverified typo report from source evidence and traces freeform groom through the source-defined create-then-groom handoff with symbolic selectors and explicit conditional branches.",
+      "files": [
+        "../../work-backlog-item/SKILL.md",
+        "../../work-backlog-item/scripts/parser/parse.schema.json",
+        "../../work-backlog-item/scripts/parser/command-routes.json",
+        "../../work-backlog-item/references/workflows/create/scope.md",
+        "../../work-backlog-item/references/workflows/create/start.md",
+        "../../work-backlog-item/references/workflows/groom/start.md",
+        "../../work-backlog-item/references/workflows/groom/intake.md",
+        "../../work-backlog-item/references/workflows/groom/analyze.md",
+        "../../work-backlog-item/references/workflows/groom/swarm.md",
+        "../../work-backlog-item/references/workflows/groom/finalize.md",
+        "../../dh-cli-usage/references/command-reference.md",
+        "../../../agents/backlog-item-groomer.md",
+        "../../../sam_schema/cli.py",
+        "../../../backlog_core/server.py",
+        "../../../backlog_core/operations.py",
+        "../../../backlog_core/tool_responses.py",
+        "../../../sam_schema/backlog.py"
+      ],
       "expectations": [
-        "Uses a focused ordered end-to-end sequence appropriate to Low effort.",
-        "Distinguishes supplied facts, derived inferences, and materially unresolved unknowns without claiming to have run the portal.",
-        "Reports a concrete friction with its evidence, impact, and a validation check.",
-        "Offers to address, backlog, or discuss the findings."
+        "Derives freeform groom as the source-defined create-then-groom route, while retaining create-only as a terminal boundary rather than inventing automatic grooming.",
+        "Uses the declared response shape symbolically, including the empty `item_ref` plus non-empty `reference` fallback, and does not invent a runtime issue number.",
+        "Preserves interactive required-field and duplicate branches as simulated gates and carries the returned selector to the groom consumer without a live write.",
+        "Does not invent a scientific-thinking CLI, error message, typo location, or reproduction result when source evidence does not establish one.",
+        "Marks the result as hypothetical and offers to address, backlog, or discuss/split the findings."
       ]
     },
     {
-      "id": 3,
-      "prompt": "Use Medium effort to hypothetically walk through the employee-expense reimbursement process. Target: the finance workflow spanning employee submission, manager approval, finance review, payment, and correction. Trace representative scenarios that expose handoffs: (1) a receipt-backed meal expense under the policy limit, and (2) a hotel expense initially approved by a manager but later found to have a missing receipt. Evidence: policy requires receipts above $25; the expense tool marks manager-approved claims as ready for payment; finance can return a claim for correction; payroll imports only claims marked ready for payment once each Friday. Show frictions and validation checks.",
-      "expected_output": "Uses representative ordered scenarios to reveal transitions among submission, approval, finance correction, and payroll import; identifies the ready-for-payment versus correction race or ambiguity; distinguishes supplied evidence from inference and unknowns; and gives each finding an evidence, impact, and validation check.",
-      "files": [],
+      "id": 6,
+      "prompt": "$hypothetical-walkthrough Target: the supplied job-event fixture. Scenario: job `release-42` at attempt `3`.",
+      "expected_output": "Reports the unavailable instructed path as a block without substituting stdout, identifies the direct consumer's key mismatch without repairing it, and distinguishes the compatible consumer path.",
+      "files": [
+        "fixtures/transition-contracts/WORKFLOW.md",
+        "fixtures/transition-contracts/publisher.py",
+        "fixtures/transition-contracts/consumer.py",
+        "fixtures/transition-contracts/consumer_compatible.py"
+      ],
       "expectations": [
-        "Covers both representative scenarios rather than only one happy path.",
-        "Traces state and actor transitions from entry through payment or correction outcome.",
-        "Treats both claim amounts as unresolved, does not assign either side of the $25 threshold, and keeps receipt-policy conclusions conditional.",
-        "Identifies a meaningful interaction or transition friction without presenting an inference as observed fact.",
-        "Ends by offering to address, backlog, or discuss/split the findings."
-      ]
-    },
-    {
-      "id": 4,
-      "prompt": "Perform a High-effort hypothetical walkthrough of a production change-management process. Target: the process from an engineer proposing a database migration through review, staging rollout, production deployment, monitoring, rollback, and post-incident follow-up. Generate representative user stories that cover a normal migration, a staging failure, and a post-deployment latency regression. Evidence: every migration needs database-review approval; staging deploys automatically after merge; production deploys require an on-call acknowledgement; rollback restores application code but not database schema; latency alerts page the on-call engineer after five minutes above threshold. Trace all relevant reactions and identify frictions with validation checks.",
-      "expected_output": "Simulates generated user stories step by step across the full change lifecycle and relevant reactions, makes the schema-rollback limitation and alert delay visible as risks, preserves evidence boundaries, and gives concrete validation checks without claiming an observed production deployment.",
-      "files": [],
-      "expectations": [
-        "Uses multiple generated representative stories, including normal, staging-failure, and production-regression paths.",
-        "Provides ordered steps across proposal, approval, staging, production, monitoring, rollback, and follow-up where relevant.",
-        "Distinguishes supplied facts, derived inferences, and materially unresolved unknowns, and explicitly frames the output as a simulation.",
-        "Reports friction findings with evidence, impact, and concrete validation checks.",
-        "Ends by offering to address, backlog, or discuss/split the findings."
+        "Derives `job_id` as a string and `attempt` as an integer from the fixture CLI input and publisher output.",
+        "Marks the unavailable instructed fixture path as a blocked transition and does not silently substitute the publisher's stdout; any continuation is explicitly diagnostic or counterfactual.",
+        "Identifies the direct consumer's required `jobId` key as a missing mapping without changing either side.",
+        "Distinguishes the compatible consumer's `job_id` contract from the broken consumer without treating a code-declared mapping as an improvised recovery.",
+        "Marks the result as hypothetical and offers to address, backlog, or discuss/split the findings."
       ]
     }
   ]
