@@ -28,7 +28,9 @@
 
 Research entry `/home/user/claude_skills/research/mcp-ecosystem/gitdiagram.md` (lines 232–238) explicitly states: "claude_skills could integrate GitDiagram's MCP server directly as a built-in connector, enabling agents to analyze external repositories without fetching them locally. This would provide codebase context for tasks like **cross-repository analysis or pattern research**." This is exactly what research-curator does—it analyzes external repositories to extract patterns and insights.
 
-**Integration opportunity**: The research-insight-extractor agent could call GitDiagram's MCP `get_repository_diagram` tool (documented in `/home/user/claude_skills/research/mcp-ecosystem/gitdiagram.md`, lines 118–126) with the external repository owner/repo pair, retrieve the generated Mermaid diagram plus component explanations, and embed these in the improvement proposals and insights written to `./research/insights/{date}-{name}-improvements.md`. This adds a new capability—visual architecture documentation—without replacing any existing functionality.
+**Integration opportunity**: The research-insight-extractor agent could call GitDiagram's MCP `get_repository_diagram` tool (documented in `/home/user/claude_skills/research/mcp-ecosystem/gitdiagram.md`, lines 118–126) with the external repository's `owner/repo` string, retrieve the stored Mermaid diagram plus component explanations, and embed these in the improvement proposals and insights written to `./research/insights/{date}-{name}-improvements.md`. This adds a new capability—visual architecture documentation—without replacing any existing functionality.
+
+**Cache-miss fallback**: `get_repository_diagram` is read-only. It returns a diagram only when one is already stored in GitDiagram's public namespace; otherwise it returns a message with the page link and never starts a generation. Because research-curator handles arbitrary repositories, a miss is expected for many of them. The integration must treat a miss as "no architecture context" and continue with the existing shallow-clone analysis. The improvements file defers the integration as low confidence for the same reason.
 
 ### Integration sketch
 
@@ -47,24 +49,21 @@ def analyze_with_architecture(repo_owner: str, repo_name: str, research_entry_pa
     github_url = extract_github_url(entry_content)
     owner, repo = parse_repo_url(github_url)  # e.g., "ahmedkhaleel2004/gitdiagram"
 
-    # Call GitDiagram MCP tool
+    # Call GitDiagram MCP tool: one `repository` string ("owner/repo" or a github.com URL)
     diagram_response = mcp_client.call(
-        server_url="https://gitdiagram.com/mcp", tool="get_repository_diagram", args={"owner": owner, "repo": repo}
+        server_url="https://gitdiagram.com/mcp", tool="get_repository_diagram", args={"repository": f"{owner}/{repo}"}
     )
 
-    # diagram_response contains:
-    # - explanation: AI-generated architecture narrative
-    # - components: list of components with paths
-    # - connections: relationships between components
-    # - mermaid_source: raw Mermaid diagram code
-    # - links: GitHub links to source files
+    # The tool returns Markdown in content[0].text: the architecture explanation,
+    # components with paths, connections, Mermaid source, and the interactive and video links.
+    # When no public diagram is stored, the same field holds a message with the page link
+    # and similar stored repositories; the tool never starts a generation.
+    diagram_markdown = diagram_response.content[0].text
+    has_diagram = looks_like_diagram(diagram_markdown)  # e.g. contains a ```mermaid block
 
-    # Embed in improvement proposal
+    # Embed in improvement proposal; on a cache miss continue with the existing clone analysis
     improvement_proposal = {
-        "architecture_context": {
-            "diagram_explanation": diagram_response["explanation"],
-            "mermaid": diagram_response["mermaid_source"],
-        },
+        "architecture_context": diagram_markdown if has_diagram else None,
         "patterns_observed": extract_patterns(entry_content),
         "improvements": [...],  # existing logic
     }
@@ -79,15 +78,14 @@ def analyze_with_architecture(repo_owner: str, repo_name: str, research_entry_pa
    {
      "mcpServers": {
        "gitdiagram": {
-         "command": "node",
-         "args": ["./scripts/npx-run.cjs", "-y", "gitdiagram-mcp"],
-         "env": {}
+         "type": "http",
+         "url": "https://gitdiagram.com/mcp"
        }
      }
    }
    ```
 
-   (Installation per research entry lines 158–174: `claude mcp add --transport http gitdiagram https://gitdiagram.com/mcp`)
+   (Same configuration as the upstream `plugins/gitdiagram/.mcp.json`; the CLI equivalent is `claude mcp add --transport http gitdiagram https://gitdiagram.com/mcp`.)
 
 2. Modify research-insight-extractor agent to:
    - Extract repository owner/name from research entry

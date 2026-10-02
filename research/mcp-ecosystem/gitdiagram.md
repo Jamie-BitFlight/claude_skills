@@ -185,7 +185,7 @@ bun install
 cp .env.example .env
 ```
 
-Fill in `.env` with API credentials (see [setup guide](docs/dev-setup.md)), then:
+Fill in `.env` with API credentials (see [setup guide](https://github.com/ahmedkhaleel2004/gitdiagram/blob/main/docs/dev-setup.md)), then:
 
 ```bash
 bun run dev  # Starts at localhost:3000
@@ -275,7 +275,7 @@ bun run start            # Run production server
 - [README.md](https://github.com/ahmedkhaleel2004/gitdiagram/blob/main/README.md) (accessed 2026-10-02)
 - [CLAUDE.md — Architecture Documentation](https://github.com/ahmedkhaleel2004/gitdiagram/blob/main/CLAUDE.md) (accessed 2026-10-02)
 - [Development Setup Guide](https://github.com/ahmedkhaleel2004/gitdiagram/blob/main/docs/dev-setup.md) (accessed 2026-10-02)
-- [MCP Server Documentation](https://github.com/ahmedkhaleel2004/gitdiagram/blob/main/docs/architecture.md) (accessed 2026-10-02) — MCP server section describes tools, rate limiting, and integration points
+- [Architecture Documentation](https://github.com/ahmedkhaleel2004/gitdiagram/blob/main/docs/architecture.md) (accessed 2026-10-02) — generation, storage, and deployment architecture; it has no MCP section (the MCP tools and rate limit are documented in the "MCP server" section of CLAUDE.md above)
 
 ---
 
@@ -291,6 +291,3 @@ bun run start            # Run production server
 | [BrowserMCP](./browsermcp-mcp.md) | mcp-ecosystem | Complementary MCP servers; browsermcp provides browser automation for visualizing diagrams or monitoring deployment visualization |
 | [HomeButler](./homebutler.md) | mcp-ecosystem | Alternative MCP server for infrastructure and service management; shares deployment and integration patterns with gitdiagram |
 | [OctoCode MCP](./octocode-mcp.md) | mcp-ecosystem | Research-driven development platform with GitHub integration; both tools analyze repositories to support agent-driven code research |
-| [Model Context Protocol (MCP)](../mcp-ecosystem/model-context-protocol.md) | mcp-ecosystem | GitDiagram provides a production MCP server; complements core MCP documentation |
-| [Mermaid.js](../documentation-tools/mermaid.md) | documentation-tools | GitDiagram uses Mermaid as the output format; demonstrates compilation and security patterns |
-| [Claude Code Plugins & Skills](../ai-design-tools/claude-code-plugin-architecture.md) | ai-design-tools | GitDiagram demonstrates multi-tool integration and plugin marketplace patterns |
