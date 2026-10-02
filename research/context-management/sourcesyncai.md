@@ -257,3 +257,4 @@ curl -X POST https://api.sourcesync.ai/v1/search/hybrid \
 | [unblocked](./unblocked.md) | context-management | referenced by unblocked (context-management) |
 | [tolaria](../developer-tools/tolaria.md) | developer-tools | referenced by tolaria (developer-tools) |
 | [zvec](../ml-infrastructure/zvec.md) | ml-infrastructure | referenced by zvec (ml-infrastructure) |
+| [pageindex](./pageindex.md) | context-management | referenced by pageindex (context-management) |

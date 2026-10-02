@@ -263,3 +263,4 @@ mcpskills --url https://mcp.example.com/sse --token <token> --multi-skills
 | [prompt-optimizer](../prompt-engineering/prompt-optimizer.md) | prompt-engineering | referenced by prompt-optimizer (prompt-engineering) |
 | [claude-scientific-skills](./claude-scientific-skills.md) | skill-generation-tools | referenced by claude-scientific-skills (skill-generation-tools) |
 | [mattpocock-skills](./mattpocock-skills.md) | skill-generation-tools | referenced by mattpocock-skills (skill-generation-tools) |
+| [hashicorp-agent-skills](./hashicorp-agent-skills.md) | skill-generation-tools | referenced by hashicorp-agent-skills (skill-generation-tools) |

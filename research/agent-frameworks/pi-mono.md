@@ -356,6 +356,7 @@ await agent.prompt("Hello!");
 | [ruflo](./ruflo.md) | agent-frameworks | referenced by ruflo (agent-frameworks) |
 | [omniroute](../api-frameworks/omniroute.md) | api-frameworks | referenced by omniroute (api-frameworks) |
 | [gridland](../developer-tools/gridland.md) | developer-tools | referenced by gridland (developer-tools) |
+| [ai-engineering-from-scratch](../ai-research-tools/ai-engineering-from-scratch.md) | ai-research-tools | referenced by ai-engineering-from-scratch (ai-research-tools) |
 
 ---
 

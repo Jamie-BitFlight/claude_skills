@@ -239,3 +239,4 @@ npx claude-code-templates@latest --plugins         # Plugin dashboard
 | [maverick](../coding-agents/maverick.md) | coding-agents | referenced by maverick (coding-agents) |
 | [anything_about_game_ai_resources](../developer-tools/anything_about_game_ai_resources.md) | developer-tools | referenced by anything_about_game_ai_resources (developer-tools) |
 | [TheAlgorithms-Python](../learning-resources/TheAlgorithms-Python.md) | learning-resources | referenced by TheAlgorithms-Python (learning-resources) |
+| [hashicorp-agent-skills](./hashicorp-agent-skills.md) | skill-generation-tools | referenced by hashicorp-agent-skills (skill-generation-tools) |

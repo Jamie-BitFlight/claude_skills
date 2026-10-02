@@ -424,3 +424,4 @@ User Input (URL/GitHub/PDF)
 |-------|----------|--------------|
 | [claude-scientific-skills](./claude-scientific-skills.md) | skill-generation-tools | referenced by claude-scientific-skills (skill-generation-tools) |
 | [mattpocock-skills](./mattpocock-skills.md) | skill-generation-tools | referenced by mattpocock-skills (skill-generation-tools) |
+| [hashicorp-agent-skills](./hashicorp-agent-skills.md) | skill-generation-tools | referenced by hashicorp-agent-skills (skill-generation-tools) |

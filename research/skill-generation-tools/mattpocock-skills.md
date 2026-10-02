@@ -324,5 +324,7 @@ mattpocock/skills provides **reference implementations** for skill structure, ac
 | [oh-my-opencode](../research-agent-patterns/oh-my-opencode.md) | research-agent-patterns | Production-scale orchestration (37.5K stars) implementing multi-agent patterns that mattpocock skills coordinate; hash-anchored editing complements skill-based workflows |
 | [Agent Skills Eval](../evaluation-testing/agent-skills-eval.md) | evaluation-testing | referenced by Agent Skills Eval (evaluation-testing) |
 | [composio-codebase-migrate](./composio-codebase-migrate.md) | skill-generation-tools | referenced by composio-codebase-migrate (skill-generation-tools) |
+| [ai-engineering-from-scratch](../ai-research-tools/ai-engineering-from-scratch.md) | ai-research-tools | referenced by ai-engineering-from-scratch (ai-research-tools) |
+| [jakubkrehel-skills](../developer-tools/jakubkrehel-skills.md) | developer-tools | referenced by jakubkrehel-skills (developer-tools) |
 
 ---

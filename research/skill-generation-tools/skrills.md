@@ -262,3 +262,11 @@ cors_origins = "https://app.example.com"
 | Last Verified | 2026-02-23 |
 | Version at Verification | v0.5.6 |
 | Next Review Recommended | 2026-05-23 |
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [hashicorp-agent-skills](./hashicorp-agent-skills.md) | skill-generation-tools | referenced by hashicorp-agent-skills (skill-generation-tools) |

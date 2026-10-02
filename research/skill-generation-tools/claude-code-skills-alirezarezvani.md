@@ -282,3 +282,5 @@ CLAUDE.md states "No build system or test frameworks — intentional design choi
 | [maverick](../coding-agents/maverick.md) | coding-agents | referenced by maverick (coding-agents) |
 | [graphify](./graphify.md) | skill-generation-tools | referenced by graphify (skill-generation-tools) |
 | [mattpocock-skills](./mattpocock-skills.md) | skill-generation-tools | referenced by mattpocock-skills (skill-generation-tools) |
+| [jakubkrehel-skills](../developer-tools/jakubkrehel-skills.md) | developer-tools | referenced by jakubkrehel-skills (developer-tools) |
+| [hashicorp-agent-skills](./hashicorp-agent-skills.md) | skill-generation-tools | referenced by hashicorp-agent-skills (skill-generation-tools) |

@@ -306,3 +306,4 @@ curl -fsSL https://raw.githubusercontent.com/maxritter/claude-pilot/main/uninsta
 | [open-spdd](../prompt-engineering/open-spdd.md) | prompt-engineering | referenced by open-spdd (prompt-engineering) |
 | [prompt-optimizer](../prompt-engineering/prompt-optimizer.md) | prompt-engineering | referenced by prompt-optimizer (prompt-engineering) |
 | [mattpocock-skills](../skill-generation-tools/mattpocock-skills.md) | skill-generation-tools | referenced by mattpocock-skills (skill-generation-tools) |
+| [jakubkrehel-skills](./jakubkrehel-skills.md) | developer-tools | referenced by jakubkrehel-skills (developer-tools) |

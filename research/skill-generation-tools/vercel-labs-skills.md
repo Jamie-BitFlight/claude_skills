@@ -283,3 +283,4 @@ Describe the scenarios where this skill should be used.
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [composio-codebase-migrate](./composio-codebase-migrate.md) | skill-generation-tools | referenced by composio-codebase-migrate (skill-generation-tools) |
+| [hashicorp-agent-skills](./hashicorp-agent-skills.md) | skill-generation-tools | referenced by hashicorp-agent-skills (skill-generation-tools) |

@@ -238,3 +238,4 @@ metadata:
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [OpenSpace](../ai-research-tools/OpenSpace.md) | ai-research-tools | referenced by OpenSpace (ai-research-tools) |
+| [hashicorp-agent-skills](./hashicorp-agent-skills.md) | skill-generation-tools | referenced by hashicorp-agent-skills (skill-generation-tools) |
