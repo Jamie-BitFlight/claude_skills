@@ -11,7 +11,7 @@
 ## Utilization 1: .claude/skills/gh/ → gh-aw CLI extension
 
 **Research entry**: ./research/developer-tools/gh-aw.md
-**Caller**: /home/user/claude_skills/.claude/skills/gh/SKILL.md
+**Caller**: .claude/skills/gh/SKILL.md
 **Integration mechanism**: CLI subprocess (gh aw extension discovery and invocation)
 **Replaces or adds**: Adds capability to define and execute AI-powered GitHub workflows declaratively using Markdown
 **Setup cost**: Low (gh-aw installs as GitHub CLI extension; no additional auth beyond existing GITHUB_TOKEN)
@@ -37,12 +37,21 @@ cat > .github/workflows/issue-triage.md << 'EOF'
 ---
 name: Issue Triager
 on: [issues]
-engines: [claude]
+engine: claude
 permissions:
-  issues: write
-  pull-requests: read
-mcp_servers:
-  - github
+  contents: read
+  issues: read
+strict: true
+tools:
+  github:
+    toolsets: [default]
+safe-outputs:
+  add-labels:
+    allowed: [bug, feature, documentation]
+    max: 3
+  assign-to-user:
+    allowed: [team-lead]
+    max: 1
 ---
 
 # Markdown body: agent instructions
@@ -50,6 +59,7 @@ Analyze the newly opened issue and:
 1. Classify it by type (bug, feature, documentation)
 2. Add appropriate labels based on classification
 3. Assign to relevant team if urgent
+4. Call noop if no label or assignment applies
 EOF
 
 # Compilation (validates Markdown, generates .lock.yml)
@@ -65,7 +75,7 @@ gh aw run issue-triage
 ## Utilization 2: .github/workflows/ (GitHub Actions) → gh-aw workflow format
 
 **Research entry**: ./research/developer-tools/gh-aw.md
-**Caller**: /home/user/claude_skills/.github/workflows/ (existing workflow files)
+**Caller**: .github/workflows/ (existing workflow files)
 **Integration mechanism**: CLI subprocess (gh aw compile generates .lock.yml for Actions execution)
 **Replaces or adds**: Replaces manual YAML workflow authoring with declarative Markdown for AI-driven tasks; preserves existing deterministic CI/CD workflows
 **Setup cost**: Medium (requires initialization with `gh aw init`, workflow conversion, compiler validation; existing workflows remain unchanged)
@@ -79,10 +89,8 @@ The repository currently has 9 GitHub Actions workflows in `.github/workflows/` 
 - Limited ability to reason about complex conditions (e.g., when to auto-rebase, how to triage failing tests)
 
 gh-aw would replace manual YAML workflow authoring for tasks requiring AI reasoning with declarative Markdown that specifies the goal and constraints, leaving execution safety to gh-aw's built-in permission validation and sandboxing. Examples:
-- **Issue triage** (`claude-code-review.yml`-adjacent): Use AI to classify issues, add labels, assign to teams
 - **CI investigation** (`main-ci-health-check.yml`): Use AI to analyze CI failures and suggest remedies
 - **Auto-rebase decisions** (`auto-rebase.yml`): Use AI to reason about when rebasing is safe
-- **Code review orchestration**: Use AI to route reviews to appropriate specialists
 
 The research entry notes that compiled workflows embed agent prompts, engine selection, MCP server configuration, and safe-outputs validation — exactly what this repository needs to coordinate complex repository automation without hardcoding conditional logic.
 
@@ -95,15 +103,21 @@ The research entry notes that compiled workflows embed agent prompts, engine sel
 name: CI Investigation Agent
 on:
   workflow_run:
-    workflows: [code-quality]
+    workflows: [Code quality]  # matches `name:` in .github/workflows/code-quality.yml
     types: [completed]
-engines: [claude]
+engine: claude
 permissions:
-  checks: read
-  pull-requests: write
   contents: read
-mcp_servers:
-  - github  # Provides GitHub API access to read checks, artifacts
+  actions: read
+  pull-requests: read
+strict: true
+tools:
+  github:
+    toolsets: [default]  # GitHub API access to read runs, checks, artifacts
+safe-outputs:
+  add-comment:
+    max: 1
+  noop:
 ---
 
 # Agent task description (in Markdown)
@@ -113,7 +127,7 @@ When the code quality workflow fails, analyze the failure:
 1. Read the workflow run logs and artifact outputs
 2. Identify the root cause (syntax error, test failure, type mismatch, etc.)
 3. For each failure, suggest a specific fix with code if applicable
-4. Comment on the PR with structured findings and next steps
+4. Post one comment (via the `add-comment` safe output) with structured findings and next steps; call `noop` when the run did not fail
 
 Prioritize:
 - Test failures first (usually actionable)

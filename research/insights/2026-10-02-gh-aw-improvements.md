@@ -28,15 +28,3 @@ whose absence can be observed in a local file.
 |---|---|
 | Multi-engine registry with validation before compile (Relevance > Applications, mapped to `plugins/agent-orchestration/`) | Already covered. `scripts/generate_harness_compatibility.py` keeps a `HARNESSES` registry and rejects unknown harness and plugin names with an explicit error (lines 124-131). `plugins/agent-orchestration/README.md` line 14 sets up per-harness notes under `delegate/references/harness-notes/`. The entry's "Change" field ("could inform how this repo scales multi-engine support") gives no target state beyond that. |
 | Markdown + YAML frontmatter declarative definitions (Relevance > Applications, mapped to `.claude/agents/research-curator.md`) | The entry's own Change field says "none". Local agents and skills already use YAML frontmatter, and skilllint validates it on commit. |
-
----
-
-## Research Entry Defects Observed (for the research-curator, not backlog proposals)
-
-- Limitations & Caveats says that versions ">= 0.83.3 and < 0.85.4" were retired and that users
-  should "upgrade to v0.40.1 or later". v0.40.1 is lower than the affected range, so the claim
-  contradicts itself. One of the version numbers is wrong.
-- Integration Opportunities says "nothing" matches and then cites 572 `git grep` matches.
-- The Cross-References link `../../agent-frameworks/agent-orchestration.md` resolves outside
-  `research/`. Neither `research/agent-frameworks/agent-orchestration.md` nor a top-level
-  `agent-frameworks/` exists.
