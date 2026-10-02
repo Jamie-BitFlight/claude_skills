@@ -5,13 +5,13 @@ subtitle: GitHub CLI extension for defining AI-powered repository automation in 
 research_date: 2026-10-02
 source_url: https://github.com/github/gh-aw
 github_repository: https://github.com/github/gh-aw
-version_at_research: v0.40.1
+version_at_research: v0.89.21
 license: MIT
 freshness_tracking:
   last_verified: 2026-10-02
-  version_at_verification: v0.40.1
+  version_at_verification: v0.89.21
   next_review: 2027-01-02
-  confidence_map: "Identity: high | Problem Addressed: high | Key Features: high | Technical Architecture: high (doc + code-read) | Installation & Usage: high | Relevance: high"
+  confidence_map: "Identity: high | Problem Addressed: high | Key Features: high | Technical Architecture: medium | Installation & Usage: high | Limitations & Caveats: high | Relevance: medium"
 ---
 
 # GitHub Agentic Workflows
@@ -139,20 +139,29 @@ Workflows are Markdown files with YAML frontmatter in `.github/workflows/`:
 
 ```markdown
 ---
-# YAML frontmatter
+emoji: 🧠
 name: Issue Triager
-on: [issues]
-engines: [copilot]
+description: Triages issues by type, labels, and assignment
+on:
+  issues:
+    types: [opened]
 permissions:
-  issues: write
-  pull-requests: read
-mcp_servers:
-  - github
+  contents: read
+  actions: read
+strict: true
+network:
+  allowed: [defaults, github]
+tools:
+  github:
+    mode: gh-proxy
+    toolsets: [default]
+safe-outputs:
+  add-comment:
 ---
 
-# Markdown body (task description)
+# Workflow Title
 
-Analyze the newly opened issue and:
+Natural language instructions for the AI agent. Analyze the newly opened issue and:
 1. Classify it by type (bug, feature, documentation)
 2. Add appropriate labels
 3. Assign to relevant team if urgent
@@ -205,11 +214,11 @@ gh aw doctor --repo owner/repo
 
 ## Limitations & Caveats
 
-- **Security advisory**: A vulnerability was discovered in versions >= 0.83.3 and < 0.85.4; those releases were retired as a preemptive measure. Users should upgrade to v0.40.1 or later.
+- **Security advisory**: "A [security vulnerability](https://github.com/github/gh-aw/security/advisories/GHSA-8h78-hpm7-29gg) was discovered in versions `>= 0.83.3, < 0.85.4` and, as a result, those releases were retired as a pre-emptive measure." Users should upgrade to v0.85.4 or later.
 - **MCP server availability**: MCP server integrations require the server to be available during workflow execution; unavailable servers will fail the workflow.
-- **Engine dependency**: Workflows must specify a valid engine; fallback or auto-detection is not supported. Token limits vary by engine and may impact complex reasoning tasks.
-- **Compilation required**: Workflows must be compiled to `.lock.yml` before execution; direct Markdown execution in GitHub Actions is not supported.
-- **Permissions scoping**: Safe-outputs framework can only write to repository resources with explicitly scoped permissions; workflows cannot escalate permissions at runtime.
+- **Engine dependency**: "Workflows must specify a valid engine; fallback or auto-detection is not supported." Token limits vary by engine and may impact complex reasoning tasks.
+- **Compilation required**: "Workflows must be compiled to `.lock.yml` before execution; direct Markdown execution in GitHub Actions is not supported."
+- **Permissions scoping**: "Safe outputs buffer configured writes, validate them, and apply them in separate jobs with scoped permissions. These controls are configurable, so workflow authors must review permissions, tools, network access, and generated files before deployment."
 
 ---
 
@@ -217,21 +226,21 @@ gh aw doctor --repo owner/repo
 
 ### Applications
 
-- **Multi-engine AI agent orchestration** -> `plugins/agent-orchestration/`
+- **Multi-engine AI agent orchestration** -> `./.claude/skills/README.md`
   - Term: `orchestration`
   - Today: "Provides a global contract that enforces disciplined behavior patterns for specialist agents in orchestrated workflows."
   - Change: This repository's agent-orchestration plugin already covers workflow coordination patterns; gh-aw's engine registry could inform how this repo scales multi-engine support
 
-- **Markdown-based declarative workflow definitions** -> `.claude/agents/research-curator.md`
+- **Markdown-based declarative workflow definitions** -> `./.claude/agents/backlog-mcp-validator.md`
   - Term: `frontmatter`
-  - Today: "Update Freshness Tracking with today's date and new confidence assessments — in frontmatter"
-  - Change: none — `.claude/agents/` files use YAML frontmatter for agent configuration; gh-aw validates a similar pattern for workflows
+  - Today: "The `backlog` server is configured in this agent's `mcpServers` frontmatter."
+  - Change: none — `.claude/agents/` files use YAML frontmatter for MCP server configuration; gh-aw validates a similar pattern for workflow tools
 
 ### Integration Opportunities
 
-- **MCP server integration patterns** -> nothing in `plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md`
-  - Today: `git grep --full-name -il "MCP" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md` → 572 matches
-  - Today: (broader search for "Model Context Protocol" returns even more results, but most are references in skill documentation, not implementations)
+- **MCP server integration patterns** -> `.mcp.json`
+  - Term: `MCP`
+  - Today: "`mcpServers` configuration with environment variable indirection for API keys, exemplifying secure MCP server initialization patterns"
   - Change: gh-aw's MCP integration patterns (safe-inputs validation, tool mapping, server lifecycle) could inform how this repo's MCP ecosystem evolves beyond documentation into operational safety patterns
 
 ---

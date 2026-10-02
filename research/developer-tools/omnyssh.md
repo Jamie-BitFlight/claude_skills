@@ -11,7 +11,7 @@ freshness_tracking:
   last_verified: 2026-10-02
   version_at_verification: 1.1.4
   next_review: 2027-01-02
-  confidence_map: "Overview: high | Features: high | Architecture: high (code-read) | Usage: high"
+  confidence_map: "Overview: high | Features: high | Architecture: medium | Usage: high | Limitations: high | Relevance: medium"
 ---
 
 # OmnySSH
@@ -103,7 +103,7 @@ OmnySSH is structured as a **Rust cargo workspace with frontend-agnostic archite
 
 ### Core Components (Source: `crates/omnyssh-core/src/`)
 
-**SSH Engine (`ssh/` module)**: A native russh client (version 0.63.3, not OpenSSH) powers:
+**SSH Engine (`ssh/` module)**: A native russh client (version 0.46, not OpenSSH) powers:
   - Metrics collection via remote command execution (CPU, RAM, disk, OS, process introspection)
   - SFTP file transfer via russh-sftp (version 2.0)
   - Multi-session PTY terminal emulation via vt100 screen parser
@@ -131,7 +131,7 @@ OmnySSH is structured as a **Rust cargo workspace with frontend-agnostic archite
   - Frontends receive `CoreEvent` and wrap into UI event streams
   - Enables loosely-coupled frontend implementations
 
-**Update Checker (`update.rs`): Self-updater
+**Update Checker (`update.rs`): Self-updater**
   - Queries GitHub Releases API
   - Downloads, verifies SHA256, extracts, and replaces binary
   - Uses `reqwest` (Rustls TLS), `semver`, `sha2`, `flate2`, `tar`, and `self-replace` crate
@@ -145,7 +145,7 @@ OmnySSH is structured as a **Rust cargo workspace with frontend-agnostic archite
 ### Dependencies
 
 **Core SSH & Networking**:
-- `russh` (0.63.3): SSH client implementation with ring backend and RSA/Ed25519 support; zlib compression via flate2
+- `russh` (0.46): SSH client implementation with ring backend and RSA/Ed25519 support; zlib compression via flate2
 - `russh-sftp` (2.0): SFTP protocol over russh channels
 
 **Async Runtime**: `tokio` (1.x) — selectively enabled features only (rt-multi-thread, time, sync, process, fs, io-util, net)
@@ -237,6 +237,12 @@ The app opens with an empty dashboard. It reads existing `~/.ssh/config` at star
 
 ---
 
+## Limitations and Caveats
+
+Not mentioned in documentation.
+
+---
+
 ## Relevance to Claude Code Development
 
 ### Applications
@@ -248,8 +254,8 @@ The app opens with an empty dashboard. It reads existing `~/.ssh/config` at star
 
 - **Real-time metrics and monitoring** -> `rules/ci-workflows.md`
   - Term: `metrics`
-  - Today: "Q3 →|No — post-processing only: metrics, cache, coverage| Accept[Acceptable]"
-  - Change: OmnySSH's live metrics collection pattern (background pollers → CoreEvent channel → dashboard display) could inform how CI workflow observability and metrics reporting are structured in development-harness monitoring systems
+  - Today: `Q3 -->|No — post-processing only: metrics, cache, coverage| Accept[Acceptable]`
+  - Change: OmnySSH's metrics poller patterns (background tasks → structured events → UI display) could inform how CI pipeline metrics are collected and surfaced in development-harness workflows
 
 - **Event system architecture for async communication** -> `plugins/plugin-creator/skills/hook-creator/SKILL.md`
   - Term: `event system`
@@ -258,10 +264,10 @@ The app opens with an empty dashboard. It reads existing `~/.ssh/config` at star
 
 ### Patterns Worth Adopting
 
-- **Workspace-based multi-frontend architecture** -> `AGENTS.md`
-  - Term: `workspace`
-  - Today: "Workspace layout: `crates/omnyssh-core` — engine, frontend agnostic; `crates/omnyssh` — TUI application (binary: omny); `crates/omnyssh-gui` — Tauri desktop application."
-  - Change: none — claude_skills already uses workspace architecture (multiple plugins as separate directories), but OmnySSH's library/frontends separation offers a model for future multi-frontend agent systems (CLI agent, web-based agent, IDE plugin agent all depending on common orchestration core)
+- **Workspace-based multi-frontend architecture** -> `ARCHITECTURE.md`
+  - Term: `plugins`
+  - Today: "Entries are local directories under `plugins/`, plus external plugins pinned from other repositories."
+  - Change: out-of-scope — claude_skills already uses directory-based workspace architecture; the library/frontends pattern OmnySSH demonstrates (core engine depended on by UI implementations) is not a direct parallel to plugin composition
 
 ### Integration Opportunities
 
