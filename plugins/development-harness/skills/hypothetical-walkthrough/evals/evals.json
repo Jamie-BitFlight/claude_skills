@@ -62,7 +62,8 @@
       "expectations": [
         "Derives freeform groom as the source-defined create-then-groom route, while retaining create-only as a terminal boundary rather than inventing automatic grooming.",
         "Uses the declared response shape symbolically, including the empty `item_ref` plus non-empty `reference` fallback, and does not invent a runtime issue number.",
-        "Preserves interactive required-field and duplicate branches as simulated gates and carries the returned selector to the groom consumer without a live write.",
+        "Preserves interactive required-field and duplicate branches as simulated gates, binding every groom-consumer selector to the exact producer field and declared branch mapping without a live write.",
+        "Carries unresolved gates through nested-agent, persistence, and finalization handoffs; labels any continuation beyond an unmet condition as counterfactual and retains source-declared conflicts as conditional outcomes.",
         "Does not invent a scientific-thinking CLI, error message, typo location, or reproduction result when source evidence does not establish one.",
         "Marks the result as hypothetical and offers to address, backlog, or discuss/split the findings."
       ]
