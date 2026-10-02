@@ -1415,6 +1415,7 @@ Implement the Chief of Staff + Iterative Loop hybrid:
 |-------|----------|--------------|
 | [CocoIndex Code](../mcp-ecosystem/cocoindex-code.md) | mcp-ecosystem | MCP-based semantic code search complements github-patterns' file selection and context discovery |
 | [Screenpipe](../mcp-ecosystem/screenpipe.md) | mcp-ecosystem | Continuous context capture via MCP could enhance Chief of Staff model with ambient project context |
+| [gh-aw](../developer-tools/gh-aw.md) | developer-tools | referenced by gh-aw (developer-tools) |
 
 ---
 

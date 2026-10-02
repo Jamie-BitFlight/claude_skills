@@ -243,3 +243,4 @@ SPEC_WORKFLOW_HOME=/workspace/.spec-workflow-mcp npx -y @pimzino/spec-workflow-m
 |-------|----------|--------------|
 | [openspec-mcp](./openspec-mcp.md) | mcp-ecosystem | referenced by openspec-mcp (mcp-ecosystem) |
 | [open-spdd](../prompt-engineering/open-spdd.md) | prompt-engineering | referenced by open-spdd (prompt-engineering) |
+| [gh-aw](../developer-tools/gh-aw.md) | developer-tools | referenced by gh-aw (developer-tools) |

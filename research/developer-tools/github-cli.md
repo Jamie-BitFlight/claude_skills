@@ -482,3 +482,4 @@ gh run list --limit 5
 | [sidecar](./sidecar.md) | developer-tools | referenced by sidecar (developer-tools) |
 | [awesome-codex-skills-issue-triage](../skill-generation-tools/awesome-codex-skills-issue-triage.md) | skill-generation-tools | referenced by awesome-codex-skills-issue-triage (skill-generation-tools) |
 | [composio-codebase-migrate](../skill-generation-tools/composio-codebase-migrate.md) | skill-generation-tools | referenced by composio-codebase-migrate (skill-generation-tools) |
+| [gh-aw](./gh-aw.md) | developer-tools | referenced by gh-aw (developer-tools) |
