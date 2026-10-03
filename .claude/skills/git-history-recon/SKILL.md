@@ -516,8 +516,6 @@ The required section headers (`## Code Hotspots`, `## Bug Magnets`, `## High-Ris
 ## References
 
 - SOURCE: GitHub issue #2249 — "feat: New skill: git-history-recon for codebase risk profiling before code review", groomed content, Acceptance Criteria, Desired Structure (accessed 2026-05-22)
-- SOURCE: `research/insights/2026-05-10-codebase-recon-skill-improvements.md` (retired; full text in git history at commit aa334b4a88) Improvement 1 — repo-size thresholds (small <500, medium 500–10k, large >10k) and probe commands (accessed 2026-05-22)
-- SOURCE: `research/insights/2026-05-10-codebase-recon-skill-improvements.md` (retired; full text in git history at commit aa334b4a88) Improvement 2 — git-history risk reconnaissance as a standalone skill, Seven-Dimension Parallel Analysis pattern (accessed 2026-05-22)
 - SOURCE: External pattern: <https://github.com/yujiachen-y/codebase-recon-skill> by Jiachen Yu, MIT license — Seven-Dimension Parallel Analysis design, cross-reference and risk identification patterns (accessed 2026-05-22)
 - SOURCE: [linear-walkthrough/SKILL.md](../linear-walkthrough/SKILL.md) — Mermaid-as-authoritative-procedure callout (lines 15–18), `walkthrough/` output directory convention (line 13), parallel-agent dispatch model (accessed 2026-05-22)
 - SOURCE: [create-merge-request-changelog/SKILL.md](../create-merge-request-changelog/SKILL.md) — git command documentation style, `allowed-tools` comma-string format (accessed 2026-05-22)
