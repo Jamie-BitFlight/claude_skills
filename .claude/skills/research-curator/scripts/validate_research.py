@@ -445,6 +445,14 @@ RELEVANCE_ANCHOR_PATH_PATTERN = re.compile(r"`((?:plugins/|\.claude/|rules/|docs
 # any single file can satisfy, so it is excluded from the existence check rather than failed by it.
 _UNRESOLVABLE_PATH_CHARS = "*?[{"
 
+# Patterns for parsing Relevance section presence-anchor items and verifying quotes.
+_RELEVANCE_QUOTE_ITEM_HEAD_PATTERN = re.compile(r"^[-*]\s+\*\*")
+_RELEVANCE_QUOTE_TERM_PATTERN = re.compile(r"^\s*[-*]\s+Term:\s*`([^`]+)`")
+_RELEVANCE_QUOTE_TODAY_PATTERN = re.compile(r'^\s*[-*]\s+Today:\s*"(.*)"\s*$')
+# Characters that have special meaning in git grep basic or extended regex; skip Term check
+# when Term contains any of these, since the Term should be interpreted as a regex pattern.
+_REGEX_SPECIAL_CHARS = r"\.*[^$|?+({}"
+
 
 def exempt_by_date(reference_date: str | None, cutoff: date) -> bool:
     """Report whether an entry's date puts it before a check's cutoff.
@@ -551,6 +559,106 @@ def check_relevance_anchor_paths(
         for candidate in cited
         if not (repo_root / candidate).exists()
     ]
+
+
+def _normalize_quote_text(text: str) -> str:
+    """Normalize quote text for comparison.
+
+    Removes `**` bold markers, collapses whitespace runs to single spaces, and strips.
+
+    Args:
+        text: Raw quote text.
+
+    Returns:
+        Normalized text.
+    """
+    return " ".join(text.replace("**", "").split())
+
+
+def check_relevance_quotes(
+    lines: list[str], sections: dict[str, tuple[int, int]], repo_root: Path | None
+) -> list[Issue]:
+    """Check that Relevance section quotes are found in their cited files.
+
+    Validates presence-anchor items by checking that the `Today:` quote line is found
+    in the cited file (outside YAML frontmatter) and that the optional `Term:` line
+    appears within the quote. Skips entries outside a checkout, missing the Relevance
+    section, and items with no double-quoted `Today:` line.
+
+    Args:
+        lines: Body lines of the entry.
+        sections: Section heading -> (start_line, end_line) mapping.
+        repo_root: Checkout root for resolving cited file paths, or ``None``.
+
+    Returns:
+        List of ``relevance_quote_unverified`` issues found.
+    """
+    section = sections.get(RELEVANCE_SECTION)
+    if section is None or repo_root is None:
+        return []
+
+    start, end = section
+    issues: list[Issue] = []
+    section_lines = lines[start - 1 : end]
+
+    current_path: str | None = None
+    current_term: str | None = None
+
+    for line_offset, line in enumerate(section_lines):
+        if _RELEVANCE_QUOTE_ITEM_HEAD_PATTERN.match(line):
+            current_path = None
+            current_term = None
+            for match in RELEVANCE_ANCHOR_PATH_PATTERN.finditer(line):
+                candidate = match.group(1).split()[0].rstrip(".,;:)")
+                if not any(ch in candidate for ch in _UNRESOLVABLE_PATH_CHARS):
+                    current_path = candidate
+                    break
+
+        term_match = _RELEVANCE_QUOTE_TERM_PATTERN.match(line)
+        if term_match:
+            current_term = term_match.group(1)
+
+        today_match = _RELEVANCE_QUOTE_TODAY_PATTERN.match(line)
+        if not today_match or not current_path:
+            continue
+        file_path = repo_root / current_path
+        if not file_path.is_file():
+            continue
+
+        quoted_text = _normalize_quote_text(today_match.group(1))
+        file_lines = file_path.read_text(encoding="utf-8", errors="replace").splitlines()
+        body_lines = _yaml_body_lines(file_lines) if detect_format(file_lines) == "yaml_frontmatter" else file_lines
+        body_haystack = _normalize_quote_text("\n".join(body_lines))
+
+        if quoted_text not in body_haystack:
+            issues.append({
+                "check": "relevance_quote_unverified",
+                "severity": "error",
+                "message": (
+                    f"{RELEVANCE_SECTION} quotes a line not found in `{current_path}` "
+                    f"outside its YAML frontmatter -- copy the line verbatim, inner double "
+                    f"quotes included"
+                ),
+                "line": start + line_offset,
+            })
+
+        if (
+            current_term
+            and not any(ch in current_term for ch in _REGEX_SPECIAL_CHARS)
+            and _normalize_quote_text(current_term).lower() not in quoted_text.lower()
+        ):
+            issues.append({
+                "check": "relevance_quote_unverified",
+                "severity": "error",
+                "message": (
+                    f"{RELEVANCE_SECTION} quote from `{current_path}` does not contain "
+                    f"its Term `{current_term}` -- a quoted line that lacks the term is "
+                    f"evidence about something else"
+                ),
+                "line": start + line_offset,
+            })
+
+    return issues
 
 
 # Fixed pathspec scope every absence-anchor ``git grep`` command searches, in this exact order --
@@ -1077,6 +1185,7 @@ def _yaml_frontmatter_issues(lines: list[str], repo_root: Path | None) -> list[I
     issues.extend(check_cross_references(sections, entry_date))
     issues.extend(check_relevance_anchored(body_lines, sections, entry_date))
     issues.extend(check_relevance_anchor_paths(body_lines, sections, repo_root))
+    issues.extend(check_relevance_quotes(body_lines, sections, repo_root))
     issues.extend(check_relevance_absence_anchors(body_lines, sections, repo_root))
     return issues
 
@@ -1104,6 +1213,7 @@ def _text_header_issues(lines: list[str], repo_root: Path | None) -> list[Issue]
     issues.extend(check_cross_references(sections, entry_date))
     issues.extend(check_relevance_anchored(lines, sections, entry_date))
     issues.extend(check_relevance_anchor_paths(lines, sections, repo_root))
+    issues.extend(check_relevance_quotes(lines, sections, repo_root))
     issues.extend(check_relevance_absence_anchors(lines, sections, repo_root))
     return issues
 
@@ -1427,26 +1537,20 @@ def check_backlinks(
         repaired = 0
         excluded_writes = 0
         for source, target in asymmetric:
+            source_rel = os.path.relpath(source, vault_path).replace("\\", "/")
+            target_rel = os.path.relpath(target, vault_path).replace("\\", "/")
             # _repair_one_asymmetric_pair writes the reciprocal row into target.
             if target.resolve() in excluded:
                 excluded_writes += 1
-                typer.echo(f"note: excluded, not writing to {target.relative_to(vault_path)}", err=True)
+                typer.echo(f"note: excluded, not writing to {target_rel}", err=True)
                 continue
             try:
                 if _repair_one_asymmetric_pair(bl, source, target, vault_path):
                     repaired += 1
             except OSError as exc:
-                typer.echo(
-                    f"warning: io-error, could not repair {source.relative_to(vault_path)} -> "
-                    f"{target.relative_to(vault_path)}: {exc}",
-                    err=True,
-                )
+                typer.echo(f"warning: io-error, could not repair {source_rel} -> {target_rel}: {exc}", err=True)
             except ValueError as exc:
-                typer.echo(
-                    f"warning: structural, could not repair {source.relative_to(vault_path)} -> "
-                    f"{target.relative_to(vault_path)}: {exc}",
-                    err=True,
-                )
+                typer.echo(f"warning: structural, could not repair {source_rel} -> {target_rel}: {exc}", err=True)
 
         # quiet=True: this rebuild only checks for remaining asymmetric edges after
         # repair; the fix step never touches scan-skip defects, so re-scanning here
