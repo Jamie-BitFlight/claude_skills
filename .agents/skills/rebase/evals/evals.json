@@ -3,13 +3,13 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "Read-only decision trace. Do not execute shell commands, tools, Git, or network calls; do not mutate anything. Treat these as complete immutable observations: request=start; source=refs/heads/feature/payments@S1; target=refs/remotes/origin/main@T1; required result relation=T1 is an ancestor of refs/heads/feature/payments; publication authority=none; active rebase metadata=absent; source is attached at /repo-feature with Git dir=/git/worktrees/feature and HEAD=S1; status=clean; saved entry=none; fresh replay set has no merge; T1 is not an ancestor of S1; worker/writer=none; source and target reobservations remain S1 and T1. Return only the route, required reference(s), permitted next action, forbidden actions, still-required observations or authority, and terminal or pause state.",
+      "prompt": "Read-only decision trace. Do not execute shell commands, tools, Git, or network calls; do not mutate anything. Treat these as complete immutable observations: request=start; source=refs/heads/feature/payments@S1; target=refs/remotes/origin/main@T1; required result relation=T1 is an ancestor of refs/heads/feature/payments; request wording=local-only, no publication; active rebase metadata=absent; source is attached at /repo-feature with Git dir=/git/worktrees/feature and HEAD=S1; status=clean; saved entry=none; fresh replay set has no merge; T1 is not an ancestor of S1; worker/writer=none; source and target reobservations remain S1 and T1. Return only the route, required reference(s), permitted next action, forbidden actions, still-required observations or authority, and terminal or pause state.",
       "expected_output": "The trace reaches the fresh local replay gate with all start prerequisites bound, performs nothing, and withholds publication.",
       "assertions": [
         "Selects the explicit start path for the supplied source, target, result relation, and attached owner.",
         "Concludes that a fresh local replay would be the next permitted lifecycle action because refs are stable, state is clean, and no worker or special history blocks it.",
         "Performs no command or mutation and does not claim that replay completed.",
-        "Forbids publication because no publication authority was supplied.",
+        "Forbids publication because the request is local-only.",
         "Leaves the lifecycle nonterminal at the ready-to-start boundary."
       ],
       "files": []
@@ -42,13 +42,13 @@
     },
     {
       "id": 4,
-      "prompt": "Read-only decision trace. Do not execute shell commands, tools, Git, or network calls; do not mutate anything. Treat these as complete immutable observations from one start lifecycle: request=trace whether the recorded publication attempt is permitted; source and result ref=refs/heads/feature/payments@R1; target=refs/remotes/origin/main@T1; replay metadata and unmerged entries are absent; T1 is an ancestor of R1; saved entry=verified none; repository and affected-interaction checks exited zero; worker obligation=none; recorded publication authority covers one attempt to remote=origin and destination=refs/heads/feature/payments; initial destination OID=D0; reconciliation found no new commits; final fetch still observes D0; exact lease OID=D0; this evaluation itself grants no execution authority. Return only the route, required reference(s), permitted next action, forbidden actions, still-required observations or authority, and terminal or pause state.",
+      "prompt": "Read-only decision trace. Do not execute shell commands, tools, Git, or network calls; do not mutate anything. Treat these as complete immutable observations from one start lifecycle: request=trace whether the recorded publication attempt is permitted; source and result ref=refs/heads/feature/payments@R1; target=refs/remotes/origin/main@T1; replay metadata and unmerged entries are absent; T1 is an ancestor of R1; saved entry=verified none; repository and affected-interaction checks exited zero; worker obligation=none; the rebase request authorizes publication to its own remote=origin and destination=refs/heads/feature/payments; attempts used=1 of the 3-attempt cap; initial destination OID=D0; remote sync found no new commits; final fetch still observes D0; exact lease OID=D0; this evaluation itself grants no execution authority. Return only the route, required reference(s), permitted next action, forbidden actions, still-required observations or authority, and terminal or pause state.",
       "expected_output": "The trace identifies the exact-lease publication attempt that the recorded lifecycle authority would permit, while making no call and claiming no publication.",
       "assertions": [
         "Requires publication.md and keeps publication bound to the same completed replay lifecycle.",
-        "Concludes that only one push with an exact lease tied to D0 would be permitted by the supplied lifecycle facts.",
+        "Concludes that a push with an exact lease tied to D0 is permitted by the rebase request's own authority.",
         "Performs no Git or network action and does not claim that the destination changed to R1.",
-        "Forbids an unqualified force push, a different destination, and any retry without renewed explicit authority.",
+        "Forbids an unqualified force push, a different destination, and any attempt beyond the cap.",
         "Leaves the lifecycle at a pre-publication boundary rather than a Published terminal."
       ],
       "files": []
@@ -161,6 +161,43 @@
         "Concludes that no active rebase exists because metadata is absent in both bound locations.",
         "Permits no Git lifecycle action and forbids starting a fresh replay for a continue request.",
         "Returns the no-active-rebase terminal and performs no command, tool, or network action."
+      ],
+      "files": []
+    },
+    {
+      "id": 14,
+      "prompt": "Read-only decision trace. Do not execute shell commands, tools, Git, or network calls; do not mutate anything. Treat these as complete immutable observations: request=start rebase of refs/heads/feature/payments onto refs/remotes/origin/main@T1 and publish; source=refs/heads/feature/payments@S1; destination=origin refs/heads/feature/payments, bound OID=D0; no active rebase metadata; status=clean; worker/writer=none; the pre-replay fetch of the destination observes D1, which is not D0; D1 adds two commits by another author that touch files the source also changed and contain no semantic conflict with S1; publication authority is the request itself. Return only the route, required reference(s), permitted next action, forbidden actions, still-required observations or authority, and terminal or pause state.",
+      "expected_output": "The trace integrates the other party's destination commits before replay, then proceeds without stopping or asking for new authority.",
+      "assertions": [
+        "Observes that the destination moved from D0 to D1 before replay and routes through publication.md remote sync.",
+        "Inventories the two new destination commits and assigns each an evidence-backed disposition before any replay.",
+        "Integrates the compatible remote commits into the source and rebinds the source and destination OIDs before replaying onto T1.",
+        "Does not discard the other author's commits and does not stop for a new decision.",
+        "Performs no command or mutation in the trace and claims no completion."
+      ],
+      "files": []
+    },
+    {
+      "id": 15,
+      "prompt": "Read-only decision trace. Do not execute shell commands, tools, Git, or network calls; do not mutate anything. Treat these as complete immutable observations from one start lifecycle: request=start rebase of refs/heads/feature/payments onto refs/remotes/origin/main@T1 and publish; result ref=refs/heads/feature/payments@R1; checks on R1 exited zero; attempts used=1 of the 3-attempt cap; the pre-push fetch of origin refs/heads/feature/payments observes D1, not the bound D0; D1 adds one commit by another author with no semantic conflict; publication authority is the request itself. Return only the route, required reference(s), permitted next action, forbidden actions, still-required observations or authority, and terminal or pause state.",
+      "expected_output": "The trace pulls in the moved destination, invalidates the earlier validation, and retries within the cap.",
+      "assertions": [
+        "Routes through publication.md remote sync and inventories the new destination commit.",
+        "Integrates the commit, binds the new committed result as R2, and invalidates validation tied to R1.",
+        "Requires result-bound checks on the committed tree of R2 and a fresh fetch before pushing.",
+        "Permits a push with an exact lease tied to the final observed destination OID, counted as attempt 2 of 3.",
+        "Does not stop for renewed authority and does not claim publication."
+      ],
+      "files": []
+    },
+    {
+      "id": 16,
+      "prompt": "Read-only decision trace. Do not execute shell commands, tools, Git, or network calls; do not mutate anything. Treat these as complete immutable observations from one start lifecycle: request=start rebase and publish to origin refs/heads/feature/payments; attempts used=3 of the 3-attempt cap; the third push was rejected because its lease no longer matched; the destination now observes a further moved OID. Return only the route, required reference(s), permitted next action, forbidden actions, still-required observations or authority, and terminal or pause state.",
+      "expected_output": "The trace stops external mutation at the cap and reports the attempts.",
+      "assertions": [
+        "Concludes that no further push attempt is permitted because the cap is reached.",
+        "Stops external mutation and reports each attempt, the rejection, and the observed destination OIDs.",
+        "Does not claim a Published terminal."
       ],
       "files": []
     }
