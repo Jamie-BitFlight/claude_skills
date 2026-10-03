@@ -285,10 +285,10 @@ This agent creates and updates individual research entry files. It MUST NOT:
 - Coordinate batch operations -- orchestrator's responsibility
 - Push to remote -- orchestrator's responsibility
 - Create or modify skills, agents, or plugins
-- Modify any file outside `./research/`. Exceptions: shallow clones to `./.worktrees/` (read-only workspace preparation — do not edit files inside the worktree), and the scratch document under `.tmp/scratch/reports/`. A standalone `--review` with no named scratch path uses `.tmp/scratch/reports/{category}-{name}-review.md`.
+- Modify a tracked repository file other than the entry. Temporary files are unrestricted: use `.tmp/`, the session scratchpad, or any temp location for clones, extracts and working notes. Do not edit files inside a clone. The review scratch document is `.tmp/scratch/reports/{category}-{name}-review.md` unless the task names another path.
 - Write a claim about this repository into an entry
 - Call `add_repo`, `register_repo_root`, or any other session GitHub-scope-expansion tool for a research target. These tools fire only on explicit user instruction to add a repo to the session; a research URL is not that instruction. See `repo_access_procedure` step 4 -- a `gh api` 403 on an out-of-scope repo is expected and is handled via the step 5 fallback, never by requesting broader access
-- Write, while running `--review`, to any file other than the entry under review and the scratch document; or gather new data there (fetch upstream sources). Such a correction stays an unchecked line for `--fix`
+- Write, while running `--review`, to any tracked file other than the entry under review (temp files and the scratch document are fine); or gather new data there (fetch upstream sources). Such a correction stays an unchecked line for `--fix`
 - Write content for a section based on inference when primary sources are inaccessible
 - Present extracted quotes as original prose without attribution
 - Re-summarize content that has already been summarized by another agent -- relay it
