@@ -11,7 +11,7 @@ freshness_tracking:
   last_verified: 2026-10-02
   version_at_verification: 1.6.3
   next_review: 2027-01-02
-  confidence_map: "Overview: high | Features: high | Architecture: high | Usage: high | Limitations: medium"
+  confidence_map: "Overview: high | Features: medium | Architecture: medium | Usage: high | Limitations: low | Problem Addressed: high | Relevance to Claude Code Development: medium"
 ---
 
 # Jakub Krehel Interface Skills Collection
@@ -40,7 +40,7 @@ A distributed collection of specialized agent skills for building product interf
 
 - `better-interface` combines all domain skills in order: accessibility → layout → writing → typography → colors → UI polish
 - Consolidates evidence across domains, ranks findings by user impact, caps report at 15 findings
-- Escalation triggers (accessibility failures, keyboard reachability, contrast, reduced-motion, content clipping, destructive actions without confirmation) rank HIGH severity immediately
+- Escalation triggers (the list includes an interactive control with no accessible name, keyboard reachability, contrast, reduced-motion, content clipping, destructive actions without confirmation) rank HIGH severity immediately
 - Shared severity scale: HIGH (blocks task, misleads user, hides content, causes data loss, repeated systemic failure), MEDIUM (harms comprehension/efficiency/adaptability/consistency), LOW (isolated polish)
 
 ### Domain Skills Covering Product Interface
@@ -63,8 +63,8 @@ A distributed collection of specialized agent skills for building product interf
 
 - `break` renders a component in every scenario it accepts (content length, states, container widths)
 - Runs one load, one look in a browser; observes and reports what visibly broke
-- Finds owner domain skill for each break, routed to the right fix workflow
-- Destroys throwaway test harness after findings are reported
+- Names the owning domain skill for each break in an Owner column; fixes nothing unless asked
+- Leaves the throwaway test page running after the findings are reported; deletes it and its fixtures only when the user says they are done with it
 
 ### Specialized Review Entry Points
 
@@ -103,15 +103,17 @@ Each skill links to supporting `.md` files for depth beyond principles:
 
 - `better-ui/surfaces.md`: radius, shadow, outline recipes
 - `better-ui/enter-exit.md`: entrance animation stagger guidance
-- `better-ui/animations.md`: keyframe vs transition use; icon animation techniques; theme-switch suppression
+- `better-ui/animations.md`: interruptible animations (CSS transitions vs keyframes), scale on press, skipping animation on page load, theme-switch suppression, motion restraint
+- `better-ui/icon-transitions.md`: contextual icon animation recipes
 - `better-ui/icons.md`: icon sizing, stroke weights, RTL behavior
 - `better-ui/performance.md`: will-change usage
-- `better-colors/palette-construction.md`: palette building recipes
-- `better-typography/type-scale.md`: type system design
+- `better-colors/palette-structure.md`: which ramps a system needs and what each step is for
+- `better-colors/palette-generation.md`: producing ramp values from a brand color, color libraries, dark mode
+- `better-typography/spacing-and-sizing.md`: units, type scale, heading hierarchy, kerning and letter-spacing, line-height, text trimming
 - `variant/picker.md`: URL picker implementation
 - `break/scenarios.md`: scenario axes and applicability cues
 - `interface-review/scope-resolution.md`: scope detection for branches, PRs, uncommitted changes
-- `interface-review/removed-signals.md`: interface reading signals no longer present in removed code
+- `interface-review/removed-signals.md`: what to look for on the `-` side of a diff hunk and which domain skill owns the judgement
 
 ### Distribution and Plugin Manifest
 
@@ -132,7 +134,7 @@ Both entry points discover skills from `skills/` directory automatically; no man
 npx skills add jakubkrehel/skills
 ```
 
-Skill invocation: `/better-interface`, `/variant`, `/break` (each user-invoked skill on its own)
+Skill invocation: `/better-interface`, `/variant`, `/break`
 
 ### Claude Code Plugin
 
@@ -166,9 +168,9 @@ The skill resolves scope, reads the project's conventions from contributing/desi
   - Change: none — the delegate skill implements orchestration patterns (phase decomposition, dispatch, adjudication) that mirror `better-interface`'s multi-domain skill routing and consolidation
 
 - **Plugin distribution and marketplace registration** → `.claude-plugin/marketplace.json`
-  - Term: `marketplace`
-  - Today: The marketplace.json file at the repository root registers plugins and their sources, allowing installation via `/plugin marketplace add` or `npx skills add` — a mechanism the jakubkrehel/skills repository itself uses
-  - Change: none — marketplace distribution and dual-channel publishing (npm + Claude Code) are already patterns in this repository
+  - Term: `source`
+  - Today: `"source": "./plugins/agent-orchestration"`
+  - Change: none — this repository's `.claude-plugin/marketplace.json` already registers each plugin by `name` and `source` path, the same registration role as the jakubkrehel/skills `.claude-plugin/marketplace.json`; the npm `skills` channel is not present in this file
 
 ### Patterns Worth Adopting
 
@@ -178,16 +180,16 @@ The skill resolves scope, reads the project's conventions from contributing/desi
   - Change: none — the code-review agent's principle (respect existing patterns, focus on correctness within context) mirrors jakubkrehel/skills' separation of concerns: `better-interface` routes to domain experts, each domain enforces its own rules, neither overrides deliberate project choices
 
 - **Evidence-first review criteria** → `rules/fact-verification-first.md`
-  - Term: `evidence`
-  - Today: Rule requires verification against primary sources rather than inference, matching the jakubkrehel design reviews' escalation-trigger approach
-  - Change: none — the fact-verification-first rule carries the same principle; the design review's escalation triggers are a realization of it in a different domain
+  - Term: `verification`
+  - Today: "No planning, design, or code generation may occur before this verification step completes."
+  - Change: none — the rule fires when a prompt names a specific product, technology, version, or release event and requires a `WebSearch` before planning; it is a pre-planning fact check, a different mechanism from the jakubkrehel escalation triggers, which rank review findings. Both put checked facts ahead of judgment, but the rule does not implement the triggers
 
 ### Integration Opportunities
 
-- **Component quality gates and stress testing** → `plugins/development-harness/skills/review-verdict-contract/SKILL.md`
-  - Term: `component.*gate`
-  - Today: "Load the shared verdict, punch-list, SKIP, and gate schema used by the dh multi-perspective review orchestrator, reviewers, and synthesizer."
-  - Change: the dh review verdict schema gates component quality across reviewers; extending this with component stress-test routing (similar to `break`'s scenario exploration) would catch visual and behavioral breaks before code review
+- **Component quality gates and stress testing** → `plugins/development-harness/skills/review-verdict-contract/references/verdict-schema.md`
+  - Term: `BLOCKER`
+  - Today: "`findings[].severity`: `BLOCKER` means the verdict is `REJECT`; `MINOR` and `INFO` do not block"
+  - Change: hypothesis, not yet tested — a `break`-like stress-test perspective could add rendered-component findings to the verdict schema that the existing reviewers do not produce. Verification step: read `plugins/development-harness/skills/review-verdict-contract/references/verdict-schema.md` and the reviewer skills to confirm whether any local reviewer renders UI
 
 - **Robustness validation through stress testing** → `plugins/agentskill-kaizen/references/arl-ARL-agent-instructions.md`
   - Term: `stress.*test`
@@ -208,6 +210,10 @@ The skill resolves scope, reads the project's conventions from contributing/desi
 - [break SKILL.md](https://github.com/jakubkrehel/skills/blob/main/skills/break/SKILL.md) (accessed 2026-10-02)
 - [interfaces.dev — Jakub Krehel's design magazine](https://interfaces.dev/) (accessed 2026-10-02)
 - [jakub.kr/ — Personal website](https://jakub.kr/) (accessed 2026-10-02)
+
+## Limitations and Caveats
+
+Not mentioned in documentation.
 
 ---
 

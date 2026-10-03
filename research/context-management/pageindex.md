@@ -11,7 +11,7 @@ freshness_tracking:
   last_verified: 2026-10-02
   version_at_verification: 0.2.10
   next_review: 2027-01-02
-  confidence_map: "Overview: high, Problem Addressed: high, Key Features: high, Technical Architecture: high (doc + code-read), Installation & Usage: high, Limitations: medium"
+  confidence_map: "Overview: high, Problem Addressed: high, Key Features: high, Technical Architecture: medium (doc + code-read), Installation & Usage: high, Limitations: medium, Relevance to Claude Code Development: medium"
 ---
 
 # PageIndex
@@ -84,17 +84,17 @@ The Python SDK supports both local mode (on-machine indexing with your own LLM k
 - `index`: controls indexing strategy (`"gpt-5.6-luna"`, other model names for local mode; `"cloud"` for cloud mode)
 - `chat`: specifies the model for searching the tree (`"gpt-5.6-sol"`, OpenAI/Anthropic/Claude model identifiers, or `"litellm/{provider}/{model}"`)
 
-**LocalAPI** (Source: pageindex/local_api.py) — Backs `PageIndexClient`'s local mode. Manages indexing and retrieval workflows on the client's machine, handling document submission, tree generation, and LLM-driven tree search.
+**LocalAPI** (Source: pageindex/local_api.py — class LocalAPI) — Backs `PageIndexClient`'s local mode. Manages indexing and retrieval workflows on the client's machine, handling document submission, tree generation, and LLM-driven tree search.
 
-**DocStore** (referenced in LocalAPI) — Persistent local storage layer for indexed documents and their tree structures, using the filesystem for document and tree data.
+**DocStore** (Source: pageindex/local_store.py — class DocStore) — Persistent local storage layer for indexed documents and their tree structures, using the filesystem for document and tree data.
 
-**PageIndex Flash** (Source: pageindex/flash module) — LLM-free tree extraction from PDF layout statistics. Analyzes PDF structure (text positioning, font sizes, spacing) to generate hierarchical tree indices without LLM API calls.
+**PageIndex Flash** (Source: pageindex/flash/api.py — page_index_flash()) — LLM-free tree extraction from PDF layout statistics. Analyzes PDF structure (text positioning, font sizes, spacing) to generate hierarchical tree indices without LLM API calls.
 
-**CloudAPI** — Handles communication with PageIndex Cloud for managed indexing and retrieval when `index="cloud"` is configured.
+**CloudAPI** (Source: pageindex/cloud_api.py — class CloudAPI) — Handles communication with PageIndex Cloud for managed indexing and retrieval when `index="cloud"` is configured.
 
 ### Indexing Flow
 
-1. **PDF Parsing**: Document submitted via `client.submit_document(file_path)` returns a `doc_id`
+1. **PDF Parsing**: Document submitted via `client.submit_document(file_path)` returns a `doc_id`. In local mode the submitted file must have a `.pdf` name; any other extension raises `PageIndexAPIError` ("only PDF files are supported in local mode"). (Source: pageindex/local_api.py — class LocalAPI)
 2. **Tree Generation**:
    - Local mode: PageIndex Flash extracts layout-based structure, or LLM-driven indexing with the configured `index` model summarizes and refines nodes
    - Cloud mode: PageIndex Cloud handles parsing, OCR, and tree construction
@@ -102,7 +102,7 @@ The Python SDK supports both local mode (on-machine indexing with your own LLM k
 
 ### Retrieval Flow
 
-1. **Query Submission**: `client.chat(question, doc_id=doc_id)` initiates retrieval
+1. **Query Submission**: `client.chat(question, doc_id=doc_id)` initiates retrieval. The `doc_id` parameter is typed `Optional[Union[str, list[str]]]`, so a list of document IDs is accepted. (Source: pageindex/client.py — class PageIndexClient, method `chat`)
 2. **Tree Search**: Chat model (configured via `chat=`) reasons over the tree structure, selecting which nodes to read
 3. **Context Assembly**: Only the nodes the model reached are fetched and assembled into the prompt context
 4. **Response Generation**: Model generates answer with citations extracted and deduplicated from tree node metadata
@@ -178,8 +178,8 @@ print(answer)
 
 ### Model Recommendations
 
-- **Index model**: A basic model is sufficient because the tree structure is extracted from layout without LLM processing (Flash indexing). The index model only summarizes and refines nodes.
-- **Chat model**: Use the best model available. The chat model drives tree search and directly affects retrieval accuracy. Cost scales with model capability and document length accessed.
+- **Index model**: The README states: "`index=`: a basic model is sufficient. The tree structure itself is extracted from the document layout without an LLM; the index model only summarizes and refines it, which a basic model does well." (Source: README.md, accessed 2026-10-02)
+- **Chat model**: The README states: "`chat=`: use the best model you can afford. The chat model searches the tree to retrieve information." (Source: README.md, accessed 2026-10-02)
 
 ### Agent SDK Integration
 
@@ -196,10 +196,11 @@ tools = get_pageindex_tools(client=pageindex_client)
 ## Limitations and Caveats
 
 - **Local mode OCR**: PageIndex local mode handles text-based PDFs. For scanned documents or images, PageIndex Cloud with OCR is required. (Source: official documentation, accessed 2026-10-02)
-- **Model cost variability**: Retrieval cost and accuracy depend directly on the chat model's capabilities; weaker models may miss relevant sections. (Inferred from SDK architecture: chat model drives tree search and directly affects accuracy.)
+- **Chat model choice**: The README directs users to "use the best model you can afford" for `chat=` because that model searches the tree. Measured failure rates for weaker chat models: not mentioned in documentation. (Source: README.md, accessed 2026-10-02)
 - **Citation granularity tradeoff**: Local mode provides page-level citations; cloud mode provides block-level citations with more precise location information. (Source: documentation, accessed 2026-10-02)
-- **Indexing not optimized for sparse documents**: Flash indexing works best on documents with clear layout structure; documents with irregular formatting may require the slower LLM-driven indexing path. (Inferred from Flash indexing design: layout-based extraction assumes clear document structure.)
-- **Multi-document reasoning**: While PageIndex supports multi-document search, cross-document reasoning connections are not explicitly modeled in the tree structure; reasoning happens at retrieval time only. (Inferred from architecture: tree indices are per-document; multi-doc queries concatenate results without structural cross-references.)
+- **Flash indexing can refuse a document**: `flash_rejection_reason` returns a refusal when a PDF has no text layer ("scanned or image-only; run OCR before indexing it"), when a document of more than `FLAT_TREE_MAX_NODES` pages has no layout structure, or when no structure can be extracted; the latter two messages direct the caller to `mode='standard'`, "which builds the structure with the model". (Source: pageindex/flash/api.py — flash_rejection_reason())
+- **Multi-document reasoning**: The README lists "multi-document search" among SDK-configurable features, and `chat` accepts a list of `doc_id` values. Whether cross-document relationships are modeled structurally: not mentioned in documentation. (Source: README.md, accessed 2026-10-02; pageindex/client.py — class PageIndexClient, method `chat`)
+- **Markdown input**: In local mode `submit_document` accepts only `.pdf` files. A separate function, `md_to_tree(md_path, ...)`, exists in `pageindex/page_index_md.py`; the `chat` and `submit_document` documentation does not describe it as a path into the client. (Source: pageindex/local_api.py — class LocalAPI, pageindex/page_index_md.py — md_to_tree())
 
 ---
 
@@ -207,33 +208,22 @@ tools = get_pageindex_tools(client=pageindex_client)
 
 ### Applications
 
-- **Long document analysis in agents** -> `.claude/agents/research-utilization-assessor.md`
-  - Term: `research utilization`
-  - Today: "Assess whether an existing skill, agent, or workflow in this repo could directly call, depend on, or integrate the tool described in a research entry as an external service, API, or SDK dependency."
-  - Change: Integrate PageIndex SDK to enable research-utilization-assessor to analyze long research documents, PDFs, and reference materials by querying indexed trees instead of passing full documents, reducing API cost and context pressure.
+- **Research entry assessment in `research-utilization-assessor`** -> `.claude/agents/research-utilization-assessor.md`
+  - Term: `utilization`
+  - Today: "Assess utilization opportunities from ./research/{category}/{name}.md"
+  - Change: none — out of scope (the agent's input is a Markdown research entry, `./research/{category}/{name}.md`; PageIndex local mode rejects non-PDF files in `submit_document` (pageindex/local_api.py — class LocalAPI), and no failure of this agent on entry length is recorded in `research/insights/2026-10-02-pageindex-improvements.md`)
 
-- **Document-based agent tools** -> `AGENTS.md`
-  - Term: `delegate`
-  - Today: "When the user says \"can you\", they mean \"orchestrate this via sub-agents\" — delegate accordingly."
-  - Change: PageIndex integrations with Claude Agent SDK (claude-agent-sdk optional dependency) and Anthropic SDK enable agents to retrieve precise, traceable information from long documents without exhausting context, supporting delegation workflows over large reference materials.
-
-- **Research entry processing and multi-document synthesis** -> `.claude/agents/research-insight-extractor.md`
-  - Term: `document retrieval`
-  - Today: Referenced as part of extracting insights from research entries and creating structured analysis of external tools.
-  - Change: PageIndex enables research-insight-extractor to index and query multiple research entries and external documentation simultaneously, identifying patterns and connections across documents that would be expensive or impossible with native PDF input to the model.
-
-### Patterns Worth Adopting
-
-- **Hierarchical information organization** -> `plugins/development-harness/dh_core/ledger_spec.py`
-  - Term: `tree structure retrieval`
-  - Today: Work ledger defines a state machine and task tracking structure; reading a task requires sequential access through status fields.
-  - Change: none — `ledger_spec.py` already models tasks as structured hierarchies; PageIndex's tree reasoning approach could inspire similar reasoning-based navigation patterns when tasks or workflows grow complex.
+- **Research entry processing in `research-insight-extractor`** -> `.claude/agents/research-insight-extractor.md`
+  - Term: `research entry`
+  - Today: "Takes one completed research entry and produces concrete, measurable improvement proposals for this repo's skills, agents, and workflows."
+  - Change: none — out of scope (the agent processes one Markdown entry per run, which it reads directly; PageIndex local mode accepts only PDF files, and the README lists multi-document search without describing cross-document relationship modeling)
 
 ### Integration Opportunities
 
-- **PageIndex MCP server for long-document retrieval in agent workflows** -> `docs/MCP-INDEX.md`
-  - Today: The repo documents MCP architecture and integration patterns (`docs/MCP-INDEX.md`, `docs/mcp-architecture-analysis.md`), and multiple plugins expose MCP servers for specialized tasks. Document analysis is addressed per-skill (e.g., `audit-documentation-drift` for drift detection, `codebase-analyzer` for code understanding) but no unified MCP service exists for general-purpose reasoning-based document indexing and retrieval.
-  - Change: Create an MCP server wrapping PageIndex SDK to expose document indexing and retrieval as MCP tools available to any agent in the system. Expose tools for `index_document(file_path, doc_id)`, `query_index(doc_id, question)`, and `get_citations(result)` operations. Allow configuration via PageIndex Cloud API key or local model settings. Agents would use this to retrieve from long reference documents without exhausting context, complementing task-specific analysis skills.
+- **PageIndex SDK as MCP tools (`index_document`, `query_index`) for PDF sources** -> `docs/MCP-INDEX.md`
+  - Term: `Model Context Protocol`
+  - Today: "Complete documentation for adding Model Context Protocol (MCP) servers to claude_skills plugins."
+  - Change: Do not add a standalone PageIndex MCP server for Markdown: R1 of `plugins/development-harness/docs/agent-markdown-consumption-contract.md` ("A single markdown engine serves every markdown consumption path") already assigns Markdown tree navigation to the `progressive_markdown` engine, and PageIndex local mode takes only PDFs. A PageIndex-backed wrapper is only justified for PDF sources, and then as a provider feeding that engine (`plugins/development-harness/progressive_markdown/providers.py`) rather than as a parallel server.
 
 ---
 
