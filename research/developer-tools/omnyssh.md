@@ -11,7 +11,7 @@ freshness_tracking:
   last_verified: 2026-10-02
   version_at_verification: 1.1.4
   next_review: 2027-01-02
-  confidence_map: "Overview: high | Features: high | Architecture: medium | Usage: high | Limitations: high | Relevance: medium"
+  confidence_map: "Overview: high | Problem Addressed: high | Features: high | Architecture: medium (code-read) | Usage: high | Limitations: low | Relevance: medium"
 ---
 
 # OmnySSH
@@ -29,7 +29,7 @@ OmnySSH is an open-source SSH client and server management tool providing "Every
 | Managing multiple SSH connections scattered across terminal tabs and tmux sessions | Unified dashboard organizing all hosts as cards with live status and one-click connection switching |
 | Manual SSH key setup and secure credential management | Automated SSH key generation, `authorized_keys` configuration with rollback protection, and passphrase caching |
 | Lack of visibility into remote server health | Live dashboard displaying CPU, RAM, disk usage, uptime, OS version, and top processes per host; bars turn yellow/red as thresholds breach |
-| Inefficient file transfer workflows | Two-panel SFTP browser (local left, remote right) with drag-and-drop, progress bars, and bulk operations |
+| Inefficient file transfer workflows | Two-panel SFTP browser (local left, remote right) with progress bars and bulk operations; select files and move across panels |
 | Repetitive command execution across hosts | Snippets with parameter substitution; execute a single snippet across multiple selected hosts at once |
 | Terminal bloat from competing tools | Single lightweight application (~20 MB download) versus Termius (~649 MB RAM, 9 processes) or scattered tmux + ssh tools |
 
@@ -110,20 +110,19 @@ OmnySSH is structured as a **Rust cargo workspace with frontend-agnostic archite
   - Local port forwarding / SSH tunneling
   - Source files: `client.rs`, `pool.rs`, `session.rs`, `sftp.rs`, `pty.rs`, `metrics.rs`
 
-**SSH Identity & Authentication (`identity.rs`, `password.rs`, `known_hosts.rs`, `key_setup.rs`)**:
+**SSH Identity & Authentication** (Source: `crates/omnyssh-core/src/ssh/identity.rs`, `password.rs`, `known_hosts.rs`, `key_setup.rs`):
   - Identity file discovery and management
   - Password authentication with retry handling
   - Known hosts verification
   - Automated SSH key setup: generates Ed25519 key, appends to `authorized_keys`, disables password login with rollback on failure
 
-**Configuration (`config/` module)**:
+**Configuration** (Source: `crates/omnyssh-core/src/config/ssh_config.rs`, `app_config.rs`, `snippets.rs`):
   - SSH config parser supporting `ProxyJump`, `Include` directives with glob patterns, and host aliases
   - Application config (TOML-based for TUI: themes, keybindings, snippets)
-  - Source: `config/ssh_config.rs`, `config/app_config.rs`, `config/snippets.rs`
 
-**Smart Server Context Discovery (`discovery.rs`, `services/`)**: Service detection on remote servers
+**Smart Server Context Discovery** (Source: `crates/omnyssh-core/src/ssh/discovery.rs`, `services/`): Service detection on remote servers
   - Detects: Docker (container count), Nginx (configuration), PostgreSQL (status), Redis (connectivity), Node.js (version)
-  - Source files: `services/docker.rs`, `services/nginx.rs`, `services/postgresql.rs`, `services/redis.rs`, `services/nodejs.rs`
+  - Source files: `crates/omnyssh-core/src/ssh/services/docker.rs`, `nginx.rs`, `postgresql.rs`, `redis.rs`, `nodejs.rs`
 
 **Event System (`event.rs`)**: Domain events for background task communication
   - Background tasks (metrics poller, SFTP, PTY sessions, discovery, updater) report via `CoreEvent` enum over `mpsc` channel
@@ -140,7 +139,7 @@ OmnySSH is structured as a **Rust cargo workspace with frontend-agnostic archite
 
 1. **Metrics polling**: Background task on interval → runs remote commands (cpu, df, uptime, ps) → parses stdout → emits `CoreEvent::MetricsUpdate` → frontend renders dashboard bars
 2. **PTY session**: User connects to host → `Session` struct spawned → PTY child process spawned via russh channel → I/O reader thread → parses into vt100 terminal state → emits `CoreEvent::PtyOutput` when terminal updated → frontend renders terminal
-3. **SFTP file transfer**: User selects files → `SftpManager` opens channel → `FileEntry` list returned → user drags across panels → progress callback emits `CoreEvent::FileTransferProgress` → progress bar updates
+3. **SFTP file transfer**: User selects files → `SftpManager` opens channel → `FileEntry` list returned → user moves selected files across panels → progress callback emits `CoreEvent::FileTransferProgress` → progress bar updates
 
 ### Dependencies
 
@@ -233,13 +232,16 @@ man omny
 
 ### First Run
 
-The app opens with an empty dashboard. It reads existing `~/.ssh/config` at startup (hosts behind `ProxyJump` bastion included) but never writes to it. Hosts are stored separately in the app's local database.
+The app opens with an empty dashboard. It reads existing `~/.ssh/config` at startup (hosts behind `ProxyJump` bastion included) but never writes to it. Manually added hosts are stored in the application's local configuration (source: README, no details on storage mechanism provided).
 
 ---
 
 ## Limitations and Caveats
 
-Not mentioned in documentation.
+**Documented caveats** (Source: README):
+- **No confirmation step in SSH key setup flow**: When initiating the automated SSH key setup process (`Set up SSH key` button), "starting the flow means going through with it" — there is no intermediate confirmation prompt to cancel the operation after it begins. The server's `sshd_config` backup is created and password login is disabled with rollback protection, but the user cannot interrupt the flow once started.
+
+**Undocumented limitations**: The reviewed sources (README, CONTRIBUTING.md, crate documentation) document no additional limitations on compatibility, deployment environments, authentication methods, or operational constraints. (Confidence: low — absence of documented limitations does not confirm absence of limitations.)
 
 ---
 
@@ -250,17 +252,17 @@ Not mentioned in documentation.
 - **PTY multiplexing and session management** -> `AGENTS.md`
   - Term: `PTY`
   - Today: "On a TTY error (`Inappropriate ioctl for device`, `not a terminal`, `ENOTTY`), or before running any tool that requires a TTY (including `git rebase -i`/`git add -i`), read `rules/interactive-terminal-workarounds.md` for PTY providers and non-interactive equivalents."
-  - Change: The interactive-terminal-workarounds skill could leverage omnyssh's PTY/terminal multiplexing patterns (vt100 screen parsing, multi-session management) to handle complex TTY requirements in AI agent orchestration workflows
+  - Change: already covered — `rules/interactive-terminal-workarounds.md` (lines 7-20) documents tmux as the current PTY provider for Claude Code. OmnySSH's vt100 screen model is a Rust library inside a GUI/TUI SSH client, not a callable tool for agent orchestration.
 
 - **Real-time metrics and monitoring** -> `rules/ci-workflows.md`
   - Term: `metrics`
-  - Today: `Q3 -->|No — post-processing only: metrics, cache, coverage| Accept[Acceptable]`
-  - Change: OmnySSH's metrics poller patterns (background tasks → structured events → UI display) could inform how CI pipeline metrics are collected and surfaced in development-harness workflows
+  - Today: Line 116 documents post-processing decision: `continue-on-error: true` acceptable for metrics jobs
+  - Change: out-of-scope — the rule is about CI job sequencing, not pipeline metrics architecture. Development-harness has no live metrics collection surface that OmnySSH's patterns could extend.
 
 - **Event system architecture for async communication** -> `plugins/plugin-creator/skills/hook-creator/SKILL.md`
   - Term: `event system`
-  - Today: "Create hooks that integrate with the Claude Code event system. Hooks automate validation, enforcement, and context injection across the session lifecycle."
-  - Change: OmnySSH's CoreEvent enum and event channel pattern (background tasks report standardized events, frontends consume via channel) parallels Claude Code's hook/event model; could inform cross-session event broadcast and loose coupling between agent subsystems
+  - Today: Lines 10+ document hook creation for Claude Code's harness-defined event system. Hooks consume session lifecycle events for validation and context injection.
+  - Change: out-of-scope — Claude Code's hook events are defined by the harness, not in this repository. No local event bus exists for OmnySSH's `CoreEvent` pattern to extend.
 
 ### Patterns Worth Adopting
 
@@ -284,7 +286,7 @@ Not mentioned in documentation.
 - [CONTRIBUTING.md](https://github.com/timhartmann7/omnyssh/blob/main/CONTRIBUTING.md) — workspace layout, development setup, architecture overview (accessed 2026-10-02)
 - [omnyssh-core/src/lib.rs](https://github.com/timhartmann7/omnyssh/blob/main/crates/omnyssh-core/src/lib.rs) — module documentation, separation of concerns (accessed 2026-10-02)
 - [omnyssh-core/src/event.rs](https://github.com/timhartmann7/omnyssh/blob/main/crates/omnyssh-core/src/event.rs) — CoreEvent enum, domain events, background task communication (accessed 2026-10-02)
-- [omnyssh-core/src/ssh/mod.rs](https://github.com/timhartmann7/omnyssh/blob/main/crates/omnyssh-core/src/ssh/mod.rs) — SSH module components, russh client, metrics, SFTP, PTY, services (accessed 2026-10-02)
+- [omnyssh-core/src/ssh/](https://github.com/timhartmann7/omnyssh/tree/main/crates/omnyssh-core/src/ssh) — SSH module: client.rs, pool.rs, session.rs, sftp.rs, pty.rs, metrics.rs, discovery.rs, services/, identity.rs, password.rs, known_hosts.rs, key_setup.rs (accessed 2026-10-02)
 - [omnyssh-core/Cargo.toml](https://github.com/timhartmann7/omnyssh/blob/main/crates/omnyssh-core/Cargo.toml) — dependencies, russh version, async runtime configuration (accessed 2026-10-02)
 - [Cargo.toml (root workspace)](https://github.com/timhartmann7/omnyssh/blob/main/Cargo.toml) — version 1.1.4, Rust 1.89+, workspace members (accessed 2026-10-02)
 
