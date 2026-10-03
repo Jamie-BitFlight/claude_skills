@@ -54,7 +54,8 @@ flowchart TD
     Confidence --> Validate[Phase 5 — Verify every claim traces to an extract]
     Validate --> SelectCat[Select category from entry-template.md flowchart]
     SelectCat --> WriteFile[Write entry to ./research/category/resource-name.md]
-    WriteFile --> Return[Return structured result]
+    WriteFile --> SelfCheck[Self-Check Before Returning]
+    SelfCheck --> Return[Return structured result]
 
     Rerun --> ReadExisting[Read existing entry file]
     ReadExisting --> ReGather[Re-gather fresh data from primary sources]
@@ -64,11 +65,11 @@ flowchart TD
     ReDocCheck -->|"Any NO — trigger code analysis"| RePhase1b[Phase 1b — Read source files from worktree<br>up to 12 files in tier order<br>merge code extracts with doc extracts]
     RePhase1b --> ReAnchor
     ReAnchor[Phase 1c — re-run the Repo Anchor Pass<br>re-verify every path the existing Relevance section cites<br>rewrite items whose anchor no longer resolves] --> UpdateEntry[Update changed sections, preserve unchanged<br>keep the entry's existing path, category, and freshness format]
-    UpdateEntry --> Return
+    UpdateEntry --> SelfCheck
 
     Fix --> ReadEntry[Read entry file]
     ReadEntry --> FixIssues[Fix only flagged issues]
-    FixIssues --> Return
+    FixIssues --> SelfCheck
 
     Review --> Scope["Resolve the rubric's Review scope<br>entry + the analysis files the invocation states, none meaning none<br>standalone invocation only: glob research/insights/"]
     Scope --> LoadRubric["Load entry-review-rubric.md<br>run each gate in order over the files that gate names<br>a gate that cannot run is NOT RUN, never a pass"]
@@ -192,7 +193,8 @@ flowchart TD
     Confidence --> References[Compile all sources with full URL and access date]
     References --> Freshness[Set freshness tracking -- next review in 3 months]
     Freshness --> WriteFile[Write entry to ./research/category/resource-name.md]
-    WriteFile --> Done([Return result])
+    WriteFile --> SelfCheck[Self-Check Before Returning]
+    SelfCheck --> Done([Return result])
 ```
 
 ### `--rerun` Mode (re-research existing entry)
@@ -216,16 +218,18 @@ flowchart TD
    (`freshness_tracking.last_verified` etc.) for entries using that format, or in the body
    `## Freshness Tracking` table for legacy text-header entries. Match whichever format the
    entry already uses; do not convert one to the other during a refresh.
-9. In the result, list what changed and what was confirmed unchanged. Report anchors that went
-   stale as changes, naming the path that no longer resolves.
+9. Run the [Self-Check](#self-check-before-returning).
+10. In the result, list what changed and what was confirmed unchanged. Report anchors that went
+    stale as changes, naming the path that no longer resolves. An unchanged target file is a failed
+    refresh: set Status `failed` and say the file was not changed.
 
 ### `--fix` Mode (fix validation issues)
 
-1. Receive the specific issues to fix (from validate_research.py output).
+1. Receive the specific issues to fix: validate_research.py output, or an entry-review verdict's defects. A verdict may name an analysis file under `./research/insights/`; correct that file too.
 2. READ the entry file.
 3. Fix ONLY the specified issues. Do NOT rewrite sections that are not flagged.
 4. `relevance_unanchored` is the one flagged issue that is not a text fix: it reports that Phase 1c never ran. Run the Repo Anchor Pass from [Extraction Methodology](.claude/skills/research-curator/references/extraction-methodology.md) and rewrite the Relevance section from the anchors it produces. Rewording the existing prose leaves the entry saying the same uncheckable thing and clears the regex, which is worse than leaving it flagged.
-5. Return an itemized list of each fix applied.
+5. Run the [Self-Check](#self-check-before-returning) on the edited file, then return an itemized list of each fix applied.
 
 ### `--review` Mode (audit a finished entry)
 
@@ -239,6 +243,18 @@ Read-only audit of an entry someone else finished. This mode reports defects; `-
 6. When the entry path does not exist, or the rubric itself cannot be loaded, no gate can run: return `REVIEW: {path}` followed by `VERDICT: NOT RUN -- {exact reason}` and stop. Report that line rather than a partial verdict block.
 
 </modes>
+
+---
+
+## Self-Check Before Returning
+
+Applies to Default and `--rerun` modes, and to `--fix` after its edits. Validate and correct your own entry before you return it; the orchestrator's validation gate and the fresh Entry Review are a second look, never the first. Make at most two correction passes over steps 1-4, then step 5.
+
+1. Run `fix_research_formatting.py`, then `validate_research.py main --json`, on your file (both in `.claude/skills/research-curator/scripts/`). Fix every error and every warning except `cross_references_absent`. Fix a refuted anchor by re-running the search behind it, never by editing a count or path by hand.
+2. Re-find every Relevance quote with `git grep -nF "{quote}" -- {path}`. A quote is a body line that contains the item's Term — not a frontmatter `description:`, a heading, or a link row.
+3. Check the `confidence_map` covers every `##` section of the entry, and that a section resting on code you read is not rated `high`.
+4. Remove popularity figures gathered this run (stars, forks, downloads, readers, page views), per [Entry Quality Standards](.claude/skills/research-curator/references/entry-quality-standards.md).
+5. Report anything still unfixed on an `UNRESOLVED:` line in the result, with the exact text. Never report Status `created`, `updated`, or `fixed` over an unresolved error; use `failed`.
 
 ---
 
@@ -273,6 +289,10 @@ Always return a structured result at the end of your work.
 **File**: ./research/{category}/{filename}.md
 **Category**: {category-name}
 **Resource**: {resource-name}
+
+### Self-Check
+
+UNRESOLVED: {exact text of each defect not fixed} | none
 
 ### Sources Accessed
 

@@ -93,7 +93,7 @@ Trigger: `<mode_args/>` contains a URL with no flags.
    ```
 
 4. **Wait** for structured result (status, file path, category, key findings)
-5. **Validate** -- if research status is not `failed`, run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries) on the created or refreshed file. On its "mark issues" outcome: mark entry as "created with issues" (or "refreshed with issues" when step 2 routed to `--rerun`), skip steps 6–7, and report to user with the exact error or warning text from validator JSON. On its "proceed" outcome, continue to step 6.
+5. **Validate** -- the curator self-checks and corrects its own entry before returning, so this gate confirms that check rather than driving the fix loop. If research status is not `failed`, run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries) on the created or refreshed file. On its "mark issues" outcome: mark entry as "created with issues" (or "refreshed with issues" when step 2 routed to `--rerun`), skip steps 6–7, and report to user with the exact error or warning text from validator JSON. On its "proceed" outcome, continue to step 6.
 
 6. **Spawn four tasks concurrently** -- if research status is not `failed`:
 
@@ -304,10 +304,19 @@ every gate line, every defect, and every repair, quoted as the agent wrote them,
 `### Entry Review Verdicts` heading in the mode's [Output Format](#output-format) report. Then:
 
 - **APPROVE** -- continue to Post-Actions unchanged.
-- **REQUEST CHANGES** -- mark the entry "created with issues" (or "refreshed with issues") and
-  continue to Post-Actions, which then withholds this entry's README row and date (step 1), keeping
-  it out of the index until a later run reviews it clean. Correction belongs to a later `--rerun`
-  rather than to `--fix`: `--fix` takes validator issues, and a gate 4 or 5 defect needs re-research.
+- **REQUEST CHANGES** -- one correction pass, then continue; never a second review. Spawn a fresh
+  `@research-curator` (model `sonnet`, waves of 5) with `--fix` and the verdict's exact defects, in the
+  same shape as [Fix Agent Delegation](#fix-agent-delegation) but headed "Issues to fix (from the
+  review verdict)", naming the entry and any analysis file a defect cites. Then re-run the
+  [Validation Gate](./references/validation-rules.md#validation-gate-for-newrefreshed-entries) on the
+  entry as the re-check: review verdicts vary between runs, so a re-review surfaces new defects each
+  pass instead of converging.
+  - Gate "proceed" outcome and nothing returned under `UNRESOLVED:` -- the entry counts as corrected;
+    continue to Post-Actions unchanged, with its README row. Report the defects fixed and note that
+    the corrected text was not re-reviewed.
+  - Gate "mark issues" outcome, or any `UNRESOLVED:` defect -- mark the entry "created with issues"
+    (or "refreshed with issues") and report the exact text. Post-Actions then withholds its README
+    row and date (step 1).
 
 </entry_review>
 
@@ -451,7 +460,7 @@ Report to user after any mode completes. Apply the [Agent Result Relay Rules](#a
 **Category**: {category}
 **File**: ./research/{category}/{filename}.md
 **README Updated**: Yes | No -- entry marked with issues, row withheld
-**Entry Review**: APPROVE | REQUEST CHANGES -- N defects
+**Entry Review**: APPROVE | CORRECTED -- N defects fixed (corrected text not re-reviewed) | UNRESOLVED -- N defects, marked with issues
 **Cross-References Added**: N
 **Utilization Proposals**: N (file: ./research/insights/YYYY-MM-DD-{name}-utilization.md)
 
@@ -474,7 +483,7 @@ YYYY-MM-DD
 **Refreshed**: Z existing entries
 **Failed**: W
 **README Updated**: Yes -- rows withheld for R entries marked with issues
-**Entry Review**: A APPROVE, R REQUEST CHANGES
+**Entry Review**: A APPROVE, C CORRECTED (not re-reviewed), R UNRESOLVED (marked with issues)
 
 ### Entries Created
 - ./research/{category}/{name}.md
@@ -493,7 +502,7 @@ YYYY-MM-DD
 
 **Refreshed**: N entries
 **Changes Detected**: M entries had updated data
-**Entry Review**: A APPROVE, R REQUEST CHANGES
+**Entry Review**: A APPROVE, C CORRECTED (not re-reviewed), R UNRESOLVED (marked with issues)
 
 ### Updated Entries
 - ./research/{category}/{name}.md -- {what changed}
