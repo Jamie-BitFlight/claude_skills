@@ -11,7 +11,7 @@ Split every claim into one of two kinds:
 
 - **Evergreen** — what the tool is, the problem it solves, its architecture, its design
   tradeoffs. This should still be true in a year; write it as such.
-- **Snapshot** — star counts, pricing, version numbers, benchmark figures. These go stale. A
+- **Snapshot** — pricing, version numbers, benchmark figures. These go stale. A
   snapshot is not wrong for going stale — it is wrong for going stale *silently*. Every snapshot
   claim carries the date it was true and the source it came from, so a future reader can re-check
   it in seconds instead of trusting a frozen number.
