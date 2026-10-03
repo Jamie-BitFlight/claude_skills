@@ -197,13 +197,13 @@ Devices authenticated to the same synced account are **trusted peers** for remot
 
 ### Deferred Product Work
 
-The following are intentionally deferred:
+Items 1-4 are deferred product work; item 5 is recorded separately as a milestone gap:
 
 1. Explicit session selection and copy between local and synced profiles, including attachment copying, provenance, and conflict behavior.
 2. Browsing both scopes simultaneously or switching visible scope without engine restart.
 3. Supported self-hosted backend contract (current endpoint and bearer overrides remain development seams).
 4. Cursor harness implementation, per ARCHITECTURE.md (its M5 gaps line and Open question 3, "parity item, scheduled after Codex"). The file carries no date of its own; it is from the v0.2.102 clone, whose commit is dated 2026-10-02. This conflicts with the README listing Cursor as a controlled agent and with `crates/harness/src/cursor/` existing (`catalog.rs`, `mod.rs`, `shim.mjs`, `state.rs`), so the statement may be stale. Whether Cursor, ACP, OpenCode or Pi harnesses are functional is not verified beyond directory names.
-5. Prefers-reduced-motion support and engine hardening (instance lock, watchdogs) in current release.
+5. Prefers-reduced-motion support and engine hardening (instance lock, watchdogs) are listed as gaps of the M6 Polish milestone in ARCHITECTURE.md (lines 288-290). The same file says at line 194 that `prefers-reduced-motion` is honored, so the source contradicts itself on this point; it is not described as intentionally deferred.
 
 ### Workspace File Trust
 
@@ -237,7 +237,7 @@ Remote workspace file requests are subject to workspace-relative path containmen
   - Today: `git grep --full-name -il "append-only" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md` → 15 matches
   - Quote from [plugins/development-harness/dh_core/ledger/store.py](../../plugins/development-harness/dh_core/ledger/store.py) line 497: "The append-only log. ``ledger_spec.COLUMNS`` describes the tables materialised from it, not it."
   - Observation: the Zeron-specific terms `local-first` returned 0 matches and `CRDT` returned 3 matches (all binary `hero.png` files under `plugins/`) over the same scope; the repo's own durable state is this SQLite event log, one database per repository.
-  - Change: none — out of scope (Zeron's Loro CRDT merge of one session document across devices has no counterpart in the ledger docstring read above, which describes a single SQLite database per repository; no edit is proposed)
+  - Change: none — out of scope (Zeron's Loro CRDT merge of one session document across devices has no counterpart in the ledger docstring read above, whose module docstring (`store.py` line 3) says "One SQLite database per repository holds every plan and task"; no edit is proposed)
 
 ---
 

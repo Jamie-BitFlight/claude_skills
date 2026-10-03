@@ -13,12 +13,12 @@ Note: `mcp__plugin_dh_backlog__backlog_list` returned a GraphQL-unavailable erro
 
 ## Improvement 1: Project-level decision/rationale store searchable across sessions
 
-**Source pattern**: "Integration Opportunities" — "extend dh's backlog_core to store architectural decisions and design rationale alongside task tracking" (Engram: SQLite + FTS5 observations typed decision|bug|pattern, queried via mem_search at session start).
+**Source pattern**: "Integration Opportunities" — "edit `plugins/development-harness/backlog_core/` to store architectural decisions and design rationale alongside task tracking, queryable like Engram's `mem_search`" (Engram: SQLite + FTS5 observations typed decision|bug|pattern, queried via mem_search at session start).
 **Local system**: `plugins/development-harness/backlog_core/ARCHITECTURE.md`, `plugins/plugin-creator/skills/memory-and-rules/SKILL.md`
 **Absence evidence**: `git grep -ilE "engram" -- plugins/ .claude/skills/ .claude/agents/ rules/` -> 0 matches. `git grep -ilE "mem_save|session_summary" -- plugins/ .claude/skills/ .claude/agents/ rules/` -> 1 match (`plugins/frustration-analyzer/mcp/server.py`, not opened; relevance unverified). No search was run for a decision-record store (ADRs exist under `plugins/development-harness/docs/adrs/` and `rules/adr-lifecycle.md`), so absence of a queryable decision store is not established.
 **Confidence**: Medium
 **Impact**: Low
-**Backlog**: Deferred — confidence Medium: the entry gives only a "could complement" suggestion; Claude Code auto memory and ADRs already cover part of this need
+**Backlog**: Deferred — confidence Medium: the entry's Change line proposes the edit without establishing a gap; Claude Code auto memory and ADRs already cover part of this need
 
 ### Current state
 

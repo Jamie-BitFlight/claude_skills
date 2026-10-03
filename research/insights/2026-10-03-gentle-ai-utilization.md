@@ -21,7 +21,7 @@ Absence check run before proposing: `grep -rIl -i -E "engram|gentle-ai|guardian.
 
 ### Why this caller
 
-`.pre-commit-config.yaml` (hook ids read: conventional-pre-commit, ruff, biome-check, markdownlint-cli2, skilllint, ty, validate-research-entries, and others) contains only deterministic checks. The one LLM-based reviewer, `.claude/agents/code-review.md` (frontmatter: "Use ONLY when explicitly requested by user... DO NOT use proactively"), is manual. GGA would add a gate that judges staged files against the rules in `AGENTS.md`, with SHA256 caching so only changed files are re-reviewed, and it can use Claude Code as the provider. The entry documents `AGENTS.md` as GGA's rules file, and this repo already has an `AGENTS.md`. Caveat: this repo's `AGENTS.md` is a broad working guide rather than a concise rule list, and prek stashes unstaged changes during hooks (AGENTS.md gotcha 3), so a slow LLM hook lengthens the stash window.
+`.pre-commit-config.yaml` (hook ids read: conventional-pre-commit, ruff, biome-check, markdownlint-cli2, skilllint, ty, validate-research-entries, and others) contains only deterministic checks, so no pre-commit hook runs an LLM. `.claude/agents/code-review.md` (frontmatter: "Use ONLY when explicitly requested by user... DO NOT use proactively") is a manually invoked reviewer. GGA would add a gate that judges staged files against the rules in `AGENTS.md`, with SHA256 caching so only changed files are re-reviewed, and it can use Claude Code as the provider. The entry documents `AGENTS.md` as GGA's rules file, and this repo already has an `AGENTS.md`. Caveat: this repo's `AGENTS.md` is a broad working guide rather than a concise rule list, and prek stashes unstaged changes during hooks (AGENTS.md gotcha 3), so a slow LLM hook lengthens the stash window.
 
 ### Integration sketch
 
@@ -66,7 +66,7 @@ on decision   -> mem_save(observation, type: decision|bug|pattern)
 session end   -> mem_session_summary(goal, discoveries, accomplished, files)
 ```
 
-Wiring into `.mcp.json` is deferred: the server `command`/`args` is not in the research entry. The only documented way to wire it is `gentle-ai install --agents claude-code --non-interactive`, which writes `~/.claude.json` and `~/.claude/` (user scope) rather than the repo's `.mcp.json`. Trial path: run `gentle-ai install` with a Memory Only preset in a throwaway environment, then read the resulting `~/.claude.json` entry to copy into `.mcp.json`.
+Wiring into `.mcp.json` is deferred: the server `command`/`args` is not in the research entry. The documented install form is `gentle-ai install --agent claude-code ... --preset <documented value>`; the entry records that `--non-interactive` is not documented in `docs/non-interactive.md` or `docs/usage.md` and that the documented `--preset` values are `full-gentleman`, `ecosystem-only`, `minimal` and `custom`, so the exact invocation for this repo is unconfirmed. The install writes `~/.claude.json` and `~/.claude/` (user scope) rather than the repo's `.mcp.json`. Trial path: confirm in `docs/usage.md` which documented preset installs the Engram component, run `gentle-ai install` with it in a throwaway environment, then read the resulting `~/.claude.json` entry to copy into `.mcp.json`.
 
 ---
 

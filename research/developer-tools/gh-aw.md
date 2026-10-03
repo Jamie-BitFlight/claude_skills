@@ -81,7 +81,7 @@ GitHub Agentic Workflows (`gh-aw`) is a GitHub CLI extension that enables develo
 
 The gh-aw tooling consists of several layered components. Each claim below is read from the v0.89.21 source tree, and the `Source:` line names the file and the exported (or, where no exported name carries the claim, the package-level) identifier.
 
-**CLI layer**: `main.go` builds a Cobra root command and registers a large command set via `createCommandSet()` and `addCommandsToRoot()`; the set includes `compile`, `add`, `add-wizard`, `new`, `init`, `run`, `status`, `logs`, `audit`, `doctor`, `fix`, `validate`, `lint`, `mcp-server` and others. Source: `cmd/gh-aw/main.go` — `createCommandSet()`, `addCommandsToRoot()`, `rootCmd`
+**CLI layer**: `main.go` builds a Cobra root command and registers the commands built by `createCommandSet()` (35 command constructors in its struct literal at v0.89.21, counted from `cmd/gh-aw/main.go`) and `addCommandsToRoot()`; the set includes `add`, `add-wizard`, `init`, `status`, `logs`, `audit`, `doctor`, `fix`, `validate`, `lint` and `mcp-server`, and `compile` and `new` are defined separately as `compileCmd` and `newCmd`. Source: `cmd/gh-aw/main.go` — `createCommandSet()`, `addCommandsToRoot()`, `rootCmd`
 
 **Parser**: The package doc describes frontmatter parsing, markdown-body extraction, import processing and GitHub URL resolution. Frontmatter is validated against JSON schemas embedded in the package (`main_workflow_schema.json`, `mcp_config_schema.json`, `repo_config_schema.json`). Source: `pkg/parser/doc.go` — package `parser`, `pkg/parser/schema_validation.go` — `ValidateMainWorkflowFrontmatterWithSchemaAndLocation()`, `pkg/parser/schema_compiler.go` — `//go:embed schemas/main_workflow_schema.json`
 

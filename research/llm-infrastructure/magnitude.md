@@ -18,7 +18,7 @@ freshness_tracking:
 
 ## Overview
 
-Magnitude is an open source inference engine for agents that optimizes itself for your exact hardware. It compiles and tunes its kernels on your device, so open models run up to 2x faster than llama.cpp. One click connects the agent you already use (Pi, OpenCode, Hermes, Codex, and more). Works on Apple Silicon, NVIDIA, AMD, or nothing but a CPU.
+Magnitude is an open source inference engine for agents that optimizes itself for your exact hardware. It compiles and tunes its kernels on your device, so open models run up to 2x faster than llama.cpp [vendor-reported; measurement method not mentioned in documentation]. One click connects the agent you already use (Pi, OpenCode, Hermes, Codex, and more). Works on Apple Silicon, NVIDIA, AMD, or nothing but a CPU.
 
 ---
 
@@ -95,7 +95,7 @@ Both families support JSON and server-sent event (SSE) streaming responses. Defa
 | Platform | Acceleration | Notes |
 |----------|--------------|-------|
 | Apple Silicon Mac | Metal (native, no separate toolkit) | Unified memory shared with GPU; app memory constraints apply |
-| Intel Mac | CPU only | No CUDA or Metal support |
+| Intel Mac | CPU | Intel Macs use CPU inference (docs/installation/macos.mdx); CUDA/Metal support on Intel Mac: Not mentioned in documentation |
 | Windows x64 | CPU, NVIDIA CUDA, Vulkan-compatible GPUs | CUDA targets Ampere-class (RTX 30/40 series) and newer |
 | Linux x64/ARM64 | CPU, NVIDIA CUDA, Vulkan-compatible GPUs | Same CUDA generation requirements as Windows |
 
@@ -188,7 +188,7 @@ curl http://127.0.0.1:10100/inference/anthropic/v1/messages \
 - **OpenAI-compatible API exposure** -> `plugins/llamafile/skills/llamafile/SKILL.md`
   - Term: `OpenAI-compatible`
   - Today: "Llamafile exposes these OpenAI-compatible endpoints when running with `--server`"
-  - Change: none — Magnitude's dual-API (OpenAI and Anthropic) endpoint design pattern already covered by LiteLLM abstraction skill
+  - Change: none — out of scope (this skill documents llamafile's OpenAI-compatible endpoints only; Magnitude's second, Anthropic-compatible endpoint has no counterpart to edit here, and `plugins/litellm/skills/litellm/SKILL.md` lines 27-31 list Anthropic only as a cloud provider)
 
 - **Model lifecycle management (residency: download, load, unload)** -> nothing in `plugins/`, `.claude/skills/`, `.claude/agents/`, `rules/`, `docs/`, `AGENTS.md`
   - Today: `git grep --full-name -il "model residency" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md` → 0 matches
@@ -200,7 +200,7 @@ curl http://127.0.0.1:10100/inference/anthropic/v1/messages \
 - **Agent integration through a standard API** -> `plugins/litellm/skills/litellm/SKILL.md`
   - Term: `OpenAI message format`
   - Today: "- **Unified Format**: All requests use OpenAI message format"
-  - Change: none — `plugins/litellm/skills/litellm/SKILL.md` already routes every provider, including local servers, through one standard API rather than agent-specific adapters
+  - Change: none — `plugins/litellm/skills/litellm/SKILL.md` already routes the providers it lists (cloud: OpenAI, Anthropic, Google, Azure, AWS Bedrock; local: llamafile, Ollama, LocalAI, vLLM; lines 27-31) through one OpenAI message format rather than agent-specific adapters
 
 ---
 
