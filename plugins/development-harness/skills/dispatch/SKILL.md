@@ -11,7 +11,7 @@ Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
 The orchestrator's job is experience sharing and worker health, not prompt engineering.
 Workers are specialists. Trust them. Relay what they learn. Unblock them when stuck. Synthesize what they produce.
 
-For the delegation prompt template and pre-send verification, activate the `/agent-orchestration:agent-orchestration` skill.
+For the delegation prompt template and pre-send verification, activate the `/agent-orchestration:delegate` skill.
 
 ## Two Dispatch Modes
 
@@ -19,7 +19,7 @@ For the delegation prompt template and pre-send verification, activate the `/age
 flowchart TD
     Start(["Work to dispatch"]) --> Q{"Is there a SAM task<br>for this work?"}
     Q -->|"Yes — SAM plan exists"| SAM["SAM Dispatch<br>Minimal prompt — task has everything"]
-    Q -->|"No — ad-hoc work"| AdHoc["Ad-Hoc Dispatch<br>Use delegation template from<br>/agent-orchestration:agent-orchestration"]
+    Q -->|"No — ad-hoc work"| AdHoc["Ad-Hoc Dispatch<br>Use delegation template from<br>/agent-orchestration:delegate"]
     SAM --> SAMOpen["plan dispatch --address P/T<br>prints the attempt number"]
     SAMOpen --> SAMPrompt["Agent prompt:<br>'You are working on P{N}/T{M}, attempt {A}'<br>Agent reads the task from the ledger —<br>acceptance criteria, context, verification steps all there"]
     AdHoc --> AdHocPrompt["Write OBSERVATIONS + DEFINITION OF SUCCESS +<br>CONTEXT per agent-orchestration template"]
@@ -69,7 +69,7 @@ The worker reads the task from the ledger. All acceptance criteria, verification
 live in the task. Keep a table of launch handle to address and attempt in your working notes — it
 is what lets you tell a worker still running from one whose launch already ended.
 
-**Ad-hoc dispatch:** follow the delegation template from `/agent-orchestration:agent-orchestration` — OBSERVATIONS, DEFINITION OF SUCCESS, CONTEXT.
+**Ad-hoc dispatch:** follow the delegation template from `/agent-orchestration:delegate` — OBSERVATIONS, DEFINITION OF SUCCESS, CONTEXT.
 
 ### 2 — Relay Discoveries Between Waves
 
