@@ -5,6 +5,14 @@ user — not documentation for a human reader. Write and edit every entry for th
 mid-plan pulling in a tool's tradeoffs, architecture, and integration surface, not a marketing
 summary.
 
+## What an entry is not
+
+An entry is a bookmark with a summary, kept for later discussion with agents and as idea and
+inspiration capture. It makes no claims about this repository and carries no popularity statistics.
+Overlap with this repository lives in GitHub issues filed by the Overlap Scan. See
+[Scope](../.claude/skills/research-curator/references/entry-quality-standards.md#scope) and
+[Rule 2a](../.claude/skills/research-curator/references/entry-quality-standards.md#rule-2a-no-popularity-statistics).
+
 ## Evergreen substance, dated snapshots
 
 Split every claim into one of two kinds:
