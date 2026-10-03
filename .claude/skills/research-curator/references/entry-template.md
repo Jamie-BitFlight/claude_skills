@@ -104,6 +104,12 @@ Documented limitations, or the low-confidence absence statement from [Entry Qual
 
 ---
 
+## Limitations and Caveats
+
+Documented limitations, or the low-confidence absence statement from [Entry Quality Standards](./entry-quality-standards.md).
+
+---
+
 ## Installation & Usage
 
 ```bash
