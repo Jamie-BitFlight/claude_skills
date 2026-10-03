@@ -445,6 +445,14 @@ RELEVANCE_ANCHOR_PATH_PATTERN = re.compile(r"`((?:plugins/|\.claude/|rules/|docs
 # any single file can satisfy, so it is excluded from the existence check rather than failed by it.
 _UNRESOLVABLE_PATH_CHARS = "*?[{"
 
+# Patterns for parsing Relevance section presence-anchor items and verifying quotes.
+_RELEVANCE_QUOTE_ITEM_HEAD_PATTERN = re.compile(r"^[-*]\s+\*\*")
+_RELEVANCE_QUOTE_TERM_PATTERN = re.compile(r"^\s*[-*]\s+Term:\s*`([^`]+)`")
+_RELEVANCE_QUOTE_TODAY_PATTERN = re.compile(r'^\s*[-*]\s+Today:\s*"(.*)"\s*$')
+# Characters that have special meaning in git grep basic or extended regex; skip Term check
+# when Term contains any of these, since the Term should be interpreted as a regex pattern.
+_REGEX_SPECIAL_CHARS = r"\.*[^$|?+({}"
+
 
 def exempt_by_date(reference_date: str | None, cutoff: date) -> bool:
     """Report whether an entry's date puts it before a check's cutoff.
@@ -551,6 +559,228 @@ def check_relevance_anchor_paths(
         for candidate in cited
         if not (repo_root / candidate).exists()
     ]
+
+
+def _normalize_quote_text(text: str) -> str:
+    """Normalize quote text for comparison.
+
+    Removes `**` bold markers, collapses whitespace runs to single spaces, and strips.
+
+    Args:
+        text: Raw quote text.
+
+    Returns:
+        Normalized text.
+    """
+    return " ".join(text.replace("**", "").split())
+
+
+def _parse_head_line_paths(line: str) -> list[str]:
+    """Extract and collect all distinct resolvable paths from a head line.
+
+    Strips trailing line-number suffixes (`:NN`, `#L...`) and filters unresolvable paths.
+
+    Args:
+        line: A head line containing backticked paths.
+
+    Returns:
+        List of distinct resolvable paths.
+    """
+    paths: list[str] = []
+    for match in RELEVANCE_ANCHOR_PATH_PATTERN.finditer(line):
+        candidate = match.group(1).split()[0].rstrip(".,;:)")
+        # F2a: Strip trailing :digits or #L... suffix before checking
+        candidate_stripped = re.sub(r"(?::[0-9]+|#L[0-9]+)$", "", candidate)
+        if not any(ch in candidate_stripped for ch in _UNRESOLVABLE_PATH_CHARS) and candidate_stripped not in paths:
+            paths.append(candidate_stripped)
+    return paths
+
+
+def _read_file_body_text(file_path: Path) -> str:
+    """Read a file and return its body text normalized for quote matching.
+
+    Args:
+        file_path: Path to the file to read.
+
+    Returns:
+        Normalized body text (YAML frontmatter excluded, whitespace collapsed).
+    """
+    file_lines = file_path.read_text(encoding="utf-8", errors="replace").splitlines()
+    body_lines = _yaml_body_lines(file_lines) if detect_format(file_lines) == "yaml_frontmatter" else file_lines
+    return _normalize_quote_text("\n".join(body_lines))
+
+
+def _quote_found_in_any_file(quoted_text: str, paths: list[str], repo_root: Path) -> bool:
+    """Search for a quote in all cited files.
+
+    Args:
+        quoted_text: The normalized quote text to search for.
+        paths: List of repo-relative file paths to search.
+        repo_root: Checkout root for resolving paths.
+
+    Returns:
+        True if the quote is found in any cited file.
+    """
+    for candidate_path in paths:
+        file_path = repo_root / candidate_path
+        if not file_path.is_file():
+            continue
+        body_haystack = _read_file_body_text(file_path)
+        if quoted_text in body_haystack:
+            return True
+    return False
+
+
+def _check_malformed_today_line(line: str, current_paths: list[str], start: int, line_offset: int) -> Issue | None:
+    """Check for a Today line that starts with quote but doesn't match full pattern.
+
+    Args:
+        line: The line to check.
+        current_paths: List of currently cited file paths.
+        start: Starting line number of the section.
+        line_offset: Offset within the section.
+
+    Returns:
+        An Issue dict if the line is malformed, else None.
+    """
+    if not current_paths or not (line.lstrip().startswith("- Today:") or line.lstrip().startswith("* Today:")):
+        return None
+
+    line_stripped = line.lstrip()
+    if not line_stripped.startswith(("- Today:", "* Today:")):
+        return None
+
+    value_part = line_stripped.split("Today:", 1)[1].strip() if "Today:" in line_stripped else ""
+    if value_part.startswith('"') and not _RELEVANCE_QUOTE_TODAY_PATTERN.match(line):
+        return {
+            "check": "relevance_quote_unverified",
+            "severity": "error",
+            "message": (
+                f"{RELEVANCE_SECTION} has a Today: line that must be a double-quoted line with "
+                f"nothing after the closing quote"
+            ),
+            "line": start + line_offset,
+        }
+    return None
+
+
+def _check_term_in_quote(current_term: str | None, quoted_text: str, start: int, line_offset: int) -> Issue | None:
+    """Check if the Term appears in the quote.
+
+    Args:
+        current_term: The term to search for, or None.
+        quoted_text: The normalized quote text.
+        start: Starting line number of the section.
+        line_offset: Offset within the section.
+
+    Returns:
+        An Issue dict if the term is missing, else None.
+    """
+    if not current_term or any(ch in current_term for ch in _REGEX_SPECIAL_CHARS):
+        return None
+
+    if _normalize_quote_text(current_term).lower() not in quoted_text.lower():
+        return {
+            "check": "relevance_quote_unverified",
+            "severity": "error",
+            "message": (
+                f"{RELEVANCE_SECTION} quote does not contain "
+                f"its Term `{current_term}` -- a quoted line that lacks the term is "
+                f"evidence about something else"
+            ),
+            "line": start + line_offset,
+        }
+    return None
+
+
+def check_relevance_quotes(
+    lines: list[str], sections: dict[str, tuple[int, int]], repo_root: Path | None
+) -> list[Issue]:
+    """Check that Relevance section quotes are found in their cited files.
+
+    Validates presence-anchor items by checking that the `Today:` quote line is found
+    in the cited file (outside YAML frontmatter) and that the optional `Term:` line
+    appears within the quote. Skips entries outside a checkout, missing the Relevance
+    section, and items with no double-quoted `Today:` line.
+
+    Args:
+        lines: Body lines of the entry.
+        sections: Section heading -> (start_line, end_line) mapping.
+        repo_root: Checkout root for resolving cited file paths, or ``None``.
+
+    Returns:
+        List of ``relevance_quote_unverified`` issues found.
+    """
+    section = sections.get(RELEVANCE_SECTION)
+    if section is None or repo_root is None:
+        return []
+
+    start, end = section
+    issues: list[Issue] = []
+    section_lines = lines[start - 1 : end]
+
+    current_paths: list[str] = []
+    current_term: str | None = None
+
+    for line_offset, line in enumerate(section_lines):
+        # F3: Reset on any list line at indent 0 or any heading line
+        if (
+            line
+            and line[0] not in " \t"
+            and (line.lstrip().startswith("-") or line.lstrip().startswith("*") or line.lstrip().startswith("##"))
+        ):
+            current_paths = []
+            current_term = None
+            # F1: Collect ALL distinct resolvable paths on head line
+            if _RELEVANCE_QUOTE_ITEM_HEAD_PATTERN.match(line):
+                current_paths = _parse_head_line_paths(line)
+
+        term_match = _RELEVANCE_QUOTE_TERM_PATTERN.match(line)
+        if term_match:
+            current_term = term_match.group(1)
+
+        today_match = _RELEVANCE_QUOTE_TODAY_PATTERN.match(line)
+        if not today_match:
+            # F2b: Check for Today line that starts with quote but doesn't match full pattern
+            malformed_issue = _check_malformed_today_line(line, current_paths, start, line_offset)
+            if malformed_issue:
+                issues.append(malformed_issue)
+            continue
+
+        if not current_paths:
+            continue
+
+        quoted_text = _normalize_quote_text(today_match.group(1))
+
+        if not quoted_text:
+            issues.append({
+                "check": "relevance_quote_unverified",
+                "severity": "error",
+                "message": f"{RELEVANCE_SECTION} has an empty Today: quote",
+                "line": start + line_offset,
+            })
+            continue
+
+        # F1: Search all cited files, report error only if quote not found in ANY of them
+        if not _quote_found_in_any_file(quoted_text, current_paths, repo_root):
+            issues.append({
+                "check": "relevance_quote_unverified",
+                "severity": "error",
+                "message": (
+                    f"{RELEVANCE_SECTION} quotes a line not found in any of {current_paths} "
+                    f"outside its YAML frontmatter -- copy the line verbatim, inner double "
+                    f"quotes included"
+                ),
+                "line": start + line_offset,
+            })
+            continue
+
+        # Check Term appears in the quote
+        term_issue = _check_term_in_quote(current_term, quoted_text, start, line_offset)
+        if term_issue:
+            issues.append(term_issue)
+
+    return issues
 
 
 # Fixed pathspec scope every absence-anchor ``git grep`` command searches, in this exact order --
@@ -1077,6 +1307,7 @@ def _yaml_frontmatter_issues(lines: list[str], repo_root: Path | None) -> list[I
     issues.extend(check_cross_references(sections, entry_date))
     issues.extend(check_relevance_anchored(body_lines, sections, entry_date))
     issues.extend(check_relevance_anchor_paths(body_lines, sections, repo_root))
+    issues.extend(check_relevance_quotes(body_lines, sections, repo_root))
     issues.extend(check_relevance_absence_anchors(body_lines, sections, repo_root))
     return issues
 
@@ -1104,6 +1335,7 @@ def _text_header_issues(lines: list[str], repo_root: Path | None) -> list[Issue]
     issues.extend(check_cross_references(sections, entry_date))
     issues.extend(check_relevance_anchored(lines, sections, entry_date))
     issues.extend(check_relevance_anchor_paths(lines, sections, repo_root))
+    issues.extend(check_relevance_quotes(lines, sections, repo_root))
     issues.extend(check_relevance_absence_anchors(lines, sections, repo_root))
     return issues
 
@@ -1427,26 +1659,20 @@ def check_backlinks(
         repaired = 0
         excluded_writes = 0
         for source, target in asymmetric:
+            source_rel = os.path.relpath(source, vault_path).replace("\\", "/")
+            target_rel = os.path.relpath(target, vault_path).replace("\\", "/")
             # _repair_one_asymmetric_pair writes the reciprocal row into target.
             if target.resolve() in excluded:
                 excluded_writes += 1
-                typer.echo(f"note: excluded, not writing to {target.relative_to(vault_path)}", err=True)
+                typer.echo(f"note: excluded, not writing to {target_rel}", err=True)
                 continue
             try:
                 if _repair_one_asymmetric_pair(bl, source, target, vault_path):
                     repaired += 1
             except OSError as exc:
-                typer.echo(
-                    f"warning: io-error, could not repair {source.relative_to(vault_path)} -> "
-                    f"{target.relative_to(vault_path)}: {exc}",
-                    err=True,
-                )
+                typer.echo(f"warning: io-error, could not repair {source_rel} -> {target_rel}: {exc}", err=True)
             except ValueError as exc:
-                typer.echo(
-                    f"warning: structural, could not repair {source.relative_to(vault_path)} -> "
-                    f"{target.relative_to(vault_path)}: {exc}",
-                    err=True,
-                )
+                typer.echo(f"warning: structural, could not repair {source_rel} -> {target_rel}: {exc}", err=True)
 
         # quiet=True: this rebuild only checks for remaining asymmetric edges after
         # repair; the fix step never touches scan-skip defects, so re-scanning here

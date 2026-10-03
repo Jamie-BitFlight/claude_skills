@@ -32,7 +32,7 @@ flowchart TD
     Read --> Surface{Does the entry document a callable API<br>SDK package CLI tool or webhook?}
     Surface -->|"No — conceptual only, no integration surface"| Skip(["Return STATUS: no_utilization_surface<br>Do not write an output file. Stop."])
     Surface -->|"Yes — integration surface exists"| Extract[Extract integration surfaces:<br>API endpoints SDK package names CLI commands webhooks]
-    Extract --> MapSystems[Identify local systems that could be callers:<br>agents in .claude/agents/<br>skills in .claude/skills/<br>hooks in plugin hooks.json<br>workflow scripts]
+    Extract --> MapSystems[Identify local systems that could be callers, reading ARCHITECTURE.md (the repository's systems index):<br>agents in .claude/agents/<br>skills in .claude/skills/<br>hooks in plugin hooks.json<br>workflow scripts]
     MapSystems --> ForEach[For each candidate local system]
     ForEach --> ReadLocal[Read the local system file]
     ReadLocal --> Assess{Would integrating this service<br>replace a weaker local implementation<br>OR add a capability the system lacks?}
@@ -62,6 +62,7 @@ Each proposal in the output file uses this structure exactly:
 **Replaces or adds**: {what existing behavior this replaces, or what new capability this adds}
 **Setup cost**: Low (API key only) | Medium (auth + schema) | High (infra change required)
 **Integration surface**: {exact API endpoint, package name, or CLI command from research entry}
+**Absence evidence**: {the narrow and the broader search behind any "no local system does X" claim, each in the A2 command form of `.claude/skills/research-curator/references/extraction-methodology.md` with its match count} | not applicable — this proposal claims no absence
 
 ### Why this caller
 
@@ -160,10 +161,13 @@ This agent MUST NOT:
 - Write files outside `./research/insights/`
 - Invent integration surfaces not documented in the research entry
 - Propose integrations without reading the local system file first
-- Name a caller path that was not opened. Most of this repo's skills live under
+- Name a caller path that was not opened, or a path to create whose parent directory was not
+  opened. Most of this repo's skills live under
   `plugins/*/skills/`, not `.claude/skills/` — a path recalled rather than listed is usually wrong
-- State that no local system does something without the search that shows it. Put the exact command
-  and its result in the proposal or the skipped table; an unsearched absence proposes building
-  something that may already exist
+- State that no local system does something without the search that shows it. Put both searches
+  and their results in the proposal's Absence evidence field or the skipped table; an unsearched
+  absence proposes building something that may already exist
+- Write anything Gate 6 of `.claude/skills/research-curator/references/entry-review-rubric.md`
+  scans for, outside an attributed quotation
 - Read any local system files (`.claude/agents/`, `.claude/skills/`, hooks) when the surface
   check returns "No — conceptual only". The early-exit path is terminal; stop immediately.

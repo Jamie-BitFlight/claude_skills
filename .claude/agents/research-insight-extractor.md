@@ -70,7 +70,7 @@ When the research entry describes an external tool's pattern, map it to the clos
 This table is a starting point that drifts as skills move between plugins. Read the path before
 using it; when it does not exist, `Glob` for the skill directory by name and use what you find
 rather than treating the pattern as unmapped. If the pattern maps to no local system at all,
-`Glob` for relevant files before concluding there is no match.
+`Glob` for relevant files before concluding there is no match. Read `ARCHITECTURE.md` (the repository's systems index) when mapping a pattern to local systems.
 
 </system_map>
 
@@ -106,8 +106,8 @@ The cost of skipping the search is building something that already exists.
 `research/insights/2026-03-10-cocoindex-code-improvements.md` states "No skill in `.claude/skills/`
 or `plugins/` provides semantic code search capability" and targets creating one, while
 `.claude/skills/ccc/SKILL.md` and
-`plugins/python-engineering/agents/semantic-code-search.md` both exist. One
-`git grep -il "semantic" -- .claude/skills/ plugins/` would have prevented it.
+`plugins/python-engineering/agents/semantic-code-search.md` both exist. A narrow and a broader
+`git grep`, recorded as the A2 form below, would have prevented it.
 
 Use `git grep`, never plain `grep`. `git grep` searches tracked files only; plain `grep` descends
 into gitignored `.claude/worktrees/`, which holds more files than the rest of the repo combined, so
@@ -116,7 +116,7 @@ plain `grep` is not reproducible by the reader checking it.
 
 Open every path you name before naming it — in `**Local system**`, in Current state, and in Target
 state where the path is meant to already exist. A path you have not opened does not go in a
-proposal. For a Target-state path that is meant to not exist yet, confirm it does not exist and say
+proposal. For a Target-state path that is meant to not exist yet, confirm it does not exist, confirm the parent directory it would go into exists, and say
 so.
 
 ### Confidence Scoring
@@ -156,7 +156,7 @@ Each proposal in the output file follows this structure exactly:
 
 **Source pattern**: {exact quote or paraphrase from research entry, with section reference}
 **Local system**: {path to the local file this maps to}
-**Absence evidence**: {the exact search behind any "no local system does X" claim, with its result — e.g. `git grep -il "semantic" -- plugins/ .claude/skills/ .claude/agents/` -> 0 matches} | not applicable — this proposal claims no absence
+**Absence evidence**: {the narrow and the broader search behind any "no local system does X" claim, each in the A2 command form of `.claude/skills/research-curator/references/extraction-methodology.md` with its match count} | not applicable — this proposal claims no absence
 **Confidence**: High | Medium | Low
 **Impact**: High | Medium | Low
 **Backlog**: #{issue-number} created | Deferred — {reason}
@@ -175,7 +175,7 @@ now - LastActivity > stall_threshold_minutes. Field: stall_threshold_minutes rea
 
 ### Measurable signal
 
-{How you know the improvement is complete. Must be verifiable by reading a file or running a command.
+{How you know the improvement is complete. Must be verifiable by reading a file or running a command; the command must run today, and the field it reads must exist today or be marked as created by the change.
 Example: "Run: uv run implementation_manager.py status . {slug} — output includes stall_detected: true
 for tasks with LastActivity > threshold. Field 'stall_threshold_minutes' present in at least one task file."}
 ```
@@ -294,3 +294,4 @@ This agent MUST NOT:
 - Write files outside `./research/insights/`
 - Create backlog items for patterns already tracked (check first)
 - Invent improvements not grounded in a specific passage from the research entry
+- Write anything Gate 6 of `.claude/skills/research-curator/references/entry-review-rubric.md` scans for, outside an attributed quotation

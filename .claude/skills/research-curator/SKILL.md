@@ -94,9 +94,9 @@ Trigger: `<mode_args/>` contains a URL with no flags.
    ```
 
 4. **Wait** for structured result (status, file path, category, key findings)
-5. **Validate** -- if research status is not `failed`, run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries) on the created or refreshed file. On its "mark issues" outcome: mark entry as "created with issues" (or "refreshed with issues" when step 2 routed to `--rerun`), skip steps 6–7, and report to user with the exact error or warning text from validator JSON. On its "proceed" outcome, continue to step 6.
+5. **Validate** -- the curator self-checks and corrects its own entry before returning, so this gate confirms that check rather than driving the fix loop. If research status is not `failed`, run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries) on the created or refreshed file. On its "mark issues" outcome: mark entry as "created with issues" (or "refreshed with issues" when step 2 routed to `--rerun`), skip steps 6–7, and report to user with the exact error or warning text from validator JSON. On its "proceed" outcome, continue to step 6.
 
-6. **Spawn four tasks concurrently** -- if research status is not `failed`:
+6. **Spawn three tasks concurrently** -- if research status is not `failed`:
 
    ```text
    a. Agent tool parameters:
@@ -110,11 +110,9 @@ Trigger: `<mode_args/>` contains a URL with no flags.
    c. Agent tool parameters:
         agent: .claude/agents/research-cross-referencer.md
         prompt: "Add cross-references to {file-path-from-agent-result}"
-
-   d. Update ./research/README.md -- add new entry to category table, or refresh the freshness date for an existing entry when step 2 routed to `--rerun`
    ```
 
-7. **Wait, surface, review** -- collect structured return blocks from each step 6 task and confirm README updated, then run [Entry Review](#entry-review) on the entry together with whatever step 6 wrote:
+7. **Wait, surface, review** -- collect structured return blocks from each step 6 task, then run [Entry Review](#entry-review) on the entry together with whatever step 6 wrote:
 
    - **Insight**: if the result contains `IMMEDIATE_ATTENTION:`, report each item with `#{issue} {title}` and the one-sentence reason. If no `IMMEDIATE_ATTENTION` section: report "N improvements added to backlog from {resource-name}."
    - **Utilization**: relay `PROPOSALS_WRITTEN` count and `FILE` path. If `STATUS: no_utilization_surface`, report "No direct utilization surface found."
@@ -178,25 +176,22 @@ flowchart TD
     Q -->|"category/name — single entry path"| VerifyFile{"Does ./research/category/name.md exist?"}
     Q -->|"all — re-research every entry"| FindAll["Glob ./research/**/*.md<br>excluding README.md — collect all entry paths"]
     VerifyFile -->|"No — file not found"| Missing(["Report error: entry not found at path. Stop."])
-    VerifyFile -->|"Yes — file exists"| ReadFile["Read ./research/category/name.md<br>extract current content and metadata"]
-    ReadFile --> Spawn1["Spawn @research-curator via Agent tool<br>prompt: --rerun ./research/category/name.md"]
+    VerifyFile -->|"Yes — file exists"| Spawn1["Spawn @research-curator via Agent tool<br>prompt: --rerun ./research/category/name.md"]
     Spawn1 --> RelayCheck1["Apply the Agent Result Relay Rules"]
     RelayCheck1 --> Validate1["Run the Validation Gate for New/Refreshed Entries<br>(validation-rules.md) on this file"]
     Validate1 -->|"errors, or gated warnings remain<br>after --fix retry"| Issues1(["Mark entry refreshed with issues<br>Skip analysis agents for it<br>No README date refresh for it<br>Report exact issue text to user"])
-    Validate1 -->|"clean"| UpdateDate["Update ./research/README.md<br>refresh freshness date for this entry"]
+    Validate1 -->|"clean"| SpawnAnalysis1["Concurrently spawn analysis agents:<br>@research-insight-extractor 'Extract improvements from ./research/category/name.md'<br>@research-utilization-assessor 'Assess utilization opportunities from ./research/category/name.md'<br>@research-cross-referencer 'Add cross-references to ./research/category/name.md'"]
     FindAll --> WaveSpawn["Spawn @research-curator agents in waves of 5<br>each receives --rerun ./research/category/name.md<br>wait for each wave before spawning next"]
     WaveSpawn --> RelayCheck2["Apply the Agent Result Relay Rules<br>to all wave results"]
     RelayCheck2 --> ValidateN["Run the Validation Gate for New/Refreshed Entries<br>(validation-rules.md) on each updated entry"]
     ValidateN -->|"an entry has errors, or gated<br>warnings remain after --fix retry"| IssuesN["Mark that entry refreshed with issues<br>Skip analysis agents for it<br>No README date refresh for it<br>Include exact issue text in report"]
-    ValidateN -->|"clean entries"| UpdateDates["Update ./research/README.md once,<br>after all waves complete — refresh freshness<br>dates for clean re-researched entries only"]
-    UpdateDate --> SpawnAnalysis1["Concurrently spawn analysis agents:<br>@research-insight-extractor 'Extract improvements from ./research/category/name.md'<br>@research-utilization-assessor 'Assess utilization opportunities from ./research/category/name.md'<br>@research-cross-referencer 'Add cross-references to ./research/category/name.md'"]
+    ValidateN -->|"clean entries"| SpawnAnalysisN["For each updated entry (concurrent, up to 5 entries)<br>spawn analysis agents per entry:<br>@research-insight-extractor<br>@research-utilization-assessor<br>@research-cross-referencer"]
     SpawnAnalysis1 --> WaitAnalysis1["Wait for all agents<br>Surface IMMEDIATE_ATTENTION items from insight result<br>Report utilization proposal count<br>Report cross-references added count"]
-    WaitAnalysis1 --> Review1["Run Entry Review: backlink repair first,<br>then review ./research/category/name.md<br>naming the analysis files just written"]
+    WaitAnalysis1 --> Review1["Run Entry Review: backlink repair first,<br>then the review loop on ./research/category/name.md<br>naming the analysis files just written"]
     Review1 --> PostActions(["Execute Post-Actions — lint, commit, push"])
     Issues1 --> PostActions
-    UpdateDates --> SpawnAnalysisN["For each updated entry (concurrent, up to 5 entries)<br>spawn analysis agents per entry:<br>@research-insight-extractor<br>@research-utilization-assessor<br>@research-cross-referencer"]
     SpawnAnalysisN --> WaitAnalysisN["Wait for all analysis agents<br>Collect IMMEDIATE_ATTENTION items<br>Report total utilization proposals and cross-references added"]
-    WaitAnalysisN --> ReviewN["Run Entry Review: backlink repair once,<br>then review each entry that reached analysis<br>one review per entry, in waves of 5"]
+    WaitAnalysisN --> ReviewN["Run Entry Review: backlink repair once,<br>then the review loop on each entry that reached analysis<br>one loop per entry, in waves of 5"]
     ReviewN --> PostActions
     IssuesN --> PostActions
 ```
@@ -267,48 +262,78 @@ report. [Failure Recovery](./references/batch-mode.md#failure-recovery) does not
 ## Entry Review
 
 Runs in Default, Batch, and Rerun Mode, once that mode's analysis agents have all returned and
-before Post-Actions. Audits each entry this run created or refreshed, with the analysis files
-written for it, against [Entry Review Rubric](./references/entry-review-rubric.md), which the agent loads.
+before Post-Actions. Loops each entry this run created or refreshed, with the analysis files
+written for it, through review and correction against [Entry Review Rubric](./references/entry-review-rubric.md), which the agents load.
 
 **Repair reciprocity first.** `@research-cross-referencer` writes forward links only, so the vault is
 asymmetric the moment it returns, and the rubric's Gate 1 scores an asymmetric pair as a defect
 against the citing entry -- reviewing now fails every entry on a defect this run is about to repair.
 Run the [Post-Actions](#post-actions) step 2 backlink repair, handling its four result cases exactly
-as step 2 specifies, before spawning any review. This is the invocation's one repair pass: reviews
-write nothing, so Post-Actions step 2 skips its own scan when this pass already ran. Validate Mode
-reaches step 2 without passing through here, so there step 2 runs the scan.
+as step 2 specifies, before spawning any review. The loop below writes entries afterwards, so
+Post-Actions step 2 always runs its own scan too.
 
-Then spawn one `@research-curator` per entry, in waves of 5, matching the analysis fan-out. One
-review per entry, never one across a batch: the verdict block is per-entry, and the repo-claims gate
-opens the local file behind every proposal.
+Then run the loop per entry, entries in waves of 5, matching the analysis fan-out. One loop per
+entry, never one across a batch: the verdict block is per-entry, and the repo-claims gate opens the
+local file behind every proposal. The scratch document `.tmp/scratch/reports/{category}-{name}-review.md`
+([Findings Document](./references/entry-review-rubric.md#findings-document)) carries the entry's
+findings through every round.
+
+The loop runs reviewer, worker, reviewer, worker until the reviewer passes. It stops UNRESOLVED when
+a round ends with the same unchecked line ids as the previous round (no progress), or after 5 review
+rounds; the owner can change that number. A FAIL with no unchecked lines (a `NOT RUN` gate) has
+nothing to hand the worker: it is the no-progress stop, UNRESOLVED, naming that gate. Either stop is a process defect, not an entry defect: the
+instructions that tell the curator what to create and the reviewer what to check disagree.
+
+```mermaid
+flowchart TD
+    Start(["Entry reached the analysis agents"]) --> Review["Spawn the reviewer, model sonnet<br>--review, scratch document, Round N"]
+    Review --> Gate["Run the Validation Gate checks on the entry<br>without its fix retry<br>append each remaining error and gated warning<br>not yet listed to the scratch document as an unchecked D line"]
+    Gate --> Q{"Reviewer verdict PASS<br>and no unchecked D line?"}
+    Q -->|"Yes"| Pass(["PASS — continue to Post-Actions"])
+    Q -->|"No"| Stop{"FAIL with no unchecked D line,<br>same unchecked ids as the previous round,<br>or the 5th review?"}
+    Stop -->|"Yes"| Unresolved(["UNRESOLVED — mark the entry created/refreshed with issues<br>withhold its README row<br>report the unchecked lines verbatim, the gate ids that recurred across rounds,<br>and the scratch path as a process defect"])
+    Stop -->|"No"| Fix["Spawn the worker, model haiku<br>--fix, scratch document"]
+    Fix --> Gate2["Run the Validation Gate checks as above"]
+    Gate2 --> Review
+```
 
 ```text
-Agent tool parameters:
+Reviewer — Agent tool parameters:
   agent: .claude/agents/research-curator.md
   model: sonnet
   prompt: "--review ./research/{category}/{name}.md
+Round: {N}
+Scratch document: .tmp/scratch/reports/{category}-{name}-review.md
 Analysis files written this run:
   improvements: {path from the insight agent result, or none}
   utilization:  {FILE path from the utilization agent result, or none}"
+
+Worker — Agent tool parameters:
+  agent: .claude/agents/research-curator.md
+  model: haiku
+  prompt: "--fix ./research/{category}/{name}.md
+Scratch document: .tmp/scratch/reports/{category}-{name}-review.md
+Address every unchecked D line and record a did: note on each."
 ```
 
-Answer both lines, `none` included: the paths carry a date the agent cannot derive from the entry
-name and the rubric scopes gates 4, 5 and 6 to them, so a blank line costs three gates, while a bare
-`none` stops the agent globbing up a stale proposal an earlier run wrote for this same resource.
+Answer both analysis lines, `none` included: the paths carry a date the agent cannot derive from the
+entry name and the rubric scopes gates 4, 5 and 6 to them, so a blank line costs three gates, while a
+bare `none` stops the agent globbing up a stale proposal an earlier run wrote for this same resource.
+
+A reviewer without a verdict, or with `VERDICT: NOT RUN`, makes the entry UNRESOLVED: report its exact
+reason and any unchecked lines already in the document. A worker that fails or times out has checked
+nothing; the next review runs anyway.
 
 An entry the validation gate already marked "created with issues" or "refreshed with issues" is not
 reviewed this run -- it never reached the analysis agents, so most of the rubric's scope does not
 exist for it. It is reviewed by whichever later `--rerun` clears its validation issues.
 
-Relay each verdict block verbatim under the [Agent Result Relay Rules](#agent-result-relay-rules) --
-every gate line, every defect, and every repair, quoted as the agent wrote them, under an
-`### Entry Review Verdicts` heading in the mode's [Output Format](#output-format) report. Then:
-
-- **APPROVE** -- continue to Post-Actions unchanged.
-- **REQUEST CHANGES** -- mark the entry "created with issues" (or "refreshed with issues") and
-  continue to Post-Actions, which then withholds this entry's README row and date (step 1), keeping
-  it out of the index until a later run reviews it clean. Correction belongs to a later `--rerun`
-  rather than to `--fix`: `--fix` takes validator issues, and a gate 4 or 5 defect needs re-research.
+Relay the final round's verdict block verbatim under the [Agent Result Relay Rules](#agent-result-relay-rules)
+under an `### Entry Review Verdicts` heading in the mode's [Output Format](#output-format) report,
+with the scratch document path. An UNRESOLVED entry lists its unchecked lines there, exactly as
+written, names the gate ids whose findings recurred across rounds, and relays the stop to the user as
+a process defect so the misalignment can be traced. Post-Actions then withholds its README row and date (step 1). The analysis files were
+already written; the mark does not remove them.
 
 </entry_review>
 
@@ -322,28 +347,18 @@ Shared by all modes. Execute after any mode completes successfully. Step 3 deriv
 files this run touched by diffing the current working tree against the pre-mode baseline captured
 in [Mode Routing](#mode-routing).
 
-1. **README Update** -- if `./research/README.md` was already dirty in the pre-mode baseline,
-   report to the user: `./research/README.md -- pre-existing uncommitted changes present; this
-   run's README update will not be committed` before proceeding -- the update below still needs to
-   happen so the mode's own entry is recorded, but step 3 will exclude README.md from this run's
-   commit. Otherwise, add or update entries in `./research/README.md` category tables as usual.
-   This restates the README step each mode's own flow already gates (Default step 6d, Batch
-   `UpdateAll`/`Partial`, Rerun `UpdateDate(s)`) -- do not run it as a fresh, ungated pass. Do not
-   add a row, or refresh the Last Updated date on an existing row, for any entry marked "created
-   with issues" or "refreshed with issues" earlier in this run; that entry's README state stays
-   exactly as it was before this run started. [Entry Review](#entry-review) sets that mark after
-   this run already wrote the row, so for an entry it marks, restore that entry's row to the
-   version in `git show HEAD:./research/README.md` -- deleting the row outright when that version
-   has none. That command is the pre-run state only when README.md was clean in the baseline; when
-   it was already dirty, this run's README changes are excluded from the commit by this step
-   anyway, so report the mark and leave the file alone
+1. **README Update** -- add or update `./research/README.md` category-table rows (and the Last
+   Updated date of an existing row) only for entries whose [Entry Review](#entry-review) returned
+   PASS; an entry marked "created with issues" or "refreshed with issues" gets none, so its README
+   state stays as it was before this run. If `./research/README.md` was already dirty in the
+   pre-mode baseline, report to the user: `./research/README.md -- pre-existing uncommitted changes
+   present; this run's README update will not be committed` before proceeding -- the update still
+   needs to happen so the mode's own entry is recorded, but step 3 will exclude README.md from this
+   run's commit
 
 2. **Backlink Repair** -- deterministically repair the bidirectional cross-reference graph across
-   the whole vault, not just entries this run touched. Skip this step when [Entry Review](#entry-review)
-   already ran the repair this invocation and its four result cases all resolved to "continue";
-   no backlink-scanned entry (any `./research/**/*.md` except `README.md`) has changed since, so a
-   second scan finds nothing new. Step 1's README edits do not count, because the scan ignores
-   `README.md`:
+   the whole vault, not just entries this run touched. Runs even after [Entry Review](#entry-review)'s
+   pre-review repair: the review loop's reviewer and worker passes write entries after it:
 
    Pass `--exclude {path}` once per path that was **already** dirty in the pre-mode baseline
    (see [Mode Routing](#mode-routing)). The repair writes its reciprocal row into the *cited*
@@ -452,7 +467,7 @@ Report to user after any mode completes. Apply the [Agent Result Relay Rules](#a
 **Category**: {category}
 **File**: ./research/{category}/{filename}.md
 **README Updated**: Yes | No -- entry marked with issues, row withheld
-**Entry Review**: APPROVE | REQUEST CHANGES -- N defects
+**Entry Review**: PASS -- N findings fixed | UNRESOLVED -- N unchecked, marked with issues (scratch: {path})
 **Cross-References Added**: N
 **Utilization Proposals**: N (file: ./research/insights/YYYY-MM-DD-{name}-utilization.md)
 
@@ -475,7 +490,7 @@ YYYY-MM-DD
 **Refreshed**: Z existing entries
 **Failed**: W
 **README Updated**: Yes -- rows withheld for R entries marked with issues
-**Entry Review**: A APPROVE, R REQUEST CHANGES
+**Entry Review**: A PASS, R UNRESOLVED (marked with issues)
 
 ### Entries Created
 - ./research/{category}/{name}.md
@@ -494,7 +509,7 @@ YYYY-MM-DD
 
 **Refreshed**: N entries
 **Changes Detected**: M entries had updated data
-**Entry Review**: A APPROVE, R REQUEST CHANGES
+**Entry Review**: A PASS, R UNRESOLVED (marked with issues)
 
 ### Updated Entries
 - ./research/{category}/{name}.md -- {what changed}
