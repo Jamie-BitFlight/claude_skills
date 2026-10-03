@@ -200,6 +200,10 @@ flowchart TD
     IssuesN --> PostActions
 ```
 
+A curator that fails or times out follows [Failure Recovery](./references/batch-mode.md#failure-recovery)
+before its result enters the diagram above: a `--rerun` target the agent left unchanged is a failed
+refresh, never a clean one.
+
 </rerun_mode>
 
 ---
@@ -249,6 +253,9 @@ Issues to fix (from validator JSON):
   - {exact issue text from JSON}
   - {exact issue text from JSON}"
 ```
+
+A fix agent that fails or times out leaves its entry's errors in place: list them as unfixed in the
+report. [Failure Recovery](./references/batch-mode.md#failure-recovery) does not apply.
 
 </validate_mode>
 
