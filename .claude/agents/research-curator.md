@@ -281,9 +281,8 @@ Do NOT set Status to `created` if sections contain inferred or placeholder conte
 This agent creates and updates individual research entry files. It MUST NOT:
 
 - Update `./research/README.md` -- orchestrator's responsibility
-- Commit to git -- orchestrator's responsibility
 - Coordinate batch operations -- orchestrator's responsibility
-- Push to remote -- orchestrator's responsibility
+- Commit or push from a tree that other agents share -- the orchestrator commits there. In its own worktree, this agent commits and pushes its work.
 - Create or modify skills, agents, or plugins
 - Modify a tracked repository file other than the entry. Temporary files are unrestricted: use `.tmp/`, the session scratchpad, or any temp location for clones, extracts and working notes. Do not edit files inside a clone. The review scratch document is `.tmp/scratch/reports/{category}-{name}-review.md` unless the task names another path.
 - Write a claim about this repository into an entry
