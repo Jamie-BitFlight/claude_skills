@@ -14,7 +14,7 @@
 **Caller**: .claude/skills/gh/SKILL.md
 **Integration mechanism**: CLI subprocess (gh aw extension discovery and invocation)
 **Replaces or adds**: Adds capability to define and execute AI-powered GitHub workflows declaratively using Markdown
-**Setup cost**: Low (gh-aw installs as GitHub CLI extension; no additional auth beyond existing GITHUB_TOKEN)
+**Setup cost**: Low (gh-aw installs as GitHub CLI extension; the `engine: claude` workflow in the sketch also needs engine authentication: an `ANTHROPIC_API_KEY` repository secret or Anthropic Workload Identity Federation, per the gh-aw Claude engine docs)
 **Integration surface**: CLI extension `gh aw` with commands: `init`, `new`, `compile`, `run`, `logs`, `audit`, `doctor`, `add-wizard`, `status`, `fix`
 
 ### Why this caller
@@ -86,11 +86,10 @@ gh aw run issue-triage
 The repository currently has 9 GitHub Actions workflows in `.github/workflows/` that handle CI/CD, code quality, Claude Code integration, and backlog synchronization. Several of these workflows involve intelligent decision-making that currently relies on:
 - Hardcoded conditionals for when to trigger Claude Code (looking for `@claude` mentions)
 - Sequential job execution with bash logic for state inspection
-- Limited ability to reason about complex conditions (e.g., when to auto-rebase, how to triage failing tests)
+- Limited ability to reason about complex conditions (e.g., how to triage failing tests)
 
 gh-aw would replace manual YAML workflow authoring for tasks requiring AI reasoning with declarative Markdown that specifies the goal and constraints, leaving execution safety to gh-aw's built-in permission validation and sandboxing. Examples:
 - **CI investigation** (`main-ci-health-check.yml`): Use AI to analyze CI failures and suggest remedies
-- **Auto-rebase decisions** (`auto-rebase.yml`): Use AI to reason about when rebasing is safe
 
 The research entry notes that compiled workflows embed agent prompts, engine selection, MCP server configuration, and safe-outputs validation — exactly what this repository needs to coordinate complex repository automation without hardcoding conditional logic.
 
@@ -113,7 +112,7 @@ permissions:
 strict: true
 tools:
   github:
-    toolsets: [default]  # GitHub API access to read runs, checks, artifacts
+    toolsets: [default, actions]  # `default` omits `actions`; `actions` covers workflows, runs, artifacts
 safe-outputs:
   add-comment:
     max: 1

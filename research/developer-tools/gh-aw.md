@@ -11,7 +11,7 @@ freshness_tracking:
   last_verified: 2026-10-02
   version_at_verification: v0.89.21
   next_review: 2027-01-02
-  confidence_map: "Identity: high | Problem Addressed: high | Key Features: high | Technical Architecture: medium | Installation & Usage: high | Limitations & Caveats: high | Relevance: medium"
+  confidence_map: "Overview: high | Problem Addressed: high | Key Features: high | Technical Architecture: medium (code-read) | Installation & Usage: high | Limitations & Caveats: high | Relevance: medium"
 ---
 
 # GitHub Agentic Workflows
@@ -228,8 +228,8 @@ gh aw doctor --repo owner/repo
 
 - **Multi-engine AI agent orchestration** -> `./.claude/skills/README.md`
   - Term: `orchestration`
-  - Today: "Provides a global contract that enforces disciplined behavior patterns for specialist agents in orchestrated workflows."
-  - Change: This repository's agent-orchestration plugin already covers workflow coordination patterns; gh-aw's engine registry could inform how this repo scales multi-engine support
+  - Today: "Provides a global contract that enforces disciplined behavior patterns for specialist agents in orchestrated workflows. Not directly user-invocable - loaded by role-based agents that participate in orchestration patterns."
+  - Change: already covered — `scripts/generate_harness_compatibility.py` keeps a `HARNESSES` registry and rejects unknown names (lines 124-131)
 
 - **Markdown-based declarative workflow definitions** -> `./.claude/agents/backlog-mcp-validator.md`
   - Term: `frontmatter`
@@ -240,8 +240,8 @@ gh aw doctor --repo owner/repo
 
 - **MCP server integration patterns** -> `.mcp.json`
   - Term: `MCP`
-  - Today: "`mcpServers` configuration with environment variable indirection for API keys, exemplifying secure MCP server initialization patterns"
-  - Change: gh-aw's MCP integration patterns (safe-inputs validation, tool mapping, server lifecycle) could inform how this repo's MCP ecosystem evolves beyond documentation into operational safety patterns
+  - Today: "`mcpServers` configuration with environment variable indirection: `"REF_API_KEY": "$REF_API_KEY"`"
+  - Change: out of scope — the entry does not say what safe-inputs validates or against what schema, so no gap in `.mcp.json` handling can be stated
 
 ---
 
