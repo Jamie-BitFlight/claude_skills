@@ -377,6 +377,7 @@ All factual claims in this entry are traceable to extracted passages from the of
 | [OpenSpace](../ai-research-tools/OpenSpace.md) | ai-research-tools | referenced by OpenSpace (ai-research-tools) |
 | [opencut](../coding-agents/opencut.md) | coding-agents | referenced by opencut (coding-agents) |
 | [takt](../research-agent-patterns/takt.md) | research-agent-patterns | referenced by takt (research-agent-patterns) |
+| [foreman](./foreman.md) | agent-frameworks | referenced by foreman (agent-frameworks) |
 
 ---
 
