@@ -107,7 +107,7 @@ After each wave, collect and log results:
 
 ```text
 Wave {N} complete: {M}/{total} succeeded
-  updated   -- ./research/agent-frameworks/agno.md (v0.3→v0.5, +2k stars)
+  updated   -- ./research/agent-frameworks/agno.md (v0.3→v0.5)
   unchanged -- ./research/mcp-ecosystem/narsil-mcp.md (no changes detected)
   failed    -- ./research/developer-tools/orbstack.md -- error: [reason]
 ```
