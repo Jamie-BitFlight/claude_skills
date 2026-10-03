@@ -205,8 +205,8 @@ Trigger: `<mode_args/>` contains `--validate`.
 ```mermaid
 flowchart TD
     Start(["Parse --validate argument value"]) --> Q{"What is the --validate target value?"}
-    Q -->|"category/name — single entry path"| RunScript["Run validate_research.py --json<br>on ./research/category/name.md"]
-    Q -->|"all — validate every entry"| RunScriptAll["Run validate_research.py --json<br>on ./research/ directory"]
+    Q -->|"category/name — single entry path"| RunScript["Run validate_research.py main --json<br>on ./research/category/name.md"]
+    Q -->|"all — validate every entry"| RunScriptAll["Run validate_research.py main --json<br>on ./research/ directory"]
     RunScript --> ParseJSON["Parse JSON output<br>Group entries[].issues[] by severity: error, warning<br>Count totals per severity"]
     RunScriptAll --> ParseJSON
     ParseJSON --> Zero{"summary.total is 0?"}
@@ -262,7 +262,7 @@ asymmetric the moment it returns, and the rubric's Gate 1 scores an asymmetric p
 against the citing entry -- reviewing now fails every entry on a defect this run is about to repair.
 Run the [Post-Actions](#post-actions) step 2 backlink repair, handling its four result cases exactly
 as step 2 specifies, before spawning any review. The loop below writes entries afterwards, so
-Post-Actions step 2 always runs its own scan too.
+Post-Actions step 2 always runs its own scan too. Append each pair that repair could not write (counted in `backlinks_excluded`) to the scratch document as an `R` line, per the Findings Document format.
 
 Then run the loop per entry, entries in waves of 5. One loop per
 entry, never one across a batch: the verdict block is per-entry. The scratch document `.tmp/scratch/reports/{category}-{name}-review.md`
@@ -270,8 +270,8 @@ entry, never one across a batch: the verdict block is per-entry. The scratch doc
 findings through every round.
 
 The loop runs reviewer, worker, reviewer, worker until the reviewer passes. It stops when
-a round ends with the same unchecked line ids as the previous round (no progress), or after 5 review
-rounds; the owner can change that number. A FAIL with no unchecked lines (a `NOT RUN` gate) has
+a round ends with the same unchecked `D` line ids as the previous round (no progress; `R` lines are excluded), or after 5 review
+rounds. A FAIL with no unchecked lines (a `NOT RUN` gate) has
 nothing to hand the worker: it is a stop that names that gate.
 
 An entry is a bookmark with a summary, so the stop outcome depends on the gate of each unchecked line:
@@ -282,7 +282,7 @@ An entry is a bookmark with a summary, so the stop outcome depends on the gate o
 ```mermaid
 flowchart TD
     Start(["Entry reached cross-referencing"]) --> Review["Spawn the reviewer, model sonnet<br>--review, scratch document, Round N"]
-    Review --> Gate["Run the Validation Gate checks on the entry<br>without its fix retry<br>append each remaining error and gated warning<br>not yet listed to the scratch document as an unchecked D line"]
+    Review --> Gate["Run the Validation Gate checks on the entry<br>without its fix retry<br>append each remaining error and gated warning<br>not yet listed to the scratch document as an unchecked gate 1 D line"]
     Gate --> Q{"Reviewer verdict PASS<br>and no unchecked D line?"}
     Q -->|"Yes"| Pass(["PASS — continue to the Overlap Scan (created entries) or Post-Actions"])
     Q -->|"No"| Stop{"FAIL with no unchecked D line,<br>same unchecked ids as the previous round,<br>or the 5th review?"}
@@ -431,7 +431,9 @@ in [Mode Routing](#mode-routing).
    The baseline only detects files that were already dirty when it was captured; a concurrent edit
    starting afterwards is indistinguishable from this run's own write. When another contributor may
    be editing `./research/` at the same time, run this skill from an isolated worktree -- see
-   `rules/commit-cadence-and-worktrees.md`.
+   `rules/commit-cadence-and-worktrees.md`. A curator that ran in its own worktree already committed
+   and pushed its entry there; this step then finds nothing of that entry to commit, and the
+   orchestrator still handles the README rows, the backlink repair and the final push.
 
    If the filtered list is empty (nothing was created, refreshed, or repaired this run -- e.g. a
    clean Validate Mode pass where the backlink repair also found nothing writable to fix), skip
@@ -490,9 +492,10 @@ Report to user after any mode completes. Apply the [Agent Result Relay Rules](#a
 **README Updated**: Yes | No -- entry marked with issues, row withheld
 **Entry Review**: PASS -- N findings fixed | ACCEPTED -- N semantic lines unchecked (best effort) | UNRESOLVED -- N unchecked, marked with issues (scratch: {path})
 **Cross-References Added**: N
-**Overlap Issues**: #N {url}, ... | none | not run -- {reason}
+**Overlap Issues**: #N {url}, ... | none | failed -- {reason} | not run -- {reason}
 **Overlap EXISTING**: {issue numbers} | none
 **Overlap UNFILED**: {findings} | none
+**Overlap notes**: {ROUTE_FAILURES, SURFACES_FOUND, REASON, verbatim} | none
 
 ### Entry Review Verdicts
 {final verdict block, verbatim}
@@ -519,9 +522,10 @@ YYYY-MM-DD
 **With issues (validation gate)**: V
 **Entry Review**: A PASS, B ACCEPTED, R UNRESOLVED (marked with issues)
 **Cross-References Added**: N
-**Overlap Issues**: #N {url}, ... | none
+**Overlap Issues**: #N {url}, ... | none | failed -- {reason} | not run -- {reason}
 **Overlap EXISTING**: {issue numbers} | none
 **Overlap UNFILED**: {findings} | none
+**Overlap notes**: {ROUTE_FAILURES, SURFACES_FOUND, REASON, verbatim} | none
 
 ### Entry Review Verdicts
 {final verdict block per entry, verbatim}
