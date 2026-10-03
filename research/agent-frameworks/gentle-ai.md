@@ -80,7 +80,7 @@ Pre-commit hook that validates staged files against team standards defined in `A
 
 Gentle-AI configures any of 17 AI coding agents with identical ecosystem components. Each integration uses the agent's native capabilities, so available features (delegation, RDD review) differ by agent.
 
-**Supported agents**: Claude Code, OpenCode, Cursor, VS Code (Copilot/Cline), Gemini CLI, Codex, Windsurf (Codeium), Antigravity, VS Code Copilot, Kilo Code, Kimi Code, Kiro IDE, Qwen Code, Hermes, OpenClaw, Trae, Conductor
+**Supported agents** (the 17 listed in `docs/agents.md` lines 12-28): Claude Code, OpenCode, Kilo Code, Gemini CLI, Cursor, VS Code Copilot, Codex, Windsurf, Antigravity, Kimi Code, Qwen Code, Kiro IDE, OpenClaw, Trae, Pi, Hermes, Conductor
 
 **Ecosystem support tiers**:
 - **Full** (Claude Code, OpenCode): Engram plugin, MCP servers, skills, SDD orchestrator, GGA integration, persona, theme, permissions, statusline, hooks
@@ -128,7 +128,7 @@ Optional persona mode (selected during install, not forced).
 
 | Component | What it does |
 |-----------|-------------|
-| **Config backups** | Snapshotted before every single write; restore via `gentle-ai restore` |
+| **Config backups** | Snapshotted before every single write; restore via `gentle-ai restore latest` (Source: `docs/rollback.md` line 68) |
 | **Doctor** | `gentle-ai doctor` — read-only health report on installation state and dependencies |
 | **Skill registry** | Auto-discovered at startup; manually refresh with `gentle-ai skill-registry refresh --force` |
 | **Self-update** | `gentle-ai update` checks and upgrades the binary |
@@ -337,6 +337,9 @@ gentle-ai uninstall               # Remove managed configuration
 - [Engram Memory System](https://github.com/Gentleman-Programming/gentle-ai/blob/main/docs/engram.md) (accessed 2026-10-02)
 - [Agents Matrix (17 Integrations)](https://github.com/Gentleman-Programming/gentle-ai/blob/main/docs/agents.md) (accessed 2026-10-02)
 - [Product Requirements Document (PRD)](https://github.com/Gentleman-Programming/gentle-ai/blob/main/PRD.md) (accessed 2026-10-02)
+- [Non-interactive install documentation](https://github.com/Gentleman-Programming/gentle-ai/blob/main/docs/non-interactive.md) (accessed 2026-10-03)
+- [Usage documentation](https://github.com/Gentleman-Programming/gentle-ai/blob/main/docs/usage.md) (accessed 2026-10-03)
+- [Rollback documentation](https://github.com/Gentleman-Programming/gentle-ai/blob/main/docs/rollback.md) (accessed 2026-10-03)
 
 ---
 
