@@ -432,14 +432,36 @@ def reference_date_yaml(
 RELEVANCE_SECTION = "Relevance to Claude Code Development"
 
 # Anchor evidence: a backticked repo-relative path under one of the roots the Phase 1c Repo Anchor
-# Pass searches, or a ``git grep`` command string. extraction-methodology.md's Phase 1c writes every
-# Relevance item from one or the other, so a section carrying neither did not run the pass.
-RELEVANCE_ANCHOR_PATTERN = re.compile(r"`(?:plugins/|\.claude/|rules/|docs/|AGENTS\.md)[^`\n]*`|git\s+grep")
+# Pass searches, a ``git grep`` command string, or a ``Found by:`` line recording the search.
+# extraction-methodology.md's Phase 1c writes every Relevance item from one of these, so a section
+# carrying none did not run the pass.
+RELEVANCE_ANCHOR_PATTERN = re.compile(
+    r"`(?:plugins/|\.claude/|rules/|docs/|AGENTS\.md)[^`\n]*`|git\s+grep|^[ \t]*[-*][ \t]+Found by:", re.MULTILINE
+)
 
 
 # The backticked repo-relative path inside a Relevance anchor. Same roots as
 # RELEVANCE_ANCHOR_PATTERN, but capturing the path so it can be resolved against the repo root.
 RELEVANCE_ANCHOR_PATH_PATTERN = re.compile(r"`((?:plugins/|\.claude/|rules/|docs/|AGENTS\.md)[^`\n]*)`")
+
+
+def _head_line_arrow_tails(section_lines: list[str]) -> str:
+    """Extract text after arrows on item head lines, for path resolution.
+
+    Item head lines are item-list heads (matching _RELEVANCE_QUOTE_ITEM_HEAD_PATTERN).
+
+    Returns:
+        Joined text after the first `->` or `→` on each head line; head lines with no arrow
+        contribute nothing.
+    """
+    parts = []
+    for line in section_lines:
+        if _RELEVANCE_QUOTE_ITEM_HEAD_PATTERN.match(line):
+            arrow_pos = max(line.find("->") if "->" in line else -1, line.find("→") if "→" in line else -1)
+            if arrow_pos >= 0:
+                parts.append(line[arrow_pos + 2 :].strip())
+    return "\n".join(parts)
+
 
 # A backticked span carrying one of these is a shape (a glob, a template placeholder), not a path
 # any single file can satisfy, so it is excluded from the existence check rather than failed by it.
@@ -496,7 +518,7 @@ def repo_root_for(path: Path) -> Path | None:
 def check_relevance_anchor_paths(
     lines: list[str], sections: dict[str, tuple[int, int]], repo_root: Path | None
 ) -> list[Issue]:
-    """Check that every repo path the Relevance section cites resolves in the repository.
+    """Check that every repo path cited on Relevance item head lines (after the arrow) resolves in the repository.
 
     ``check_relevance_anchored`` below tests only that anchor-shaped evidence is present. Shape
     alone is satisfied by a plausible-looking path that was never opened, which makes naming an
@@ -521,7 +543,7 @@ def check_relevance_anchor_paths(
 
     start, end = section
     cited: list[str] = []
-    for match in RELEVANCE_ANCHOR_PATH_PATTERN.finditer("\n".join(lines[start - 1 : end])):
+    for match in RELEVANCE_ANCHOR_PATH_PATTERN.finditer(_head_line_arrow_tails(lines[start - 1 : end])):
         candidate = match.group(1).split()[0].rstrip(".,;:)")
         if any(ch in candidate for ch in _UNRESOLVABLE_PATH_CHARS):
             continue
@@ -802,8 +824,9 @@ _ABSENCE_ANCHOR_UNIT_PATTERN = re.compile(
 
 # Broader trigger for "this text is attempting to record a git-grep absence anchor" -- deliberately
 # looser than _ABSENCE_ANCHOR_UNIT_PATTERN so a malformed attempt is still detected as an attempt
-# rather than silently ignored.
-_GIT_GREP_ATTEMPT_PATTERN = re.compile(r"git\s+grep")
+# rather than silently ignored. Restricted to legacy absence-anchor lines (a `Today:` bullet) so that
+# `git grep` mentioned in prose, in a `Change:` line, or on a `Found by:` line is not an attempt.
+_GIT_GREP_ATTEMPT_PATTERN = re.compile(r"^[ \t]*[-*][ \t]+Today:[ \t]*`?(git[ \t]+grep)", re.MULTILINE)
 
 _ABSENCE_ANCHOR_TIMEOUT_SECONDS = 15
 
@@ -831,7 +854,7 @@ def _parse_absence_anchor_units(
     Finds every canonical absence-anchor unit (a ``git grep`` command against the fixed Phase 1c
     scope, immediately followed by its own recorded match count) and, separately, every
     git-grep-shaped attempt whose text does not reproduce that canonical form -- an attempt is any
-    occurrence of ``git grep`` whose position falls outside every canonical match's span.
+    ``Today:`` line with a ``git grep`` command whose position falls outside every canonical match's span.
 
     Args:
         section_text: The Relevance section's raw text (its lines joined with ``\\n``).
@@ -850,12 +873,12 @@ def _parse_absence_anchor_units(
 
     unparsed: list[UnparsedAbsenceAnchorAttempt] = []
     for attempt in _GIT_GREP_ATTEMPT_PATTERN.finditer(section_text):
-        if any(cov_start <= attempt.start() < cov_end for cov_start, cov_end in covered):
+        if any(cov_start <= attempt.start(1) < cov_end for cov_start, cov_end in covered):
             continue
-        line_start = section_text.rfind("\n", 0, attempt.start()) + 1
-        line_end_idx = section_text.find("\n", attempt.start())
+        line_start = section_text.rfind("\n", 0, attempt.start(1)) + 1
+        line_end_idx = section_text.find("\n", attempt.start(1))
         line_end = line_end_idx if line_end_idx != -1 else len(section_text)
-        line = start_line + section_text.count("\n", 0, attempt.start())
+        line = start_line + section_text.count("\n", 0, attempt.start(1))
         unparsed.append(UnparsedAbsenceAnchorAttempt(line_text=section_text[line_start:line_end].strip(), line=line))
 
     return units, unparsed
@@ -1012,7 +1035,7 @@ def check_relevance_anchored(
             "check": "relevance_unanchored",
             "severity": "warning",
             "message": (
-                f"{RELEVANCE_SECTION} cites no repo-relative path and no search command "
+                f"{RELEVANCE_SECTION} cites no repo-relative path, no search command, and no `Found by:` line "
                 "-- run the Phase 1c Repo Anchor Pass (references/extraction-methodology.md)"
             ),
             "line": start,
