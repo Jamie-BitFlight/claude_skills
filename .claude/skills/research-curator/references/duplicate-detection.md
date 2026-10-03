@@ -2,7 +2,9 @@
 
 Runs before spawning `@research-curator` for a URL.
 
-Check whether `./research/` already contains an entry for the URL's resource. If found:
+Check whether `./research/` already contains an entry for the URL's resource: match on the
+frontmatter `source_url` or `github_repository` (ignoring a trailing slash or `.git`), then on the
+file name slug. If found:
 
 1. Read Last Verified and Version at Verification: check frontmatter first
    (`freshness_tracking.last_verified` / `freshness_tracking.version_at_verification`, or bare

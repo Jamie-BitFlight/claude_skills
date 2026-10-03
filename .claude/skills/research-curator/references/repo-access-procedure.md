@@ -74,7 +74,7 @@ and 5 give directly.
 ## 5. Fallback for latest-release/version data blocked by step 3
 
 Stars, forks, and contributor counts are never gathered at all -- see
-`research-curator.md`'s Fidelity Rule 2a -- so step 3 blocking them is not a gap to fill.
+Rule 2a in [Entry Quality Standards](./entry-quality-standards.md) -- so step 3 blocking them is not a gap to fill.
 The only functional data step 3 can block is release/version currency. Look for it
 already inside the clone from step 1 before concluding it's unavailable:
 
@@ -83,6 +83,6 @@ already inside the clone from step 1 before concluding it's unavailable:
 - `package.json` / `pyproject.toml` version fields
 - `git log -1 --format=%cd` inside the worktree, for last-commit date
 
-If genuinely absent from the clone, apply Fidelity Rule 3 verbatim: write "Unable to access via
-GitHub API — repository outside this session's authorized scope" in the entry's References
-section. Do not infer the value, and do not attempt steps 3 or 4 again to get it.
+If genuinely absent from the clone, write the inaccessible-source sentence from Rule 1 in
+[Entry Quality Standards](./entry-quality-standards.md) in the entry's References section, with
+"repository outside this session's authorized scope" as the reason. Do not infer the value, and do not attempt steps 3 or 4 again to get it.

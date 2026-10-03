@@ -168,25 +168,7 @@ Entry files go at `./research/{category}/{resource-name}.md`.
 
 ### Default Mode (new URL/resource)
 
-```mermaid
-flowchart TD
-    Start([New resource URL or name]) --> CloneCheck{Is target a repo,<br>or does the site have an associated repo?}
-    CloneCheck -->|"Yes — repo URL known"| ShallowClone["Shallow clone to .worktrees/repo-name/<br>git clone --depth 1 URL .worktrees/repo-name/"]
-    CloneCheck -->|"No repo"| Fetch[Fetch all available primary sources]
-    ShallowClone --> Fetch[Fetch all available primary sources<br>using .worktrees/repo-name/ as primary entry point]
-    Fetch --> Extract[Extract key passages per source with source references]
-    Extract --> Metadata[Gather identity -- name, exact version string, license, URLs]
-    Metadata --> Features[Document features with mechanism and examples, not just names]
-    Features --> Architecture[Describe architecture with component names and data flow]
-    Architecture --> Usage[Write installation and usage examples verified against official docs]
-    Usage --> Limitations[Document limitations and caveats from source, or note absence explicitly]
-    Limitations --> Confidence[Assign confidence level per section]
-    Confidence --> References[Compile all sources with full URL and access date]
-    References --> Freshness[Set freshness tracking -- next review per Setting Next Review in entry-template.md]
-    Freshness --> WriteFile[Write entry to ./research/category/resource-name.md]
-    WriteFile --> SelfCheck[Self-Check Before Returning]
-    SelfCheck --> Done([Return result])
-```
+Follow the New research mode path of the Research Workflow chart above. Set freshness tracking per Setting Next Review in [entry-template.md](.claude/skills/research-curator/references/entry-template.md).
 
 ### `--rerun` Mode (re-research existing entry)
 
@@ -197,7 +179,7 @@ flowchart TD
 5. (Conditional) Run Phase 1b code analysis on the worktree if the doc-sufficiency check failed. Merge the resulting code extracts with the re-extracted passages before updating sections.
 6. Update sections where source data has changed. Preserve sections where source data is unchanged.
    Keep the entry at its existing path — a refresh never re-runs category selection, because moving
-   the file orphans every cross-reference and backlink pointing at it.
+   the file orphans every cross-reference and backlink pointing at it. Keep a legacy `## Relevance to Claude Code Development` section and `Key Statistics` block as found.
 7. Update Freshness Tracking with today's date and new confidence assessments — in frontmatter
    (`freshness_tracking.last_verified` etc.) for entries using that format, or in the body
    `## Freshness Tracking` table for legacy text-header entries. Match whichever format the
@@ -211,19 +193,19 @@ flowchart TD
 1. Receive the specific issues to fix: validate_research.py output, or the unchecked `D` lines of a review scratch document whose path the invocation gives.
 2. READ the entry file, and the scratch document when one was given.
 3. Fix ONLY the specified issues. Do NOT rewrite sections that are not flagged. Gather what a line's `needs:` names. On every scratch line you address, record `did:` with a short action note; check the line off once the fix is re-found in the file, and leave a line you cannot fix unchecked, its note saying why.
-4. A validator issue raised against an existing `## Relevance to Claude Code Development` section goes on the `UNRESOLVED:` line.
+4. A validator issue against a pre-existing `## Relevance to Claude Code Development` section is reported and not fixed, and does not fail the entry; an empty legacy Relevance heading does not force Status `failed`. Leave that section and any `Key Statistics` block as found.
 5. Run the [Self-Check](#self-check-before-returning) on the edited file, then return an itemized list of each fix applied. With a scratch document, return its path as `SCRATCH: {path}` after the Status line.
 
 ### `--review` Mode (audit and correct a finished entry)
 
-Audit an entry someone else finished, or the same entry after a `--fix` pass. Record each finding in the scratch document and fix every one that needs no additional research. A finding that needs more data stays unchecked for a `--fix` pass; fetching upstream sources is that pass's work, not this mode's.
+Audit an entry someone else finished, or the same entry after a `--fix` pass. The front matter default is `haiku` (the `--fix` worker); the orchestrator passes `sonnet` for `--review`. Record each finding in the scratch document and fix every one that needs no additional research. A finding that needs more data stays unchecked for a `--fix` pass; fetching upstream sources is that pass's work, not this mode's.
 
 1. Load [Entry Review Rubric](.claude/skills/research-curator/references/entry-review-rubric.md) before reading the entry. It is this mode's entire contract — the files in scope, the gates, what counts as a defect, and the verdict block all come from it. Follow it as written.
 2. Run the gates in the order the rubric lists them, over the entry and, for cross-reference reciprocity, the entries it cites.
 3. A gate you could not run is recorded `NOT RUN` with the reason; it is never a pass, and it is never omitted from the report.
-4. Write every finding to the scratch document the invocation names, unchecked, before fixing any. Then work the lines in order as the rubric's Findings Document section directs: fix what needs no additional research, re-find the fix in the file, check the line off; leave the rest unchecked with `needs:`. Re-run Gate 1's commands after your last edit. An invocation naming a later round follows the rubric's rule for rounds after the first.
+4. Write every finding to the scratch document the invocation names, unchecked, before fixing any. Then work the lines in order as the rubric's Findings Document section directs: fix what needs no additional research, re-find the fix in the file, check the line off; leave the rest unchecked with `needs:`. Re-run the Gate 1 commands this mode runs after your last edit. A finding in a file you may not write is not a scratch line; the orchestrator relays it. An invocation naming a later round follows the rubric's rule for rounds after the first.
 5. Return the rubric's verdict block, filled in, as your whole result. It replaces the [Return Format](#return-format) below for this mode — that block reports research this agent performed, and this mode performs none.
-6. When the entry path does not exist, or the rubric itself cannot be loaded, no gate can run: return `REVIEW: {path}` followed by `VERDICT: NOT RUN -- {exact reason}` and stop. Report that line rather than a partial verdict block.
+6. When the entry path does not exist, or the rubric itself cannot be loaded, no gate can run: return `REVIEW: {path}` followed by `VERDICT: FAIL -- NOT RUN: {exact reason}` and stop. Report that line rather than a partial verdict block.
 
 </modes>
 
@@ -237,7 +219,7 @@ Applies to Default and `--rerun` modes, and to `--fix` after its edits. Validate
 2. Check the `confidence_map` covers every major section (Rule 4), and that a section resting on code you read is not rated `high`.
 3. List each version, figure, license, install command, and architecture assertion with the extract it came from; delete any that has none.
 4. Scan the entry for the Gate 4 triggers in [Entry Review Rubric](.claude/skills/research-curator/references/entry-review-rubric.md) and rewrite each hit outside an attributed quotation.
-5. Report anything still unfixed on an `UNRESOLVED:` line in the result, with the exact text. Never report Status `created`, `updated`, or `fixed` over an unresolved error; use `failed`.
+5. Report anything still unfixed on an `UNRESOLVED:` line in the result, with the exact text. Never report Status `created`, `updated`, or `fixed` over an unresolved error; use `failed`. An issue against a pre-existing Relevance section is not an unresolved error.
 
 ---
 
@@ -247,10 +229,10 @@ Applies to Default and `--rerun` modes, and to `--fix` after its edits. Validate
 
 When a primary source cannot be fetched:
 
-1. Report explicitly: "Unable to access {URL}: {reason — HTTP 404 | timeout | auth required | etc.}"
+1. Report it with the sentence in [Entry Quality Standards](.claude/skills/research-curator/references/entry-quality-standards.md) Rule 1, verbatim, including the access date.
 2. Do NOT guess or infer content from the URL path, domain, or page title.
 3. Write a section whose source was inaccessible in Rule 3 language, with no inferred content.
-4. Document the inaccessibility in the entry's References section with the exact error.
+4. Document the inaccessibility in the entry's References section using that sentence, with the exact error as its reason.
 5. If fallback sources exist (e.g., GitHub README when docs site is down), fetch those and note the fallback in the entry.
 
 "Not mentioned in the sources I could access" is NOT the same as "doesn't exist." Use the precise Rule 3 language.
@@ -299,14 +281,13 @@ Do NOT set Status to `created` if sections contain inferred or placeholder conte
 This agent creates and updates individual research entry files. It MUST NOT:
 
 - Update `./research/README.md` -- orchestrator's responsibility
-- Commit to git -- orchestrator's responsibility
 - Coordinate batch operations -- orchestrator's responsibility
-- Push to remote -- orchestrator's responsibility
+- Commit or push from a tree that other agents share -- the orchestrator commits there. In its own worktree, this agent commits and pushes its work.
 - Create or modify skills, agents, or plugins
-- Modify any file outside `./research/` (exception: shallow clones to `./.worktrees/` are permitted as read-only workspace preparation — do not edit files inside the worktree).
+- Modify a tracked repository file other than the entry. Temporary files are unrestricted: use `.tmp/`, the session scratchpad, or any temp location for clones, extracts and working notes. Do not edit files inside a clone. The review scratch document is `.tmp/scratch/reports/{category}-{name}-review.md` unless the task names another path.
 - Write a claim about this repository into an entry
 - Call `add_repo`, `register_repo_root`, or any other session GitHub-scope-expansion tool for a research target. These tools fire only on explicit user instruction to add a repo to the session; a research URL is not that instruction. See `repo_access_procedure` step 4 -- a `gh api` 403 on an out-of-scope repo is expected and is handled via the step 5 fallback, never by requesting broader access
-- Write, while running `--review`, to any file other than the entry under review and the scratch document; or gather new data there (fetch upstream sources). Such a correction stays an unchecked line for `--fix`
+- Write, while running `--review`, to any tracked file other than the entry under review (temp files and the scratch document are fine); or gather new data there (fetch upstream sources). Such a correction stays an unchecked line for `--fix`
 - Write content for a section based on inference when primary sources are inaccessible
 - Present extracted quotes as original prose without attribution
 - Re-summarize content that has already been summarized by another agent -- relay it

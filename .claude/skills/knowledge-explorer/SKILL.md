@@ -45,7 +45,7 @@ Each entry shows: filename, version, verified date, next-review date, and `[OVER
 
 ### show-template
 
-Print the skill-spec frontmatter template for new entries.
+Print the legacy skill-spec frontmatter template (see [Frontmatter schema](#frontmatter-schema)).
 
 ```bash
 uv run research/knowledge-explorer.py show-template
@@ -76,19 +76,9 @@ metadata:
 [Body content here]
 ```
 
-Use this template as the starting point for any new entry before passing it to `add`.
+Use this template as the starting point for an entry passed to `add`.
 
-**Valid categories** (verified from source lines 59-86):
-
-```text
-agent-frameworks, agent-infrastructure, ai-design-tools, ai-observability,
-ai-research-tools, ai-writing-tools, api-frameworks, async-libraries,
-code-auditing, coding-agents, context-management, data-infrastructure,
-developer-tooling, developer-tools, documentation-tools, evaluation-testing,
-installer-tools, llm-infrastructure, low-code-platforms, mcp-ecosystem,
-ml-infrastructure, python-runtimes, research-agent-patterns, rust-python-bindings,
-skill-generation-tools, task-management
-```
+**Valid categories**: see `VALID_CATEGORIES` in `research/knowledge-explorer.py`.
 
 ### fetch-github
 
@@ -312,7 +302,7 @@ Run with `--dry-run` first to preview changes before committing.
 
 ## Frontmatter schema
 
-Skill-spec format (canonical, written by all write operations):
+Legacy skill-spec format, the one this script reads, writes, and migrates to. New entries created by `/research-curator` follow [entry-template.md](../research-curator/references/entry-template.md), which is authoritative for them.
 
 ```yaml
 ---

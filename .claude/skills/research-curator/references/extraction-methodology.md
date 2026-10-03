@@ -22,16 +22,16 @@ EXTRACTED PASSAGES — {resource-name}
 
 1. "{exact quote or data point}"
    Source: {URL or tool + section}
-   Relevance: {which entry section this feeds}
+   Feeds: {which entry section this feeds}
 
 2. "{exact quote or data point}"
    Source: {URL or tool + section}
-   Relevance: {which entry section this feeds}
+   Feeds: {which entry section this feeds}
 ```
 
 Apply this to EVERY section: features, architecture, installation steps, usage examples, limitations. Numbers, version strings, benchmark figures, and configuration values MUST be quoted verbatim from source — never paraphrased or estimated. Star, download, fork, and contributor counts are the exception (Rule 2a): never extract them, including from badges and quoted passages.
 
-**Relevance values**: Use the exact section names from [Entry Template](./entry-template.md) — Overview, Problem Addressed, Key Features, Technical Architecture, Installation & Usage, Limitations and Caveats, References, Freshness Tracking. This enables the doc-sufficiency check after Phase 1 to filter extracts by section.
+**Feeds values**: Use the exact section names from [Entry Template](./entry-template.md) — Overview, Problem Addressed, Key Features, Technical Architecture, Installation & Usage, Limitations and Caveats, References, Freshness Tracking. This enables the doc-sufficiency check after Phase 1 to filter extracts by section.
 
 ---
 
@@ -39,7 +39,7 @@ Apply this to EVERY section: features, architecture, installation steps, usage e
 
 Run immediately after Phase 1 completes. Record the result as a working note — do NOT write it to the entry file.
 
-1. Scan your Phase 1 extracts tagged with `Relevance: Technical Architecture` or `Relevance: Key Features`.
+1. Scan your Phase 1 extracts tagged with `Feeds: Technical Architecture` or `Feeds: Key Features`.
 2. Answer each question YES or NO:
    - Q1: Do any extracts name at least 2 specific component, module, or class names (not generic descriptions like "has a plugin system")?
    - Q2: Do any extracts describe how data or control flows between at least 2 named components (not generic statements like "processes data")?
@@ -106,7 +106,7 @@ This phase triggers ONLY when the doc-sufficiency check recorded "Architecture d
    ```text
    N. "{exact code passage — class definition, function signature, import block, or schema}"
       Source: {relative-path}:{start-end lines} — {exported name}
-      Relevance: Technical Architecture | Key Features
+      Feeds: Technical Architecture | Key Features
       Confidence: code-read
    ```
 

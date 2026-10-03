@@ -2,7 +2,7 @@
 
 This directory contains curated research on tools, repositories, and patterns relevant to agentic AI development with Claude Code.
 
-**Purpose**: Provide reference material for developing Claude Code skills, agents, plugins, and workflows by documenting novel approaches from the community.
+**Purpose**: Each entry is a bookmark and summary of a resource's URL, kept for discussion and idea capture.
 
 ---
 

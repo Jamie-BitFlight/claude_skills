@@ -79,7 +79,7 @@ Each major section of the entry — every `##` section present when it is writte
 
 - `high` -- full primary source read, official documentation, recent and dated
 - `medium` -- partial read, informal source, or single source with no corroboration
-- `low` -- inferred, dated source (>12 months), or source conflict
+- `low` -- dated source (>12 months) or source conflict
 
 **Factors that reduce confidence**: source truncated, source is informal (blog post vs official docs), sources contradict each other, content required interpretation rather than extraction.
 
@@ -137,4 +137,6 @@ Write nothing that Gate 4 of [Entry Review Rubric](./entry-review-rubric.md) sca
 
 ## Completeness
 
-Every section of [Entry Template](./entry-template.md) MUST be complete with real data gathered from primary sources. Placeholders, "TBD", and bare "N/A" are FORBIDDEN. When data is genuinely unavailable, write what was searched, what was found, and why the data is absent — using the Rule 3 language above.
+Rule 1 (every claim traces to an extracted passage) is checked at source level: the reviewer confirms the claim appears in a source listed in References. Extracts are working notes and are not persisted.
+
+Every section of [Entry Template](./entry-template.md) MUST be complete with real data gathered from primary sources. Placeholders, "TBD", and bare "N/A" are FORBIDDEN. When data is genuinely unavailable, write what was searched, what was found, and why the data is absent — using the Rule 3 language above. Cross-References is added later by another agent: omit its heading when it has no rows, because an empty heading is a validator error.
