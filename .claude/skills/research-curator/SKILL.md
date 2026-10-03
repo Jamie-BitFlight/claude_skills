@@ -106,7 +106,7 @@ Trigger: `<mode_args/>` contains a URL with no flags.
 
 7. **Review** -- run [Entry Review](#entry-review) on the entry
 
-8. **Overlap Scan** -- when step 2 found no existing entry and Entry Review returned PASS or ACCEPTED, run the [Overlap Scan](#overlap-scan)
+8. **Overlap Scan** -- when step 2 found no existing entry and Entry Review returned PASS, run the [Overlap Scan](#overlap-scan)
 
 9. **Post-actions** -- lint, commit, push (see [Post-Actions](#post-actions))
 
@@ -277,7 +277,7 @@ nothing to hand the worker: it is a stop that names that gate.
 An entry is a bookmark with a summary, so the stop outcome depends on the gate of each unchecked line:
 
 - **Mechanical gates (1 and 4: formatting, validator, banned wording).** An unchecked line here after the stop is UNRESOLVED. A mechanical fix needs no research, so the failure is a process defect: the instructions that tell the curator what to create and the reviewer what to check disagree.
-- **Semantic gates (2 and 3: fidelity and depth).** Unchecked lines here after the stop are best effort. The entry is ACCEPTED and continues as PASS would. The source is the truth: a reviewer finding the source does not support is dropped, not argued again. The unchecked lines go in the report, never in the entry.
+- **Semantic gates (2 and 3: fidelity and depth).** Unchecked lines here after the stop are best effort. The entry is ACCEPTED and continues as PASS would, except that it gets no Overlap Scan: an entry that did not review clean files no issues. The source is the truth: a reviewer finding the source does not support is dropped, not argued again. The unchecked lines go in the report, never in the entry.
 
 ```mermaid
 flowchart TD
@@ -288,7 +288,7 @@ flowchart TD
     Q -->|"No"| Stop{"FAIL with no unchecked D line,<br>same unchecked ids as the previous round,<br>or the 5th review?"}
     Stop -->|"Yes"| Kind{"Any unchecked line<br>in gate 1 or 4,<br>or a NOT RUN gate?"}
     Kind -->|"Yes"| Unresolved(["UNRESOLVED — mark the entry created/refreshed with issues, no Overlap Scan<br>report the unchecked lines verbatim, the gate ids that recurred across rounds,<br>and the scratch path as a process defect"])
-    Kind -->|"No — gate 2 or 3 only"| Accepted(["ACCEPTED, best effort — continue as PASS<br>report the unchecked lines verbatim and the scratch path"])
+    Kind -->|"No — gate 2 or 3 only"| Accepted(["ACCEPTED, best effort — continue as PASS, but no Overlap Scan<br>report the unchecked lines verbatim and the scratch path"])
     Stop -->|"No"| Fix["Spawn the worker, model haiku<br>--fix, scratch document"]
     Fix --> Gate2["Run the Validation Gate checks as above"]
     Gate2 --> Review
@@ -332,7 +332,7 @@ a process defect so the misalignment can be traced. An ACCEPTED entry lists its 
 
 ## Overlap Scan
 
-A one-off per [Overlap Scan](./references/overlap-scan.md), run once when an entry is first created: Default Mode when step 2 found no existing entry, Batch Mode for created entries. It runs after [Entry Review](#entry-review) returns PASS or ACCEPTED, so issues cite reviewed text. Refreshed, UNRESOLVED, and marked-with-issues entries get no scan.
+A one-off per [Overlap Scan](./references/overlap-scan.md), run once when an entry is first created: Default Mode when step 2 found no existing entry, Batch Mode for created entries. It runs after [Entry Review](#entry-review) returns PASS, so issues cite reviewed text. Refreshed, UNRESOLVED, ACCEPTED (best effort), and marked-with-issues entries get no scan.
 
 Spawn both concurrently, then relay:
 
