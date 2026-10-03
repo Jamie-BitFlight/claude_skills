@@ -83,15 +83,11 @@ gh aw run issue-triage
 
 ### Why this caller
 
-The repository currently has 9 GitHub Actions workflows in `.github/workflows/` that handle CI/CD, code quality, Claude Code integration, and backlog synchronization. Several of these workflows involve intelligent decision-making that currently relies on:
-- Hardcoded conditionals for when to trigger Claude Code (looking for `@claude` mentions)
-- Sequential job execution with bash logic for state inspection
-- Limited ability to reason about complex conditions (e.g., how to triage failing tests)
+The repository currently has 9 GitHub Actions workflows in `.github/workflows/` that handle CI/CD, code quality, Claude Code integration, and backlog synchronization. The one verified trigger condition is `.github/workflows/claude.yml`, which gates Claude Code on:
+- A hardcoded `contains(github.event.comment.body, '@claude')` conditional (line 16)
 
 gh-aw would replace manual YAML workflow authoring for tasks requiring AI reasoning with declarative Markdown that specifies the goal and constraints, leaving execution safety to gh-aw's built-in permission validation and sandboxing. Examples:
 - **CI investigation** (`main-ci-health-check.yml`): Use AI to analyze CI failures and suggest remedies
-
-The research entry notes that compiled workflows embed agent prompts, engine selection, MCP server configuration, and safe-outputs validation — exactly what this repository needs to coordinate complex repository automation without hardcoding conditional logic.
 
 ### Integration sketch
 

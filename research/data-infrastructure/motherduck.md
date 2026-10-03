@@ -215,3 +215,4 @@ con.sql("""
 | [pocketbase](./pocketbase.md) | data-infrastructure | referenced by pocketbase (data-infrastructure) |
 | [polars-documentation](./polars-documentation.md) | data-infrastructure | referenced by polars-documentation (data-infrastructure) |
 | [duckdb-python-client](../database-libraries/duckdb-python-client.md) | database-libraries | referenced by duckdb-python-client (database-libraries) |
+| [vector](./vector.md) | data-infrastructure | referenced by vector (data-infrastructure) |

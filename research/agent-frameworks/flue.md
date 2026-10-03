@@ -260,6 +260,7 @@ Flue serves as a production-grade reference implementation for building autonomo
 | [deepseek-harness](./deepseek-harness.md) | agent-frameworks | referenced by deepseek-harness (agent-frameworks) |
 | [foreman](./foreman.md) | agent-frameworks | shares worker backend abstraction and asyncio-based event processing (bidirectional) |
 | [gh-aw](../developer-tools/gh-aw.md) | developer-tools | referenced by gh-aw (developer-tools) |
+| [gentle-ai](./gentle-ai.md) | agent-frameworks | referenced by gentle-ai (agent-frameworks) |
 
 ---
 

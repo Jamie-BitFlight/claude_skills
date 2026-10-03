@@ -249,3 +249,4 @@ analyze dependencies, and generate a structured report.
 | [solace-agent-mesh](./solace-agent-mesh.md) | agent-frameworks | referenced by solace-agent-mesh (agent-frameworks) |
 | [helix-db](../data-infrastructure/helix-db.md) | data-infrastructure | referenced by helix-db (data-infrastructure) |
 | [airllm](../llm-infrastructure/airllm.md) | llm-infrastructure | referenced by airllm (llm-infrastructure) |
+| [gentle-ai](./gentle-ai.md) | agent-frameworks | referenced by gentle-ai (agent-frameworks) |

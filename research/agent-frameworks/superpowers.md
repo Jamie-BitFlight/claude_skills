@@ -357,3 +357,4 @@ The `writing-skills` skill treats skill creation as TDD for documentation:
 | [maverick](../coding-agents/maverick.md) | coding-agents | referenced by maverick (coding-agents) |
 | [pilot-shell](../coding-agents/pilot-shell.md) | coding-agents | referenced by pilot-shell (coding-agents) |
 | [agent-skills-eval](../evaluation-testing/agent-skills-eval.md) | evaluation-testing | referenced by agent-skills-eval (evaluation-testing) |
+| [gentle-ai](./gentle-ai.md) | agent-frameworks | referenced by gentle-ai (agent-frameworks) |

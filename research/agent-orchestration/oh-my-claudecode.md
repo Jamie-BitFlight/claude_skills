@@ -563,6 +563,7 @@ The ARCHITECTURE.md file covers overview and skill composition but does not deta
 | [octogent](../agent-frameworks/octogent.md) | agent-frameworks | referenced by octogent (agent-frameworks) |
 | [orchestra](../agent-frameworks/orchestra.md) | agent-frameworks | referenced by orchestra (agent-frameworks) |
 | [compression-monitor](../ai-observability/compression-monitor.md) | ai-observability | referenced by compression-monitor (ai-observability) |
+| [coop](../agent-infrastructure/coop.md) | agent-infrastructure | referenced by coop (agent-infrastructure) |
 
 ---
 

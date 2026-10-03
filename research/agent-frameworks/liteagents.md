@@ -374,3 +374,4 @@ liteagents friction ~/.claude/projects
 | [AutoResearchClaw](../agent-infrastructure/AutoResearchClaw.md) | agent-infrastructure | referenced by AutoResearchClaw (agent-infrastructure) |
 | [empirica](../agent-infrastructure/empirica.md) | agent-infrastructure | referenced by empirica (agent-infrastructure) |
 | [simplemem-cross](../context-management/simplemem-cross.md) | context-management | referenced by simplemem-cross (context-management) |
+| [gentle-ai](./gentle-ai.md) | agent-frameworks | referenced by gentle-ai (agent-frameworks) |
