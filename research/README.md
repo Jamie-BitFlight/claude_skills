@@ -540,6 +540,7 @@ Agent SDKs, orchestration frameworks, and comparative studies of multi-agent arc
 | [ponytail.md](./agent-frameworks/ponytail.md) | Ponytail v4.7.0 — "lazy senior developer mode" for AI agents; 6-rung decision ladder (YAGNI→stdlib→native→deps→one-liner→minimal code) with benchmark results: 80–94% code reduction, 42–75% cost reduction, 3–6× faster; 13 platform support (MIT) | 2026-06-18 |
 | [flue.md](./agent-frameworks/flue.md) | Flue — TypeScript agent harness framework providing durable-first execution, sandboxes, typed tools, MCP integration, subagent delegation, and 20+ channel adapters (Slack, Teams, Discord, GitHub); deploys to Node.js, Cloudflare Workers, GitHub Actions, GitLab CI/CD, Daytona, Render (Apache-2.0, v1.0.0-beta.9) | 2026-07-03 |
 | [deepseek-harness.md](./agent-frameworks/deepseek-harness.md) | DeepSeek Harness (`dsh`) — DeepSeek AI's open-source agent harness; everything-is-a-plugin architecture on Cordis; 30+ capability packages (core loop, LLM access, shell/fs/web execution, subagent delegation, workflow, skills, session persistence); Service Definition/Provider/Consumer seam pattern; bridges Claude Code, Codex, OpenCode, GitHub coding agents via shared wire protocol; developer preview, no security audit (MIT) | 2026-09-11 |
+| [zeron.md](./agent-frameworks/zeron.md) | Zeron v0.2.102 — local-first Rust controller for multiple coding agents (Claude Code, Codex, Cursor and others) with an 18-member Cargo workspace, native gpui UI, Loro CRDT session documents and optional multi-device sync via Cloudflare Durable Objects (MIT) | 2026-10-02 |
 
 **Key Topics**:
 
@@ -606,6 +607,7 @@ Infrastructure tools and platforms for deploying, orchestrating, and managing ag
 | [empirica.md](./agent-infrastructure/empirica.md) | Empirica v1.7.7 — epistemic measurement and Sentinel gating system for autonomous AI agents: 13-vector assessment, 4-layer memory architecture, noetic-praxic gating enforces understanding before code modification, Claude Code native hooks integration | 2026-04-05   |
 | [trigger-dev.md](./agent-infrastructure/trigger-dev.md) | Trigger.dev v3 — open-source TypeScript platform for AI agents and long-running workflows: durable checkpoint-resume execution, human-in-the-loop waitpoints, real-time streaming, batch ops, concurrency control, multi-environment isolation (14.5K stars, Apache-2.0) | 2026-04-11   |
 | [iii.md](./agent-infrastructure/iii.md) | iii v0.19.4 (Motia LLC) — unified backend composition engine with "zero integration" via Worker/Function/Trigger primitives; 12 built-in modules, multi-language SDKs (Node.js/Python/Rust/Go), runtime-extensible capabilities, WebSocket protocol (18.3K stars, ELv2 engine / Apache-2.0 SDKs) | 2026-06-18 |
+| [coop.md](./agent-infrastructure/coop.md) | coop 0.6.0 — Trail of Bits Rust CLI that runs Claude Code, Codex and Grok Build inside disposable VMs (Firecracker on Linux, Lima on macOS) behind a `VmBackend` abstraction, with workspace sync and credential forwarding (Apache-2.0) | 2026-10-02 |
 
 **Key Topics**:
 
@@ -807,6 +809,8 @@ Developer productivity tools and workflow automation for software engineering wi
 | [tolaria.md](./developer-tools/tolaria.md) | Tolaria is a desktop application for macOS and Linux designed for managing markdown-based knowledge bases and second brains. Built with Tauri (Rust backend), React, and TypeScript, it provides a four-panel interface for organizing, searching, and collaborating on personal notes, company documentation, and AI agent cont | 2026-04-26 |
 | [claude-codepro.md](./developer-tools/claude-codepro.md) | Claude CodePro — containerized Claude Code dev environment (lcatlett fork): Alpine Linux container, Node 22, Python 3.12, 5 MCP servers, modular rules, hooks, and spec-driven slash commands (/setup, /plan, /implement, /verify) (AGPL-3.0) | 2026-05-25 |
 | [rtk.md](./developer-tools/rtk.md) | RTK (Rust Token Killer) v0.48.0 — single Rust binary proxying 100+ shell commands with smart filtering, grouping, truncation, and deduplication; transparent PreToolUse hook for Claude Code and 17 other AI coding tools, up to 90% output reduction | 2026-09-12 |
+| [omnyssh.md](./developer-tools/omnyssh.md) | OmnySSH v1.1.4 — Rust SSH management dashboard: frontend-agnostic `omnyssh-core` with TUI (Ratatui) and GUI (Tauri 2) frontends, native russh client, multi-session PTY, live host metrics, SFTP and snippets with broadcast execution (Apache-2.0) | 2026-10-02 |
+| [gh-aw.md](./developer-tools/gh-aw.md) | GitHub Agentic Workflows (gh-aw) v0.89.21 — GitHub CLI extension compiling Markdown workflows with YAML frontmatter into GitHub Actions `.lock.yml` files; per-workflow AI engine selection (Copilot, Claude Code, Codex, Gemini, Pi), `safe-outputs` permission-scoped writes and `mcp-scripts` inline tools (Go, MIT) | 2026-10-03 |
 
 **Key Topics**:
 
@@ -1022,6 +1026,7 @@ Real-time data platforms and analytics infrastructure for powering AI applicatio
 | [cocoindex.md](./data-infrastructure/cocoindex.md) | CocoIndex is an ultra-performant real-time data transformation framework for AI, with its core engine written in Rust. It makes it effortless to transform data with AI and keep source data and targets in sync, supporting incremental processing and data lineage out-of-the-box. Whether building vector indexes, knowledge  | 2026-02-23 |
 | [honker.md](./data-infrastructure/honker.md) | Honker is a SQLite extension and multi-language binding library that adds PostgreSQL-style `NOTIFY`/`LISTEN` semantics, durable pub/sub, task queues, and event streams to SQLite — without client polling, daemon/broker overhead, or separate datastore. By replacing application-level polling with a single-digit-microsecon | 2026-04-25 |
 | [helix-db.md](./data-infrastructure/helix-db.md) | HelixDB v3.0.6 — graph-vector database built in Rust; unified relational/vector/graph/KV/document storage; dynamic query builder DSL; TypeScript/Rust/Go/Python SDKs; ACID cloud deployment with 3+ node HA; MCP server via `helix chef`; containerized local dev on port 6969 (Apache-2.0) | 2026-06-18 |
+| [vector.md](./data-infrastructure/vector.md) | Vector v0.58.0 — Rust observability data pipeline (sources, transforms, sinks) with end-to-end acknowledgements, disk and memory buffers with backpressure, and runtime topology reload (MPL-2.0) | 2026-10-03 |
 
 **Key Topics**:
 

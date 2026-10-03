@@ -11,7 +11,7 @@ freshness_tracking:
   last_verified: 2026-10-03
   version_at_verification: v4.0.0
   next_review: 2026-12-02
-  confidence_map: "Overview: high | Problem Addressed: high | Key Features: high | Technical Architecture: medium (doc + code-read) | Installation & Usage: medium (install flags checked against docs/non-interactive.md and docs/usage.md at clone 5140c5f, 2026-10-03) | Limitations and Caveats: medium (docs clone; partial coverage) | Relevance to Claude Code Development: high"
+  confidence_map: "Overview: medium (several claims appear only in PRD.md, a design document: port 7437, 8+ providers, SHA256 two-level cache, 30+ skill files, installer phases, persona) | Problem Addressed: medium (same PRD-only basis) | Key Features: medium (same PRD-only basis) | Technical Architecture: medium (doc-derived; no source files are listed in References) | Installation & Usage: medium (install flags checked against docs/non-interactive.md and docs/usage.md at clone 5140c5f, 2026-10-03) | Limitations and Caveats: medium (docs clone; partial coverage) | Relevance to Claude Code Development: high"
 ---
 
 # Gentle-AI™
@@ -291,10 +291,10 @@ gentle-ai uninstall               # Remove managed configuration
   - Today: "Your `memory: project` frontmatter field gives you a persistent, cross-session memory directory (see the platform's standard memory-directory conventions — do not hardcode its path here)."
   - Change: none — `plugins/development-harness/agents/backlog-item-groomer.md` already gives this agent a persistent cross-session memory directory; Engram would add only a full-text-searchable store shared across harnesses, mapped under Integration Opportunities
 
-- **Deterministic workflow state machine** -> `plugins/development-harness/AGENTS.md`
-  - Term: `state machine`
-  - Today: "**Modifying the backlog lifecycle, grooming, or issue state machine:**"
-  - Change: none — out of scope (the dh backlog lifecycle already gates stage transitions through `plugins/development-harness/docs/backlog-lifecycle.md`; ODD's authorization gate would duplicate it, and the entry documents no transition API that dh could call)
+- **Deterministic workflow state machine** -> `plugins/development-harness/docs/backlog-lifecycle.md`
+  - Term: `item statuses`
+  - Today: "This document defines the desired item statuses, the route that writes each status, and the gates"
+  - Change: none — out of scope (this document already defines the statuses, the route that writes each status and the gates; ODD's authorization gate would duplicate it, and the entry documents no transition API that dh could call)
 
 - **Agent memory and skill management** -> `plugins/python-engineering/agents/code-reviewer.md`
   - Term: `agent memory`

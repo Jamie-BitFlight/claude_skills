@@ -45,6 +45,6 @@ Status: concept only. Defer implementation until the narrowed open question abov
 
 | Local System | Reason skipped |
 |---|---|
-| ./plugins/agent-orchestration/skills/parallel-work/SKILL.md | Describes fan-out shapes and isolation guidance (line 14) but spawns nothing itself; the only concrete mechanism is the harness-notes worktree convention. Search: `grep -nE "sandbox\|dangerously\|bypass\|worktree\|isolat"` returned only prose references to worktrees. |
+| ./plugins/agent-orchestration/skills/parallel-work/SKILL.md | Describes fan-out shapes and isolation guidance (line 14) but spawns nothing itself; the only concrete mechanism is the harness-notes worktree convention. Search: `grep -n -i -e sandbox -e dangerously -e bypass -e worktree -e isolat` returned only prose references to worktrees. |
 | ./plugins/agent-orchestration/skills/delegate/references/harness-notes/claude-code.md | Isolation section (line 13) covers `isolation: worktree` on the Agent tool; Agent-tool sub-agents run inside the parent harness process and cannot be redirected into a coop VM. Incompatible with the documented coop surface. |
 | ./plugins/development-harness/docs/live-e2e-validation.md and live-test scripts | Their sandbox is an isolated GitHub repo, not an agent execution environment; the research entry's "sandbox" integration opportunity conflates the two. No overlap with coop's CLI. |
