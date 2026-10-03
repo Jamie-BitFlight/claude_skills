@@ -1,6 +1,6 @@
 ---
 name: rebase
-description: Start a local Git rebase when the user explicitly requests replay of a named source ref, or of the current branch, onto a named target, including a rebase-then-push request, or continue or abort an active rebase. Use only when local history replay will start or is active; do not use for merge-based branch updates, repository merge settings, pull-request or merge-request merging, or push-only requests.
+description: Start a local Git rebase when the user explicitly requests replay of a named source ref, or of the current branch, onto a named target, including a rebase-then-push request, which carries exact-lease publication to the branch's own remote destination, or continue or abort an active rebase. Use only when local history replay will start or is active; do not use for merge-based branch updates, repository merge settings, pull-request or merge-request merging, or push-only requests.
 ---
 
 **Keywords**: rebase, git rebase, history replay, rebase conflict, continue rebase, abort rebase, git worktree, rewritten history, authorized force-with-lease publication
@@ -22,9 +22,10 @@ refs or ancestry still satisfy the goal.
 
 ## Publication authority
 
-A request to rebase a branch authorizes publishing `R` to that branch's own remote
+A start request to rebase a branch authorizes publishing `R` to that branch's own remote
 destination, using `--force-with-lease` bound to an observed destination OID. Local-only
-wording in the request withdraws it. Any other destination, any lease not bound to an
+wording in the request withdraws it. Continue publishes only under authority bound at
+start; abort never publishes. Any other destination, any lease not bound to an
 observed OID, and any other force-push needs explicit authority.
 
 Other parties update remote feature branches. Fetch the destination before replay and
@@ -107,7 +108,7 @@ flowchart TD
     VerifyResult -->|Failure or unobservable| Recover
     Correct --> CorrectResult{Correction committed within task authority?}
     CorrectResult -->|Yes; invalidate old evidence and rebind R| Orient; CorrectResult -->|Commit blocked or unauthorized| Decision; CorrectResult -->|Failure or unobservable| Recover
-    Publish -->|No| Handoff; Publish -->|Yes| Remote["`Agent: read [publication](./references/publication.md); reconcile destination movement for one attempt`"]
+    Publish -->|No| Handoff; Publish -->|Yes| Remote["`Agent: read [publication](./references/publication.md); reconcile destination movement for this attempt`"]
     Remote --> RemoteResult{Remote stage result?}
     RemoteResult -->|Final fetch unchanged; exact lease current; R revalidated; result ref equals R| Push[Agent: push immutable R with the authorized exact lease]
     RemoteResult -->|Destination moved at final observation| Retry
@@ -115,11 +116,11 @@ flowchart TD
     RemoteResult -->|Conflict| RemoteConflict["`Agent: read [conflict and ambiguity](./references/conflict-and-ambiguity.md); resolve remote intent`"]
     RemoteResult -->|Failure or unobservable| Recover
     RemoteConflict --> RemoteIntent{Exactly one outcome preserves compatible intent and passes checks?}
-    RemoteIntent -->|Exactly one| Remote; RemoteIntent -->|None or incompatible alternatives| Decision
+    RemoteIntent -->|Exactly one| Retry; RemoteIntent -->|None or incompatible alternatives| Decision
     RemoteIntent -->|Failure or unobservable| Recover
     Push --> PushResult{Push result?}
     PushResult -->|Exit zero; post-fetch destination equals R| Handoff; PushResult -->|Lease rejected or destination moved| Retry{Attempts used below the cap in publication.md?}
-    Retry -->|Yes| Remote; Retry -->|No| LeaseStop[Agent: stop external mutation; report each attempt, rejection, and destination]
+    Retry -->|Yes| Remote; Retry -->|No| LeaseStop[Agent: stop external mutation; report each attempt, its rejection or movement, and the destination]
     PushResult -->|Other failure or unobservable| Recover
     NoChange --> Handoff; NoActive --> Handoff; Decision[Agent: stop mutation; report missing fact/alternatives and evidence] --> Handoff
     Recover["`Agent: read [active recovery](./references/active-rebase-recovery.md); stop mutation and collect report`"] --> Handoff
