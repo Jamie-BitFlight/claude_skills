@@ -105,7 +105,6 @@ VALID_CATEGORIES: frozenset[str] = frozenset({
     "documentation-tools",
     "embedded-ui-libraries",
     "evaluation-testing",
-    "insights",
     "installer-tools",
     "learning-resources",
     "llm-infrastructure",

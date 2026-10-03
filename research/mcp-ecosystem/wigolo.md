@@ -290,14 +290,14 @@ None in scope — Local-First, Zero-Key Design patterns are out of scope for thi
   - Change: wigolo's `crawl` and `extract` tools cover a gap in that agent's `<research_tools>` block, which has no
     route that follows links across a site within a page budget and no route that pulls structured records out of a
     page. Tracked as issue #3790; integration sketches in
-    [2026-09-21-wigolo-utilization.md](../insights/2026-09-21-wigolo-utilization.md).
+    the retired `research/insights/2026-09-21-wigolo-utilization.md` (full text in git history at commit aa334b4a88).
 
 - **Local-first web lookup for claim verification** → `.claude/skills/fact-check/SKILL.md`
   - Term: `Verify`
   - Today: "Verify factual claims against primary sources using web lookups. Training data recall is NOT evidence."
   - Change: wigolo's `search`, `fetch` and `extract` are candidate replacements for that skill's WebFetch/WebSearch calls,
     and its `diff` tool adds staleness detection the skill currently has no route for. Proposal in
-    [2026-09-21-wigolo-utilization.md](../insights/2026-09-21-wigolo-utilization.md).
+    the retired `research/insights/2026-09-21-wigolo-utilization.md` (full text in git history at commit aa334b4a88).
 
 ---
 

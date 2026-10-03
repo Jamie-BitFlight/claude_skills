@@ -11,7 +11,7 @@ Checks performed by `./scripts/validate_research.py` and severity mapping for th
 - **section_completeness**: All required `##`-level sections must exist. The authoritative list is `REQUIRED_BODY_SECTIONS` (plus `_REQUIRED_SECTIONS_TEXT_HEADER_ONLY` for legacy text-header entries) in `validate_research.py`; the sections match `entry-template.md`'s Entry File Template except Limitations and Caveats and Cross-References, which the template carries and the validator does not require. Header fields (Research Date, Source URL, etc.) are checked separately via **header_fields**. The validator does not check `confidence_map` or Limitations and Caveats; the review rubric does (Gate 2 Rule 4, Gate 3).
 - **empty_sections**: Section heading exists but contains no content below it before the next heading. A validator issue against a pre-existing `## Relevance to Claude Code Development` section is reported and not fixed, and does not fail the entry; that section is inert (see `entry-quality-standards.md` `## Scope`).
 
-Not entries, excluded by the validator: `README.md`, `CLAUDE.md`, `AGENTS.md`, and any file under an `insights`, `utilization`, or `design-notes` directory.
+Not entries, excluded by the validator: `README.md`, `CLAUDE.md`, `AGENTS.md`, and any file under a `utilization` or `design-notes` directory.
 
 ### Warning Severity (should fix)
 
