@@ -460,3 +460,4 @@ CLI flags > Environment vars > Project config (`.narsil.yaml`) > User config (`~
 | [mcpskills-cli](./mcpskills-cli.md) | mcp-ecosystem | referenced by mcpskills-cli (mcp-ecosystem) |
 | [repowise](./repowise.md) | mcp-ecosystem | referenced by repowise (mcp-ecosystem) |
 | [wigolo](./wigolo.md) | mcp-ecosystem | referenced by wigolo (mcp-ecosystem) |
+| [gitdiagram](./gitdiagram.md) | mcp-ecosystem | referenced by gitdiagram (mcp-ecosystem) |

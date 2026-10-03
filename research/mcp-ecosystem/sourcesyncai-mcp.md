@@ -230,3 +230,4 @@ npx -y @smithery/cli install @pbteja1998/sourcesyncai-mcp --client claude
 |-------|----------|--------------|
 | [unblocked](../context-management/unblocked.md) | context-management | referenced by unblocked (context-management) |
 | [openspec-mcp](./openspec-mcp.md) | mcp-ecosystem | shares multi-source document aggregation pattern for knowledge base ingestion and cross-service sync (bidirectional) |
+| [gitdiagram](./gitdiagram.md) | mcp-ecosystem | referenced by gitdiagram (mcp-ecosystem) |

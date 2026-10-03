@@ -199,3 +199,4 @@ The Chrome extension must be installed separately from the Chrome Web Store. Aft
 | [scrapling-skill](../developer-tools/scrapling-skill.md) | developer-tools | referenced by scrapling-skill (developer-tools) |
 | [screenpipe](./screenpipe.md) | mcp-ecosystem | referenced by screenpipe (mcp-ecosystem) |
 | [wigolo](./wigolo.md) | mcp-ecosystem | referenced by wigolo (mcp-ecosystem) |
+| [gitdiagram](./gitdiagram.md) | mcp-ecosystem | referenced by gitdiagram (mcp-ecosystem) |
