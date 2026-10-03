@@ -109,7 +109,7 @@ One per entry, at the path the invocation names, kept across rounds; the reviewe
 
 `D` marks a defect, `R` a repair; ids stay fixed across rounds. The reviewer edits no tracked file except the entry; this document and temp files are unrestricted.
 
-**Loop**: a sonnet reviewer and a haiku worker share this document. The orchestrator runs at most 5 review rounds and stops early when a round's unchecked `D` ids equal the previous round's (`R` lines are excluded from the comparison). A `FAIL` after either stop is reported `UNRESOLVED`, a process defect of the instructions, not of the entry.
+**Loop**: a sonnet reviewer and a haiku worker share this document. The orchestrator runs at most 5 review rounds and stops early when a round's unchecked `D` ids equal the previous round's (`R` lines are excluded from the comparison). After either stop, a `FAIL` with an unchecked line in gate 1 or 4 (mechanical) or a `NOT RUN` gate is reported `UNRESOLVED`, a process defect of the instructions, not of the entry. A `FAIL` with unchecked lines in gates 2 and 3 only (semantic) is `ACCEPTED` as best effort, and the source is the truth.
 
 **Fix with no additional research:** reword; restructure; add a missing section from material already in the entry or in files already cited or opened; fix a quote re-found in a file already available; remove a claim that cannot be sourced. Re-running a recorded command to check it is verification, not research.
 

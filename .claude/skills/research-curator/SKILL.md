@@ -106,7 +106,7 @@ Trigger: `<mode_args/>` contains a URL with no flags.
 
 7. **Review** -- run [Entry Review](#entry-review) on the entry
 
-8. **Overlap Scan** -- when step 2 found no existing entry and Entry Review returned PASS, run the [Overlap Scan](#overlap-scan)
+8. **Overlap Scan** -- when step 2 found no existing entry and Entry Review returned PASS or ACCEPTED, run the [Overlap Scan](#overlap-scan)
 
 9. **Post-actions** -- lint, commit, push (see [Post-Actions](#post-actions))
 
@@ -269,11 +269,15 @@ entry, never one across a batch: the verdict block is per-entry. The scratch doc
 ([Findings Document](./references/entry-review-rubric.md#findings-document)) carries the entry's
 findings through every round.
 
-The loop runs reviewer, worker, reviewer, worker until the reviewer passes. It stops UNRESOLVED when
+The loop runs reviewer, worker, reviewer, worker until the reviewer passes. It stops when
 a round ends with the same unchecked line ids as the previous round (no progress), or after 5 review
 rounds; the owner can change that number. A FAIL with no unchecked lines (a `NOT RUN` gate) has
-nothing to hand the worker: it is the no-progress stop, UNRESOLVED, naming that gate. Either stop is a process defect, not an entry defect: the
-instructions that tell the curator what to create and the reviewer what to check disagree.
+nothing to hand the worker: it is a stop that names that gate.
+
+An entry is a bookmark with a summary, so the stop outcome depends on the gate of each unchecked line:
+
+- **Mechanical gates (1 and 4: formatting, validator, banned wording).** An unchecked line here after the stop is UNRESOLVED. A mechanical fix needs no research, so the failure is a process defect: the instructions that tell the curator what to create and the reviewer what to check disagree.
+- **Semantic gates (2 and 3: fidelity and depth).** Unchecked lines here after the stop are best effort. The entry is ACCEPTED and continues as PASS would. The source is the truth: a reviewer finding the source does not support is dropped, not argued again. The unchecked lines go in the report, never in the entry.
 
 ```mermaid
 flowchart TD
@@ -282,7 +286,9 @@ flowchart TD
     Gate --> Q{"Reviewer verdict PASS<br>and no unchecked D line?"}
     Q -->|"Yes"| Pass(["PASS — continue to the Overlap Scan (created entries) or Post-Actions"])
     Q -->|"No"| Stop{"FAIL with no unchecked D line,<br>same unchecked ids as the previous round,<br>or the 5th review?"}
-    Stop -->|"Yes"| Unresolved(["UNRESOLVED — mark the entry created/refreshed with issues, no Overlap Scan<br>report the unchecked lines verbatim, the gate ids that recurred across rounds,<br>and the scratch path as a process defect"])
+    Stop -->|"Yes"| Kind{"Any unchecked line<br>in gate 1 or 4,<br>or a NOT RUN gate?"}
+    Kind -->|"Yes"| Unresolved(["UNRESOLVED — mark the entry created/refreshed with issues, no Overlap Scan<br>report the unchecked lines verbatim, the gate ids that recurred across rounds,<br>and the scratch path as a process defect"])
+    Kind -->|"No — gate 2 or 3 only"| Accepted(["ACCEPTED, best effort — continue as PASS<br>report the unchecked lines verbatim and the scratch path"])
     Stop -->|"No"| Fix["Spawn the worker, model haiku<br>--fix, scratch document"]
     Fix --> Gate2["Run the Validation Gate checks as above"]
     Gate2 --> Review
@@ -316,7 +322,7 @@ Relay the final round's verdict block verbatim under the [Agent Result Relay Rul
 under an `### Entry Review Verdicts` heading in the mode's [Output Format](#output-format) report,
 with the scratch document path. An UNRESOLVED entry lists its unchecked lines there, exactly as
 written, names the gate ids whose findings recurred across rounds, and relays the stop to the user as
-a process defect so the misalignment can be traced.
+a process defect so the misalignment can be traced. An ACCEPTED entry lists its unchecked lines there as best-effort notes.
 
 </entry_review>
 
@@ -326,7 +332,7 @@ a process defect so the misalignment can be traced.
 
 ## Overlap Scan
 
-A one-off per [Overlap Scan](./references/overlap-scan.md), run once when an entry is first created: Default Mode when step 2 found no existing entry, Batch Mode for created entries. It runs after [Entry Review](#entry-review) returns PASS, so issues cite reviewed text. Refreshed, UNRESOLVED, and marked-with-issues entries get no scan.
+A one-off per [Overlap Scan](./references/overlap-scan.md), run once when an entry is first created: Default Mode when step 2 found no existing entry, Batch Mode for created entries. It runs after [Entry Review](#entry-review) returns PASS or ACCEPTED, so issues cite reviewed text. Refreshed, UNRESOLVED, and marked-with-issues entries get no scan.
 
 Spawn both concurrently, then relay:
 
@@ -360,7 +366,7 @@ in [Mode Routing](#mode-routing).
 
 1. **README Update** -- add or update `./research/README.md` category-table rows (and the Last
    Updated date of an existing row) only for entries whose [Entry Review](#entry-review) returned
-   PASS; an entry marked "created with issues" or "refreshed with issues" gets none, so its README
+   PASS or ACCEPTED; an entry marked "created with issues" or "refreshed with issues" gets none, so its README
    state stays as it was before this run. If `./research/README.md` was already dirty in the
    pre-mode baseline, report to the user: `./research/README.md -- pre-existing uncommitted changes
    present; this run's README update will not be committed` before proceeding -- the update still
@@ -482,7 +488,7 @@ Report to user after any mode completes. Apply the [Agent Result Relay Rules](#a
 **Category**: {category}
 **File**: ./research/{category}/{filename}.md
 **README Updated**: Yes | No -- entry marked with issues, row withheld
-**Entry Review**: PASS -- N findings fixed | UNRESOLVED -- N unchecked, marked with issues (scratch: {path})
+**Entry Review**: PASS -- N findings fixed | ACCEPTED -- N semantic lines unchecked (best effort) | UNRESOLVED -- N unchecked, marked with issues (scratch: {path})
 **Cross-References Added**: N
 **Overlap Issues**: #N {url}, ... | none | not run -- {reason}
 **Overlap EXISTING**: {issue numbers} | none
@@ -511,7 +517,7 @@ YYYY-MM-DD
 **Failed**: W
 **README Updated**: Yes -- rows withheld for V + R entries marked with issues
 **With issues (validation gate)**: V
-**Entry Review**: A PASS, R UNRESOLVED (marked with issues)
+**Entry Review**: A PASS, B ACCEPTED, R UNRESOLVED (marked with issues)
 **Cross-References Added**: N
 **Overlap Issues**: #N {url}, ... | none
 **Overlap EXISTING**: {issue numbers} | none
@@ -538,7 +544,7 @@ YYYY-MM-DD
 **Refreshed**: N entries
 **Changes Detected**: M entries had updated data
 **With issues (validation gate)**: V
-**Entry Review**: A PASS, R UNRESOLVED (marked with issues)
+**Entry Review**: A PASS, B ACCEPTED, R UNRESOLVED (marked with issues)
 **Cross-References Added**: N
 
 ### Entry Review Verdicts

@@ -23,7 +23,7 @@ flowchart TD
     SpawnXref --> WaitXref["Wait for all cross-referencers to complete<br>Collect CROSS_REFERENCES_ADDED counts<br>Report total cross-references added"]
     SkipPartial --> WaitXref
     WaitXref --> Review["Run Entry Review (SKILL.md) on each clean entry<br>backlink repair first, then one review loop per entry, in waves of 5<br>entries marked failed, created with issues, or refreshed with issues are not reviewed"]
-    Review --> Scan["Run the Overlap Scan (SKILL.md) on each created entry whose review returned PASS<br>relay per the Overlap Scan section there<br>refreshed and UNRESOLVED entries get no scan"]
+    Review --> Scan["Run the Overlap Scan (SKILL.md) on each created entry whose review returned PASS or ACCEPTED<br>relay per the Overlap Scan section there<br>refreshed and UNRESOLVED entries get no scan"]
     Scan --> PostActions(["Execute Post-Actions — README rows for PASS entries, vault-wide backlink repair, then lint, commit, push (see SKILL.md for the authoritative step order)"])
 ```
 
