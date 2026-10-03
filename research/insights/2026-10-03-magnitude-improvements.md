@@ -2,10 +2,10 @@
 
 **Research entry**: ./research/llm-infrastructure/magnitude.md
 **Generated**: 2026-10-03
-**Patterns assessed**: 6
+**Patterns assessed**: 8
 **Backlog items created**: 1 (issue: #4039)
 **Deferred (low confidence)**: 2
-**Skipped (already covered or tracked)**: 3
+**Skipped (already covered or tracked)**: 5
 
 **Backlog note**: Improvement 1 is high confidence. The `dh` backlog duplicate check was unavailable (GraphQL not available), so the duplicate check ran through GitHub issue search and found none; the item was filed as #4039
 ---

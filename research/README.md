@@ -1365,6 +1365,7 @@ Self-hosted LLM inference servers, multi-provider gateways, and LLMOps platforms
 | [bifrost.md](./llm-infrastructure/bifrost.md) | Bifrost is a high-performance open-source AI gateway written in Go that unifies access to 20+ LLM providers through a single OpenAI-compatible API. Benchmarked at <100 µs overhead per request at 5,000 RPS, it provides automatic failover, adaptive load balancing, semantic caching, MCP gateway support, and enterprise-gra | 2026-02-26 |
 | [airllm.md](./llm-infrastructure/airllm.md) | AirLLM v2.11.0 — layer-sharded streaming for 70B+ LLM inference on 4GB GPU; AutoModel dispatcher for 8 architectures (Llama/Qwen/Mistral/Mixtral etc.); optional block-wise quantization for 3× speedup; Apple Silicon MLX support; no quantization or distillation required | 2026-06-18 |
 | [quantum-free-router.md](./llm-infrastructure/quantum-free-router.md) | quantum-free-router — professional free-tier LLM router aggregating 9 providers into single OpenAI-compatible endpoint (127.0.0.1:4000); 4-tier reliability model, 14-model certified fallback chain (2026-06-11), built on Bifrost 1.5.11, systemd service with SHA256 verification | 2026-06-18 |
+| [magnitude.md](./llm-infrastructure/magnitude.md) | Magnitude 0.2.4 — hardware-tuned local inference engine for agents: Engine, Seismic and Service components, OpenAI- and Anthropic-compatible endpoints on one local port, device-specific kernel compilation across CPU, Metal, CUDA and Vulkan; speed and memory figures are vendor-reported against llama.cpp | 2026-10-03 |
 
 **Key Topics**:
 
