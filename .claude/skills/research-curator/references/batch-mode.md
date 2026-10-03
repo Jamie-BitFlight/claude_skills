@@ -48,8 +48,8 @@ usable entry, and a wave whose agents all hit one cause wastes every later wave 
    against the pre-mode baseline, and attribute a file to the failed agent only when its `source_url`
    frontmatter field matches that agent's URL (or it is the `--rerun` target). Concurrent agents in a wave write
    concurrently, so an unmatched new file belongs to no failed agent. For an attributed file, run the
-   Validation Gate on it instead of discarding it. A `--rerun` target unchanged against the baseline still
-   holds the old content: treat that as a failed refresh, and skip validation and
+   Validation Gate on it instead of discarding it. A `--rerun` target whose `git hash-object` equals the baseline hash still
+   holds the old content (status alone cannot show this for a path already dirty): treat that as a failed refresh, and skip validation and
    analysis for it. A clean recovered file continues exactly as a successful agent's result would, with
    the recovery supplying the missing status (created or refreshed): Default mode at step 6, Batch at the
    analysis fan-out, Rerun at its analysis fan-out. Analysis and Entry Review still run, so a

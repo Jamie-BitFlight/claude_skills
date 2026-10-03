@@ -21,7 +21,8 @@ Orchestrate research entry creation, maintenance, and validation in `./research/
 Parse `<mode_args/>` to select operating mode. Before executing any mode below, capture a
 `git status --porcelain --untracked-files=all -- ./research/` baseline -- the invocation's
 pre-write state, taken before this run's own README update or curator agent
-writes anything. Post-Actions compares against this baseline, not a fresh snapshot, to tell this
+writes anything. For each `--rerun` target, also record `git hash-object {path}` with the baseline.
+Post-Actions compares against this baseline, not a fresh snapshot, to tell this
 run's own writes apart from another contributor's pre-existing uncommitted work.
 `--untracked-files=all` is required: the default collapses an untracked directory to a single
 line, so a pre-existing untracked file inside a new untracked directory would never match the
