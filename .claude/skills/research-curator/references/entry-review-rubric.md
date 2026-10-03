@@ -1,6 +1,6 @@
 # Research Entry Review Rubric
 
-How to review a finished research entry and the analysis files produced from it.
+How to review a finished research entry and the analysis files produced from it, and which findings the reviewer fixes itself.
 
 Writing an entry rather than reviewing one? Use [Entry Quality Standards](./entry-quality-standards.md) and [Extraction Methodology](./extraction-methodology.md) instead — this rubric is the audit that runs afterwards.
 
@@ -31,7 +31,7 @@ uv run --script .claude/skills/research-curator/scripts/validate_research.py che
 
 | Command | What a defect looks like | Record |
 |---|---|---|
-| `fix_research_formatting.py --check` | Non-zero exit — the file needs formatting fixes | Every path the tool named, and the fix it wanted. `--check` does not write; drop `--check` only when this review is also applying fixes |
+| `fix_research_formatting.py --check` | Non-zero exit — the file needs formatting fixes | Every path the tool named, and the fix it wanted. Run it without `--check`: this review applies fixes, so a path it reformatted is a checked finding |
 | `validate_research.py main --json` | Any issue in the JSON `entries[].issues[]` array | `errors: N, warnings: N` from `summary`, then every issue's `check`, `severity`, `message`, and `line`, quoted |
 | `validate_research.py check-backlinks ./research` | Any asymmetric cross-reference involving this entry, or any file the scan could not read or parse | Each object in JSON `edges`, and every object in `skips` when `scan_skipped_files` is non-zero. `--fix` retains the original `edges` and adds repair outcome fields |
 
@@ -154,12 +154,33 @@ SOURCE: Triggers 1–4 adapted for research-entry content from the `hallucinatio
 
 ---
 
+## Findings Document
+
+One per entry, at the path the invocation names, kept across rounds. Write every defect and repair to it as an unchecked line before fixing any. Then work the lines in order and check each off once its fix is applied and re-found in the file.
+
+```text
+- [ ] D1 | gate {N} | {file}:{line} | "{exact quoted text}" | {required correction}
+- [x] D2 | gate {N} | {file}:{line} | "{exact quoted text}" | fixed: {what changed}
+- [ ] D3 | gate {N} | {file}:{line} | "{exact quoted text}" | needs: {data to gather, and from where}
+```
+
+`D` marks a defect, `R` a repair. The reviewer writes only the entry, its analysis files, and this document.
+
+**Fix with no additional research:** reword; restructure; add a missing section from material already in the entry or in files already cited or opened; fix a quote re-found in a file already available; remove a claim that cannot be sourced. Re-running a recorded command to check it is verification, not research.
+
+**Leave unchecked** any correction that needs data gathering to validate — fetching upstream sources, re-running a repo anchor pass for new evidence — with `needs:` stating the data. A finding in a file outside the writable set is also left unchecked, naming that file.
+
+**Later rounds** (the invocation says which): verify rather than re-audit. Re-check every line against the file — a checked line whose fix is absent or wrong reopens unchecked — and re-run Gate 1. Add a line only for a defect a gate defines; prose no gate names is not a finding. A closed finding set is what lets rounds converge.
+
+---
+
 ## Verdict
 
-Report in this form:
+Report in this form. Gate lines record the state after this pass's fixes; the defects themselves live in the findings document.
 
 ```text
 REVIEW: ./research/{category}/{name}.md
+SCRATCH: {findings document path}
 
 GATE 1 mechanical:    PASS | FAIL | NOT RUN ({reason})
   fix_research_formatting --check: exit {N}
@@ -171,17 +192,15 @@ GATE 4 repo claims:   PASS | FAIL — {N} claims verified, {N} defective, {N} fo
 GATE 5 engagement:    PASS | FAIL
 GATE 6 triggers:      PASS | FAIL — triggers hit: {names}
 
-DEFECTS: {N}
-1. {file}:{line} — GATE {N} — "{exact quoted text}" — {required correction}
-2. ...
+DEFECTS: {N} found, {N} checked, {N} unchecked
+REPAIRS: {N} found, {N} checked, {N} unchecked
 
-REPAIRS: {N}
-1. {file}:{line} — GATE {N} — "{exact quoted text}" — {the change that invalidated it} — {required correction}
-2. ...
+UNCHECKED: (each unchecked line, verbatim)
+- [ ] D3 | gate {N} | ...
 
-VERDICT: APPROVE | REQUEST CHANGES
+VERDICT: APPROVE | UNRESOLVED
 ```
 
-`APPROVE` requires every gate at PASS and `DEFECTS: 0`. Any gate at FAIL or NOT RUN, or any defect recorded, is `REQUEST CHANGES` — a defect count above zero and an `APPROVE` verdict cannot both be true.
+`APPROVE` requires every gate at PASS and no unchecked defect. Any gate at FAIL or NOT RUN, or any unchecked defect, is `UNRESOLVED` — an unchecked defect and an `APPROVE` verdict cannot both be true.
 
-Repairs are reported and then set aside: they are work scheduled against the citing file, so an entry with repairs and `DEFECTS: 0` is `APPROVE` and keeps its README row. A gate whose only findings are repairs is `PASS`.
+An unchecked repair is work scheduled against the citing file and is set aside: an entry whose only unchecked lines are repairs is `APPROVE` and keeps its README row. A gate whose only findings are repairs is `PASS`.
