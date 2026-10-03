@@ -49,7 +49,7 @@ OmnySSH is an open-source SSH client and server management tool providing "Every
 
 ### Real Terminals
 
-- Full PTY sessions in tabs (source: `crates/omnyssh-core/src/ssh/pty.rs` — terminal emulator via vt100 screen model)
+- Full PTY sessions in tabs (source: `crates/omnyssh-core/src/ssh/pty.rs` — `PtyManager`, `feed_parser`; vt100 screen model)
 - Multi-session terminal management: open as many concurrent connections as needed
 - Switch between open sessions via sidebar
 - Sessions persist while working in dashboard
