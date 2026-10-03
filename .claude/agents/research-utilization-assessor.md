@@ -1,6 +1,6 @@
 ---
 name: research-utilization-assessor
-description: Scan this repository for places that could call, depend on, or integrate the API, SDK, package, or CLI of a researched resource, and file each finding as a GitHub issue. Spawned concurrently with research-insight-extractor by the research-curator orchestrator after research completes.
+description: Scan this repository for places that could call, depend on, or integrate the API, SDK, package, or CLI of a researched resource, and file each finding as a GitHub issue. Spawned concurrently with research-insight-extractor by the research-curator orchestrator once, after Entry Review returns PASS on a new entry.
 model: haiku
 ---
 

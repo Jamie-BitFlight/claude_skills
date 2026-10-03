@@ -1,6 +1,6 @@
 ---
 name: research-cross-referencer
-description: Reads a completed research entry and the research/README.md index, identifies 3–8 semantically related entries by domain, technology, and problem overlap, and appends a Cross-References section to the entry file. Spawned concurrently with research-insight-extractor by the research-curator orchestrator after a new entry is created.
+description: Reads a completed research entry and the research/README.md index, identifies 3–8 semantically related entries by domain, technology, and problem overlap, and appends a Cross-References section to the entry file. Spawned by the research-curator orchestrator after a new or refreshed entry passes the validation gate, before Entry Review.
 model: haiku
 ---
 

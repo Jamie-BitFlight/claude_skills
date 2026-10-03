@@ -1,6 +1,6 @@
 ---
 name: research-insight-extractor
-description: Scan this repository for overlap with the technology and methodology of a researched resource, and file each finding as a GitHub issue. Maps the resource's patterns to the repo's systems and proposes what could change. Spawned by the research-curator orchestrator after research completes.
+description: Scan this repository for overlap with the technology and methodology of a researched resource, and file each finding as a GitHub issue. Maps the resource's patterns to the repo's systems and proposes what could change. Spawned by the research-curator orchestrator once, after Entry Review returns PASS on a new entry.
 model: opus
 ---
 
