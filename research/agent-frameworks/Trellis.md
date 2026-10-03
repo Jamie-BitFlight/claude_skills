@@ -231,6 +231,7 @@ The PreToolUse hook (v0.3.6) aligns with Claude Code's hook system and can autom
 | [takt.md](../research-agent-patterns/takt.md) | research-agent-patterns | YAML-defined multi-agent workflow engine with state machine transitions and faceted prompting for agent coordination |
 | [claude-codex-settings.md](../claude-code-plugins/claude-codex-settings.md) | claude-code-plugins | battle-tested Claude Code plugin ecosystem with 17 plugins and multi-LLM backend configuration |
 | [omnigent](./omnigent.md) | agent-frameworks | referenced by omnigent (agent-frameworks) |
+| [foreman](./foreman.md) | agent-frameworks | referenced by foreman (agent-frameworks) |
 
 ---
 

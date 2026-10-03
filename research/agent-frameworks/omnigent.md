@@ -285,3 +285,4 @@ Omnigent is highly relevant to Claude Code and AI coding agents because:
 | [Google ADK](./google-adk.md) | agent-frameworks | Python multi-agent framework with sub_agents hierarchy and LLM-driven routing; alternative approach to Omnigent's unified policy-based orchestration layer |
 | [Agno](./agno.md) | agent-frameworks | Stateful multi-agent system with persistent user profiles; complementary to Omnigent's cross-device session sync and real-time collaboration model |
 | [omniroute](../api-frameworks/omniroute.md) | api-frameworks | referenced by omniroute (api-frameworks) |
+| [foreman](./foreman.md) | agent-frameworks | referenced by foreman (agent-frameworks) |

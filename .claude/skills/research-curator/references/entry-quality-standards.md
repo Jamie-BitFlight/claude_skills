@@ -6,6 +6,18 @@ Reviewing a finished entry rather than writing one? Use [Entry Review Rubric](./
 
 ---
 
+## Scope
+
+An entry summarizes the researched resource and nothing else: its evergreen substance, plus
+snapshots (version, release date, figures, status) that carry the date or version they were read
+at. It makes no claim about this repository; overlap with the repository is found by a separate
+scan after research and filed as GitHub issues, never in the entry.
+
+An entry written before this rule may carry a `## Relevance to Claude Code Development` section.
+The section is inert and does not make the entry invalid. A refresh or fix leaves it as found.
+
+---
+
 ## Fidelity Rules
 
 <fidelity_rules>
@@ -14,7 +26,7 @@ Reviewing a finished entry rather than writing one? Use [Entry Review Rubric](./
 
 NEVER describe a resource based on its name, URL path, or domain alone. ALWAYS fetch and read primary sources before writing any section.
 
-If a source cannot be accessed: write "Unable to access [source]: [reason]" in the entry's References section. Do NOT infer content.
+If a source cannot be accessed: write "Unable to access [URL] (accessed YYYY-MM-DD): [reason]" in the entry's References section. Do NOT infer content.
 
 ### Rule 2: Preserve Counts and Specifics
 
@@ -61,7 +73,7 @@ Use precise language when information is not found in sources.
 
 ### Rule 4: State Confidence Explicitly
 
-Each major section of the entry MUST have a confidence level. Record this in the entry's Freshness Tracking section as a confidence map.
+Each major section of the entry — every `##` section present when it is written, except References and Cross-References — MUST have a confidence level. Record this in the entry's Freshness Tracking section as a confidence map.
 
 **Confidence levels**:
 
@@ -114,6 +126,12 @@ For installation commands: verify the exact command from official docs. Do NOT c
 REQUIRED — not optional. Every tool has limitations. If primary sources document none, write: "No limitations documented in reviewed sources (confidence: low — absence of documented limitations does not confirm absence of limitations)."
 
 </depth_requirements>
+
+---
+
+## Wording
+
+Write nothing that Gate 4 of [Entry Review Rubric](./entry-review-rubric.md) scans for, outside an attributed quotation; its table lists the triggers.
 
 ---
 

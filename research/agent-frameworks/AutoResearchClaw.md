@@ -179,6 +179,7 @@ researchclaw run --topic "Your research idea" --mode custom
 | [OpenSpec MCP](../mcp-ecosystem/openspec-mcp.md) | mcp-ecosystem | spec-driven workflow with approval state machine and quality gates; parallels AutoResearchClaw's multi-stage pipeline with structured gating and verification logic |
 | [omnigent](./omnigent.md) | agent-frameworks | referenced by omnigent (agent-frameworks) |
 | [research-mode](../ai-observability/research-mode.md) | ai-observability | referenced by research-mode (ai-observability) |
+| [foreman](./foreman.md) | agent-frameworks | shares asyncio-based worker coordination and evidence collection patterns (bidirectional) |
 
 ---
 
