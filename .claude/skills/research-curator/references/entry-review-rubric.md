@@ -156,21 +156,21 @@ SOURCE: Triggers 1–4 adapted for research-entry content from the `hallucinatio
 
 ## Findings Document
 
-One per entry, at the path the invocation names, kept across rounds. Write every defect and repair to it as an unchecked line before fixing any. Then work the lines in order and check each off once its fix is applied and re-found in the file.
+One per entry, at the path the invocation names, kept across rounds; the reviewer and the `--fix` worker both write it. The reviewer writes every defect and repair as an unchecked line before fixing any. Whoever acts on a line adds `did:` with a short action note, and checks the line off once its fix is re-found in the file.
 
 ```text
 - [ ] D1 | gate {N} | {file}:{line} | "{exact quoted text}" | {required correction}
-- [x] D2 | gate {N} | {file}:{line} | "{exact quoted text}" | fixed: {what changed}
-- [ ] D3 | gate {N} | {file}:{line} | "{exact quoted text}" | needs: {data to gather, and from where}
+- [x] D2 | gate {N} | {file}:{line} | "{exact quoted text}" | {required correction} | did: {what changed}
+- [ ] D3 | gate {N} | {file}:{line} | "{exact quoted text}" | needs: {data to gather, and from where} | did: {what was tried}
 ```
 
-`D` marks a defect, `R` a repair. The reviewer writes only the entry, its analysis files, and this document.
+`D` marks a defect, `R` a repair; ids stay fixed across rounds. The reviewer writes only the entry, its analysis files, and this document.
 
 **Fix with no additional research:** reword; restructure; add a missing section from material already in the entry or in files already cited or opened; fix a quote re-found in a file already available; remove a claim that cannot be sourced. Re-running a recorded command to check it is verification, not research.
 
 **Leave unchecked** any correction that needs data gathering to validate — fetching upstream sources, re-running a repo anchor pass for new evidence — with `needs:` stating the data. A finding in a file outside the writable set is also left unchecked, naming that file.
 
-**Later rounds** (the invocation says which): verify rather than re-audit. Re-check every line against the file — a checked line whose fix is absent or wrong reopens unchecked — and re-run Gate 1. Add a line only for a defect a gate defines; prose no gate names is not a finding. A closed finding set is what lets rounds converge.
+**Rounds after the first** (the invocation says which): review the worker's changes and research, not only the lines. Run every gate over the files again and check each `did:` note against the file and the source it cites; a checked line whose fix is absent or wrong reopens unchecked. Add a line only for a defect a gate defines; prose no gate names is not a finding. A closed finding set is what lets rounds converge.
 
 ---
 
@@ -183,7 +183,7 @@ REVIEW: ./research/{category}/{name}.md
 SCRATCH: {findings document path}
 
 GATE 1 mechanical:    PASS | FAIL | NOT RUN ({reason})
-  fix_research_formatting --check: exit {N}
+  fix_research_formatting:         exit {N}
   validate_research main --json:   errors {N}, warnings {N}
   check-backlinks:                 {N} asymmetric pairs, {N} scan-skipped files
 GATE 2 fidelity:      PASS | FAIL — rules failed: {1|2|2a|3|4}
@@ -198,9 +198,9 @@ REPAIRS: {N} found, {N} checked, {N} unchecked
 UNCHECKED: (each unchecked line, verbatim)
 - [ ] D3 | gate {N} | ...
 
-VERDICT: APPROVE | UNRESOLVED
+VERDICT: PASS | FAIL
 ```
 
-`APPROVE` requires every gate at PASS and no unchecked defect. Any gate at FAIL or NOT RUN, or any unchecked defect, is `UNRESOLVED` — an unchecked defect and an `APPROVE` verdict cannot both be true.
+`PASS` requires every gate at PASS and no unchecked defect. Any gate at FAIL or NOT RUN, or any unchecked defect, is `FAIL` — an unchecked defect and a `PASS` verdict cannot both be true.
 
-An unchecked repair is work scheduled against the citing file and is set aside: an entry whose only unchecked lines are repairs is `APPROVE` and keeps its README row. A gate whose only findings are repairs is `PASS`.
+An unchecked repair is work scheduled against the citing file and is set aside: an entry whose only unchecked lines are repairs is `PASS` and keeps its README row. A gate whose only findings are repairs is `PASS`.

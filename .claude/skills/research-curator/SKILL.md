@@ -280,16 +280,21 @@ Then run the loop per entry, entries in waves of 5, matching the analysis fan-ou
 entry, never one across a batch: the verdict block is per-entry, and the repo-claims gate opens the
 local file behind every proposal. The scratch document `.tmp/scratch/reports/{category}-{name}-review.md`
 ([Findings Document](./references/entry-review-rubric.md#findings-document)) carries the entry's
-findings through every round. At most 2 reviews and 1 curator pass run.
+findings through every round.
+
+The loop runs reviewer, worker, reviewer, worker until the reviewer passes. It stops UNRESOLVED when
+a round ends with the same unchecked line ids as the previous round (no progress), or after 5 review
+rounds; the owner can change that number.
 
 ```mermaid
 flowchart TD
     Start(["Entry reached the analysis agents"]) --> Review["Spawn the reviewer, model sonnet<br>--review, scratch document, Round N"]
-    Review --> Gate["Run the Validation Gate checks on the entry<br>without its fix retry<br>append each remaining error and gated warning<br>to the scratch document as an unchecked D line"]
+    Review --> Gate["Run the Validation Gate checks on the entry<br>without its fix retry<br>append each remaining error and gated warning<br>not yet listed to the scratch document as an unchecked D line"]
     Gate --> Q{"Any unchecked D line?"}
-    Q -->|"No"| Approve(["APPROVE — continue to Post-Actions"])
-    Q -->|"Yes, and this was the final review"| Unresolved(["UNRESOLVED — mark the entry created/refreshed with issues<br>report the unchecked lines verbatim"])
-    Q -->|"Yes, and a review remains"| Fix["Spawn the curator, model haiku<br>--fix, scratch document: unchecked D lines only"]
+    Q -->|"No"| Pass(["PASS — continue to Post-Actions"])
+    Q -->|"Yes"| Stop{"Same unchecked ids as the previous round,<br>or the 5th review?"}
+    Stop -->|"Yes"| Unresolved(["UNRESOLVED — mark the entry created/refreshed with issues<br>withhold its README row<br>report the unchecked lines verbatim with the scratch path"])
+    Stop -->|"No"| Fix["Spawn the worker, model haiku<br>--fix, scratch document"]
     Fix --> Gate2["Run the Validation Gate checks as above"]
     Gate2 --> Review
 ```
@@ -299,18 +304,18 @@ Reviewer — Agent tool parameters:
   agent: .claude/agents/research-curator.md
   model: sonnet
   prompt: "--review ./research/{category}/{name}.md
-Round: {1|2}
+Round: {N}
 Scratch document: .tmp/scratch/reports/{category}-{name}-review.md
 Analysis files written this run:
   improvements: {path from the insight agent result, or none}
   utilization:  {FILE path from the utilization agent result, or none}"
 
-Curator — Agent tool parameters:
+Worker — Agent tool parameters:
   agent: .claude/agents/research-curator.md
   model: haiku
   prompt: "--fix ./research/{category}/{name}.md
 Scratch document: .tmp/scratch/reports/{category}-{name}-review.md
-Fix the unchecked D lines only."
+Address every unchecked D line and record a did: note on each."
 ```
 
 Answer both analysis lines, `none` included: the paths carry a date the agent cannot derive from the
@@ -318,7 +323,7 @@ entry name and the rubric scopes gates 4, 5 and 6 to them, so a blank line costs
 bare `none` stops the agent globbing up a stale proposal an earlier run wrote for this same resource.
 
 A reviewer without a verdict, or with `VERDICT: NOT RUN`, makes the entry UNRESOLVED: report its exact
-reason and any unchecked lines already in the document. A curator that fails or times out has checked
+reason and any unchecked lines already in the document. A worker that fails or times out has checked
 nothing; the next review runs anyway.
 
 An entry the validation gate already marked "created with issues" or "refreshed with issues" is not
@@ -361,7 +366,7 @@ in [Mode Routing](#mode-routing).
 
 2. **Backlink Repair** -- deterministically repair the bidirectional cross-reference graph across
    the whole vault, not just entries this run touched. Runs even after [Entry Review](#entry-review)'s
-   pre-review repair: the review loop's reviewer and curator passes write entries after it:
+   pre-review repair: the review loop's reviewer and worker passes write entries after it:
 
    Pass `--exclude {path}` once per path that was **already** dirty in the pre-mode baseline
    (see [Mode Routing](#mode-routing)). The repair writes its reciprocal row into the *cited*
@@ -470,7 +475,7 @@ Report to user after any mode completes. Apply the [Agent Result Relay Rules](#a
 **Category**: {category}
 **File**: ./research/{category}/{filename}.md
 **README Updated**: Yes | No -- entry marked with issues, row withheld
-**Entry Review**: APPROVE -- N findings fixed | UNRESOLVED -- N unchecked, marked with issues (scratch: {path})
+**Entry Review**: PASS -- N findings fixed | UNRESOLVED -- N unchecked, marked with issues (scratch: {path})
 **Cross-References Added**: N
 **Utilization Proposals**: N (file: ./research/insights/YYYY-MM-DD-{name}-utilization.md)
 
@@ -493,7 +498,7 @@ YYYY-MM-DD
 **Refreshed**: Z existing entries
 **Failed**: W
 **README Updated**: Yes -- rows withheld for R entries marked with issues
-**Entry Review**: A APPROVE, R UNRESOLVED (marked with issues)
+**Entry Review**: A PASS, R UNRESOLVED (marked with issues)
 
 ### Entries Created
 - ./research/{category}/{name}.md
@@ -512,7 +517,7 @@ YYYY-MM-DD
 
 **Refreshed**: N entries
 **Changes Detected**: M entries had updated data
-**Entry Review**: A APPROVE, R UNRESOLVED (marked with issues)
+**Entry Review**: A PASS, R UNRESOLVED (marked with issues)
 
 ### Updated Entries
 - ./research/{category}/{name}.md -- {what changed}
