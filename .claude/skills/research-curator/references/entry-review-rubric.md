@@ -21,7 +21,7 @@ Writing an entry rather than reviewing one? Use [Entry Quality Standards](./entr
 
 ## Gate 1 — Mechanical Checks
 
-Run all three commands. Report their output as **exact counts per severity and the verbatim issue lines** — "mostly clean", "a few warnings", and "passes validation" are not review output.
+Run the formatter. The orchestrator runs the validator after every pass, appending its remaining issues to the scratch document as `D` lines, and repairs cross-reference reciprocity before review; an orchestrated review (it names a scratch document) skips those two commands, and a standalone `--review` runs all three. Report output as **exact counts per severity and the verbatim issue lines** — "mostly clean", "a few warnings", and "passes validation" are not review output.
 
 ```bash
 uv run --script .claude/skills/research-curator/scripts/fix_research_formatting.py --check ./research/{category}/{name}.md
@@ -32,26 +32,25 @@ uv run --script .claude/skills/research-curator/scripts/validate_research.py che
 | Command | What a defect looks like | Record |
 |---|---|---|
 | `fix_research_formatting.py --check` | Non-zero exit — the file needs formatting fixes | Every path the tool named, and the fix it wanted. Run it without `--check`: this review applies fixes, so a path it reformatted is a checked finding |
-| `validate_research.py main --json` | Any issue in the JSON `entries[].issues[]` array | `errors: N, warnings: N` from `summary`, then every issue's `check`, `severity`, `message`, and `line`, quoted |
-| `validate_research.py check-backlinks ./research` | Any asymmetric cross-reference involving this entry, or any file the scan could not read or parse | Each object in JSON `edges`, and every object in `skips` when `scan_skipped_files` is non-zero. `--fix` retains the original `edges` and adds repair outcome fields |
+| `validate_research.py main --json` | Any issue in the JSON `entries[].issues[]` array except `cross_references_absent`, non-blocking per [Validation Rules](./validation-rules.md) | `errors: N, warnings: N` from `summary`, then every issue's `check`, `severity`, `message`, and `line`, quoted |
+| `validate_research.py check-backlinks ./research` | A residual asymmetric cross-reference involving this entry, or any file the scan could not read or parse | Each object in JSON `edges`, and every object in `skips` when `scan_skipped_files` is non-zero. `--fix` retains the original `edges` and adds repair outcome fields |
 
 A non-zero `scan_skipped_files` field fails this command on its own, because a file dropped from
 the scan was never compared -- exit 0 would claim coverage the scan did not have. Treat those
 paths as Gate 1 defects, not as noise.
 
-**Cross-reference reciprocity** is measured by `check-backlinks`, not by eye. An entry that cites B while B does not cite back is a defect against this entry even though the missing row lives in B. Row format: [Cross-Reference Format](./cross-reference-format.md).
+**Cross-reference reciprocity** is measured by `check-backlinks`, not by eye, and repaired by the orchestrator; the reviewer reports only a residual pair. An entry that cites B while B does not cite back is a defect against this entry even though the missing row lives in B. Row format: [Cross-Reference Format](./cross-reference-format.md).
 
 ---
 
 ## Gate 2 — Fidelity Rules
 
-Each rule in [Entry Quality Standards](./entry-quality-standards.md) is a separate check with its own verdict. Run all five; one rule's pass says nothing about another's.
+Each rule in [Entry Quality Standards](./entry-quality-standards.md) is a separate check with its own verdict. Run every rule below; one rule's pass says nothing about another's.
 
 | Check | Question | Defect |
 |---|---|---|
 | **Rule 1 — Read Before Writing** | Does every section's content trace to a source listed in References, and was that source actually reachable? | A claim whose only possible basis is the resource's name, URL path, or domain. An inaccessible source whose absence is not stated in References |
 | **Rule 2 — Preserve Counts** | Are capability figures written as the exact number the source gives? | A vague quantifier ("many languages", "recent release", "low latency") standing where the source has a figure |
-| **Rule 2a — No Popularity Statistics** | Did this run leave every star, download, fork, and contributor count out of the entry? | A figure this run gathered, wherever it landed — a badge, a quoted README passage, a section of its own. Figures the entry already carried stay as written, per Rule 2a's scope |
 | **Rule 3 — Absence vs Nonexistence** | Where information was not found, does the entry say it was not found? | "Doesn't support X" / "Not available" / "Not supported" where the honest statement is "Not mentioned in documentation" or "Unable to access {source}". Applies to the entry's repo claims too: `-> nothing in {scope}` reports that these search terms matched nothing in that scope, and an item reading it as "this repo has no X" is a Rule 3 defect |
 | **Rule 4 — Explicit Confidence** | Does every major section carry a confidence level in the confidence map? | A section missing from the map. A `high` on a section whose sources are informal, partial, contradictory, or code-read |
 
@@ -97,7 +96,7 @@ For each repo claim, in order:
 
    Opening first, then consulting the log, is what keeps a path the repository renamed out from under
    a correct entry in the repair column rather than the defect column.
-2. **Path is described correctly** — the file's real contents match what the claim says about them. A proposal that names a real path but misdescribes what lives there is a defect of the same severity as an invented path.
+2. **Path is described correctly** — the file's real contents match what the claim says about them. A proposal that names a real path but misdescribes what lives there is a defect of the same severity as an invented path. So is a quoted `Source pattern` or `Current state` line that no longer exists in the entry or the file.
 3. **Gap is real** — where a proposal says the local system lacks a capability, the file confirms the absence. A capability the file already implements makes the proposal a defect, not a low-confidence proposal.
 4. **Measurable signal is runnable** — where a proposal names a command or an observable field as its completion signal, that command runs and that field is reachable.
 5. **Quoted line contains the matched term** — each present-anchor Relevance item carries a `Term:` line naming the term that produced its match list ([Entry Template](./entry-template.md)'s Relevance item shape). Check that the quoted line contains that term. A quote that does not is evidence about something else, and is a defect no matter how real the path is: a GUI `widget` anchored to a tmux menu widget, an SDL2 `simulator` anchored to an iOS Simulator. An item with no `Term:` line is itself the defect — record it as one and check the quote against both of the capability's terms; do not mark this rule NOT RUN for a missing field the entry was required to write.
@@ -118,7 +117,7 @@ Two item shapes pass, and they pass for different reasons.
 
 - A **presence anchor** passes when it names a specific file, skill, agent, or workflow of this repo and says something about it that is true here and would be false elsewhere.
 - An **absence anchor** passes when you re-run **both** of its search commands — the narrow term and the broader term — and get zero from each. Its `→ 0 matches` is true of most repositories, so it never satisfies the would-be-false-elsewhere test; re-running the commands is what makes it a finding rather than a claim, and running them is the check. An anchor whose commands you did not re-run is `NOT RUN`, not a pass. An anchor recording only one command is a defect — one term at zero is the manufactured absence Phase 1c exists to prevent, not an anchor. An anchor whose commands now return matches is also a defect: what the entry recorded as searched-and-empty is neither, so the item rests on nothing. Report it as a stale anchor, and do not restate it as "the entry claims this repo has no X" — per Gate 2 Rule 3, the entry claims no such thing.
-  **This half is now mechanical**: `validate_research.py`'s `relevance_absence_anchor_refuted` and `relevance_absence_anchor_unparsed` checks (error severity, run by Gate 1) already re-execute every recorded absence-anchor command and fail the entry when its count disagrees or its shape does not reproduce. A Gate 1 pass on those two checks means the re-run-and-compare step above has already happened by machine; this gate's own re-running of absence anchors is redundant with a clean Gate 1 and exists as a backstop for what the mechanical check cannot see — a `NOT RUN` scan (no `.git` above the entry, reported as `relevance_absence_anchors_unchecked`), and whether the surviving term is actually the resource-specific one Phase 1c step 1 asked for rather than a technically-correct but generic substitute. Spend this gate's judgment there, not on re-deriving counts a machine already verified.
+  **This half is now mechanical**: `validate_research.py`'s `relevance_absence_anchor_refuted` and `relevance_absence_anchor_unparsed` checks (error severity, run by the validator) already re-execute every recorded absence-anchor command and fail the entry when its count disagrees or its shape does not reproduce. A clean validator result on those two checks means the re-run-and-compare step above has already happened by machine; this gate's own re-running of absence anchors is redundant with it and exists as a backstop for what the mechanical check cannot see — a `NOT RUN` scan (no `.git` above the entry, reported as `relevance_absence_anchors_unchecked`), and whether the surviving term is actually the resource-specific one Phase 1c step 1 asked for rather than a technically-correct but generic substitute. Spend this gate's judgment there, not on re-deriving counts a machine already verified.
 - **FAILS** when an item carries neither shape — text that would survive a find-and-replace of this repo's name, generic advice ("could improve code quality", "useful for agent workflows", "fits well with this project's architecture") dressed as repo-specific findings.
 
 An entry whose Relevance section is entirely absence anchors passes this gate when every command re-runs to zero. It is a thin entry, not a failing one; record the count so the thinness is visible.
@@ -184,9 +183,9 @@ SCRATCH: {findings document path}
 
 GATE 1 mechanical:    PASS | FAIL | NOT RUN ({reason})
   fix_research_formatting:         exit {N}
-  validate_research main --json:   errors {N}, warnings {N}
-  check-backlinks:                 {N} asymmetric pairs, {N} scan-skipped files
-GATE 2 fidelity:      PASS | FAIL — rules failed: {1|2|2a|3|4}
+  validate_research main --json:   orchestrator | errors {N}, warnings {N}
+  check-backlinks:                 orchestrator | {N} asymmetric pairs, {N} scan-skipped files
+GATE 2 fidelity:      PASS | FAIL — rules failed: {1|2|3|4}
 GATE 3 depth:         PASS | FAIL — sections failed: {names}
 GATE 4 repo claims:   PASS | FAIL — {N} claims verified, {N} defective, {N} for repair
 GATE 5 engagement:    PASS | FAIL

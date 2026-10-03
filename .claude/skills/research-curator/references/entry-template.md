@@ -59,7 +59,7 @@ freshness_tracking:
   last_verified: YYYY-MM-DD
   version_at_verification: vX.Y.Z
   next_review: YYYY-MM-DD
-  confidence_map: "section: level (qualifier)"
+  confidence_map: "Overview: high, Problem Addressed: high, Key Features: high, Technical Architecture: medium (code-read), Installation & Usage: high, Limitations and Caveats: low, Relevance to Claude Code Development: medium"
 ---
 
 # {Resource Name}
@@ -98,6 +98,12 @@ How the resource works internally. Include diagrams if helpful.
 
 ---
 
+## Limitations and Caveats
+
+Documented limitations, or the low-confidence absence statement from [Entry Quality Standards](./entry-quality-standards.md).
+
+---
+
 ## Installation & Usage
 
 ```bash
@@ -116,7 +122,7 @@ How the resource works internally. Include diagrams if helpful.
 
 - **{capability this resource provides}** -> `{repo-relative path}`
   - Term: `{the term that produced this match list — narrow or broader}`
-  - Today: "{exact line, heading, table row, or config value read from that path}"
+  - Today: "{exact body line read from that path, containing the Term}"
   - Change: {the specific edit this suggests}
 
 ### Patterns Worth Adopting
@@ -167,7 +173,7 @@ How the resource works internally. Include diagrams if helpful.
 > - Two item forms, shown in the template above. Present anchor: `-> {path}` with a `Term:` line
 >   naming the term that produced the match list — copied from the anchor record's `Term matched:`
 >   field — and a quoted line that contains that term, and is not a frontmatter field, a
->   link-list bullet, or a sample
+>   link-list or index-table bullet, or a sample
 >   argument inside a code fence — those carry the term without asserting anything. `Term:` is what
 >   makes the quote checkable by a reader who did not run the pass; without it Gate 4 Rule 5 of
 >   [Entry Review Rubric](./entry-review-rubric.md) has nothing to check against. Absence anchor:
