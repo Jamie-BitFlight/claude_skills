@@ -333,7 +333,9 @@ in [Mode Routing](#mode-routing).
 2. **Backlink Repair** -- deterministically repair the bidirectional cross-reference graph across
    the whole vault, not just entries this run touched. Skip this step when [Entry Review](#entry-review)
    already ran the repair this invocation and its four result cases all resolved to "continue";
-   nothing has written to `./research/` since, so a second scan finds nothing new:
+   no backlink-scanned entry (any `./research/**/*.md` except `README.md`) has changed since, so a
+   second scan finds nothing new. Step 1's README edits do not count, because the scan ignores
+   `README.md`:
 
    Pass `--exclude {path}` once per path that was **already** dirty in the pre-mode baseline
    (see [Mode Routing](#mode-routing)). The repair writes its reciprocal row into the *cited*

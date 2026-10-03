@@ -48,13 +48,17 @@ flowchart TD
 
 ## Failure Recovery
 
-Applies to every mode that spawns `@research-curator`. A failed or timed-out agent may have written
-a usable entry, and a wave whose agents all hit one cause wastes every later wave on that cause.
+Applies to Default and Batch modes, the two that link here; Rerun and Validate have no failed-agent
+branch of their own and report a failed agent's exact reason. A failed or timed-out agent may have
+written a usable entry, and a wave whose agents all hit one cause wastes every later wave on that cause.
 
 1. **Check for partial output first.** Compare `git status --porcelain --untracked-files=all -- ./research/`
-   against the pre-mode baseline. If the agent wrote or changed the entry file, run the Validation Gate
-   on it instead of discarding it: a clean file proceeds as normal, one with issues is marked
-   "created with issues" or "refreshed with issues".
+   against the pre-mode baseline, and attribute a file to the failed agent only when its `source_url`
+   frontmatter field matches that agent's URL (or it is the `--rerun` target). Concurrent agents in a wave write
+   concurrently, so an unmatched new file belongs to no failed agent. For an attributed file, run the
+   Validation Gate on it instead of discarding it: a clean file proceeds through analysis and Entry
+   Review as normal, so a structurally valid but incomplete entry is still reviewed; one with issues is
+   marked "created with issues" or "refreshed with issues".
 2. **Re-run once, narrower, only when the file is absent.** Re-spawn that URL's agent a single time and
    name the sources the first attempt could not reach. A second failure is final: relay the exact reason.
 3. **Stop the waves on a shared cause.** When every agent in a wave returned the same access failure
