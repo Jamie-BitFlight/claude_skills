@@ -93,7 +93,7 @@ Trigger: `<mode_args/>` contains a URL with no flags.
    ```
 
 4. **Wait** for structured result (status, file path, category, key findings)
-5. **Validate** -- if research status is not `failed`, run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries) on the created or refreshed file. On its "mark issues" outcome: mark entry as "created with issues" (or "refreshed with issues" when step 2 routed to `--rerun`), skip steps 6–8, and report to user with the exact error or warning text from validator JSON. On its "proceed" outcome, continue to step 6.
+5. **Validate** -- if research status is not `failed`, run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries) on the created or refreshed file. On its "mark issues" outcome: mark entry as "created with issues" (or "refreshed with issues" when step 2 routed to `--rerun`), skip steps 6–7, and report to user with the exact error or warning text from validator JSON. On its "proceed" outcome, continue to step 6.
 
 6. **Spawn four tasks concurrently** -- if research status is not `failed`:
 
@@ -113,19 +113,17 @@ Trigger: `<mode_args/>` contains a URL with no flags.
    d. Update ./research/README.md -- add new entry to category table, or refresh the freshness date for an existing entry when step 2 routed to `--rerun`
    ```
 
-7. **Wait for all tasks above and surface results** -- collect structured return blocks from each agent and confirm README updated:
+7. **Wait, surface, review** -- collect structured return blocks from each step 6 task and confirm README updated, then run [Entry Review](#entry-review) on the entry together with whatever step 6 wrote:
 
    - **Insight**: if the result contains `IMMEDIATE_ATTENTION:`, report each item with `#{issue} {title}` and the one-sentence reason. If no `IMMEDIATE_ATTENTION` section: report "N improvements added to backlog from {resource-name}."
    - **Utilization**: relay `PROPOSALS_WRITTEN` count and `FILE` path. If `STATUS: no_utilization_surface`, report "No direct utilization surface found."
    - **Cross-references**: relay `CROSS_REFERENCES_ADDED` count.
 
-8. **Review** -- run [Entry Review](#entry-review) on the entry, auditing it together with whatever step 6 wrote
-
-9. **Post-actions** -- lint, commit, push (see [Post-Actions](#post-actions))
+8. **Post-actions** -- lint, commit, push (see [Post-Actions](#post-actions))
 
 ### Error Handling
 
-- If agent returns `status: failed`, relay the exact failure reason to user and stop
+- If agent returns `status: failed`, or times out without returning, follow [Failure Recovery](./references/batch-mode.md#failure-recovery) before reporting; a failed agent that wrote nothing: relay the exact failure reason to user and stop
 - Do not create partial entries or update README on failure
 
 </default_mode>
@@ -268,8 +266,9 @@ written for it, against [Entry Review Rubric](./references/entry-review-rubric.m
 asymmetric the moment it returns, and the rubric's Gate 1 scores an asymmetric pair as a defect
 against the citing entry -- reviewing now fails every entry on a defect this run is about to repair.
 Run the [Post-Actions](#post-actions) step 2 backlink repair, handling its four result cases exactly
-as step 2 specifies, before spawning any review. Step 2 still runs in its own place afterwards: the
-repair is idempotent, and Validate Mode reaches it without passing through here.
+as step 2 specifies, before spawning any review. This is the invocation's one repair pass: reviews
+write nothing, so Post-Actions step 2 skips its own scan when this pass already ran. Validate Mode
+reaches step 2 without passing through here, so there step 2 runs the scan.
 
 Then spawn one `@research-curator` per entry, in waves of 5, matching the analysis fan-out. One
 review per entry, never one across a batch: the verdict block is per-entry, and the repo-claims gate
@@ -332,7 +331,9 @@ in [Mode Routing](#mode-routing).
    anyway, so report the mark and leave the file alone
 
 2. **Backlink Repair** -- deterministically repair the bidirectional cross-reference graph across
-   the whole vault, not just entries this run touched:
+   the whole vault, not just entries this run touched. Skip this step when [Entry Review](#entry-review)
+   already ran the repair this invocation and its four result cases all resolved to "continue";
+   nothing has written to `./research/` since, so a second scan finds nothing new:
 
    Pass `--exclude {path}` once per path that was **already** dirty in the pre-mode baseline
    (see [Mode Routing](#mode-routing)). The repair writes its reciprocal row into the *cited*

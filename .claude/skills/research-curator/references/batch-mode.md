@@ -41,5 +41,27 @@ flowchart TD
 ## Error Handling
 
 - **Individual failure**: Log the error, continue with remaining URLs. Do not abort the batch.
-- **Agent timeout**: If an agent does not return within reasonable time, mark as failed and continue.
+- **Agent timeout or failure**: follow [Failure Recovery](#failure-recovery) before marking the URL failed.
 - **Duplicate detection**: see [Duplicate Detection](./duplicate-detection.md) — applied before spawning, per URL.
+
+---
+
+## Failure Recovery
+
+Applies to every mode that spawns `@research-curator`. A failed or timed-out agent may have written
+a usable entry, and a wave whose agents all hit one cause wastes every later wave on that cause.
+
+1. **Check for partial output first.** Compare `git status --porcelain --untracked-files=all -- ./research/`
+   against the pre-mode baseline. If the agent wrote or changed the entry file, run the Validation Gate
+   on it instead of discarding it: a clean file proceeds as normal, one with issues is marked
+   "created with issues" or "refreshed with issues".
+2. **Re-run once, narrower, only when the file is absent.** Re-spawn that URL's agent a single time and
+   name the sources the first attempt could not reach. A second failure is final: relay the exact reason.
+3. **Stop the waves on a shared cause.** When every agent in a wave returned the same access failure
+   (the same HTTP status, rate limit, or missing MCP tool), do not spawn the next wave. Report the
+   shared reason and the URLs not attempted, so the user can fix the cause once.
+4. **MCP tool outage.** The agent file's source-access fallback chain applies inside each agent; the
+   orchestrator does not retry a fallback the agent already reported as exhausted.
+5. **Incomplete upstream documentation** is not a failure. The entry records the gap as "Not mentioned
+   in documentation" per [Entry Quality Standards](./entry-quality-standards.md), and the validation
+   gate decides whether it passes.
