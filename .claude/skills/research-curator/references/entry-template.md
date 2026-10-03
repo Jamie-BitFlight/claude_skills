@@ -2,6 +2,8 @@
 
 Standard format for all research entries in `./research/`.
 
+Content scope: [Entry Quality Standards](./entry-quality-standards.md#scope).
+
 ---
 
 ## Category Selection
@@ -59,7 +61,7 @@ freshness_tracking:
   last_verified: YYYY-MM-DD
   version_at_verification: vX.Y.Z
   next_review: YYYY-MM-DD
-  confidence_map: "Overview: high, Problem Addressed: high, Key Features: high, Technical Architecture: medium (code-read), Installation & Usage: high, Limitations and Caveats: low, Relevance to Claude Code Development: medium"
+  confidence_map: "Overview: high, Problem Addressed: high, Key Features: high, Technical Architecture: medium (code-read), Installation & Usage: high, Limitations and Caveats: low"
 ---
 
 # {Resource Name}
@@ -104,12 +106,6 @@ Documented limitations, or the low-confidence absence statement from [Entry Qual
 
 ---
 
-## Limitations and Caveats
-
-Documented limitations, or the low-confidence absence statement from [Entry Quality Standards](./entry-quality-standards.md).
-
----
-
 ## Installation & Usage
 
 ```bash
@@ -119,34 +115,6 @@ Documented limitations, or the low-confidence absence statement from [Entry Qual
 ```python
 # Usage example
 ```
-
----
-
-## Relevance to Claude Code Development
-
-### Applications
-
-- **{capability this resource provides}** -> `{repo-relative path}`
-  - Found by: {tool} — {query}
-  - Today: "{exact body line read from that path that supports the claim}"
-  - Overlaps: {repo system or goal this touches}
-  - Change: {the specific edit this suggests}
-
-### Patterns Worth Adopting
-
-- **{pattern}** -> `{repo-relative path}`
-  - Found by: {tool} — {query}
-  - Today: "{exact body line read from that path}"
-  - Overlaps: {repo system or goal this touches}
-  - Change: none — {path} already covers it
-
-### Integration Opportunities
-
-- **{API, package, or CLI this resource exposes}** -> not found by these searches
-  - Found by: {tool} — {query}; {tool} — {query}
-  - Today: nothing relevant returned
-  - Overlaps: {repo system or goal this would touch}
-  - Change: {what would have to exist here first}
 
 ---
 
@@ -163,41 +131,6 @@ Documented limitations, or the low-confidence absence statement from [Entry Qual
 |-------|----------|--------------|
 | [Resource Name](../category/filename.md) | category-name | {one-phrase relationship} |
 ````
-
-> **Relevance section — subject**: THIS REPOSITORY, the `claude_skills` marketplace checkout and everything in it
-> (`plugins/`, `.claude/`, `rules/`, `docs/`, `AGENTS.md`, and more). Not Claude
-> Code the product. "Claude Code skills could use X" describes the product and is out of scope here
-> however true it is; "`plugins/agent-orchestration/skills/parallel-work/SKILL.md` does X"
-> describes the repository and is in scope. The heading is fixed by the validator's
-> required-section list and reads ambiguously; this note, not the heading, defines the subject.
-
-> **Relevance section — anchor rules**. Write every item from an anchor record produced by the
-> Repo Anchor Pass in [Extraction Methodology](./extraction-methodology.md); run that pass before
-> writing any item:
->
-> - The path is repo-relative from the repository root and comes from an anchor record — never
->   from memory of what a repo like this usually contains.
-> - `Today:` carries evidence, not characterisation: a line read from that path, or the
->   fixed line `nothing relevant returned` with every search on the `Found by:` line. "Claude Code skills need X" is neither.
-> - Two item forms, shown in the template above. Present anchor: `-> {path}` with a `Found by:`
->   line naming the search tool and query that surfaced the file, and a quoted body line that
->   supports the claim (nothing after the closing quote, inner quotes verbatim) and is not a frontmatter field, a link-list or index-table bullet, or a
->   sample argument inside a code fence — those carry the words without asserting anything. A
->   reader opens the path and sees the line. Absence anchor: `-> not found by these searches` with
->   every tool and query run on its `Found by:` line and the result you observed. Never type a
->   result you did not observe. Zero hits is a finding, not a failure to find one — but it records
->   that these searches found nothing, never that the capability is absent from this repo.
-> - `Overlaps:` names the repo system or goal the capability touches — the point of the section is
->   what the repo can learn, reuse, or stop maintaining.
-> - No two items anchor to the same path. Repeating one file across items multiplies a single
->   observation instead of adding one.
-> - `Change:` has three passing outcomes — a specific edit, `none — {path} already covers it`, or
->   `none — out of scope ({why})`. An entry recording that this repo already solved something is
->   worth more than one proposing it again, and unlike a proposal it is falsifiable. The
->   out-of-scope outcome is the honest exit for a pattern that maps to nothing here; force-fitting
->   it to an unrelated path is the defect this shape removes.
-> - Drop a sub-heading with no anchored item rather than filling it with unanchored prose. Three
->   anchored items beat twelve unanchored ones; item count is not a target.
 
 > **Confidence qualifiers**: When a section's claims derive from code analysis rather than
 > documentation, append `(code-read)` to the confidence level — e.g., `Architecture: medium
