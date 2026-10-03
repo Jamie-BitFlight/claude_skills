@@ -6,6 +6,18 @@ Reviewing a finished entry rather than writing one? Use [Entry Review Rubric](./
 
 ---
 
+## Scope
+
+An entry summarizes the researched resource and nothing else: its evergreen substance, plus
+snapshots (version, release date, figures, status) that carry the date or version they were read
+at. It makes no claim about this repository; overlap with the repository is found by a separate
+scan after research and filed as GitHub issues, never in the entry.
+
+An entry written before this rule may carry a `## Relevance to Claude Code Development` section.
+The section is inert and does not make the entry invalid. A refresh or fix leaves it as found.
+
+---
+
 ## Fidelity Rules
 
 <fidelity_rules>
@@ -119,7 +131,7 @@ REQUIRED — not optional. Every tool has limitations. If primary sources docume
 
 ## Wording
 
-Write nothing that Gate 6 of [Entry Review Rubric](./entry-review-rubric.md) scans for, outside an attributed quotation; its table lists the triggers.
+Write nothing that Gate 4 of [Entry Review Rubric](./entry-review-rubric.md) scans for, outside an attributed quotation; its table lists the triggers.
 
 ---
 

@@ -20,7 +20,7 @@ Orchestrate research entry creation, maintenance, and validation in `./research/
 
 Parse `<mode_args/>` to select operating mode. Before executing any mode below, capture a
 `git status --porcelain --untracked-files=all -- ./research/` baseline -- the invocation's
-pre-write state, taken before this run's own README update, curator agent, or analysis agent
+pre-write state, taken before this run's own README update or curator agent
 writes anything. Post-Actions compares against this baseline, not a fresh snapshot, to tell this
 run's own writes apart from another contributor's pre-existing uncommitted work.
 `--untracked-files=all` is required: the default collapses an untracked directory to a single
@@ -62,7 +62,7 @@ These rules apply whenever this orchestrator receives results from any `@researc
 | "Rate limited" | "rate limited" | "unavailable" |
 | "Inaccessible" | "inaccessible" | "unavailable" / "nonexistent" |
 
-**Rule 3 — Reference files instead of re-summarizing.** When an agent wrote a file, include its path in the relay.
+**Rule 3 — Reference artifacts instead of re-summarizing.** When an agent wrote a file or filed an issue, include its path or its issue number and URL in the relay.
 
 **Rule 4 — Relay structure, not interpretation.** When an agent returns a STATUS/ARTIFACTS/WARNINGS block, preserve that structure. Do not flatten it into a single sentence.
 
@@ -95,7 +95,7 @@ Trigger: `<mode_args/>` contains a URL with no flags.
 4. **Wait** for structured result (status, file path, category, key findings)
 5. **Validate** -- the curator self-checks and corrects its own entry before returning, so this gate confirms that check rather than driving the fix loop. If research status is not `failed`, run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries) on the created or refreshed file. On its "mark issues" outcome: mark entry as "created with issues" (or "refreshed with issues" when step 2 routed to `--rerun`), skip steps 6–7, and report to user with the exact error or warning text from validator JSON. On its "proceed" outcome, continue to step 6.
 
-6. **Spawn three tasks concurrently** -- if research status is not `failed`:
+6. **Spawn three tasks concurrently** -- if research status is not `failed`. The first two run the [Overlap Scan](./references/integration-opportunity-search.md) and file GitHub issues; the third links entries:
 
    ```text
    a. Agent tool parameters:
@@ -111,10 +111,9 @@ Trigger: `<mode_args/>` contains a URL with no flags.
         prompt: "Add cross-references to {file-path-from-agent-result}"
    ```
 
-7. **Wait, surface, review** -- collect structured return blocks from each step 6 task, then run [Entry Review](#entry-review) on the entry together with whatever step 6 wrote:
+7. **Wait, surface, review** -- collect structured return blocks from each step 6 task, then run [Entry Review](#entry-review) on the entry:
 
-   - **Insight**: if the result contains `IMMEDIATE_ATTENTION:`, report each item with `#{issue} {title}` and the one-sentence reason. If no `IMMEDIATE_ATTENTION` section: report "N improvements added to backlog from {resource-name}."
-   - **Utilization**: relay `PROPOSALS_WRITTEN` count and `FILE` path. If `STATUS: no_utilization_surface`, report "No direct utilization surface found."
+   - **Insight and utilization**: relay each `ISSUES` entry as `#{number} {url}`, and `EXISTING` and `UNFILED` verbatim. If `STATUS: no_findings`, report "No overlap findings." If `STATUS: no_utilization_surface`, report "No direct utilization surface found."
    - **Cross-references**: relay `CROSS_REFERENCES_ADDED` count.
 
 8. **Post-actions** -- lint, commit, push (see [Post-Actions](#post-actions))
@@ -185,11 +184,11 @@ flowchart TD
     RelayCheck2 --> ValidateN["Run the Validation Gate for New/Refreshed Entries<br>(validation-rules.md) on each updated entry"]
     ValidateN -->|"an entry has errors, or gated<br>warnings remain after --fix retry"| IssuesN["Mark that entry refreshed with issues<br>Skip analysis agents for it<br>No README date refresh for it<br>Include exact issue text in report"]
     ValidateN -->|"clean entries"| SpawnAnalysisN["For each updated entry (concurrent, up to 5 entries)<br>spawn analysis agents per entry:<br>@research-insight-extractor<br>@research-utilization-assessor<br>@research-cross-referencer"]
-    SpawnAnalysis1 --> WaitAnalysis1["Wait for all agents<br>Surface IMMEDIATE_ATTENTION items from insight result<br>Report utilization proposal count<br>Report cross-references added count"]
-    WaitAnalysis1 --> Review1["Run Entry Review: backlink repair first,<br>then the review loop on ./research/category/name.md<br>naming the analysis files just written"]
+    SpawnAnalysis1 --> WaitAnalysis1["Wait for all agents<br>Report filed issue numbers and URLs<br>Report cross-references added count"]
+    WaitAnalysis1 --> Review1["Run Entry Review: backlink repair first,<br>then the review loop on ./research/category/name.md"]
     Review1 --> PostActions(["Execute Post-Actions — lint, commit, push"])
     Issues1 --> PostActions
-    SpawnAnalysisN --> WaitAnalysisN["Wait for all analysis agents<br>Collect IMMEDIATE_ATTENTION items<br>Report total utilization proposals and cross-references added"]
+    SpawnAnalysisN --> WaitAnalysisN["Wait for all analysis agents<br>Report filed issue numbers and URLs<br>Report total cross-references added"]
     WaitAnalysisN --> ReviewN["Run Entry Review: backlink repair once,<br>then the review loop on each entry that reached analysis<br>one loop per entry, in waves of 5"]
     ReviewN --> PostActions
     IssuesN --> PostActions
@@ -261,8 +260,7 @@ report. [Failure Recovery](./references/batch-mode.md#failure-recovery) does not
 ## Entry Review
 
 Runs in Default, Batch, and Rerun Mode, once that mode's analysis agents have all returned and
-before Post-Actions. Loops each entry this run created or refreshed, with the analysis files
-written for it, through review and correction against [Entry Review Rubric](./references/entry-review-rubric.md), which the agents load.
+before Post-Actions. Loops each entry this run created or refreshed through review and correction against [Entry Review Rubric](./references/entry-review-rubric.md), which the agents load.
 
 **Repair reciprocity first.** `@research-cross-referencer` writes forward links only, so the vault is
 asymmetric the moment it returns, and the rubric's Gate 1 scores an asymmetric pair as a defect
@@ -272,8 +270,7 @@ as step 2 specifies, before spawning any review. The loop below writes entries a
 Post-Actions step 2 always runs its own scan too.
 
 Then run the loop per entry, entries in waves of 5, matching the analysis fan-out. One loop per
-entry, never one across a batch: the verdict block is per-entry, and the repo-claims gate opens the
-local file behind every proposal. The scratch document `.tmp/scratch/reports/{category}-{name}-review.md`
+entry, never one across a batch: the verdict block is per-entry. The scratch document `.tmp/scratch/reports/{category}-{name}-review.md`
 ([Findings Document](./references/entry-review-rubric.md#findings-document)) carries the entry's
 findings through every round.
 
@@ -302,10 +299,7 @@ Reviewer — Agent tool parameters:
   model: sonnet
   prompt: "--review ./research/{category}/{name}.md
 Round: {N}
-Scratch document: .tmp/scratch/reports/{category}-{name}-review.md
-Analysis files written this run:
-  improvements: {path from the insight agent result, or none}
-  utilization:  {FILE path from the utilization agent result, or none}"
+Scratch document: .tmp/scratch/reports/{category}-{name}-review.md"
 
 Worker — Agent tool parameters:
   agent: .claude/agents/research-curator.md
@@ -315,24 +309,19 @@ Scratch document: .tmp/scratch/reports/{category}-{name}-review.md
 Address every unchecked D line and record a did: note on each."
 ```
 
-Answer both analysis lines, `none` included: the paths carry a date the agent cannot derive from the
-entry name and the rubric scopes gates 4, 5 and 6 to them, so a blank line costs three gates, while a
-bare `none` stops the agent globbing up a stale proposal an earlier run wrote for this same resource.
-
 A reviewer without a verdict, or with `VERDICT: NOT RUN`, makes the entry UNRESOLVED: report its exact
 reason and any unchecked lines already in the document. A worker that fails or times out has checked
 nothing; the next review runs anyway.
 
 An entry the validation gate already marked "created with issues" or "refreshed with issues" is not
-reviewed this run -- it never reached the analysis agents, so most of the rubric's scope does not
-exist for it. It is reviewed by whichever later `--rerun` clears its validation issues.
+reviewed this run -- it never reached the analysis agents. It is reviewed by whichever later `--rerun`
+clears its validation issues.
 
 Relay the final round's verdict block verbatim under the [Agent Result Relay Rules](#agent-result-relay-rules)
 under an `### Entry Review Verdicts` heading in the mode's [Output Format](#output-format) report,
 with the scratch document path. An UNRESOLVED entry lists its unchecked lines there, exactly as
 written, names the gate ids whose findings recurred across rounds, and relays the stop to the user as
-a process defect so the misalignment can be traced. Post-Actions then withholds its README row and date (step 1). The analysis files were
-already written; the mark does not remove them.
+a process defect so the misalignment can be traced. Post-Actions then withholds its README row and date (step 1).
 
 </entry_review>
 
@@ -468,7 +457,7 @@ Report to user after any mode completes. Apply the [Agent Result Relay Rules](#a
 **README Updated**: Yes | No -- entry marked with issues, row withheld
 **Entry Review**: PASS -- N findings fixed | UNRESOLVED -- N unchecked, marked with issues (scratch: {path})
 **Cross-References Added**: N
-**Utilization Proposals**: N (file: ./research/insights/YYYY-MM-DD-{name}-utilization.md)
+**Overlap Issues**: #N {url}, ... | none
 
 ### Key Findings
 - Finding 1
@@ -490,6 +479,7 @@ YYYY-MM-DD
 **Failed**: W
 **README Updated**: Yes -- rows withheld for R entries marked with issues
 **Entry Review**: A PASS, R UNRESOLVED (marked with issues)
+**Overlap Issues**: #N {url}, ... | none
 
 ### Entries Created
 - ./research/{category}/{name}.md
@@ -509,6 +499,7 @@ YYYY-MM-DD
 **Refreshed**: N entries
 **Changes Detected**: M entries had updated data
 **Entry Review**: A PASS, R UNRESOLVED (marked with issues)
+**Overlap Issues**: #N {url}, ... | none
 
 ### Updated Entries
 - ./research/{category}/{name}.md -- {what changed}
@@ -533,16 +524,5 @@ YYYY-MM-DD
 ```
 
 </output_format>
-
-## Preserved, Not Wired
-
-No mode below runs an integration-opportunity search; `/process-research-integration` and the
-`research-context-agent` that served it were deleted in PR #3529. The part of that agent's search
-procedure that was carried forward, and an inventory of the part that was not, is in
-[Integration Opportunity Search](./references/integration-opportunity-search.md). Load it only when
-redesigning that search or regenerating an existing `## Integration Opportunities` section — no
-step in this skill reads it.
-
----
 
 SOURCE: Agent result relay rules adapted from `plugins/summarizer/skills/agent-result-relay/SKILL.md` (accessed 2026-03-06).
