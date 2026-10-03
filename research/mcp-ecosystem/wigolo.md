@@ -286,7 +286,7 @@ None in scope — Local-First, Zero-Key Design patterns are out of scope for thi
 
 - **Multi-page crawl and structured extraction for research gathering** → `.claude/agents/research-curator.md`
   - Term: `research`
-  - Today: "Single-entry research executor. Creates comprehensive research entries for tools, libraries, and resources. Every claim in the produced entry MUST trace to an extracted passage from a primary source."
+  - Today: "Single-entry research executor. Creates research entries for tools, libraries, and resources. Every claim in the produced entry MUST trace to an extracted passage from a primary source."
   - Change: wigolo's `crawl` and `extract` tools cover a gap in that agent's `<research_tools>` block, which has no
     route that follows links across a site within a page budget and no route that pulls structured records out of a
     page. Tracked as issue #3790; integration sketches in
