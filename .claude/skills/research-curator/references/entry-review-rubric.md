@@ -170,7 +170,7 @@ One per entry, at the path the invocation names, kept across rounds; the reviewe
 
 **Leave unchecked** any correction that needs data gathering to validate — fetching upstream sources, re-running a repo anchor pass for new evidence — with `needs:` stating the data. A finding in a file outside the writable set is also left unchecked, naming that file.
 
-**Rounds after the first** (the invocation says which): review the worker's changes and research, not only the lines. Run every gate over the files again and check each `did:` note against the file and the source it cites; a checked line whose fix is absent or wrong reopens unchecked. Add a line only for a defect a gate defines; prose no gate names is not a finding. A closed finding set is what lets rounds converge.
+**Rounds after the first** (the invocation says which): review the worker's changes and research, not only the lines. Run every gate over the files again and check each `did:` note against the file and the source it cites; a checked line whose fix is absent or wrong reopens unchecked. Add a line only for a defect a gate defines; prose no gate names is not a finding. A closed finding set is what lets rounds converge. A gate whose findings recur across rounds marks creator and reviewer instructions that disagree; the orchestrator reports its id.
 
 ---
 
@@ -201,6 +201,6 @@ UNCHECKED: (each unchecked line, verbatim)
 VERDICT: PASS | FAIL
 ```
 
-`PASS` requires every gate at PASS and no unchecked defect. Any gate at FAIL or NOT RUN, or any unchecked defect, is `FAIL` — an unchecked defect and a `PASS` verdict cannot both be true.
+`PASS` requires every gate at PASS and no unchecked defect. Any gate at FAIL or NOT RUN, or any unchecked defect, is `FAIL` — an unchecked defect and a `PASS` verdict cannot both be true. A `NOT RUN` gate is a `FAIL` with no line for the worker; the orchestrator stops on it, naming the gate.
 
 An unchecked repair is work scheduled against the citing file and is set aside: an entry whose only unchecked lines are repairs is `PASS` and keeps its README row. A gate whose only findings are repairs is `PASS`.

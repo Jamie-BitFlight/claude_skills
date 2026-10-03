@@ -284,16 +284,18 @@ findings through every round.
 
 The loop runs reviewer, worker, reviewer, worker until the reviewer passes. It stops UNRESOLVED when
 a round ends with the same unchecked line ids as the previous round (no progress), or after 5 review
-rounds; the owner can change that number.
+rounds; the owner can change that number. A FAIL with no unchecked lines (a `NOT RUN` gate) has
+nothing to hand the worker: it is the no-progress stop, UNRESOLVED, naming that gate. Either stop is a process defect, not an entry defect: the
+instructions that tell the curator what to create and the reviewer what to check disagree.
 
 ```mermaid
 flowchart TD
     Start(["Entry reached the analysis agents"]) --> Review["Spawn the reviewer, model sonnet<br>--review, scratch document, Round N"]
     Review --> Gate["Run the Validation Gate checks on the entry<br>without its fix retry<br>append each remaining error and gated warning<br>not yet listed to the scratch document as an unchecked D line"]
-    Gate --> Q{"Any unchecked D line?"}
-    Q -->|"No"| Pass(["PASS — continue to Post-Actions"])
-    Q -->|"Yes"| Stop{"Same unchecked ids as the previous round,<br>or the 5th review?"}
-    Stop -->|"Yes"| Unresolved(["UNRESOLVED — mark the entry created/refreshed with issues<br>withhold its README row<br>report the unchecked lines verbatim with the scratch path"])
+    Gate --> Q{"Reviewer verdict PASS<br>and no unchecked D line?"}
+    Q -->|"Yes"| Pass(["PASS — continue to Post-Actions"])
+    Q -->|"No"| Stop{"FAIL with no unchecked D line,<br>same unchecked ids as the previous round,<br>or the 5th review?"}
+    Stop -->|"Yes"| Unresolved(["UNRESOLVED — mark the entry created/refreshed with issues<br>withhold its README row<br>report the unchecked lines verbatim, the gate ids that recurred across rounds,<br>and the scratch path as a process defect"])
     Stop -->|"No"| Fix["Spawn the worker, model haiku<br>--fix, scratch document"]
     Fix --> Gate2["Run the Validation Gate checks as above"]
     Gate2 --> Review
@@ -333,7 +335,8 @@ exist for it. It is reviewed by whichever later `--rerun` clears its validation 
 Relay the final round's verdict block verbatim under the [Agent Result Relay Rules](#agent-result-relay-rules)
 under an `### Entry Review Verdicts` heading in the mode's [Output Format](#output-format) report,
 with the scratch document path. An UNRESOLVED entry lists its unchecked lines there, exactly as
-written, and Post-Actions then withholds its README row and date (step 1). The analysis files were
+written, names the gate ids whose findings recurred across rounds, and relays the stop to the user as
+a process defect so the misalignment can be traced. Post-Actions then withholds its README row and date (step 1). The analysis files were
 already written; the mark does not remove them.
 
 </entry_review>
