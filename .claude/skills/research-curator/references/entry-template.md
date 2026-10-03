@@ -121,22 +121,25 @@ Documented limitations, or the low-confidence absence statement from [Entry Qual
 ### Applications
 
 - **{capability this resource provides}** -> `{repo-relative path}`
-  - Term: `{the term that produced this match list — narrow or broader}`
-  - Today: "{exact body line read from that path, containing the Term}"
+  - Found by: {tool} — {query}
+  - Today: "{exact body line read from that path that supports the claim}"
+  - Overlaps: {repo system or goal this touches}
   - Change: {the specific edit this suggests}
 
 ### Patterns Worth Adopting
 
 - **{pattern}** -> `{repo-relative path}`
-  - Term: `{the term that produced this match list — narrow or broader}`
-  - Today: "{exact line read from that path}"
+  - Found by: {tool} — {query}
+  - Today: "{exact body line read from that path}"
+  - Overlaps: {repo system or goal this touches}
   - Change: none — {path} already covers it
 
 ### Integration Opportunities
 
-- **{API, package, or CLI this resource exposes}** -> nothing in `{scope searched}`
-  - Today: `git grep --full-name -il "{narrow term}" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md` → {narrow term match count} matches
-  - Today: `git grep --full-name -il "{broader term}" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md` → {broader term match count} matches
+- **{API, package, or CLI this resource exposes}** -> not found by these searches
+  - Found by: {tool} — {query}; {tool} — {query}
+  - Today: nothing relevant returned
+  - Overlaps: {repo system or goal this would touch}
   - Change: {what would have to exist here first}
 
 ---
@@ -155,8 +158,8 @@ Documented limitations, or the low-confidence absence statement from [Entry Qual
 | [Resource Name](../category/filename.md) | category-name | {one-phrase relationship} |
 ````
 
-> **Relevance section — subject**: THIS REPOSITORY, the `claude_skills` marketplace checkout: its
-> `plugins/`, `.claude/skills/`, `.claude/agents/`, `rules/`, `docs/`, and `AGENTS.md`. Not Claude
+> **Relevance section — subject**: THIS REPOSITORY, the `claude_skills` marketplace checkout and everything in it
+> (`plugins/`, `.claude/`, `rules/`, `docs/`, `AGENTS.md`, and more). Not Claude
 > Code the product. "Claude Code skills could use X" describes the product and is out of scope here
 > however true it is; "`plugins/agent-orchestration/skills/parallel-work/SKILL.md` does X"
 > describes the repository and is in scope. The heading is fixed by the validator's
@@ -168,24 +171,18 @@ Documented limitations, or the low-confidence absence statement from [Entry Qual
 >
 > - The path is repo-relative from the repository root and comes from an anchor record — never
 >   from memory of what a repo like this usually contains.
-> - `Today:` carries evidence, not characterisation: a line read from that path, or the exact
->   search command that returned nothing. "Claude Code skills need X" is neither.
-> - Two item forms, shown in the template above. Present anchor: `-> {path}` with a `Term:` line
->   naming the term that produced the match list — copied from the anchor record's `Term matched:`
->   field — and a quoted line that contains that term, and is not a frontmatter field, a
->   link-list or index-table bullet, or a sample
->   argument inside a code fence — those carry the term without asserting anything. `Term:` is what
->   makes the quote checkable by a reader who did not run the pass; without it Gate 4 Rule 5 of
->   [Entry Review Rubric](./entry-review-rubric.md) has nothing to check against. Absence anchor:
->   `-> nothing in {scope searched}` with the narrow and the broader search command each written
->   out in full — every `:/` prefix included — and each followed by `→ {n} matches`, where `{n}` is
->   the integer that command actually printed. Never type a count you did not observe: an absence
->   anchor only has to be re-runnable, and `validate_research.py`'s
->   `relevance_absence_anchor_refuted` check re-executes every one of these commands and fails the
->   entry when the written count and the real output disagree. A command written in any other
->   shape cannot be re-run and fails as `relevance_absence_anchor_unparsed`. Zero matches is a
->   finding, not a failure to find one — but it records that these terms found nothing, never that
->   the capability is absent from this repo.
+> - `Today:` carries evidence, not characterisation: a line read from that path, or the
+>   recorded searches that returned nothing. "Claude Code skills need X" is neither.
+> - Two item forms, shown in the template above. Present anchor: `-> {path}` with a `Found by:`
+>   line naming the search tool and query that surfaced the file, and a quoted body line that
+>   supports the claim and is not a frontmatter field, a link-list or index-table bullet, or a
+>   sample argument inside a code fence — those carry the words without asserting anything. A
+>   reader opens the path and sees the line. Absence anchor: `-> not found by these searches` with
+>   every tool and query run on its `Found by:` line and the result you observed. Never type a
+>   result you did not observe. Zero hits is a finding, not a failure to find one — but it records
+>   that these searches found nothing, never that the capability is absent from this repo.
+> - `Overlaps:` names the repo system or goal the capability touches — the point of the section is
+>   what the repo can learn, reuse, or stop maintaining.
 > - No two items anchor to the same path. Repeating one file across items multiplies a single
 >   observation instead of adding one.
 > - `Change:` has three passing outcomes — a specific edit, `none — {path} already covers it`, or

@@ -62,7 +62,7 @@ Each proposal in the output file uses this structure exactly:
 **Replaces or adds**: {what existing behavior this replaces, or what new capability this adds}
 **Setup cost**: Low (API key only) | Medium (auth + schema) | High (infra change required)
 **Integration surface**: {exact API endpoint, package name, or CLI command from research entry}
-**Absence evidence**: {the narrow and the broader search behind any "no local system does X" claim, each in the A2 command form of `.claude/skills/research-curator/references/extraction-methodology.md` with its match count} | not applicable — this proposal claims no absence
+**Absence evidence**: {every tool and query behind any "no local system does X" claim, with what came back, stated as "not found by these searches"} | not applicable — this proposal claims no absence
 
 ### Why this caller
 
@@ -164,8 +164,7 @@ This agent MUST NOT:
 - Name a caller path that was not opened, or a path to create whose parent directory was not
   opened. Most of this repo's skills live under
   `plugins/*/skills/`, not `.claude/skills/` — a path recalled rather than listed is usually wrong
-- State that no local system does something without the search that shows it. Put both searches
-  and their results in the proposal's Absence evidence field or the skipped table; an unsearched
+- State that no local system does something without the search that shows it. Search by meaning with the best tools your environment offers (`ccc`, graphify, other skills, plugins, MCP servers; else Grep, Glob, or reading files) and put the tools, queries, and results in the proposal's Absence evidence field or the skipped table; an unsearched
   absence proposes building something that may already exist
 - Write anything Gate 6 of `.claude/skills/research-curator/references/entry-review-rubric.md`
   scans for, outside an attributed quotation
