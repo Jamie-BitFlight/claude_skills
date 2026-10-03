@@ -783,7 +783,7 @@ def validate_file(filepath: Path, research_root: Path) -> dict[str, Any]:
     return {"file": relative, "format": fmt, "status": status, "issues": all_issues}
 
 
-_NON_ENTRY_DIRS = frozenset({"insights", "utilization", "design-notes"})
+_NON_ENTRY_DIRS = frozenset({"utilization", "design-notes"})
 
 # Directory-level AI-facing instruction/navigation files, not comprehensive external-tool
 # reference entries -- excluded regardless of which directory under research/ they live in.
@@ -795,10 +795,9 @@ def _is_research_entry(file: Path) -> bool:
 
     Excludes directory-level AI-facing instruction/navigation files (see
     ``_NON_ENTRY_FILENAMES`` -- e.g. ``README.md``, ``CLAUDE.md``, ``AGENTS.md``) and files
-    under non-entry artifact directories such as ``research/insights/``
-    (improvement/utilization reports written by ``research-insight-extractor`` and
-    ``research-utilization-assessor``, which intentionally do not follow the research entry
-    template) and ``research/design-notes/`` (internal design/status notes for this project's
+    under non-entry artifact directories such as ``research/utilization/``
+    (utilization reports written by ``research-utilization-assessor``, which intentionally do
+    not follow the research entry template) and ``research/design-notes/`` (internal design/status notes for this project's
     own features -- working investigations that inform an implementation decision, not
     comprehensive external-tool reference entries).
     """
