@@ -83,18 +83,18 @@ freshness_tracking:
 
 ### {Feature Category 1}
 
-- Feature detail with technical specifics
-- Feature detail with technical specifics
+- {what it does} — {the mechanism}; example and constraints when the source gives them
+- {what it does} — {the mechanism}; example and constraints when the source gives them
 
 ### {Feature Category 2}
 
-- Feature detail with technical specifics
+- {what it does} — {the mechanism}; example and constraints when the source gives them
 
 ---
 
 ## Technical Architecture
 
-How the resource works internally. Include diagrams if helpful.
+Core components by exact source name, data flow or execution model, documented design rationale, extension points. Diagrams if helpful.
 
 ---
 
@@ -172,10 +172,10 @@ Documented limitations, or the low-confidence absence statement from [Entry Qual
 > - The path is repo-relative from the repository root and comes from an anchor record — never
 >   from memory of what a repo like this usually contains.
 > - `Today:` carries evidence, not characterisation: a line read from that path, or the
->   recorded searches that returned nothing. "Claude Code skills need X" is neither.
+>   fixed line `nothing relevant returned` with every search on the `Found by:` line. "Claude Code skills need X" is neither.
 > - Two item forms, shown in the template above. Present anchor: `-> {path}` with a `Found by:`
 >   line naming the search tool and query that surfaced the file, and a quoted body line that
->   supports the claim and is not a frontmatter field, a link-list or index-table bullet, or a
+>   supports the claim (nothing after the closing quote, inner quotes verbatim) and is not a frontmatter field, a link-list or index-table bullet, or a
 >   sample argument inside a code fence — those carry the words without asserting anything. A
 >   reader opens the path and sees the line. Absence anchor: `-> not found by these searches` with
 >   every tool and query run on its `Found by:` line and the result you observed. Never type a
@@ -198,7 +198,7 @@ Documented limitations, or the low-confidence absence statement from [Entry Qual
 > (code-read)`. This distinguishes entries where architectural claims come from source code
 > inspection (verifiable but potentially incomplete) versus official documentation (authoritative
 > but potentially outdated). Sections with mixed sources use the lower confidence level and
-> note both qualifiers: `Architecture: medium (doc + code-read)`.
+> note both qualifiers: `Architecture: medium (doc + code-read)`. A `(code-read)` section is never `high`.
 
 > **Architecture section citations**: When Technical Architecture or Key Features items derive
 > from code analysis, cite the source inline using the format:

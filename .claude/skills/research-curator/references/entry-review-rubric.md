@@ -32,14 +32,14 @@ uv run --script .claude/skills/research-curator/scripts/validate_research.py che
 | Command | What a defect looks like | Record |
 |---|---|---|
 | `fix_research_formatting.py --check` | Non-zero exit — the file needs formatting fixes | Every path the tool named, and the fix it wanted. Run it without `--check`: this review applies fixes, so a path it reformatted is a checked finding |
-| `validate_research.py main --json` | Any issue in the JSON `entries[].issues[]` array except `cross_references_absent`, non-blocking per [Validation Rules](./validation-rules.md) | `errors: N, warnings: N` from `summary`, then every issue's `check`, `severity`, `message`, and `line`, quoted |
+| `validate_research.py main --json` | Any issue in the JSON `entries[].issues[]` array except `cross_references_absent`, non-blocking per [Validation Rules](./validation-rules.md), and except `relevance_anchor_path_missing` for a path `git log --all --full-history` shows moved, which is an `R` line | `errors: N, warnings: N` from `summary`, then every issue's `check`, `severity`, `message`, and `line`, quoted |
 | `validate_research.py check-backlinks ./research` | A residual asymmetric cross-reference involving this entry, or any file the scan could not read or parse | Each object in JSON `edges`, and every object in `skips` when `scan_skipped_files` is non-zero. `--fix` retains the original `edges` and adds repair outcome fields |
 
 A non-zero `scan_skipped_files` field fails this command on its own, because a file dropped from
 the scan was never compared -- exit 0 would claim coverage the scan did not have. Treat those
 paths as Gate 1 defects, not as noise.
 
-**Cross-reference reciprocity** is measured by `check-backlinks`, not by eye, and repaired by the orchestrator; the reviewer reports only a residual pair. An entry that cites B while B does not cite back is a defect against this entry even though the missing row lives in B. Row format: [Cross-Reference Format](./cross-reference-format.md).
+**Cross-reference reciprocity** is measured by `check-backlinks`, not by eye, and repaired by the orchestrator; the reviewer reports only a residual pair. An entry that cites B while B does not cite back is a defect against this entry even though the missing row lives in B. Row format: [Cross-Reference Format](./cross-reference-format.md). A pair whose missing row is in an `--exclude`d or unwritable file is recorded as an unchecked `R` line, not a `D` line; the final verdict block relays unchecked `R` lines to the user, and no worker acts on them.
 
 ---
 
@@ -196,7 +196,7 @@ REPAIRS: {N} found, {N} checked, {N} unchecked
 UNCHECKED: (each unchecked line, verbatim)
 - [ ] D3 | gate {N} | ...
 
-VERDICT: PASS | FAIL
+VERDICT: PASS | FAIL | NOT RUN -- {reason}
 ```
 
 `PASS` requires every gate at PASS and no unchecked defect. Any gate at FAIL or NOT RUN, or any unchecked defect, is `FAIL` — an unchecked defect and a `PASS` verdict cannot both be true. A `NOT RUN` gate is a `FAIL` with no line for the worker; the orchestrator stops on it, naming the gate.

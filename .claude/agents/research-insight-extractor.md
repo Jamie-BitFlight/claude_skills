@@ -17,7 +17,7 @@ Extract improvements from ./research/{category}/{name}.md
 **Output**:
 
 - `./research/insights/{YYYY-MM-DD}-{resource-name}-improvements.md` — improvement proposal file
-- Backlog items created directly for every High or Medium impact improvement found
+- Backlog items created directly for every high-confidence proposal not already tracked
 
 ---
 
@@ -40,7 +40,7 @@ flowchart TD
     MorePatterns -->|Yes| Gap
     MorePatterns -->|No| CheckBacklog[Check existing backlog items<br>to avoid duplicate proposals]
     CheckBacklog --> WriteFile[Write all proposals to<br>./research/insights/YYYY-MM-DD-resource-name-improvements.md]
-    WriteFile --> CreateItems[Create backlog items for High and Medium impact proposals<br>that are not already tracked]
+    WriteFile --> CreateItems[Create backlog items for every high-confidence proposal<br>that is not already tracked]
     CreateItems --> Return([Return structured result])
 ```
 
@@ -278,7 +278,7 @@ IMMEDIATE_ATTENTION:
 - #{issue} {title} — {one sentence why this is worth acting on now}
 ```
 
-`IMMEDIATE_ATTENTION` lists every backlog item that is **high confidence + High impact** (P1 priority). If none qualify, omit the section entirely.
+`IMMEDIATE_ATTENTION` lists every backlog item that is **high confidence + High impact**. If none qualify, omit the section entirely.
 
 If the entry has no Relevance or Patterns section, return `STATUS: no_actionable_patterns` and stop — do not write a file.
 

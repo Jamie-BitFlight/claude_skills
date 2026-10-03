@@ -192,7 +192,7 @@ flowchart TD
     Anchors --> Relevance[Write Relevance items from the anchors:<br>path, quoted line from it, and one of the three Change outcomes<br>—a specific edit, already-covered, or out-of-scope—<br>no anchor means no item]
     Relevance --> Confidence[Assign confidence level per section]
     Confidence --> References[Compile all sources with full URL and access date]
-    References --> Freshness[Set freshness tracking -- next review in 3 months]
+    References --> Freshness[Set freshness tracking -- next review per Setting Next Review in entry-template.md]
     Freshness --> WriteFile[Write entry to ./research/category/resource-name.md]
     WriteFile --> SelfCheck[Self-Check Before Returning]
     SelfCheck --> Done([Return result])
@@ -250,13 +250,14 @@ Audit an entry someone else finished, or the same entry after a `--fix` pass. Re
 
 ## Self-Check Before Returning
 
-Applies to Default and `--rerun` modes, and to `--fix` after its edits. Validate and correct your own entry before you return it; the orchestrator's validation gate and the fresh Entry Review are a second look, never the first. Make at most two correction passes over steps 1-4, then step 5.
+Applies to Default and `--rerun` modes, and to `--fix` after its edits. Validate and correct your own entry before you return it; the orchestrator's validation gate and the fresh Entry Review are a second look, never the first. Make at most two correction passes over steps 1-5, then step 6.
 
-1. Run `fix_research_formatting.py`, then `validate_research.py main --json`, on your file (both in `.claude/skills/research-curator/scripts/`). Fix every error and every warning except `cross_references_absent`. Fix a refuted anchor by re-running the search behind it, never by editing a count or path by hand.
-2. Re-find every Relevance quote in its cited file. A quote is a body line that supports the item's claim, per the anchor rules in [Entry Template](.claude/skills/research-curator/references/entry-template.md); an item with no `Found by:` line is rejected.
+1. Run `fix_research_formatting.py`, then `validate_research.py main --json`, on your file (both in `.claude/skills/research-curator/scripts/`). Fix every error, and every warning the invocation listed or the [Validation Gate](.claude/skills/research-curator/references/validation-rules.md#validation-gate-for-newrefreshed-entries) names. Fix a refuted anchor by re-running the search behind it, never by editing a count or path by hand.
+2. Re-find every Relevance quote in its cited file. A quote is a body line that supports the item's claim, per the anchor rules in [Entry Template](.claude/skills/research-curator/references/entry-template.md); an item with no `Found by:` line is rejected (an entry written before this shape carries `Term:` or a recorded `git grep` instead; leave those items unless the pass found a stale anchor).
 3. Check the `confidence_map` covers every major section (Rule 4), and that a section resting on code you read is not rated `high`.
 4. List each version, figure, license, install command, and architecture assertion with the extract it came from; delete any that has none.
-5. Report anything still unfixed on an `UNRESOLVED:` line in the result, with the exact text. Never report Status `created`, `updated`, or `fixed` over an unresolved error; use `failed`.
+5. Scan the entry for the Gate 6 triggers in [Entry Review Rubric](.claude/skills/research-curator/references/entry-review-rubric.md) and rewrite each hit outside an attributed quotation.
+6. Report anything still unfixed on an `UNRESOLVED:` line in the result, with the exact text. Never report Status `created`, `updated`, or `fixed` over an unresolved error; use `failed`.
 
 ---
 
@@ -268,7 +269,7 @@ When a primary source cannot be fetched:
 
 1. Report explicitly: "Unable to access {URL}: {reason — HTTP 404 | timeout | auth required | etc.}"
 2. Do NOT guess or infer content from the URL path, domain, or page title.
-3. Do NOT proceed to write content for a section if the required source was inaccessible.
+3. Write a section whose source was inaccessible in Rule 3 language, with no inferred content.
 4. Document the inaccessibility in the entry's References section with the exact error.
 5. If fallback sources exist (e.g., GitHub README when docs site is down), fetch those and note the fallback in the entry.
 
