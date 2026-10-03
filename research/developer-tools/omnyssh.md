@@ -261,7 +261,7 @@ The app opens with an empty dashboard. It reads existing `~/.ssh/config` at star
 
 - **PTY multiplexing and session management** -> `AGENTS.md`
   - Term: `PTY`
-  - Today: "On a TTY error (`Inappropriate ioctl for device`, `not a terminal`, `ENOTTY`), or before running any tool that requires a TTY (including `git rebase -i`/`git add -i`), read `rules/interactive-terminal-workarounds.md` for PTY providers and non-interactive equivalents."
+  - Today: "`rules/interactive-terminal-workarounds.md` for PTY providers and non-interactive equivalents."
   - Change: already covered — `rules/interactive-terminal-workarounds.md` (lines 7-20) documents tmux as the current PTY provider for Claude Code. OmnySSH's vt100 screen model is a Rust library inside a GUI/TUI SSH client, not a callable tool for agent orchestration.
 
 - **Real-time metrics and monitoring** -> `rules/ci-workflows.md`
@@ -271,7 +271,7 @@ The app opens with an empty dashboard. It reads existing `~/.ssh/config` at star
 
 - **Event system architecture for async communication** -> `plugins/plugin-creator/skills/hook-creator/SKILL.md`
   - Term: `event system`
-  - Today: Lines 10+ document hook creation for Claude Code's harness-defined event system. Hooks consume session lifecycle events for validation and context injection.
+  - Today: "Create hooks that integrate with the Claude Code event system. Hooks automate validation, enforcement, and context injection across the session lifecycle."
   - Change: out-of-scope — the verified observation is that `plugins/plugin-creator/skills/hook-creator/SKILL.md` describes hooks that "integrate with the Claude Code event system", i.e. consuming events the Claude Code harness defines, whereas `CoreEvent` is an in-process Rust enum sent over a `tokio` `mpsc` channel inside OmnySSH. The file gives no edit target for that pattern. No repository-wide claim about event buses is made here.
 
 ### Patterns Worth Adopting

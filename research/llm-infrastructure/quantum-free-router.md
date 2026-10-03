@@ -405,4 +405,5 @@ The separation of policy (fallback ordering in `configs/certification-models.txt
 | [localai](./localai.md) | llm-infrastructure | alternative local LLM serving: free-tier endpoint without multi-provider aggregation |
 | [tensorzero](./tensorzero.md) | llm-infrastructure | similar gateway problem: industrial-grade LLM routing with A/B testing and latency optimization |
 | [openbao](./openbao.md) | llm-infrastructure | complementary infrastructure: secret engine for managing provider API keys and credential rotation |
+| [magnitude](./magnitude.md) | llm-infrastructure | referenced by magnitude (llm-infrastructure) |
 

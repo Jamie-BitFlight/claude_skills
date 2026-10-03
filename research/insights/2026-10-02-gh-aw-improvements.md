@@ -19,7 +19,7 @@ is reclassified from "already covered" to "out of scope".
 
 | Pattern | Confidence | Reason |
 |---|---|---|
-| Safe-outputs: the agent emits structured JSON and a separately permissioned job validates it against declared permissions before writing (Key Features > Security & Sandboxing; Technical Architecture > Safe-Outputs Framework) | low | The Relevance section does not name this pattern. I inferred it from Key Features myself, so it is not grounded in a Relevance passage. The nearest local analog is the dh backlog MCP server (`plugins/development-harness/backlog_core/`), the only path agents use to write to the backlog. I did not examine whether it splits proposal from validated execution. To raise confidence, have the research entry name a concrete local target, and read the backlog write path to check whether a validate-then-execute split is absent. |
+| Safe-outputs: the agent emits structured JSON and a separately permissioned job validates it against declared permissions before writing (Key Features > Security & Sandboxing; Technical Architecture > Safe-outputs job generation) | low | The Relevance section does not name this pattern. I inferred it from Key Features myself, so it is not grounded in a Relevance passage. The nearest local analog is the dh backlog MCP server (`plugins/development-harness/backlog_core/`). I did not examine whether it splits proposal from validated execution. To raise confidence, have the research entry name a concrete local target, and read the backlog write path to check whether a validate-then-execute split is absent. |
 
 ---
 

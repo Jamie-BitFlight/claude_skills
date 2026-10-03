@@ -349,3 +349,4 @@ Unit tests via `pytest` (configured in `pyproject.toml` with `asyncio_mode = "au
 | [polars-documentation](./polars-documentation.md) | data-infrastructure | referenced by polars-documentation (data-infrastructure) |
 | [airllm](../llm-infrastructure/airllm.md) | llm-infrastructure | referenced by airllm (llm-infrastructure) |
 | [pageindex](../context-management/pageindex.md) | context-management | referenced by pageindex (context-management) |
+| [vector](./vector.md) | data-infrastructure | referenced by vector (data-infrastructure) |
