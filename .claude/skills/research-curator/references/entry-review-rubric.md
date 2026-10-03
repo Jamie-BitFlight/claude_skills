@@ -9,13 +9,13 @@ Writing an entry rather than reviewing one? Use [Entry Quality Standards](./entr
 - The entry: `./research/{category}/{name}.md`
 - Cited entries, when the entry added cross-references to them
 
-The rubric reviews the entry itself and checks no claim about this repository ([scope](./entry-quality-standards.md#scope)).
+The rubric reviews the entry itself ([scope](./entry-quality-standards.md#scope)). Gates 2-4 skip a pre-existing `## Relevance to Claude Code Development` section and any popularity-statistics block (`Key Statistics`): neither is scanned, mapped or counted, and the worker leaves both as found.
 
 **Completion criterion**: every gate below has been run and its result recorded. A gate you skipped is a gate that FAILED — record it as `NOT RUN` with the reason, never as a pass.
 
-**Defect** = a finding the entry's author controlled: text that was wrong when it was written. Record every defect as `{file}:{line} — {gate} — {exact quoted text} — {required correction}`. Quote the offending text verbatim; paraphrase loses the reviewer's evidence.
+**Defect** = a finding in the entry or a file the reviewer may write. Record every defect as `{file}:{line} — {gate} — {exact quoted text} — {required correction}`. Quote the offending text verbatim; paraphrase loses the reviewer's evidence.
 
-**Repair** = a finding the author could not have controlled: text that was accurate when written and that a later repository change invalidated. Record every repair as `{file}:{line} — {gate} — {exact quoted text} — {the change that invalidated it} — {required correction}`, and count repairs separately from defects. A repair schedules work against the citing file and leaves the verdict where it stood.
+**Repair** = a finding in a file the reviewer may not write, such as a missing backlink row in an `--exclude`d file. The orchestrator appends each `R` line from the repair result; the reviewer does not write or act on it. Format: `{file}:{line} — {gate} — {exact quoted text} — {required correction}`. Repairs are counted apart from defects and leave the verdict where it stood.
 
 ---
 
@@ -32,14 +32,14 @@ uv run --script .claude/skills/research-curator/scripts/validate_research.py che
 | Command | What a defect looks like | Record |
 |---|---|---|
 | `fix_research_formatting.py --check` | Non-zero exit — the file needs formatting fixes | Every path the tool named, and the fix it wanted. Run it without `--check`: this review applies fixes, so a path it reformatted is a checked finding |
-| `validate_research.py main --json` | Any issue in the JSON `entries[].issues[]` array except `cross_references_absent`, non-blocking per [Validation Rules](./validation-rules.md) | `errors: N, warnings: N` from `summary`, then every issue's `check`, `severity`, `message`, and `line`, quoted |
+| `validate_research.py main --json` | Any issue in the JSON `entries[].issues[]` array except `cross_references_absent`, non-blocking per [Validation Rules](./validation-rules.md) | Counts of blocking issues only (`cross_references_absent` excluded, so they can differ from `summary`): `errors: N, warnings: N`, then every blocking issue's `check`, `severity`, `message`, and `line`, quoted |
 | `validate_research.py check-backlinks ./research` | A residual asymmetric cross-reference involving this entry, or any file the scan could not read or parse | Each object in JSON `edges`, and every object in `skips` when `scan_skipped_files` is non-zero. `--fix` retains the original `edges` and adds repair outcome fields |
 
 A non-zero `scan_skipped_files` field fails this command on its own, because a file dropped from
 the scan was never compared -- exit 0 would claim coverage the scan did not have. Treat those
 paths as Gate 1 defects, not as noise.
 
-**Cross-reference reciprocity** is measured by `check-backlinks`, not by eye, and repaired by the orchestrator; the reviewer reports only a residual pair. An entry that cites B while B does not cite back is a defect against this entry even though the missing row lives in B. Row format: [Cross-Reference Format](./cross-reference-format.md). A pair whose missing row is in an `--exclude`d or unwritable file is recorded as an unchecked `R` line, not a `D` line; the final verdict block relays unchecked `R` lines to the user, and no worker acts on them.
+**Cross-reference reciprocity** is measured by `check-backlinks`, not by eye, and repaired by the orchestrator; the reviewer reports only a residual pair. An entry that cites B while B does not cite back is a defect against this entry even though the missing row lives in B. Row format: [Cross-Reference Format](./cross-reference-format.md). A pair whose missing row is in an `--exclude`d or unwritable file is an `R` line, not a `D` line; the final verdict block relays `R` lines to the user, and no worker acts on them.
 
 ---
 
@@ -50,9 +50,10 @@ Each rule in [Entry Quality Standards](./entry-quality-standards.md) is a separa
 | Check | Question | Defect |
 |---|---|---|
 | **Rule 1 — Read Before Writing** | Does every section's content trace to a source listed in References, and was that source actually reachable? | A claim whose only possible basis is the resource's name, URL path, or domain. An inaccessible source whose absence is not stated in References |
-| **Rule 2 — Preserve Counts** | Are capability figures written as the exact number the source gives? | A vague quantifier ("many languages", "recent release", "low latency") standing where the source has a figure |
+| **Rule 2 — Preserve Counts** | Are capability figures written as the exact number the source gives, and every snapshot (version, figure, status) written with the date it was read? | A vague quantifier ("many languages", "recent release", "low latency") standing where the source has a figure. A snapshot written without its date |
 | **Rule 3 — Absence vs Nonexistence** | Where information was not found, does the entry say it was not found? | "Doesn't support X" / "Not available" / "Not supported" where the honest statement is "Not mentioned in documentation" or "Unable to access {source}". |
 | **Rule 4 — Explicit Confidence** | Does every major section carry a confidence level in the confidence map? | A section missing from the map. A `high` on a section whose sources are informal, partial, contradictory, or code-read |
+| **Scope** | Is the entry a summary of the researched resource only? | A claim about this repository, or a Relevance section, in a new entry |
 
 ---
 
@@ -62,7 +63,7 @@ Score each section against its bar in [Entry Quality Standards](./entry-quality-
 
 | Section | Passes when | Defect |
 |---|---|---|
-| **Technical Architecture** | Names components with their exact source names, describes data flow or execution model, and names extension or integration points | "Uses a plugin-based architecture" with no component named and no mechanism given |
+| **Technical Architecture** | Names components with their exact source names, describes data flow or execution model, names extension or integration points, and gives the documented design rationale or the Rule 3 absence statement | "Uses a plugin-based architecture" with no component named and no mechanism given |
 | **Key Features** | Each feature states what it does AND the mechanism by which it does it | A feature list that is a list of outcomes with no mechanism |
 | **Installation & Usage** | At least one complete example taken verbatim or near-verbatim from official docs; install command verified against official docs | An install command assembled from a guessed package name. A usage example with no source behind it |
 | **Limitations and Caveats** | Present, with either documented limitations or the explicit low-confidence absence statement | Section missing, empty, or filled with "N/A" |
@@ -108,9 +109,11 @@ One per entry, at the path the invocation names, kept across rounds; the reviewe
 
 `D` marks a defect, `R` a repair; ids stay fixed across rounds. The reviewer writes only the entry and this document.
 
+**Loop**: a sonnet reviewer and a haiku worker share this document. The orchestrator runs at most 5 review rounds and stops early when a round's unchecked `D` ids equal the previous round's (`R` lines are excluded from the comparison). A `FAIL` after either stop is reported `UNRESOLVED`, a process defect of the instructions, not of the entry.
+
 **Fix with no additional research:** reword; restructure; add a missing section from material already in the entry or in files already cited or opened; fix a quote re-found in a file already available; remove a claim that cannot be sourced. Re-running a recorded command to check it is verification, not research.
 
-**Leave unchecked** any correction that needs data gathering to validate — fetching upstream sources — with `needs:` stating the data. A finding in a file outside the writable set is also left unchecked, naming that file.
+**Leave unchecked** any correction that needs data gathering to validate — fetching upstream sources — with `needs:` stating the data. A finding in a file outside the writable set is an `R` line, not a `D` line.
 
 **Rounds after the first** (the invocation says which): review the worker's changes and research, not only the lines. Run every gate over the files again and check each `did:` note against the file and the source it cites; a checked line whose fix is absent or wrong reopens unchecked. Add a line only for a defect a gate defines; prose no gate names is not a finding. A closed finding set is what lets rounds converge. A gate whose findings recur across rounds marks creator and reviewer instructions that disagree; the orchestrator reports its id.
 
@@ -128,7 +131,7 @@ GATE 1 mechanical:    PASS | FAIL | NOT RUN ({reason})
   fix_research_formatting:         exit {N}
   validate_research main --json:   orchestrator | errors {N}, warnings {N}
   check-backlinks:                 orchestrator | {N} asymmetric pairs, {N} scan-skipped files
-GATE 2 fidelity:      PASS | FAIL — rules failed: {1|2|3|4}
+GATE 2 fidelity:      PASS | FAIL — rules failed: {1|2|3|4|Scope}
 GATE 3 depth:         PASS | FAIL — sections failed: {names}
 GATE 4 triggers:      PASS | FAIL — triggers hit: {names}
 
@@ -138,9 +141,9 @@ REPAIRS: {N} found, {N} checked, {N} unchecked
 UNCHECKED: (each unchecked line, verbatim)
 - [ ] D3 | gate {N} | ...
 
-VERDICT: PASS | FAIL | NOT RUN -- {reason}
+VERDICT: PASS | FAIL | FAIL -- NOT RUN: {reason}
 ```
 
-`PASS` requires every gate at PASS and no unchecked defect. Any gate at FAIL or NOT RUN, or any unchecked defect, is `FAIL` — an unchecked defect and a `PASS` verdict cannot both be true. A `NOT RUN` gate is a `FAIL` with no line for the worker; the orchestrator stops on it, naming the gate.
+`PASS` requires every gate at PASS and no unchecked defect. Any gate at FAIL or NOT RUN, or any unchecked defect, is `FAIL` — an unchecked defect and a `PASS` verdict cannot both be true. A `NOT RUN` gate gives `FAIL -- NOT RUN: {reason}` with no line for the worker; the orchestrator stops on it, naming the gate.
 
-An unchecked repair is work scheduled against the citing file and is set aside: an entry whose only unchecked lines are repairs is `PASS` and keeps its README row. A gate whose only findings are repairs is `PASS`.
+An `R` line is set aside: an entry whose only unchecked lines are `R` lines is `PASS` and keeps its README row. A gate whose only findings are `R` lines is `PASS`.

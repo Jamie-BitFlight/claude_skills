@@ -94,30 +94,21 @@ Trigger: `<mode_args/>` contains a URL with no flags.
    ```
 
 4. **Wait** for structured result (status, file path, category, key findings)
-5. **Validate** -- the curator self-checks and corrects its own entry before returning, so this gate confirms that check rather than driving the fix loop. If research status is not `failed`, run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries) on the created or refreshed file. On its "mark issues" outcome: mark entry as "created with issues" (or "refreshed with issues" when step 2 routed to `--rerun`), skip steps 6–7, and report to user with the exact error or warning text from validator JSON. On its "proceed" outcome, continue to step 6.
+5. **Validate** -- the curator self-checks and corrects its own entry before returning, so this gate confirms that check rather than driving the fix loop. If research status is not `failed`, run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries) on the created or refreshed file. On its "mark issues" outcome: mark entry as "created with issues" (or "refreshed with issues" when step 2 routed to `--rerun`), skip steps 6–8, and report to user with the exact error or warning text from validator JSON. On its "proceed" outcome, continue to step 6.
 
-6. **Spawn three tasks concurrently** -- if research status is not `failed`. The first two run the [Overlap Scan](./references/integration-opportunity-search.md) and file GitHub issues; the third links entries:
+6. **Cross-reference** -- if research status is not `failed`, spawn the linker and relay its `CROSS_REFERENCES_ADDED` count:
 
    ```text
-   a. Agent tool parameters:
-        agent: .claude/agents/research-insight-extractor.md
-        prompt: "Extract improvements from {file-path-from-agent-result}"
-
-   b. Agent tool parameters:
-        agent: .claude/agents/research-utilization-assessor.md
-        prompt: "Assess utilization opportunities from {file-path-from-agent-result}"
-
-   c. Agent tool parameters:
-        agent: .claude/agents/research-cross-referencer.md
-        prompt: "Add cross-references to {file-path-from-agent-result}"
+   Agent tool parameters:
+     agent: .claude/agents/research-cross-referencer.md
+     prompt: "Add cross-references to {file-path-from-agent-result}"
    ```
 
-7. **Wait, surface, review** -- collect structured return blocks from each step 6 task, then run [Entry Review](#entry-review) on the entry:
+7. **Review** -- run [Entry Review](#entry-review) on the entry
 
-   - **Insight and utilization**: relay each `ISSUES` entry as `#{number} {url}`, and `EXISTING` and `UNFILED` verbatim. If `STATUS: no_findings`, report "No overlap findings." If `STATUS: no_utilization_surface`, report "No direct utilization surface found."
-   - **Cross-references**: relay `CROSS_REFERENCES_ADDED` count.
+8. **Overlap Scan** -- when step 2 found no existing entry and Entry Review returned PASS, run the [Overlap Scan](#overlap-scan)
 
-8. **Post-actions** -- lint, commit, push (see [Post-Actions](#post-actions))
+9. **Post-actions** -- lint, commit, push (see [Post-Actions](#post-actions))
 
 ### Error Handling
 
@@ -146,14 +137,14 @@ Apply the [Duplicate Detection](./references/duplicate-detection.md) check per U
 
 ### Wave Spawning
 
-Spawn up to 5 `@research-curator` agents per wave via Agent tool. Wait for all agents in the current wave before spawning the next. After all waves complete, for each successful entry, run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries). On its "mark issues" outcome: mark entry as "created with issues" (or "refreshed with issues" when the URL matched an existing entry), skip analysis agents for that entry, and include the exact error or warning text in the output report. On its "proceed" outcome: spawn concurrent analysis agents — `@research-insight-extractor`, `@research-utilization-assessor`, and `@research-cross-referencer` (up to 5 entries processed concurrently, each with its own set of analysis agents). After every analysis agent has returned and the wave counts are reported, run [Entry Review](#entry-review) on each entry that reached the analysis agents.
+Spawn up to 5 `@research-curator` agents per wave via Agent tool. Wait for all agents in the current wave before spawning the next. After all waves complete, for each successful entry, run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries). On its "mark issues" outcome: mark entry as "created with issues" (or "refreshed with issues" when the URL matched an existing entry), skip cross-referencing, review, and scan for that entry, and include the exact error or warning text in the output report. On its "proceed" outcome: spawn `@research-cross-referencer` (up to 5 entries concurrently). After every cross-referencer has returned, run [Entry Review](#entry-review) on each entry that reached it, then the [Overlap Scan](#overlap-scan) on each created entry whose review returned PASS.
 
 ### Progress Reporting
 
 After each wave, relay exact counts and exact failure reasons from agent output:
 
 ```text
-Wave N complete: M/N succeeded
+Wave W complete: M/K succeeded
   created    -- category/resource-name.md
   refreshed  -- category/resource-name.md (was N days old)
   failed     -- https://url.com -- {exact reason from agent}
@@ -173,24 +164,24 @@ Trigger: `<mode_args/>` contains `--rerun`.
 flowchart TD
     Start(["Parse --rerun argument value"]) --> Q{"What is the --rerun target value?"}
     Q -->|"category/name — single entry path"| VerifyFile{"Does ./research/category/name.md exist?"}
-    Q -->|"all — re-research every entry"| FindAll["Glob ./research/**/*.md<br>excluding README.md — collect all entry paths"]
+    Q -->|"all — re-research every entry"| FindAll["Run validate_research.py main --json ./research<br>collect entries[].file as the entry paths"]
     VerifyFile -->|"No — file not found"| Missing(["Report error: entry not found at path. Stop."])
     VerifyFile -->|"Yes — file exists"| Spawn1["Spawn @research-curator via Agent tool<br>prompt: --rerun ./research/category/name.md"]
     Spawn1 --> RelayCheck1["Apply the Agent Result Relay Rules"]
     RelayCheck1 --> Validate1["Run the Validation Gate for New/Refreshed Entries<br>(validation-rules.md) on this file"]
-    Validate1 -->|"errors, or gated warnings remain<br>after --fix retry"| Issues1(["Mark entry refreshed with issues<br>Skip analysis agents for it<br>No README date refresh for it<br>Report exact issue text to user"])
-    Validate1 -->|"clean"| SpawnAnalysis1["Concurrently spawn analysis agents:<br>@research-insight-extractor 'Extract improvements from ./research/category/name.md'<br>@research-utilization-assessor 'Assess utilization opportunities from ./research/category/name.md'<br>@research-cross-referencer 'Add cross-references to ./research/category/name.md'"]
+    Validate1 -->|"errors, or gated warnings remain<br>after --fix retry"| Issues1(["Mark entry refreshed with issues<br>Skip cross-referencing and review for it<br>No README date refresh for it<br>Report exact issue text to user"])
+    Validate1 -->|"clean"| SpawnXref1["Spawn @research-cross-referencer<br>'Add cross-references to ./research/category/name.md'"]
     FindAll --> WaveSpawn["Spawn @research-curator agents in waves of 5<br>each receives --rerun ./research/category/name.md<br>wait for each wave before spawning next"]
     WaveSpawn --> RelayCheck2["Apply the Agent Result Relay Rules<br>to all wave results"]
     RelayCheck2 --> ValidateN["Run the Validation Gate for New/Refreshed Entries<br>(validation-rules.md) on each updated entry"]
-    ValidateN -->|"an entry has errors, or gated<br>warnings remain after --fix retry"| IssuesN["Mark that entry refreshed with issues<br>Skip analysis agents for it<br>No README date refresh for it<br>Include exact issue text in report"]
-    ValidateN -->|"clean entries"| SpawnAnalysisN["For each updated entry (concurrent, up to 5 entries)<br>spawn analysis agents per entry:<br>@research-insight-extractor<br>@research-utilization-assessor<br>@research-cross-referencer"]
-    SpawnAnalysis1 --> WaitAnalysis1["Wait for all agents<br>Report filed issue numbers and URLs<br>Report cross-references added count"]
-    WaitAnalysis1 --> Review1["Run Entry Review: backlink repair first,<br>then the review loop on ./research/category/name.md"]
+    ValidateN -->|"an entry has errors, or gated<br>warnings remain after --fix retry"| IssuesN["Mark that entry refreshed with issues<br>Skip cross-referencing and review for it<br>No README date refresh for it<br>Include exact issue text in report"]
+    ValidateN -->|"clean entries"| SpawnXrefN["For each updated entry (concurrent, up to 5 entries)<br>spawn @research-cross-referencer"]
+    SpawnXref1 --> WaitXref1["Wait for the agent<br>Report cross-references added count"]
+    WaitXref1 --> Review1["Run Entry Review: backlink repair first,<br>then the review loop on ./research/category/name.md"]
     Review1 --> PostActions(["Execute Post-Actions — lint, commit, push"])
     Issues1 --> PostActions
-    SpawnAnalysisN --> WaitAnalysisN["Wait for all analysis agents<br>Report filed issue numbers and URLs<br>Report total cross-references added"]
-    WaitAnalysisN --> ReviewN["Run Entry Review: backlink repair once,<br>then the review loop on each entry that reached analysis<br>one loop per entry, in waves of 5"]
+    SpawnXrefN --> WaitXrefN["Wait for all agents<br>Report total cross-references added"]
+    WaitXrefN --> ReviewN["Run Entry Review: backlink repair once,<br>then the review loop on each entry that reached cross-referencing<br>one loop per entry, in waves of 5"]
     ReviewN --> PostActions
     IssuesN --> PostActions
 ```
@@ -209,16 +200,18 @@ refresh, never a clean one.
 
 Trigger: `<mode_args/>` contains `--validate`.
 
-`validate_research.py` checks each entry against [Validation Rules](./references/validation-rules.md) and emits JSON keyed by the severities that reference defines.
+`validate_research.py` checks each entry against [Validation Rules](./references/validation-rules.md) and emits JSON keyed by entry (`entries[].issues[]`, each with the severity that reference defines).
 
 ```mermaid
 flowchart TD
     Start(["Parse --validate argument value"]) --> Q{"What is the --validate target value?"}
     Q -->|"category/name — single entry path"| RunScript["Run validate_research.py --json<br>on ./research/category/name.md"]
     Q -->|"all — validate every entry"| RunScriptAll["Run validate_research.py --json<br>on ./research/ directory"]
-    RunScript --> ParseJSON["Parse JSON output<br>Extract issues keyed by severity: error, warning<br>Count totals per severity"]
+    RunScript --> ParseJSON["Parse JSON output<br>Group entries[].issues[] by severity: error, warning<br>Count totals per severity"]
     RunScriptAll --> ParseJSON
-    ParseJSON --> HasErrors{"Does parsed output contain<br>any error-severity issues?"}
+    ParseJSON --> Zero{"summary.total is 0?"}
+    Zero -->|"Yes — target matched no entry"| ZeroFail(["Report failure: validator scanned 0 entries. Stop."])
+    Zero -->|"No"| HasErrors{"Does parsed output contain<br>any error-severity issues?"}
     HasErrors -->|"Yes — N error-severity issues found"| SpawnFix["Spawn @research-curator agents in waves of 5<br>Each agent receives --fix flag<br>PLUS the exact error list for that entry from JSON output<br>(not a summary — the raw issue text)"]
     HasErrors -->|"No — zero error-severity issues"| ReportClean["Report: all entries passed. Include the exact warning count."]
     SpawnFix --> RelayCheck["Apply the Agent Result Relay Rules<br>to all fix-agent results"]
@@ -230,7 +223,8 @@ flowchart TD
 ### Script Invocation
 
 ```bash
-uv run .claude/skills/research-curator/scripts/validate_research.py main --json ./research/{target}
+uv run .claude/skills/research-curator/scripts/validate_research.py main --json ./research/{target}.md   # single entry
+uv run .claude/skills/research-curator/scripts/validate_research.py main --json ./research/                  # all
 ```
 
 ### Issue Handling
@@ -260,8 +254,8 @@ report. [Failure Recovery](./references/batch-mode.md#failure-recovery) does not
 
 ## Entry Review
 
-Runs in Default, Batch, and Rerun Mode, once that mode's analysis agents have all returned and
-before Post-Actions. Loops each entry this run created or refreshed through review and correction against [Entry Review Rubric](./references/entry-review-rubric.md), which the agents load.
+Runs in Default, Batch, and Rerun Mode, once that mode's cross-referencer has returned and
+before the Overlap Scan and Post-Actions. Loops each entry this run created or refreshed through review and correction against [Entry Review Rubric](./references/entry-review-rubric.md), which the agents load.
 
 **Repair reciprocity first.** `@research-cross-referencer` writes forward links only, so the vault is
 asymmetric the moment it returns, and the rubric's Gate 1 scores an asymmetric pair as a defect
@@ -270,7 +264,7 @@ Run the [Post-Actions](#post-actions) step 2 backlink repair, handling its four 
 as step 2 specifies, before spawning any review. The loop below writes entries afterwards, so
 Post-Actions step 2 always runs its own scan too.
 
-Then run the loop per entry, entries in waves of 5, matching the analysis fan-out. One loop per
+Then run the loop per entry, entries in waves of 5. One loop per
 entry, never one across a batch: the verdict block is per-entry. The scratch document `.tmp/scratch/reports/{category}-{name}-review.md`
 ([Findings Document](./references/entry-review-rubric.md#findings-document)) carries the entry's
 findings through every round.
@@ -283,12 +277,12 @@ instructions that tell the curator what to create and the reviewer what to check
 
 ```mermaid
 flowchart TD
-    Start(["Entry reached the analysis agents"]) --> Review["Spawn the reviewer, model sonnet<br>--review, scratch document, Round N"]
+    Start(["Entry reached cross-referencing"]) --> Review["Spawn the reviewer, model sonnet<br>--review, scratch document, Round N"]
     Review --> Gate["Run the Validation Gate checks on the entry<br>without its fix retry<br>append each remaining error and gated warning<br>not yet listed to the scratch document as an unchecked D line"]
     Gate --> Q{"Reviewer verdict PASS<br>and no unchecked D line?"}
-    Q -->|"Yes"| Pass(["PASS — continue to Post-Actions"])
+    Q -->|"Yes"| Pass(["PASS — continue to the Overlap Scan (created entries) or Post-Actions"])
     Q -->|"No"| Stop{"FAIL with no unchecked D line,<br>same unchecked ids as the previous round,<br>or the 5th review?"}
-    Stop -->|"Yes"| Unresolved(["UNRESOLVED — mark the entry created/refreshed with issues<br>withhold its README row<br>report the unchecked lines verbatim, the gate ids that recurred across rounds,<br>and the scratch path as a process defect"])
+    Stop -->|"Yes"| Unresolved(["UNRESOLVED — mark the entry created/refreshed with issues, no Overlap Scan<br>report the unchecked lines verbatim, the gate ids that recurred across rounds,<br>and the scratch path as a process defect"])
     Stop -->|"No"| Fix["Spawn the worker, model haiku<br>--fix, scratch document"]
     Fix --> Gate2["Run the Validation Gate checks as above"]
     Gate2 --> Review
@@ -315,16 +309,44 @@ reason and any unchecked lines already in the document. A worker that fails or t
 nothing; the next review runs anyway.
 
 An entry the validation gate already marked "created with issues" or "refreshed with issues" is not
-reviewed this run -- it never reached the analysis agents. It is reviewed by whichever later `--rerun`
+reviewed this run -- it never reached cross-referencing. It is reviewed by whichever later `--rerun`
 clears its validation issues.
 
 Relay the final round's verdict block verbatim under the [Agent Result Relay Rules](#agent-result-relay-rules)
 under an `### Entry Review Verdicts` heading in the mode's [Output Format](#output-format) report,
 with the scratch document path. An UNRESOLVED entry lists its unchecked lines there, exactly as
 written, names the gate ids whose findings recurred across rounds, and relays the stop to the user as
-a process defect so the misalignment can be traced. Post-Actions then withholds its README row and date (step 1).
+a process defect so the misalignment can be traced.
 
 </entry_review>
+
+---
+
+<overlap_scan>
+
+## Overlap Scan
+
+A one-off per [Overlap Scan](./references/overlap-scan.md), run once when an entry is first created: Default Mode when step 2 found no existing entry, Batch Mode for created entries. It runs after [Entry Review](#entry-review) returns PASS, so issues cite reviewed text. Refreshed, UNRESOLVED, and marked-with-issues entries get no scan.
+
+Spawn both concurrently, then relay:
+
+```text
+Agent tool parameters:
+  agent: .claude/agents/research-insight-extractor.md
+  prompt: "Run the Overlap Scan (insight lens) on {file-path}"
+
+Agent tool parameters:
+  agent: .claude/agents/research-utilization-assessor.md
+  prompt: "Run the Overlap Scan (utilization lens) on {file-path}"
+```
+
+Relay rule for every mode, under the [Agent Result Relay Rules](#agent-result-relay-rules):
+
+- Relay each `ISSUES` entry as `#{number} {url}`, and `EXISTING`, `UNFILED`, `ROUTE_FAILURES`, `SURFACES_FOUND`, and `REASON` verbatim.
+- `STATUS: no_findings` -- report "No overlap findings." `STATUS: no_utilization_surface` -- report "No direct utilization surface found."
+- `STATUS: failed`, or a timeout with no return -- relay the exact reason and report the scan as failed. Do not re-spawn it: an agent may already have filed issues, and a retry would duplicate them.
+
+</overlap_scan>
 
 ---
 
@@ -437,6 +459,10 @@ Commit message actions by mode:
 - Rerun -- `refresh {resource-name|N entries}`
 - Validate -- `fix validation issues in {resource-name|N entries}`
 
+An entry marked "created with issues" or "refreshed with issues" (validation gate or UNRESOLVED) is
+committed and pushed with the filtered list; only its README row is withheld. Append ` (with issues)`
+to the action, or ` ({R} with issues)` when it names a count.
+
 </post_actions>
 
 ---
@@ -458,7 +484,12 @@ Report to user after any mode completes. Apply the [Agent Result Relay Rules](#a
 **README Updated**: Yes | No -- entry marked with issues, row withheld
 **Entry Review**: PASS -- N findings fixed | UNRESOLVED -- N unchecked, marked with issues (scratch: {path})
 **Cross-References Added**: N
-**Overlap Issues**: #N {url}, ... | none
+**Overlap Issues**: #N {url}, ... | none | not run -- {reason}
+**Overlap EXISTING**: {issue numbers} | none
+**Overlap UNFILED**: {findings} | none
+
+### Entry Review Verdicts
+{final verdict block, verbatim}
 
 ### Key Findings
 - Finding 1
@@ -478,9 +509,16 @@ YYYY-MM-DD
 **Created**: Y new entries
 **Refreshed**: Z existing entries
 **Failed**: W
-**README Updated**: Yes -- rows withheld for R entries marked with issues
+**README Updated**: Yes -- rows withheld for V + R entries marked with issues
+**With issues (validation gate)**: V
 **Entry Review**: A PASS, R UNRESOLVED (marked with issues)
+**Cross-References Added**: N
 **Overlap Issues**: #N {url}, ... | none
+**Overlap EXISTING**: {issue numbers} | none
+**Overlap UNFILED**: {findings} | none
+
+### Entry Review Verdicts
+{final verdict block per entry, verbatim}
 
 ### Entries Created
 - ./research/{category}/{name}.md
@@ -499,8 +537,12 @@ YYYY-MM-DD
 
 **Refreshed**: N entries
 **Changes Detected**: M entries had updated data
+**With issues (validation gate)**: V
 **Entry Review**: A PASS, R UNRESOLVED (marked with issues)
-**Overlap Issues**: #N {url}, ... | none
+**Cross-References Added**: N
+
+### Entry Review Verdicts
+{final verdict block per entry, verbatim}
 
 ### Updated Entries
 - ./research/{category}/{name}.md -- {what changed}
@@ -515,7 +557,6 @@ YYYY-MM-DD
 **Passed**: N
 **Errors**: N found (M auto-fixed)
 **Warnings**: N
-**Info**: N
 
 ### Fixes Applied
 - ./research/{category}/{name}.md -- {exact issue fixed, from validator JSON}

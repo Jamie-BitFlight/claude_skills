@@ -1,6 +1,6 @@
 ---
 name: refresh-research
-description: Bulk-refresh research entries in ./research/ using parallel research-curator agents. Use when /refresh-research is invoked, stale research needs updating, or bulk re-verification of research entries is requested. Inventories entries by review date and age, runs RT-ICA pre-flight, spawns agents in waves of 5, updates README and Freshness Tracking, lints and commits. Supports --all, --stale, --category, --layer, and --dry-run flags.
+description: Bulk-refresh research entries in ./research/ using parallel research-curator agents. Use when /refresh-research is invoked, stale research needs updating, or bulk re-verification of research entries is requested. Inventories entries by review date and age, runs RT-ICA pre-flight, spawns agents in waves of 5, then validates, reviews, and commits through research-curator. Supports --all, --stale, --category, --layer, and --dry-run flags.
 argument-hint: '[--all | --stale | --category <name> | --layer <0|1|2> | --dry-run]'
 user-invocable: true
 ---
@@ -28,12 +28,12 @@ Orchestrate parallel research-curator agents to bulk-refresh research entries in
 Glob `./research/**/*.md` (exclude README.md). For each entry, parse:
 
 1. **YAML frontmatter** — extract `metadata.layer` value (string `"0"`, `"1"`, or `"2"`; `null` if absent).
-2. **Freshness Tracking section** — extract Last Verified and Next Review dates.
+2. **Freshness tracking** — extract Last Verified and Next Review dates from the frontmatter `freshness_tracking` mapping (`last_verified`, `next_review`); when absent, from a body `Freshness Tracking` section (legacy entries).
 
 ```mermaid
 flowchart TD
     Start([Read entry]) --> ParseFM[Parse YAML frontmatter<br>Extract metadata.layer]
-    ParseFM --> HasFreshness{Freshness Tracking section present?}
+    ParseFM --> HasFreshness{Freshness tracking found in frontmatter or legacy body section?}
     HasFreshness -->|No| Stale1[STALE: no tracking]
     HasFreshness -->|Yes| ComputeDays[Compute Days Old = today minus Last Verified]
     ComputeDays --> PastDue{Next Review Recommended < today?}
@@ -107,20 +107,16 @@ After each wave, collect and log results:
 
 ```text
 Wave {N} complete: {M}/{total} succeeded
-  updated   -- ./research/agent-frameworks/agno.md (v0.3→v0.5, +2k stars)
+  updated   -- ./research/agent-frameworks/agno.md (v0.3→v0.5)
   unchanged -- ./research/mcp-ecosystem/narsil-mcp.md (no changes detected)
   failed    -- ./research/developer-tools/orbstack.md -- error: [reason]
 ```
 
 Outcome categories: **Updated** (content changed), **Unchanged** (re-verified, no changes), **Failed** (agent could not complete).
 
-### Step 5: Update README
+### Step 5: Validate, Review, README, Commit
 
-After all waves complete, update `./research/README.md`:
-
-- Refresh freshness dates for updated and unchanged entries
-- Add new categories if agents created them
-- Regenerate category counts
+After all waves complete, activate the `/research-curator` skill and follow its Rerun Mode from the Validation Gate onward over the updated and unchanged entries, then its Post-Actions (README rows for PASS entries, lint, commit, push). No Overlap Scan runs on refresh; it runs only when an entry is first created.
 
 ### Step 6: Summary Report
 
@@ -147,7 +143,7 @@ When K = 0 in the header: `**Skipped (fresh)**: 0`. When K = 1: `**Skipped (fres
 
 | Entry | Category | Change Summary |
 |-------|----------|----------------|
-| {name} | {category} | {version bump, stat update, etc.} |
+| {name} | {category} | {version bump, snapshot change} |
 
 ## Failures
 
@@ -162,28 +158,12 @@ When K = 0 in the header: `**Skipped (fresh)**: 0`. When K = 1: `**Skipped (fres
 - Failed entries to retry: {list}
 ```
 
-### Step 7: Post-Actions
-
-Lint modified files before committing to prevent malformed entries reaching git history:
-
-```bash
-uv run prek run --files ./research/
-```
-
-Commit with a format that identifies the refresh scope for audit purposes:
-
-```bash
-git add ./research/ && git commit -m "docs(research): refresh {N} entries ({date})"
-git push -u origin HEAD
-```
-
 ## Error Handling
 
 - **No entries match filter** — report "All entries are fresh. Nothing to refresh." and stop
 - **No entries match `--layer` filter** — report "No entries found for layer {N}. Entries need `metadata.layer` in their YAML frontmatter to be targeted by `--layer`." and stop
 - **Agent failures** — continue remaining waves; include in summary Failures table
 - **Network issues mid-wave** — complete current wave, report partial results, suggest retry with `--stale`
-- **README update conflict** — re-read README and retry update once
 
 ## Related
 

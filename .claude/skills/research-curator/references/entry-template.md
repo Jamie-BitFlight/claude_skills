@@ -8,38 +8,10 @@ Content scope: [Entry Quality Standards](./entry-quality-standards.md#scope).
 
 ## Category Selection
 
-```mermaid
-flowchart TD
-    Start([Classify resource]) --> Q1{Primary function?}
-    Q1 -->|Multi-agent orchestration| RAP[research-agent-patterns/]
-    Q1 -->|Creates AI skills/prompts| SGT[skill-generation-tools/]
-    Q1 -->|Prompt optimization/testing| PE[prompt-engineering/]
-    Q1 -->|Memory, RAG, context window| CM[context-management/]
-    Q1 -->|MCP server or integration| MCP[mcp-ecosystem/]
-    Q1 -->|Agent SDK or framework| AF[agent-frameworks/]
-    Q1 -->|Agent evaluation/benchmarking| ET[evaluation-testing/]
-    Q1 -->|Developer productivity tool| DT[developer-tools/]
-    Q1 -->|Async/concurrency library| AL[async-libraries/]
-    Q1 -->|Infrastructure for agents at scale| AI[agent-infrastructure/]
-    Q1 -->|API/web framework| APF[api-frameworks/]
-    Q1 -->|LLM observability/debugging| AO[ai-observability/]
-    Q1 -->|Code security/auditing| CA[code-auditing/]
-    Q1 -->|Autonomous coding agent| COD[coding-agents/]
-    Q1 -->|Real-time data platform| DI[data-infrastructure/]
-    Q1 -->|ML compute/model serving| ML[ml-infrastructure/]
-    Q1 -->|Alternative Python runtime| PR[python-runtimes/]
-    Q1 -->|Rust-Python bindings| RPB[rust-python-bindings/]
-    Q1 -->|Task management for dev| TM[task-management/]
-    Q1 -->|Documentation tooling| DOC[documentation-tools/]
-    Q1 -->|LLM infra/serving| LLM[llm-infrastructure/]
-    Q1 -->|Low-code/no-code platform| LC[low-code-platforms/]
-    Q1 -->|AI design tools| ADT[ai-design-tools/]
-    Q1 -->|AI research tools| ART[ai-research-tools/]
-    Q1 -->|AI writing tools| AWT[ai-writing-tools/]
-    Q1 -->|None fit| NEW[Create new category directory]
-```
-
-Create the category directory if it does not exist.
+Pick the existing directory under `./research/` whose name best matches the resource's primary
+function (list them with `ls ./research/`). `VALID_CATEGORIES` in `research/knowledge-explorer.py`
+is the set that script accepts. When `developer-tools` and `developer-tooling` both fit, use
+`developer-tools`. Create a new category directory only when no existing one fits.
 
 ---
 
@@ -139,9 +111,19 @@ Documented limitations, or the low-confidence absence statement from [Entry Qual
 > but potentially outdated). Sections with mixed sources use the lower confidence level and
 > note both qualifiers: `Architecture: medium (doc + code-read)`. A `(code-read)` section is never `high`.
 
+> **Fields and absent sections**: The validator requires `research_date`, `source_url`,
+> `version_at_research`, `license` and the `freshness_tracking` keys; `name`, `title`, `subtitle`
+> and `github_repository` are not checked by it. `confidence_map` and `## Limitations and Caveats`
+> are checked by the reviewer only. When the resource has no architecture, install step, version or
+> license, write the Rule 3 absence sentence from
+> [Entry Quality Standards](./entry-quality-standards.md) in that section or field instead of
+> leaving it empty. A snapshot (a version, figure or status) carries its date and source, for
+> example `Latest release v1.4.2 (accessed 2026-10-03, source: GitHub releases page)`.
+
 > **Architecture section citations**: When Technical Architecture or Key Features items derive
 > from code analysis, cite the source inline using the format:
 > `Source: {relative-path} — {exported-name}`
+> The path is relative to the researched resource's own clone root, not to this repository.
 >
 > Examples:
 >
