@@ -575,6 +575,124 @@ def _normalize_quote_text(text: str) -> str:
     return " ".join(text.replace("**", "").split())
 
 
+def _parse_head_line_paths(line: str) -> list[str]:
+    """Extract and collect all distinct resolvable paths from a head line.
+
+    Strips trailing line-number suffixes (`:NN`, `#L...`) and filters unresolvable paths.
+
+    Args:
+        line: A head line containing backticked paths.
+
+    Returns:
+        List of distinct resolvable paths.
+    """
+    paths: list[str] = []
+    for match in RELEVANCE_ANCHOR_PATH_PATTERN.finditer(line):
+        candidate = match.group(1).split()[0].rstrip(".,;:)")
+        # F2a: Strip trailing :digits or #L... suffix before checking
+        candidate_stripped = re.sub(r"(?::[0-9]+|#L[0-9]+)$", "", candidate)
+        if not any(ch in candidate_stripped for ch in _UNRESOLVABLE_PATH_CHARS) and candidate_stripped not in paths:
+            paths.append(candidate_stripped)
+    return paths
+
+
+def _read_file_body_text(file_path: Path) -> str:
+    """Read a file and return its body text normalized for quote matching.
+
+    Args:
+        file_path: Path to the file to read.
+
+    Returns:
+        Normalized body text (YAML frontmatter excluded, whitespace collapsed).
+    """
+    file_lines = file_path.read_text(encoding="utf-8", errors="replace").splitlines()
+    body_lines = _yaml_body_lines(file_lines) if detect_format(file_lines) == "yaml_frontmatter" else file_lines
+    return _normalize_quote_text("\n".join(body_lines))
+
+
+def _quote_found_in_any_file(quoted_text: str, paths: list[str], repo_root: Path) -> bool:
+    """Search for a quote in all cited files.
+
+    Args:
+        quoted_text: The normalized quote text to search for.
+        paths: List of repo-relative file paths to search.
+        repo_root: Checkout root for resolving paths.
+
+    Returns:
+        True if the quote is found in any cited file.
+    """
+    for candidate_path in paths:
+        file_path = repo_root / candidate_path
+        if not file_path.is_file():
+            continue
+        body_haystack = _read_file_body_text(file_path)
+        if quoted_text in body_haystack:
+            return True
+    return False
+
+
+def _check_malformed_today_line(line: str, current_paths: list[str], start: int, line_offset: int) -> Issue | None:
+    """Check for a Today line that starts with quote but doesn't match full pattern.
+
+    Args:
+        line: The line to check.
+        current_paths: List of currently cited file paths.
+        start: Starting line number of the section.
+        line_offset: Offset within the section.
+
+    Returns:
+        An Issue dict if the line is malformed, else None.
+    """
+    if not current_paths or not (line.lstrip().startswith("- Today:") or line.lstrip().startswith("* Today:")):
+        return None
+
+    line_stripped = line.lstrip()
+    if not line_stripped.startswith(("- Today:", "* Today:")):
+        return None
+
+    value_part = line_stripped.split("Today:", 1)[1].strip() if "Today:" in line_stripped else ""
+    if value_part.startswith('"') and not _RELEVANCE_QUOTE_TODAY_PATTERN.match(line):
+        return {
+            "check": "relevance_quote_unverified",
+            "severity": "error",
+            "message": (
+                f"{RELEVANCE_SECTION} has a Today: line that must be a double-quoted line with "
+                f"nothing after the closing quote"
+            ),
+            "line": start + line_offset,
+        }
+    return None
+
+
+def _check_term_in_quote(current_term: str | None, quoted_text: str, start: int, line_offset: int) -> Issue | None:
+    """Check if the Term appears in the quote.
+
+    Args:
+        current_term: The term to search for, or None.
+        quoted_text: The normalized quote text.
+        start: Starting line number of the section.
+        line_offset: Offset within the section.
+
+    Returns:
+        An Issue dict if the term is missing, else None.
+    """
+    if not current_term or any(ch in current_term for ch in _REGEX_SPECIAL_CHARS):
+        return None
+
+    if _normalize_quote_text(current_term).lower() not in quoted_text.lower():
+        return {
+            "check": "relevance_quote_unverified",
+            "severity": "error",
+            "message": (
+                f"{RELEVANCE_SECTION} quote does not contain "
+                f"its Term `{current_term}` -- a quoted line that lacks the term is "
+                f"evidence about something else"
+            ),
+            "line": start + line_offset,
+        }
+    return None
+
+
 def check_relevance_quotes(
     lines: list[str], sections: dict[str, tuple[int, int]], repo_root: Path | None
 ) -> list[Issue]:
@@ -601,62 +719,57 @@ def check_relevance_quotes(
     issues: list[Issue] = []
     section_lines = lines[start - 1 : end]
 
-    current_path: str | None = None
+    current_paths: list[str] = []
     current_term: str | None = None
 
     for line_offset, line in enumerate(section_lines):
-        if _RELEVANCE_QUOTE_ITEM_HEAD_PATTERN.match(line):
-            current_path = None
+        # F3: Reset on any list line at indent 0 or any heading line
+        if (
+            line
+            and line[0] not in " \t"
+            and (line.lstrip().startswith("-") or line.lstrip().startswith("*") or line.lstrip().startswith("##"))
+        ):
+            current_paths = []
             current_term = None
-            for match in RELEVANCE_ANCHOR_PATH_PATTERN.finditer(line):
-                candidate = match.group(1).split()[0].rstrip(".,;:)")
-                if not any(ch in candidate for ch in _UNRESOLVABLE_PATH_CHARS):
-                    current_path = candidate
-                    break
+            # F1: Collect ALL distinct resolvable paths on head line
+            if _RELEVANCE_QUOTE_ITEM_HEAD_PATTERN.match(line):
+                current_paths = _parse_head_line_paths(line)
 
         term_match = _RELEVANCE_QUOTE_TERM_PATTERN.match(line)
         if term_match:
             current_term = term_match.group(1)
 
         today_match = _RELEVANCE_QUOTE_TODAY_PATTERN.match(line)
-        if not today_match or not current_path:
+        if not today_match:
+            # F2b: Check for Today line that starts with quote but doesn't match full pattern
+            malformed_issue = _check_malformed_today_line(line, current_paths, start, line_offset)
+            if malformed_issue:
+                issues.append(malformed_issue)
             continue
-        file_path = repo_root / current_path
-        if not file_path.is_file():
+
+        if not current_paths:
             continue
 
         quoted_text = _normalize_quote_text(today_match.group(1))
-        file_lines = file_path.read_text(encoding="utf-8", errors="replace").splitlines()
-        body_lines = _yaml_body_lines(file_lines) if detect_format(file_lines) == "yaml_frontmatter" else file_lines
-        body_haystack = _normalize_quote_text("\n".join(body_lines))
 
-        if quoted_text not in body_haystack:
+        # F1: Search all cited files, report error only if quote not found in ANY of them
+        if not _quote_found_in_any_file(quoted_text, current_paths, repo_root):
             issues.append({
                 "check": "relevance_quote_unverified",
                 "severity": "error",
                 "message": (
-                    f"{RELEVANCE_SECTION} quotes a line not found in `{current_path}` "
+                    f"{RELEVANCE_SECTION} quotes a line not found in any of {current_paths} "
                     f"outside its YAML frontmatter -- copy the line verbatim, inner double "
                     f"quotes included"
                 ),
                 "line": start + line_offset,
             })
+            continue
 
-        if (
-            current_term
-            and not any(ch in current_term for ch in _REGEX_SPECIAL_CHARS)
-            and _normalize_quote_text(current_term).lower() not in quoted_text.lower()
-        ):
-            issues.append({
-                "check": "relevance_quote_unverified",
-                "severity": "error",
-                "message": (
-                    f"{RELEVANCE_SECTION} quote from `{current_path}` does not contain "
-                    f"its Term `{current_term}` -- a quoted line that lacks the term is "
-                    f"evidence about something else"
-                ),
-                "line": start + line_offset,
-            })
+        # Check Term appears in the quote
+        term_issue = _check_term_in_quote(current_term, quoted_text, start, line_offset)
+        if term_issue:
+            issues.append(term_issue)
 
     return issues
 
