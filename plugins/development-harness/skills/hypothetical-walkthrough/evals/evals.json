@@ -17,6 +17,7 @@
         "../../../backlog_core/server.py",
         "../../../backlog_core/operations.py",
         "../../../backlog_core/tool_responses.py",
+        "../../../dh_core/operations.py",
         "../../../sam_schema/backlog.py"
       ],
       "expectations": [
@@ -66,6 +67,7 @@
         "../../../backlog_core/server.py",
         "../../../backlog_core/operations.py",
         "../../../backlog_core/tool_responses.py",
+        "../../../dh_core/operations.py",
         "../../../sam_schema/backlog.py"
       ],
       "expectations": [
