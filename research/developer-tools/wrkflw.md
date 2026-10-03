@@ -428,6 +428,7 @@ The following features are documented as not yet supported in wrkflw:
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [no-mistakes](./no-mistakes.md) | developer-tools | referenced by no-mistakes (developer-tools) |
+| [gh-aw](./gh-aw.md) | developer-tools | referenced by gh-aw (developer-tools) |
 
 ## References
 

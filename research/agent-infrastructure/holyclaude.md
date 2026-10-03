@@ -526,3 +526,4 @@ For Claude Code users developing in containers (Docker, Kubernetes, cloud VMs), 
 | [Browser MCP](../mcp-ecosystem/browsermcp-mcp.md) | mcp-ecosystem | Chrome browser automation via MCP; HolyClaude's Chromium + Playwright setup provides the underlying browser control infrastructure |
 | [Using tmux with Claude Code](../developer-tools/using-tmux-with-claude-code.md) | developer-tools | practical guide for tmux-based multi-pane agent orchestration — HolyClaude includes tmux pre-configured in the container |
 | [devenv](../developer-tools/devenv.md) | developer-tools | declarative dev environment alternative using Nix; HolyClaude achieves similar goal via Docker with emphasis on bundling pre-built binaries rather than building from modules |
+| [coop](./coop.md) | agent-infrastructure | referenced by coop (agent-infrastructure) |

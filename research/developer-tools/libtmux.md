@@ -568,3 +568,4 @@ libtmux self-describes as pre-1.0. Upstream recommends pinning to a minor versio
 | [claude-replay](../coding-agents/claude-replay.md) | coding-agents | referenced by claude-replay (coding-agents) |
 | [abtop](./abtop.md) | developer-tools | referenced by abtop (developer-tools) |
 | [emqutiti](./emqutiti.md) | developer-tools | referenced by emqutiti (developer-tools) |
+| [omnyssh](./omnyssh.md) | developer-tools | referenced by omnyssh (developer-tools) |

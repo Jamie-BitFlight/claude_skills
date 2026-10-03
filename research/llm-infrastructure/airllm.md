@@ -365,4 +365,5 @@ class AirLLMCompletionServer:
 | [Chroma](../data-infrastructure/chroma.md) | data-infrastructure | vector database completing RAG workflows by pairing AirLLM's local inference with semantic vector search and retrieval |
 | [Claude-Mem](../context-management/claude-mem.md) | context-management | memory compression system sharing conceptual approach with AirLLM's layer-streaming for reducing token consumption |
 | [Micro-Agent](../agent-frameworks/micro-agent.md) | agent-frameworks | lightweight Python ReAct agent framework designed to integrate AirLLM for local offline reasoning without API dependencies |
+| [magnitude](./magnitude.md) | llm-infrastructure | referenced by magnitude (llm-infrastructure) |
 

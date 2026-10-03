@@ -285,3 +285,4 @@ print(transcript.text)
 | [glm5-exacto](./glm5-exacto.md) | llm-infrastructure | referenced by glm5-exacto (llm-infrastructure) |
 | [openbao](./openbao.md) | llm-infrastructure | referenced by openbao (llm-infrastructure) |
 | [quantum-free-router](./quantum-free-router.md) | llm-infrastructure | referenced by quantum-free-router (llm-infrastructure) |
+| [magnitude](./magnitude.md) | llm-infrastructure | referenced by magnitude (llm-infrastructure) |
