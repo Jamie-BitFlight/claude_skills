@@ -175,6 +175,7 @@ it manually, rather than skipping the stage:
 | Claiming a task complete | `/dh:verify-done` |
 | Writing or improving a process | `/process-siren:improve-processes` |
 | Debugging, investigating, or facing a repeated/unclear failure | `/scientific-method:scientific-thinking` |
+| Asked to rebase | `/rebase` |
 
 Referring to a skill or sub-agent in prose or in a delegation prompt: use plain notation, never a
 harness-specific function-call form (`Skill(skill="...")` is Claude-Code-only and breaks portability
