@@ -37,8 +37,11 @@ There is no third token here. With a ledger, a mixed outcome is recorded one row
 `finish --result` has no partial value. Send DONE once all the attempts you were responsible for
 closing were recorded; send BLOCKED if any could not be closed, and identify them. The
 `agent-orchestration` plugin's similarly named `delegate/references/sub-agent-contract.md` does
-pin a third token, `PARTIAL`; that contract governs delegations with no ledger behind them, where
-the response is the only channel there is. It does not apply to a dispatch that named an address.
+pin a third token, `PARTIAL`, for dispatches invoking that separate delegate contract. It does
+not govern a dispatch naming a ledger address and attempt: that dispatch follows the ledger
+status rules above, even if its prompt opens with `Your ROLE_TYPE is sub-agent.` Absence of a ledger
+does not switch a DH dispatch to the delegate contract; DH dispatches without a ledger follow the
+two-token rules above.
 
 </status>
 
