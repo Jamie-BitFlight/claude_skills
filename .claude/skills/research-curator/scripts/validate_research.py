@@ -752,6 +752,15 @@ def check_relevance_quotes(
 
         quoted_text = _normalize_quote_text(today_match.group(1))
 
+        if not quoted_text:
+            issues.append({
+                "check": "relevance_quote_unverified",
+                "severity": "error",
+                "message": f"{RELEVANCE_SECTION} has an empty Today: quote",
+                "line": start + line_offset,
+            })
+            continue
+
         # F1: Search all cited files, report error only if quote not found in ANY of them
         if not _quote_found_in_any_file(quoted_text, current_paths, repo_root):
             issues.append({
