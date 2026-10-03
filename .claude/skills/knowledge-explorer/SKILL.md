@@ -9,6 +9,8 @@ Manages entries in `research/` — a knowledge base of verified research on tool
 
 KB root: `research/` relative to repo root. Each entry is a `.md` file inside a category subdirectory (e.g., `research/agent-frameworks/agno.md`).
 
+**New research goes through `/research-curator`.** The `add`, `update-append`, and `migrate` commands are the legacy path: they write entries without Entry Review or cross-referencing. Use them only for the mechanical operations they describe.
+
 ## Script invocation
 
 ```bash

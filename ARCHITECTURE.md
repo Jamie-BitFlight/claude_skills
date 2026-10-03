@@ -61,6 +61,7 @@ Each subsystem states its own design. Step through them from here.
 |---|---|---|
 | Development harness (`dh`) | [plugins/development-harness/ARCHITECTURE.md](./plugins/development-harness/ARCHITECTURE.md) | the automation boundary, the logical work model, the frontend and backend contracts, and the current boundary between them |
 | Backlog storage and providers | [plugins/development-harness/backlog_core/ARCHITECTURE.md](./plugins/development-harness/backlog_core/ARCHITECTURE.md) | per-collaborator responsibilities, GitHub writable records, offline and replay policy |
+| Research subsystem and curator | [.claude/skills/research-curator/SKILL.md](./.claude/skills/research-curator/SKILL.md) | the `research/` entry lifecycle: creation, refresh, validation, Entry Review, cross-referencing, and the Overlap Scan |
 | Plugin authoring | [plugins/plugin-creator/references/ARCHITECTURE.md](./plugins/plugin-creator/references/ARCHITECTURE.md) | how plugins, skills and agents are structured and validated |
 
 ## Where state lives

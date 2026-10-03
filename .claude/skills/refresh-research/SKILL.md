@@ -18,7 +18,7 @@ Orchestrate parallel research-curator agents to bulk-refresh research entries in
 - `--all` — Refresh every entry regardless of staleness
 - `--stale` (default) — Refresh entries past their review date
 - `--category <name>` — Refresh all entries in one category (e.g., `--category agent-frameworks`)
-- `--layer <0|1|2>` — Refresh entries with matching SDLC layer metadata (0=process, 1=language, 2=stack). See [plugins/development-harness/docs/sdlc-layers/](../../../plugins/development-harness/docs/sdlc-layers/).
+- `--layer <0|1|2>` — Refresh entries whose frontmatter carries a matching `metadata.layer` (0=process, 1=language, 2=stack). The current entry template stores no layer field, so this matches only entries that carry one. See [plugins/development-harness/docs/sdlc-layers/](../../../plugins/development-harness/docs/sdlc-layers/).
 - `--dry-run` — Report what would be refreshed; do not spawn agents
 
 ## Workflow
@@ -63,7 +63,7 @@ Apply filters sequentially. Filters combine with AND logic — each filter narro
 4. **Layer filter** (optional): `--layer <0|1|2>` — keep only entries where `metadata.layer` equals the requested value. Entries without `layer` metadata (`—` in inventory) are excluded.
 5. **Dry-run check**: `--dry-run` — display the filtered target list and stop without spawning agents.
 
-If zero entries remain after all filters: report "No entries match the applied filters." and stop. When `--layer` was specified and zero entries match, additionally report: "No entries found for layer {N}. Entries need `metadata.layer` in their YAML frontmatter to be targeted by `--layer`."
+If zero entries remain after all filters: report "No entries match the applied filters." and stop. When `--layer` was specified and zero entries match, additionally report: "No entries found for layer {N}. Only entries carrying `metadata.layer` in their YAML frontmatter can be targeted by `--layer`."
 
 When the `--stale` filter excludes entries because they are FRESH, list each excluded entry
 before continuing to Step 3:
@@ -93,30 +93,23 @@ Decision: {APPROVED | BLOCKED}
 
 If BLOCKED: report missing tools/access, suggest workarounds, stop.
 
-### Step 4: Spawn Agents in Waves
+### Step 4: Baseline, Then Spawn Curators in Waves
 
-Split target entries into sequential waves of 5. Within each wave spawn agents in parallel; wait for wave completion before starting the next.
+Activate `/research-curator` before spawning any curator and capture its Mode Routing baseline (the status snapshot of `./research/` and a hash per target) while no write has happened yet. Then route the refresh through its Rerun Mode: split the targets into sequential waves of 5, spawn one `@research-curator` per entry with `--rerun ./research/{category}/{name}.md` in parallel within a wave, and wait for each wave before the next. Apply the curator's [Failure Recovery](../research-curator/references/batch-mode.md#failure-recovery) to every failed, timed-out, or unchanged agent result before it enters Step 5.
 
-For each entry:
-
-```text
-Agent(subagent_type: "research-curator", prompt: "--rerun ./research/{category}/{name}.md", model: "sonnet")
-```
-
-After each wave, collect and log results:
+After each wave, log results:
 
 ```text
 Wave {N} complete: {M}/{total} succeeded
-  updated   -- ./research/agent-frameworks/agno.md (v0.3→v0.5)
-  unchanged -- ./research/mcp-ecosystem/narsil-mcp.md (no changes detected)
-  failed    -- ./research/developer-tools/orbstack.md -- error: [reason]
+  updated -- ./research/agent-frameworks/agno.md (v0.3->v0.5)
+  failed  -- ./research/developer-tools/orbstack.md -- error: [reason]
 ```
 
-Outcome categories: **Updated** (content changed), **Unchanged** (re-verified, no changes), **Failed** (agent could not complete).
+Outcome categories: **Updated** (content changed) and **Failed** (agent could not complete, or left the target unchanged, which the curator treats as a failed refresh).
 
 ### Step 5: Validate, Review, README, Commit
 
-After all waves complete, activate the `/research-curator` skill and follow its Rerun Mode from the Validation Gate onward over the updated and unchanged entries, then its Post-Actions (README rows for PASS entries, lint, commit, push). No Overlap Scan runs on refresh; it runs only when an entry is first created.
+After all waves complete, follow the curator's Rerun Mode from the Validation Gate onward over the updated entries, then its Post-Actions. Entry Review, cross-referencing, README rows and the commit rules are the curator's and are not restated here. No Overlap Scan runs on refresh.
 
 ### Step 6: Summary Report
 
@@ -132,7 +125,6 @@ After all waves complete, activate the `/research-curator` skill and follow its 
 | Outcome | Count | Notes |
 |---------|-------|-------|
 | Updated | {N} | |
-| Unchanged | {N} | |
 | Failed | {N} | |
 | Skipped (fresh) | {K} | {min}–{max} days until next review |
 
@@ -151,6 +143,10 @@ When K = 0 in the header: `**Skipped (fresh)**: 0`. When K = 1: `**Skipped (fres
 |-------|-------|
 | {name} | {reason} |
 
+## Curator Output
+
+Append the curator's [Rerun Mode Output](../research-curator/SKILL.md#rerun-mode-output) verbatim: Entry Review verdicts, with-issues counts, and Cross-References Added.
+
 ## Next Actions
 
 - Due for review in 30 days: {list}
@@ -161,9 +157,8 @@ When K = 0 in the header: `**Skipped (fresh)**: 0`. When K = 1: `**Skipped (fres
 ## Error Handling
 
 - **No entries match filter** — report "All entries are fresh. Nothing to refresh." and stop
-- **No entries match `--layer` filter** — report "No entries found for layer {N}. Entries need `metadata.layer` in their YAML frontmatter to be targeted by `--layer`." and stop
-- **Agent failures** — continue remaining waves; include in summary Failures table
-- **Network issues mid-wave** — complete current wave, report partial results, suggest retry with `--stale`
+- **No entries match `--layer` filter** — report "No entries found for layer {N}. Only entries carrying `metadata.layer` in their YAML frontmatter can be targeted by `--layer`." and stop
+- **Agent failures, timeouts, unchanged targets, shared-cause outages** — follow the curator's [Failure Recovery](../research-curator/references/batch-mode.md#failure-recovery); include remaining failures in the summary Failures table
 
 ## Related
 

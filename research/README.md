@@ -14,52 +14,52 @@ research/
 ├── agent-frameworks/                  # Agent SDKs and orchestration frameworks
 │   ├── ai-agents-frameworks.md        # 10-framework comparative benchmark study
 │   ├── claude-code-harness.md         # Go-native guardrails and 5-verb workflow for Claude Code (MIT, v4.7.0)
-│   ├── copilotkit.md                  # React-first agentic frontend framework with bi-directional state sync and AG-UI protocol (28.9K stars)
+│   ├── copilotkit.md                  # React-first agentic frontend framework with bi-directional state sync and AG-UI protocol
 │   ├── liteagents.md                  # Multi-tool AI development toolkit with 11 agents and session memory
 │   ├── micro-agent.md                 # Lightweight Python ReAct agent framework with MCP multi-server support (MIT)
 │   ├── mission-control.md             # Autonomous product engine: 24/7 research → ideation → build → PR (MIT, v2.4.0)
-│   ├── openfang.md                    # Rust Agent OS with autonomous Hands, 40 channel adapters, WASM sandbox, SKILL.md native (3.6K stars)
-│   ├── pi-mono.md                     # TypeScript monorepo: unified LLM API, agent runtime, coding CLI, TUI, web UI, Slack bot, vLLM manager (23.8K stars)
-│   ├── superpowers.md                 # Agentic skills framework and dev methodology (40K+ stars)
-│   ├── tersa.md                       # Next.js 15 + ReactFlow visual AI pipeline canvas; typed nodes wired via Vercel AI SDK Gateway (25+ providers); Tersa Agent creates workflows from natural language (927 stars)
-│   ├── everything-claude-code.md     # Comprehensive performance optimization system: 16 agents, 65+ skills, hook-based automation (50K+ stars)
+│   ├── openfang.md                    # Rust Agent OS with autonomous Hands, 40 channel adapters, WASM sandbox, SKILL.md native
+│   ├── pi-mono.md                     # TypeScript monorepo: unified LLM API, agent runtime, coding CLI, TUI, web UI, Slack bot, vLLM manager
+│   ├── superpowers.md                 # Agentic skills framework and dev methodology
+│   ├── tersa.md                       # Next.js 15 + ReactFlow visual AI pipeline canvas; typed nodes wired via Vercel AI SDK Gateway (25+ providers); Tersa Agent creates workflows from natural language
+│   ├── everything-claude-code.md     # Comprehensive performance optimization system: 16 agents, 65+ skills, hook-based automation
 │   └── flue.md                       # TypeScript agent harness framework — durable-first execution, sandboxes, skills, MCP, subagent delegation, 20+ channel integrations (Apache-2.0, v1.0.0-beta.9)
 ├── claude-code-plugins/               # Claude Code plugin ecosystems and configuration repositories
-│   └── claude-codex-settings.md      # Battle-tested Claude Code plugin ecosystem: 17 plugins, 9 MCP integrations, multi-LLM backend configs (Z.ai, Kimi K2, ccproxy) (452 stars)
+│   └── claude-codex-settings.md      # Battle-tested Claude Code plugin ecosystem: 17 plugins, 9 MCP integrations, multi-LLM backend configs (Z.ai, Kimi K2, ccproxy)
 ├── agent-infrastructure/              # Infrastructure for agentic applications
 │   ├── fly-io.md                      # Cloud platform for running apps globally in Firecracker microVMs; Sprites for AI agent sandboxes, first-class MCP support (18 regions)
-│   ├── kernel-sh.md                   # Browsers-as-a-service: isolated VM-per-browser Chrome, MCP server, 5.8x faster than Browserbase (670 stars)
+│   ├── kernel-sh.md                   # Browsers-as-a-service: isolated VM-per-browser Chrome, MCP server, 5.8x faster than Browserbase
 │   ├── plano.md                       # AI-native proxy and data plane for multi-agent orchestration
-│   ├── tinyfish.md                    # Serverless web agent API: 1,000 parallel ops, AgentQL MCP, all-in pricing at $0.04/op (148 stars)
-│   ├── picoclaw.md                    # Go AI assistant — <10MB RAM, 6 channels, runs on $10 RISC-V hardware, 18K stars
-│   ├── pinchtab.md                    # Browser control for AI agents — 12MB Go binary, HTTP API, a11y tree snapshots at 800 tokens/page (2.3K stars)
-│   ├── zeroclaw.md                    # Rust AI assistant infrastructure — sub-5MB RAM, 28+ providers, trait-driven (14.9K stars)
-│   ├── zeroboot.md                    # Sub-millisecond VM fork sandbox (0.79ms p50) — Firecracker+KVM, ~265KB RSS, Python/Node SDKs, REST API (1.4K stars)
+│   ├── tinyfish.md                    # Serverless web agent API: 1,000 parallel ops, AgentQL MCP, all-in pricing at $0.04/op
+│   ├── picoclaw.md                    # Go AI assistant — <10MB RAM, 6 channels, runs on $10 RISC-V hardware
+│   ├── pinchtab.md                    # Browser control for AI agents — 12MB Go binary, HTTP API, a11y tree snapshots at 800 tokens/page
+│   ├── zeroclaw.md                    # Rust AI assistant infrastructure — sub-5MB RAM, 28+ providers, trait-driven
+│   ├── zeroboot.md                    # Sub-millisecond VM fork sandbox (0.79ms p50) — Firecracker+KVM, ~265KB RSS, Python/Node SDKs, REST API
 │   └── vibium.md                      # Browser automation for AI agents via WebDriver BiDi — CLI, MCP server, and client library modes
 ├── api-frameworks/                    # High-performance API frameworks for backend services
-│   ├── fastapi.md                     # Modern Python web framework with Pydantic (95K+ stars)
-│   ├── motia.md                       # Unified backend framework replacing APIs/queues/workflows/AI agents with one Step primitive (15K+ stars)
-│   ├── pocketbase.md                  # Open-source Go backend in 1 file: SQLite, realtime, auth, files, admin dashboard (56K+ stars)
-│   └── tornado.md                     # Python web framework and async networking library (22K+ stars)
+│   ├── fastapi.md                     # Modern Python web framework with Pydantic
+│   ├── motia.md                       # Unified backend framework replacing APIs/queues/workflows/AI agents with one Step primitive
+│   ├── pocketbase.md                  # Open-source Go backend in 1 file: SQLite, realtime, auth, files, admin dashboard
+│   └── tornado.md                     # Python web framework and async networking library
 ├── async-libraries/                   # Python async I/O libraries and concurrency frameworks
-│   ├── anyio.md                       # Backend-agnostic async concurrency library (426M downloads/month)
-│   ├── asyncssh.md                    # Asyncio-native SSH client/server — reverse tunnels, SFTP, jump hosts, pure-Python key management (1.7K stars)
-│   └── trio.md                        # Structured concurrency async library for Python (7K+ stars)
+│   ├── anyio.md                       # Backend-agnostic async concurrency library
+│   ├── asyncssh.md                    # Asyncio-native SSH client/server — reverse tunnels, SFTP, jump hosts, pure-Python key management
+│   └── trio.md                        # Structured concurrency async library for Python
 ├── llm-infrastructure/                # LLM inference and serving infrastructure
-│   ├── localai.md                     # Free open-source local AI inference server, OpenAI-compatible API, no GPU required (43K+ stars)
+│   ├── localai.md                     # Free open-source local AI inference server, OpenAI-compatible API, no GPU required
 │   ├── openbao.md                     # OpenBao v2.5.2 — MPL-2.0 HashiCorp Vault fork: 9 auth methods, 9 secret engines, identity-based secrets for AI agents (Go 1.25.6)
 │   └── tensorzero.md                  # Industrial-grade LLM gateway with <1ms latency, fine-tuning, and A/B testing (Rust)
 ├── ml-infrastructure/                 # ML compute engines and model serving platforms
-│   ├── microgpt-playground.md         # Browser-native GPT training and inference, zero-dependency JS port of Karpathy's microgpt.py (65 stars)
-│   ├── ray.md                         # AI compute engine for scaling Python/ML workloads (41K+ stars)
+│   ├── microgpt-playground.md         # Browser-native GPT training and inference, zero-dependency JS port of Karpathy's microgpt.py
+│   ├── ray.md                         # AI compute engine for scaling Python/ML workloads
 │   ├── trainloop.md                   # Managed RL fine-tuning platform: 3-line SDK, reward model training, OpenAI-compatible deployment (YC W25)
-│   └── zvec.md                        # Alibaba's embedded vector database: in-process Proxima engine, dense+sparse vectors (8.9K stars)
+│   └── zvec.md                        # Alibaba's embedded vector database: in-process Proxima engine, dense+sparse vectors
 ├── python-runtimes/                   # Alternative Python interpreters and runtimes
-│   └── rustpython.md                  # Python 3 interpreter written in Rust with WASM support (22K+ stars)
+│   └── rustpython.md                  # Python 3 interpreter written in Rust with WASM support
 ├── rust-python-bindings/              # Rust-Python interoperability and binding libraries
-│   └── pyo3.md                        # Rust bindings for Python with maturin build tooling (15K+ stars)
+│   └── pyo3.md                        # Rust bindings for Python with maturin build tooling
 ├── ai-observability/                  # AI/LLM observability and debugging platforms
-│   ├── logfire.md                     # Pydantic Logfire - full-stack AI observability with MCP (4K+ stars)
+│   ├── logfire.md                     # Pydantic Logfire - full-stack AI observability with MCP
 │   └── compression-monitor.md        # Context-compression behavioral drift monitor for Claude Code agents (v0.2.1)
 ├── code-auditing/                     # Code security and quality auditing tools
 │   ├── hound.md                       # Autonomous AI security auditor with knowledge graphs
