@@ -1,6 +1,6 @@
 ---
 name: rebase
-description: Start a local Git rebase when the user explicitly requests replay of a named source ref, or of the current branch, onto a named target, including a rebase-then-push request, or continue or abort an active rebase. Use only when local history replay will start or is active; do not use for merge-based branch updates, repository merge settings, pull-request or merge-request merging, or push-only requests.
+description: Start a local Git rebase when the user explicitly requests replay of a named source ref, or of the current branch, onto a named target, including a rebase-then-push request, which carries exact-lease publication to the branch's own remote destination, or continue or abort an active rebase. Use only when local history replay will start or is active; do not use for merge-based branch updates, repository merge settings, pull-request or merge-request merging, or push-only requests.
 ---
 
 **Keywords**: rebase, git rebase, history replay, rebase conflict, continue rebase, abort rebase, git worktree, rewritten history, authorized force-with-lease publication
@@ -19,6 +19,18 @@ Every result change, including remote reconciliation, invalidates earlier result
 validation. Reobserve the named result ref before completion; it must still name
 `R`. A decision or stopped-state path cannot become a success merely because its
 refs or ancestry still satisfy the goal.
+
+## Publication authority
+
+A start request to rebase a branch authorizes publishing `R` to that branch's own remote
+destination, using `--force-with-lease` bound to an observed destination OID. Local-only
+wording in the request withdraws it. Continue publishes only under authority bound at
+start; abort never publishes. Any other destination, any lease not bound to an
+observed OID, and any other force-push needs explicit authority.
+
+Other parties update remote feature branches. Fetch the destination before replay and
+again before pushing; integrate what it gained, then continue
+([publication](./references/publication.md)).
 
 ## Workflow
 
@@ -51,8 +63,8 @@ flowchart TD
     PrepResult -->|Yes| Refs; PrepResult -->|No; checkpoint commit blocked| Save["`Agent: read [named stash](./references/named-stash.md); save and bind exact entry`"]
     PrepResult -->|Failure or unobservable| Recover
     Save --> SaveResult{Exact entry verified?}; SaveResult -->|Yes| Refs; SaveResult -->|No or unobservable| Recover
-    Refs[Agent: reobserve exact source and target] --> RefResult{Ref result?}
-    RefResult -->|Bound OIDs unchanged| Next; RefResult -->|Same named refs moved| Account[Agent: account for movement]
+    Refs["`Agent: reobserve exact source and target; when a publication destination is bound, fetch it per [publication](./references/publication.md) remote sync`"] --> RefResult{Ref result?}
+    RefResult -->|Bound OIDs unchanged| Next; RefResult -->|Same named refs or bound destination moved| Account[Agent: account for movement; integrate compatible destination commits into the source before replay]
     RefResult -->|Failure or unobservable| Recover
     Account --> AccountResult{Every moved commit has one evidence-backed disposition?}
     AccountResult -->|All classified; no supported conflict| Next; AccountResult -->|Unclassified or conflicting| Decision
@@ -96,19 +108,19 @@ flowchart TD
     VerifyResult -->|Failure or unobservable| Recover
     Correct --> CorrectResult{Correction committed within task authority?}
     CorrectResult -->|Yes; invalidate old evidence and rebind R| Orient; CorrectResult -->|Commit blocked or unauthorized| Decision; CorrectResult -->|Failure or unobservable| Recover
-    Publish -->|No| Handoff; Publish -->|Yes| Remote["`Agent: read [publication](./references/publication.md); reconcile one authorized attempt`"]
+    Publish -->|No| Handoff; Publish -->|Yes| Remote["`Agent: read [publication](./references/publication.md); reconcile destination movement for this attempt`"]
     Remote --> RemoteResult{Remote stage result?}
     RemoteResult -->|Final fetch unchanged; exact lease current; R revalidated; result ref equals R| Push[Agent: push immutable R with the authorized exact lease]
-    RemoteResult -->|Destination moved after one reconciliation/final observation| Retry
+    RemoteResult -->|Destination moved at final observation| Retry
     RemoteResult -->|Unexpected result-ref change| Decision
     RemoteResult -->|Conflict| RemoteConflict["`Agent: read [conflict and ambiguity](./references/conflict-and-ambiguity.md); resolve remote intent`"]
     RemoteResult -->|Failure or unobservable| Recover
     RemoteConflict --> RemoteIntent{Exactly one outcome preserves compatible intent and passes checks?}
-    RemoteIntent -->|Exactly one| Remote; RemoteIntent -->|None or incompatible alternatives| Decision
+    RemoteIntent -->|Exactly one| Retry; RemoteIntent -->|None or incompatible alternatives| Decision
     RemoteIntent -->|Failure or unobservable| Recover
     Push --> PushResult{Push result?}
-    PushResult -->|Exit zero; post-fetch destination equals R| Handoff; PushResult -->|Lease rejected or destination moved| Retry{Explicit renewed decision and authority for one attempt?}
-    Retry -->|Yes| Remote; Retry -->|No| LeaseStop[Agent: stop external mutation; report rejection and destination]
+    PushResult -->|Exit zero; post-fetch destination equals R| Handoff; PushResult -->|Lease rejected or destination moved| Retry{Attempts used below the cap in publication.md?}
+    Retry -->|Yes| Remote; Retry -->|No| LeaseStop[Agent: stop external mutation; report each attempt, its rejection or movement, and the destination]
     PushResult -->|Other failure or unobservable| Recover
     NoChange --> Handoff; NoActive --> Handoff; Decision[Agent: stop mutation; report missing fact/alternatives and evidence] --> Handoff
     Recover["`Agent: read [active recovery](./references/active-rebase-recovery.md); stop mutation and collect report`"] --> Handoff
