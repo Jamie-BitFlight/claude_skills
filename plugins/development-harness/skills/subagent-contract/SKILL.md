@@ -10,6 +10,12 @@ Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
 
 <status>
 
+When your dispatch names a ledger address and attempt, use this DH contract even if its prompt
+opens with `Your ROLE_TYPE is sub-agent.` Without that ledger identity, follow the response
+contract named by your dispatch; if it names none, use the contract selected by your caller.
+The rules below apply when `dh:subagent-contract` is selected; a no-ledger handoff naming the separate
+`agent-orchestration` delegate contract follows that contract instead.
+
 Begin your response with `STATUS: DONE` or `STATUS: BLOCKED` as its own first line. Consumers
 branch on that line in that position.
 
@@ -19,7 +25,7 @@ whatever its durable result. This reports successful recording of the attempt's 
 could not be recorded, naming the refusal or missing input and what would unblock it. Follow the
 runner contract's refusal handling when the attempt is stale or already closed.
 
-When your dispatch names no ledger address and attempt, send DONE once the acceptance criteria
+For no-ledger work governed by this contract, send DONE once the acceptance criteria
 are met as written and every stated constraint is respected. Send BLOCKED when the required
 scope cannot be completed, including unmet criteria, failed verification or a missing required
 input. Carry the completed work, the unmet scope, the observed evidence and the input or action
@@ -37,8 +43,8 @@ There is no third token here. With a ledger, a mixed outcome is recorded one row
 `finish --result` has no partial value. Send DONE once all the attempts you were responsible for
 closing were recorded; send BLOCKED if any could not be closed, and identify them. The
 `agent-orchestration` plugin's similarly named `delegate/references/sub-agent-contract.md` does
-pin a third token, `PARTIAL`; that contract governs delegations with no ledger behind them, where
-the response is the only channel there is. It does not apply to a dispatch that named an address.
+pin a third token, `PARTIAL`, for dispatches invoking that separate delegate contract. Absence of
+a ledger alone does not select either contract; use the applicability rule above.
 
 </status>
 
