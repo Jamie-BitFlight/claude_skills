@@ -9,6 +9,11 @@ Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
 
 # Implementation Manager
 
+Before dispatching or judging an attempt, read
+[the work loop](../../docs/work-ledger/work-loop.md). Before interpreting the worker's response,
+load `dh:subagent-contract`. Workers read
+[the runner contract](../../docs/work-ledger/runner-contract.md) before their first ledger command.
+
 A skill for querying and managing feature implementation tasks. Provides programmatic access to task status for orchestrators coordinating multi-step feature implementations.
 
 ## SAM MCP Tool Usage
@@ -218,7 +223,7 @@ ran.
 | Field           | Added By                                                              | When                                    |
 | --------------- | ---------------------------------------------------------------------- | --------------------------------------- |
 | `**Started**`   | `plan dispatch`, when the orchestrator opens the attempt               | When the worker is launched             |
-| `**Completed**` | `plan finish --result complete`, or `plan accept` on a returned task   | When the runner or the judge closes it  |
+| `**Completed**` | `plan finish` with durable result `complete`, or `plan accept` on a returned task | When the runner or the judge records completion |
 
 ## Hook Runtime Controls
 

@@ -226,6 +226,9 @@ class LedgerCli:
         """
         argv = [str(self.toolchain.uv), "run", str(self.toolchain.cli_path), "plan", command]
         for item in arguments:
+            if item.name == "--result" and item.value is not None:
+                argv.append(f"{item.name}={item.value}")
+                continue
             argv.append(item.name)
             if item.value is not None:
                 argv.append(item.value)

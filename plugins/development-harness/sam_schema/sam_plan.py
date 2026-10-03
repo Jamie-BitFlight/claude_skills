@@ -1657,7 +1657,14 @@ def finish(
     result: Annotated[str, typer.Option("--result")],
     note: Annotated[str | None, typer.Option("--note")] = None,
 ) -> None:
-    """Close an attempt with its outcome; the runner's last command."""
+    """Close an attempt with its outcome; the runner's last command.
+
+    Args:
+        address: The task address, ``P/T``.
+        attempt: The attempt the runner holds.
+        result: The explicit outcome, one of ``ledger_spec``'s ``finish --result`` values.
+        note: Free text stored on the row.
+    """
     plan_ref, task_ref = _task_of(address)
     with _ledger() as conn:
         _emit_transition(ledger.finish(conn, plan_ref, task_ref, attempt=attempt, result=result, note=note))

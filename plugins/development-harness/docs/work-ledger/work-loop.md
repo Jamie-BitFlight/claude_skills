@@ -28,7 +28,9 @@ update, state, append, and finalize actions on an imported plan.
    its own git worktree where the harness offers one, and pass that directory as `--worktree`. On
    `leased` or `not-ready`, go to the next task. Any other code stops this plan's loop and goes to
    the user.
-3. Launch the runner with a prompt naming the address, the attempt number, and the specialist
+3. Before launching a runner, read `dh:subagent-contract` for response/transport semantics and
+   pass it [the runner contract](./runner-contract.md) to read before its first ledger command.
+   Launch the runner with a prompt naming the address, the attempt number, and the specialist
    profile the task's `agent` field names when it names one. Launch it whichever way this harness
    allows: its own sub-agent call, a script that starts one in a directory you choose, or a child
    harness process such as `claude -p`. Keep a table of launch handle to address and attempt in

@@ -7,6 +7,11 @@ stdout and diagnostics are on stderr. `--format` is not supported. In a Beads wo
 directly for Beads-native CRUD, status, dependencies, and readiness; use this CLI only for structured
 plans and workflow operations.
 
+Before executing a dispatched attempt, read
+[the runner contract](../../../docs/work-ledger/runner-contract.md) for the complete runner
+sequence, including report prerequisites and explicit outcome selection. Before returning or
+interpreting a dispatched agent's response, load `dh:subagent-contract` for transport semantics.
+
 ```text
 plan list
 plan read --address Pc7d8e9f0
@@ -14,7 +19,7 @@ plan read --address Pc7d8e9f0/T04
 plan create --slug my-feature --goal "Route workflow I/O through the DH CLI"
 plan update --plan-address Pc7d8e9f0 --context "Background context for all tasks"
 plan update --plan-address Pc7d8e9f0 --task-id T04 --append-section "Divergence Notes" --section-content "### DN-1: Brief title"
-plan state --address Pc7d8e9f0/T04 --new-status complete
+plan state --address Pc7d8e9f0/T04 --new-status=complete --reason "why this moved without a runner"
 plan claim --address Pc7d8e9f0/T04
 plan ready --plan-address Pc7d8e9f0
 plan status --plan-address Pc7d8e9f0

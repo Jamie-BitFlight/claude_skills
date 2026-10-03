@@ -9,11 +9,11 @@ user-invocable: true
 
 You are implementing a specific task in a SAM plan, addressed as `P{id}/T{id}`. The backend resolves that address and returns the task — no path is involved.
 
-Your whole interface to task state is the SAM CLI's `plan` group. It reaches the work ledger: the
-store that holds each task's status, the attempts opened on it, the sections each attempt appended,
-and the lease that tells the orchestrator you are still working. The `sam_task` and `sam_plan` MCP
-tools answer from the content store, which holds the plan's authored content and none of that
-state, so task state moves through the commands below and not through those tools.
+Use the SAM CLI's `plan` group for the runner sequence. When your dispatch names an attempt,
+read [the runner contract](../../docs/work-ledger/runner-contract.md) in full before the first
+ledger command; it owns attempt identity, leases, reports, outcome selection, closure and
+refusals. Load `dh:subagent-contract` before returning your response; it owns the response
+destination and the distinction between recorded closure, durable outcome and immediate status.
 
 <task_input>
 $ARGUMENTS
@@ -40,23 +40,15 @@ artifact and backlog steps below use `mcp__plugin_dh_backlog__*` tools; if one i
 
 ## If `--complete <task-id>` Provided
 
-With an attempt number, close the attempt. This is the runner's own close, and it records the
-outcome as well as the status:
-
-```bash
-<sam_cli/> plan finish \
-  --address P{N}/T{M} --attempt {n} --result complete --note "{what was done}"
-```
-
-`finish --result complete` answers `report-missing` until this attempt has both a `Completion
-Report` and a `Verification Results` section. Append them first (see "Close the Attempt" below),
-then run `finish` again.
+With an attempt number, follow the runner contract's outcome selection, report prerequisites
+and closure steps for that attempt. `--complete` names the task to close; select its result from
+what happened rather than treating this argument as proof of success.
 
 Without an attempt number, no runner is closing anything, so move the status directly and say why:
 
 ```bash
 <sam_cli/> plan state \
-  --address P{N}/T{M} --new-status complete --reason "{why this moved without a runner}"
+  --address P{N}/T{M} --new-status=complete --reason "{why this moved without a runner}"
 ```
 
 `--reason` is required — the ledger records why a status moved with no runner behind it.
@@ -125,22 +117,8 @@ Without an attempt number, no runner is closing anything, so move the status dir
    task claimed that way leaves the ledger row exactly where it was and the orchestrator watching a
    task that never moved. Use `plan read --attempt {n}` (step 1) as your first command instead.
 
-   A refusal prints its reason code and what that code means. Read the message, then decide by
-   which flag it offers:
-
-   - **A flag that corrects your own call** — `--attempt`, `--reason`, `--path`, `--new-status` —
-     is yours to fix. Correct the call and run it again.
-   - **A flag that overrides the refusal** — `--force`, `--more-attempts`, `--replace` — is the
-     orchestrator's decision, never yours. `--force` past `leased` takes over an attempt another
-     agent is working in. Report the refusal and stop.
-
-   Three codes need a reply beyond what the message says:
-
-   | code | what to return |
-   |---|---|
-   | `stale-attempt` | STATUS: BLOCKED with `stale-attempt` as the reason. Do not re-read and continue on the new attempt — the orchestrator reassigned it. |
-   | `attempt-closed` | STATUS: DONE when you had already run `finish`, otherwise STATUS: BLOCKED with `attempt-closed`. |
-   | `archived` | Stop and report it. |
+   Handle refusals under the runner contract's code table and authority boundary. A superseded
+   attempt is not yours to rejoin.
 
 4. Register the active-task context via the SAM CLI (required for hook-driven updates):
 
@@ -238,52 +216,5 @@ Without an attempt number, no runner is closing anything, so move the status dir
 
 ## Close the Attempt
 
-Two sections and one command, in that order. Each carries `--attempt {n}`, because sections are
-recorded against the attempt that appended them and an attempt that follows a send-back appends
-its own.
-
-1. Append the `Completion Report` with the lines `TASK:`, `BRANCH:`, `FILES_CHANGED:`, `COMMITS:`
-   and `NOTES:`:
-
-   ```bash
-   <sam_cli/> plan update \
-     --plan-address P{N} --task-id T{M} --attempt {n} \
-     --append-section "Completion Report" --section-content "{the report}"
-   ```
-
-2. Append the `Verification Results`: one line per entry of the task's `verification_steps`, each
-   reading `<step> — passed|failed: <evidence>`, or the single word `none` when the task has no
-   verification steps:
-
-   ```bash
-   <sam_cli/> plan update \
-     --plan-address P{N} --task-id T{M} --attempt {n} \
-     --append-section "Verification Results" --section-content "{the results}"
-   ```
-
-3. Close the attempt once, as your last ledger command:
-
-   ```bash
-   <sam_cli/> plan finish \
-     --address P{N}/T{M} --attempt {n} --result complete --note "{summary}"
-   ```
-
-   Choose the result that matches what happened, and let `--note` carry what the orchestrator needs
-   in order to decide:
-
-   | result | when | what `--note` carries |
-   |---|---|---|
-   | `complete` | acceptance criteria met, verification steps run | what was done |
-   | `failed` | the work cannot be finished as written | what stopped you |
-   | `blocked` | something outside the task must change first | what must change |
-   | `needs-input` | a decision is needed before you can continue | the question |
-
-   `finish --result complete` answers `report-missing` until this attempt has both a `Completion
-   Report` and a `Verification Results` section. Append whichever is missing with `--attempt {n}`,
-   then run `finish` again. The other results — `failed`, `blocked`, `needs-input` — close the
-   attempt without either section, so a report you cannot honestly write is not what keeps you from
-   reporting the outcome.
-
-The status you write to the ledger and the `STATUS:` line you return are different things and each
-needs the other — `/dh:subagent-contract` says which carries what. Return `STATUS: DONE` once
-`finish` was recorded, whatever its `--result`.
+Follow the runner contract's completion steps for the attempt named by your dispatch. Return
+your response under `dh:subagent-contract` after closure or a refusal that prevents it.

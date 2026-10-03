@@ -13,21 +13,29 @@ Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
 Begin your response with `STATUS: DONE` or `STATUS: BLOCKED` as its own first line. Consumers
 branch on that line in that position.
 
-DONE carries what was accomplished, the deliverables in the form your dispatch named, and any risk
-you observed. Send it once the acceptance criteria are met as written and every stated constraint
-is respected.
+When your dispatch names a ledger address and attempt, send DONE once `finish` was recorded,
+whatever its durable result. This reports successful recording of the attempt's end, including
+`failed`, `blocked` or `needs-input`; it does not assert task success. Send BLOCKED when closure
+could not be recorded, naming the refusal or missing input and what would unblock it. Follow the
+runner contract's refusal handling when the attempt is stale or already closed.
 
-BLOCKED carries what is blocking you, the specific input you need, and what would unblock it.
-Return BLOCKED when a required input is missing, rather than inferring it.
+When your dispatch names no ledger address and attempt, send DONE once the acceptance criteria
+are met as written and every stated constraint is respected. Send BLOCKED when the required
+scope cannot be completed, including unmet criteria, failed verification or a missing required
+input. Carry the completed work, the unmet scope, the observed evidence and the input or action
+needed to proceed; do not infer a missing input.
+
+DONE carries what was accomplished, the deliverables in the form your dispatch named, and any
+observed risk.
 
 This line reaches your immediate caller only, in the response it reads the moment your launch
 returns. It is not a record: a reader arriving later, in another session, sees nothing of it unless
 someone wrote it down. When your dispatch names a ledger address and attempt, `<work_ledger/>`
 below says what to write down and how.
 
-There is no third token here. A mixed outcome — some of it done, some of it not — is not something
-this line reports, because the ledger already holds it one row per task and `finish --result` has
-no partial value. Report `STATUS: DONE` and let the rows say how each turned out. The
+There is no third token here. With a ledger, a mixed outcome is recorded one row per task;
+`finish --result` has no partial value. Send DONE once all the attempts you were responsible for
+closing were recorded; send BLOCKED if any could not be closed, and identify them. The
 `agent-orchestration` plugin's similarly named `delegate/references/sub-agent-contract.md` does
 pin a third token, `PARTIAL`; that contract governs delegations with no ledger behind them, where
 the response is the only channel there is. It does not apply to a dispatch that named an address.
@@ -75,47 +83,17 @@ that wrote it, so that step reads it back empty instead of failing.
 
 <work_ledger>
 
-When your dispatch names a task address `P/T` together with an attempt number, that task has a row
-in the work ledger, and the ledger is where your state belongs. The CLI is how you reach it — the
-`sam_task` and `sam_plan` MCP tools answer from the content store and carry none of these commands:
-
-```bash
-<sam_cli/> plan <command> …
-```
-
-Read your task first, with both facts on the command. Act on any `Orchestrator Response` the output
-carries before anything else — it is what a previous attempt was sent back for:
-
-```bash
-<sam_cli/> plan read --address P/T --attempt N
-```
-
-Append what you produced as task sections, each carrying the attempt, and close the attempt once as
-your last ledger command:
-
-```bash
-<sam_cli/> plan update --plan-address P --task-id T --attempt N \
-  --append-section "Completion Report" --section-content "<TASK:, BRANCH:, FILES_CHANGED:, COMMITS:, NOTES:>"
-<sam_cli/> plan update --plan-address P --task-id T --attempt N \
-  --append-section "Verification Results" --section-content "<one line per verification step, or none>"
-<sam_cli/> plan finish --address P/T --attempt N \
-  --result complete|failed|blocked|needs-input --note "<what stopped you, what you need, or your question>"
-```
-
-`finish --result complete` answers `report-missing` until this attempt carries both a `Completion
-Report` section and a `Verification Results` section, so append both before you finish. The other
-results close the attempt without them. Sections are recorded against the attempt that appended
-them, so an attempt following a send-back appends its own.
+When your dispatch names a task address `P/T` together with an attempt number, read
+[the runner contract](../../docs/work-ledger/runner-contract.md) in full before your first ledger
+command. It owns the task read, attempt identity, lease renewal, report prerequisites, explicit
+outcome selection, closure and refusal handling. Use its CLI sequence; runner lease and finish
+operations are CLI-only. Imported-plan MCP read/update routing is described there too.
 
 Send the `STATUS:` line and `finish` both. They carry different things and neither substitutes for
 the other: the `STATUS:` line is what your caller reads out of your response, and the orchestrator
 records it against the attempt as its return text; `finish --result` is the durable outcome every
 later reader queries, including an orchestrator that resumes in a new session and never saw your
-response. `STATUS: DONE` is what you send once `finish` was recorded, whatever its `--result`.
-
-The full runner sequence — renewing the lease before work that may outrun it, recording a
-divergence, and what each refusal code asks of you — is in
-[the runner contract](../../docs/work-ledger/runner-contract.md).
+response. The status rules above say which first line to send.
 
 A dispatch naming no address and no attempt has no ledger row to write, and this section asks
 nothing of it.

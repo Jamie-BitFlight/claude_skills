@@ -1119,7 +1119,7 @@ TRANSITIONS: list[Transition] = [
             CASCADE,
         ],
         events=["task.finished", "task.state"],
-        to_status="complete when --result complete; failed when failed; blocked when blocked or needs-input",
+        to_status="complete when --result is complete; failed when failed; blocked when blocked or needs-input",
         note="task.state rows only for the cascade; expires keeps its value",
     ),
     *[

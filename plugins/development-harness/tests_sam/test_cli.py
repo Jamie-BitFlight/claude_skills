@@ -7,6 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from dh_core import ledger
 from dh_core.known_failure_types import KNOWN_FAILURE_TYPES
 from ruamel.yaml import YAML
 from sam_schema.cli import app
@@ -626,6 +627,143 @@ def test_state_output_shows_old_and_new_status(plan_dir: Path) -> None:
     assert result.exit_code == 0
     data = json.loads(result.stdout)
     assert data == {"id": "T3", "status": "complete"}
+
+
+# ---------------------------------------------------------------------------
+# sam finish
+# ---------------------------------------------------------------------------
+
+
+def _dispatch_ledger_task(task_id: str) -> str:
+    """Create a one-task ledger plan and open an attempt on it.
+
+    Args:
+        task_id: The task id to create and dispatch.
+
+    Returns:
+        The canonical plan id the task was created under.
+    """
+    conn = ledger.open_ledger()
+    try:
+        plan_id = str(
+            ledger.create(
+                conn, slug=f"finish-{task_id.lower()}", goal="goal", tasks=[{"id": task_id, "title": "one"}]
+            ).plan
+        )
+        ledger.dispatch(conn, plan_id, task_id)
+    finally:
+        conn.close()
+    return plan_id
+
+
+def _append_report_sections(plan_id: str, task_id: str) -> None:
+    """Append the sections a complete finish requires for the current attempt."""
+    conn = ledger.open_ledger()
+    try:
+        ledger.update(conn, plan_id, task_id, attempt=1, section="Completion Report", section_content="did it")
+        ledger.update(conn, plan_id, task_id, attempt=1, section="Verification Results", section_content="passed")
+    finally:
+        conn.close()
+
+
+def _ledger_snapshot() -> list[str]:
+    """Capture durable state and events so rejected calls cannot silently mutate either."""
+    conn = ledger.open_ledger()
+    try:
+        return list(conn.iterdump())
+    finally:
+        conn.close()
+
+
+def test_finish_without_result_is_rejected_without_mutation() -> None:
+    """Reports alone cannot choose the task's outcome on the runner's behalf."""
+    plan_id = _dispatch_ledger_task("T1")
+    _append_report_sections(plan_id, "T1")
+    before = _ledger_snapshot()
+
+    result = runner.invoke(app, ["plan", "finish", "--address", f"{plan_id}/T1", "--attempt", "1"])
+
+    assert result.exit_code == 2
+    assert "--result" in result.stderr
+    assert _ledger_snapshot() == before
+
+
+@pytest.mark.parametrize("outcome_args", [["--result=complete"], ["--result", "complete"]], ids=["attached", "split"])
+def test_finish_with_explicit_complete_records_success(outcome_args: list[str]) -> None:
+    """Both supported parser spellings record the selected successful outcome."""
+    plan_id = _dispatch_ledger_task("T1")
+    _append_report_sections(plan_id, "T1")
+
+    result = runner.invoke(app, ["plan", "finish", "--address", f"{plan_id}/T1", "--attempt", "1", *outcome_args])
+
+    assert result.exit_code == 0
+    assert json.loads(result.stdout)["status"] == "complete"
+    conn = ledger.open_ledger()
+    try:
+        row = ledger.read(conn, plan_id, "T1").row
+        assert row is not None
+        assert row["result"] == "complete"
+        assert row["attempt_open"] == 0
+    finally:
+        conn.close()
+
+
+@pytest.mark.parametrize(
+    ("outcome", "status"), [("failed", "failed"), ("blocked", "blocked"), ("needs-input", "blocked")]
+)
+def test_finish_non_success_preserves_outcome_without_report_sections(outcome: str, status: str) -> None:
+    """Non-success closes the attempt without fabricating reports or losing needs-input."""
+    plan_id = _dispatch_ledger_task("T1")
+
+    result = runner.invoke(
+        app,
+        ["plan", "finish", "--address", f"{plan_id}/T1", "--attempt", "1", f"--result={outcome}", "--note", "stopped"],
+    )
+
+    assert result.exit_code == 0
+    assert json.loads(result.stdout)["status"] == status
+    conn = ledger.open_ledger()
+    try:
+        row = ledger.read(conn, plan_id, "T1").row
+        assert row is not None
+        assert row["result"] == outcome
+        assert row["attempt_open"] == 0
+        assert row["note"] == "stopped"
+    finally:
+        conn.close()
+
+
+def test_finish_with_invalid_result_is_rejected() -> None:
+    """A --result value the ledger does not recognize is refused, not silently accepted."""
+    plan_id = _dispatch_ledger_task("T1")
+    before = _ledger_snapshot()
+
+    result = runner.invoke(
+        app, ["plan", "finish", "--address", f"{plan_id}/T1", "--attempt", "1", "--result", "bananas"]
+    )
+
+    assert result.exit_code == 1
+    assert "must be one of" in result.stderr
+    assert _ledger_snapshot() == before
+
+
+@pytest.mark.parametrize("present_section", [None, "Completion Report", "Verification Results"])
+def test_finish_complete_requires_both_current_attempt_report_sections(present_section: str | None) -> None:
+    """The CLI preserves report refusal until both required sections exist."""
+    plan_id = _dispatch_ledger_task("T1")
+    if present_section is not None:
+        conn = ledger.open_ledger()
+        try:
+            ledger.update(conn, plan_id, "T1", attempt=1, section=present_section, section_content="report")
+        finally:
+            conn.close()
+    before = _ledger_snapshot()
+
+    result = runner.invoke(app, ["plan", "finish", "--address", f"{plan_id}/T1", "--attempt", "1", "--result=complete"])
+
+    assert result.exit_code == 1
+    assert "report-missing" in result.stderr
+    assert _ledger_snapshot() == before
 
 
 # ---------------------------------------------------------------------------

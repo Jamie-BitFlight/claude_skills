@@ -34,6 +34,7 @@ import ast
 import importlib.util
 import os
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -339,6 +340,34 @@ def test_a_non_zero_exit_carries_the_command_its_status_and_both_streams() -> No
     assert "why it refused" in message
 
 
+def test_runner_emits_explicit_result_as_one_argument(
+    preparation: Preparation, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The executable command selects success explicitly without a separate complete word."""
+    invocations: list[list[str]] = []
+
+    def record(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        invocations.append(argv)
+        return subprocess.CompletedProcess(argv, 0, stdout='{"status":"complete"}', stderr="")
+
+    monkeypatch.setattr(subprocess, "run", record)
+    cli = scripted_runner.LedgerCli(preparation.toolchain, preparation.workspace.environment, timeout_seconds=30)
+
+    cli.run(
+        "finish",
+        [
+            scripted_runner.Argument(name="--address", value="P0/T1"),
+            scripted_runner.Argument(name="--attempt", value="1"),
+            scripted_runner.Argument(name="--result", value="complete"),
+        ],
+    )
+
+    assert len(invocations) == 1
+    assert "--result=complete" in invocations[0]
+    assert "--result" not in invocations[0]
+    assert "complete" not in invocations[0]
+
+
 def test_a_command_that_does_not_finish_stops_the_run_by_name(preparation: Preparation) -> None:
     """A hung command reaches the same surface as every other failure, not a traceback."""
     cli = scripted_runner.LedgerCli(preparation.toolchain, preparation.workspace.environment, timeout_seconds=0)
@@ -462,7 +491,7 @@ def test_appending_a_report_section_emits_a_task_section_event(
 
 @pytest.mark.parametrize(("task", "attempt"), RUNNER_ATTEMPTS, ids=ATTEMPT_IDS)
 def test_finish_completes_the_task(loop_record: LoopRecord, task: str, attempt: int) -> None:
-    """``finish --result complete`` is the runner's last ledger command and leaves the task complete."""
+    """An explicitly successful finish leaves the task complete."""
     assert_satisfied(loop_record.observation(Check.FINISH_COMPLETE, task=task, attempt=attempt))
 
 
