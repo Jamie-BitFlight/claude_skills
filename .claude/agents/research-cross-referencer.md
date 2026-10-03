@@ -103,7 +103,6 @@ NOTE: No entries scored above threshold (score >= 2) — Cross-References sectio
 This agent MUST NOT:
 
 - Modify `./research/README.md`
-- Create files in `./research/insights/`
 - Create backlog items
 - Edit any file other than the target research entry
 - Commit to git or push
