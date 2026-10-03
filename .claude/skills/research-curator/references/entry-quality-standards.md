@@ -14,7 +14,7 @@ Reviewing a finished entry rather than writing one? Use [Entry Review Rubric](./
 
 NEVER describe a resource based on its name, URL path, or domain alone. ALWAYS fetch and read primary sources before writing any section.
 
-If a source cannot be accessed: write "Unable to access [source]: [reason]" in the entry's References section. Do NOT infer content.
+If a source cannot be accessed: write "Unable to access [URL] (accessed YYYY-MM-DD): [reason]" in the entry's References section. Do NOT infer content.
 
 ### Rule 2: Preserve Counts and Specifics
 

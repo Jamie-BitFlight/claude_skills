@@ -48,7 +48,7 @@ flowchart TD
     DocCheck -->|"All YES — docs sufficient"| Anchor
     DocCheck -->|"Any NO — trigger code analysis"| Phase1b[Phase 1b — Read source files from worktree<br>up to 12 files in tier order<br>merge code extracts with doc extracts]
     Phase1b --> Anchor
-    Anchor[Phase 1c — Repo Anchor Pass, unconditional<br>3-6 capabilities from your own extracts, each a narrow + broader term<br>git grep every term — never plain grep, never unbudgeted Reads<br>read up to 6 matched files, quote one line containing the term<br>0 matches on BOTH terms is an anchor; narrow term alone is not] --> Organize[Phase 2 — Organize extracts by section theme]
+    Anchor[Phase 1c — Repo Anchor Pass, unconditional<br>capabilities from your own extracts<br>discover and use the best semantic search tools available, else fall back<br>quote one body line that supports each claim<br>record Found by, Overlaps, and what could change] --> Organize[Phase 2 — Organize extracts by section theme]
     Organize --> Write[Phase 2 — Write entry grounded in extracts<br>every Relevance item carries an anchor]
     Write --> Confidence[Assign confidence per section]
     Confidence --> Validate[Confirm every claim traces to an extract]
@@ -140,7 +140,7 @@ The phase order never changes:
 1. **Phase 1 — Extract**: pull exact passages from every primary source, each recorded with its source and the entry section it feeds. Writing any section before this is FORBIDDEN.
 2. **Doc-Sufficiency Check**: three binary questions over the architecture and feature extracts. Any NO triggers Phase 1b.
 3. **Phase 1b — Code analysis**, only when the check answered NO: read source files from the shallow clone in tier order, up to 12 files, and merge the code extracts into the Phase 1 set.
-4. **Phase 1c — Repo Anchor Pass**, unconditional, every entry: extract from THIS repository the way Phase 1 extracted from the resource. Derive 3-6 capabilities from your own extracts, give each a narrow and a broader search term, and `git grep --full-name -il` every one of them over the root-anchored `:/` pathspecs that step 2 of Phase 1c defines — never plain `grep`, which descends into gitignored worktrees and returns paths no clone has, and never bare pathspecs, which resolve against the current directory and return a silent, unsignalled zero from any subdirectory. Searching is unbudgeted; search every term. Then read matched files under a six-Read budget, at most one anchor per capability and never the same file twice, quoting one line that contains the term that produced the match list. Zero matches on both a capability's terms is an anchor; zero on the narrow term alone is a manufactured absence. Report any capability left unanchored, and why, in Key Findings.
+4. **Phase 1c — Repo Anchor Pass**, unconditional, every entry: extract from THIS repository the way Phase 1 extracted from the resource. Derive capabilities from your own extracts, discover at run time which semantic search tools your environment offers (`ccc`, graphify, other skills, plugins, MCP servers), use every one that works, and fall back to Grep, Glob, or reading files when none do. Quote one body line that supports each claim, record `Found by:`, what each capability overlaps, and what could change. An absence is stated as "not found by these searches", with every tool and query listed. Report any capability left unanchored, and why, in Key Findings.
 5. **Phase 2 — Write**: compose each section from its extracts, then confirm every factual claim in that section traces to at least one extract before finalizing the section.
 
 Phase 1c is the section that most often gets skipped, because the resource is interesting and the
@@ -188,11 +188,11 @@ flowchart TD
     Features --> Architecture[Describe architecture with component names and data flow]
     Architecture --> Usage[Write installation and usage examples verified against official docs]
     Usage --> Limitations[Document limitations and caveats from source, or note absence explicitly]
-    Limitations --> Anchors[Phase 1c — anchor against THIS repo:<br>git grep each capability's narrow + broader term,<br>read up to 6 matched files, quote one line containing the term]
+    Limitations --> Anchors[Phase 1c — anchor against THIS repo:<br>search each capability with the best available tools,<br>quote one body line from each file found]
     Anchors --> Relevance[Write Relevance items from the anchors:<br>path, quoted line from it, and one of the three Change outcomes<br>—a specific edit, already-covered, or out-of-scope—<br>no anchor means no item]
     Relevance --> Confidence[Assign confidence level per section]
     Confidence --> References[Compile all sources with full URL and access date]
-    References --> Freshness[Set freshness tracking -- next review in 3 months]
+    References --> Freshness[Set freshness tracking -- next review per Setting Next Review in entry-template.md]
     Freshness --> WriteFile[Write entry to ./research/category/resource-name.md]
     WriteFile --> SelfCheck[Self-Check Before Returning]
     SelfCheck --> Done([Return result])
@@ -206,12 +206,11 @@ flowchart TD
 4. Run the Doc-Sufficiency Check from [Extraction Methodology](.claude/skills/research-curator/references/extraction-methodology.md) on the re-extracted passages. Any NO: proceed to Phase 1b before updating sections. All YES: skip Phase 1b.
 5. (Conditional) Run Phase 1b code analysis on the worktree if the doc-sufficiency check failed. Merge the resulting code extracts with the re-extracted passages before updating sections.
 6. Run the Phase 1c Repo Anchor Pass again, unconditionally. Anchors go stale independently of the
-   resource: a path the existing entry names may have moved or been deleted since, and a term that
-   found nothing then may match now. Re-verify every path the existing Relevance section cites, and
-   rewrite any item whose anchor no longer resolves. Re-verification does not spend the six-Read
-   budget and is not capped: `ls {path}` settles whether a cited path still exists, and
-   `git grep -nF "{quoted line}" -- {path}` settles whether its quote is still there. Spend a Read
-   only on a file you are anchoring afresh.
+   resource: a path the existing entry names may have moved or been deleted since, and a search that
+   found nothing then may find something now. Re-verify every path the existing Relevance section
+   cites (`ls {path}`) and re-find each quote in its file, and rewrite any item whose anchor no
+   longer resolves. Re-verification is not capped; search afresh only for capabilities you are
+   anchoring anew.
 7. Update sections where source data has changed. Preserve sections where source data is unchanged.
    Keep the entry at its existing path — a refresh never re-runs category selection, because moving
    the file orphans every cross-reference and backlink pointing at it.
@@ -230,7 +229,7 @@ flowchart TD
 2. READ the entry file, and the scratch document when one was given.
 3. Fix ONLY the specified issues. Do NOT rewrite sections that are not flagged. Gather what a line's `needs:` names. On every scratch line you address, record `did:` with a short action note; check the line off once the fix is re-found in the file, and leave a line you cannot fix unchecked, its note saying why.
 4. `relevance_unanchored` is the one flagged issue that is not a text fix: it reports that Phase 1c never ran. Run the Repo Anchor Pass from [Extraction Methodology](.claude/skills/research-curator/references/extraction-methodology.md) and rewrite the Relevance section from the anchors it produces. Rewording the existing prose leaves the entry saying the same uncheckable thing and clears the regex, which is worse than leaving it flagged.
-5. After editing the entry, `git grep -nF` each quoted string and path you removed or changed over `./research/insights/*-{name}-*.md`, and update or delete each hit.
+5. After editing the entry, search `./research/insights/*-{name}-*.md` for each quoted string and path you removed or changed, and update or delete each hit.
 6. Run the [Self-Check](#self-check-before-returning) on the edited file, then return an itemized list of each fix applied. With a scratch document, return its path as `SCRATCH: {path}` after the Status line.
 
 ### `--review` Mode (audit and correct a finished entry)
@@ -251,13 +250,14 @@ Audit an entry someone else finished, or the same entry after a `--fix` pass. Re
 
 ## Self-Check Before Returning
 
-Applies to Default and `--rerun` modes, and to `--fix` after its edits. Validate and correct your own entry before you return it; the orchestrator's validation gate and the fresh Entry Review are a second look, never the first. Make at most two correction passes over steps 1-4, then step 5.
+Applies to Default and `--rerun` modes, and to `--fix` after its edits. Validate and correct your own entry before you return it; the orchestrator's validation gate and the fresh Entry Review are a second look, never the first. Make at most two correction passes over steps 1-5, then step 6.
 
-1. Run `fix_research_formatting.py`, then `validate_research.py main --json`, on your file (both in `.claude/skills/research-curator/scripts/`). Fix every error and every warning except `cross_references_absent`. Fix a refuted anchor by re-running the search behind it, never by editing a count or path by hand.
-2. Re-find every Relevance quote with `git grep -nF "{quote}" -- {path}`. A quote is a body line that contains the item's Term, per the anchor rules in [Entry Template](.claude/skills/research-curator/references/entry-template.md); an item with no `Term:` line is rejected.
+1. Run `fix_research_formatting.py`, then `validate_research.py main --json`, on your file (both in `.claude/skills/research-curator/scripts/`). Fix every error, and every warning the invocation listed or the [Validation Gate](.claude/skills/research-curator/references/validation-rules.md#validation-gate-for-newrefreshed-entries) names. Fix a refuted anchor by re-running the search behind it, never by editing a count or path by hand.
+2. Re-find every Relevance quote in its cited file. A quote is a body line that supports the item's claim, per the anchor rules in [Entry Template](.claude/skills/research-curator/references/entry-template.md); an item with no `Found by:` line is rejected (an entry written before this shape carries `Term:` or a recorded `git grep` instead; leave those items unless the pass found a stale anchor).
 3. Check the `confidence_map` covers every major section (Rule 4), and that a section resting on code you read is not rated `high`.
 4. List each version, figure, license, install command, and architecture assertion with the extract it came from; delete any that has none.
-5. Report anything still unfixed on an `UNRESOLVED:` line in the result, with the exact text. Never report Status `created`, `updated`, or `fixed` over an unresolved error; use `failed`.
+5. Scan the entry for the Gate 6 triggers in [Entry Review Rubric](.claude/skills/research-curator/references/entry-review-rubric.md) and rewrite each hit outside an attributed quotation.
+6. Report anything still unfixed on an `UNRESOLVED:` line in the result, with the exact text. Never report Status `created`, `updated`, or `fixed` over an unresolved error; use `failed`.
 
 ---
 
@@ -269,7 +269,7 @@ When a primary source cannot be fetched:
 
 1. Report explicitly: "Unable to access {URL}: {reason — HTTP 404 | timeout | auth required | etc.}"
 2. Do NOT guess or infer content from the URL path, domain, or page title.
-3. Do NOT proceed to write content for a section if the required source was inaccessible.
+3. Write a section whose source was inaccessible in Rule 3 language, with no inferred content.
 4. Document the inaccessibility in the entry's References section with the exact error.
 5. If fallback sources exist (e.g., GitHub README when docs site is down), fetch those and note the fallback in the entry.
 
@@ -323,7 +323,7 @@ This agent creates and updates individual research entry files. It MUST NOT:
 - Coordinate batch operations -- orchestrator's responsibility
 - Push to remote -- orchestrator's responsibility
 - Create or modify skills, agents, or plugins
-- Modify any file outside `./research/` (exception: shallow clones to `./.worktrees/` are permitted as read-only workspace preparation — do not edit files inside the worktree). Reading this repo's own files is not modification: Phase 1c requires `git grep` and `Read` over the scope its step 2 defines, and that is expected, not a boundary breach
+- Modify any file outside `./research/` (exception: shallow clones to `./.worktrees/` are permitted as read-only workspace preparation — do not edit files inside the worktree). Reading this repo's own files is not modification: Phase 1c requires searching and reading this repo with whatever tools its step 2 finds, and that is expected, not a boundary breach
 - Write a Relevance item that names no path and cites no search. The template's anchor rules give three passing outcomes — a concrete edit, already-covered, out-of-scope — and unanchored prose is none of them
 - Call `add_repo`, `register_repo_root`, or any other session GitHub-scope-expansion tool for a research target. These tools fire only on explicit user instruction to add a repo to the session; a research URL is not that instruction. See `repo_access_procedure` step 4 -- a `gh api` 403 on an out-of-scope repo is expected and is handled via the step 5 fallback, never by requesting broader access
 - Write, while running `--review`, to any file other than the entry under review, its analysis files, and the scratch document; or gather new data there (fetch upstream sources, search for new anchor evidence). Such a correction stays an unchecked line for `--fix`

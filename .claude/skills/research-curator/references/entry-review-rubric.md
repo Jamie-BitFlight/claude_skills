@@ -32,14 +32,14 @@ uv run --script .claude/skills/research-curator/scripts/validate_research.py che
 | Command | What a defect looks like | Record |
 |---|---|---|
 | `fix_research_formatting.py --check` | Non-zero exit — the file needs formatting fixes | Every path the tool named, and the fix it wanted. Run it without `--check`: this review applies fixes, so a path it reformatted is a checked finding |
-| `validate_research.py main --json` | Any issue in the JSON `entries[].issues[]` array except `cross_references_absent`, non-blocking per [Validation Rules](./validation-rules.md) | `errors: N, warnings: N` from `summary`, then every issue's `check`, `severity`, `message`, and `line`, quoted |
+| `validate_research.py main --json` | Any issue in the JSON `entries[].issues[]` array except `cross_references_absent`, non-blocking per [Validation Rules](./validation-rules.md), and except `relevance_anchor_path_missing` for a path `git log --all --full-history` shows moved, which is an `R` line | `errors: N, warnings: N` from `summary`, then every issue's `check`, `severity`, `message`, and `line`, quoted |
 | `validate_research.py check-backlinks ./research` | A residual asymmetric cross-reference involving this entry, or any file the scan could not read or parse | Each object in JSON `edges`, and every object in `skips` when `scan_skipped_files` is non-zero. `--fix` retains the original `edges` and adds repair outcome fields |
 
 A non-zero `scan_skipped_files` field fails this command on its own, because a file dropped from
 the scan was never compared -- exit 0 would claim coverage the scan did not have. Treat those
 paths as Gate 1 defects, not as noise.
 
-**Cross-reference reciprocity** is measured by `check-backlinks`, not by eye, and repaired by the orchestrator; the reviewer reports only a residual pair. An entry that cites B while B does not cite back is a defect against this entry even though the missing row lives in B. Row format: [Cross-Reference Format](./cross-reference-format.md).
+**Cross-reference reciprocity** is measured by `check-backlinks`, not by eye, and repaired by the orchestrator; the reviewer reports only a residual pair. An entry that cites B while B does not cite back is a defect against this entry even though the missing row lives in B. Row format: [Cross-Reference Format](./cross-reference-format.md). A pair whose missing row is in an `--exclude`d or unwritable file is recorded as an unchecked `R` line, not a `D` line; the final verdict block relays unchecked `R` lines to the user, and no worker acts on them.
 
 ---
 
@@ -51,7 +51,7 @@ Each rule in [Entry Quality Standards](./entry-quality-standards.md) is a separa
 |---|---|---|
 | **Rule 1 — Read Before Writing** | Does every section's content trace to a source listed in References, and was that source actually reachable? | A claim whose only possible basis is the resource's name, URL path, or domain. An inaccessible source whose absence is not stated in References |
 | **Rule 2 — Preserve Counts** | Are capability figures written as the exact number the source gives? | A vague quantifier ("many languages", "recent release", "low latency") standing where the source has a figure |
-| **Rule 3 — Absence vs Nonexistence** | Where information was not found, does the entry say it was not found? | "Doesn't support X" / "Not available" / "Not supported" where the honest statement is "Not mentioned in documentation" or "Unable to access {source}". Applies to the entry's repo claims too: `-> nothing in {scope}` reports that these search terms matched nothing in that scope, and an item reading it as "this repo has no X" is a Rule 3 defect |
+| **Rule 3 — Absence vs Nonexistence** | Where information was not found, does the entry say it was not found? | "Doesn't support X" / "Not available" / "Not supported" where the honest statement is "Not mentioned in documentation" or "Unable to access {source}". Applies to the entry's repo claims too: `-> not found by these searches` (or the older `-> nothing in {scope}`) reports that those searches returned nothing, and an item reading it as "this repo has no X" is a Rule 3 defect |
 | **Rule 4 — Explicit Confidence** | Does every major section carry a confidence level in the confidence map? | A section missing from the map. A `high` on a section whose sources are informal, partial, contradictory, or code-read |
 
 ---
@@ -99,8 +99,8 @@ For each repo claim, in order:
 2. **Path is described correctly** — the file's real contents match what the claim says about them. A proposal that names a real path but misdescribes what lives there is a defect of the same severity as an invented path. So is a quoted `Source pattern` or `Current state` line that no longer exists in the entry or the file.
 3. **Gap is real** — where a proposal says the local system lacks a capability, the file confirms the absence. A capability the file already implements makes the proposal a defect, not a low-confidence proposal.
 4. **Measurable signal is runnable** — where a proposal names a command or an observable field as its completion signal, that command runs and that field is reachable.
-5. **Quoted line contains the matched term** — each present-anchor Relevance item carries a `Term:` line naming the term that produced its match list ([Entry Template](./entry-template.md)'s Relevance item shape). Check that the quoted line contains that term. A quote that does not is evidence about something else, and is a defect no matter how real the path is: a GUI `widget` anchored to a tmux menu widget, an SDL2 `simulator` anchored to an iOS Simulator. An item with no `Term:` line is itself the defect — record it as one and check the quote against both of the capability's terms; do not mark this rule NOT RUN for a missing field the entry was required to write.
-6. **Quote is an assertion and a locator** — reject a quoted line that is a frontmatter field (`description:`, `name:`, `allowed-tools:`), a bullet in a link list or index table, or a sample argument inside a code fence. Each carries the term without asserting anything about this repo's behaviour. Reject one that cannot be re-found either — `true`, `3`, a lone heading word.
+5. **Quote supports the claim** — each present-anchor Relevance item carries a `Found by:` line naming the tool and query that surfaced the file ([Entry Template](./entry-template.md)'s Relevance item shape). Open the path, find the quoted body line, and check that it supports what the item says about this repo. A line that shares the query's words but concerns something else is a defect no matter how real the path is: a GUI `widget` anchored to a tmux menu widget, an SDL2 `simulator` anchored to an iOS Simulator. An item with no `Found by:` line is itself the defect. An entry written before this shape carries a `Term:` line instead; check that its quote contains that Term.
+6. **Quote is an assertion and a locator** — reject a quoted line that is a frontmatter field (`description:`, `name:`, `allowed-tools:`), a bullet in a link list or index table, or a sample argument inside a code fence. Each carries the words without asserting anything about this repo's behaviour. Reject one that cannot be re-found either — `true`, `3`, a lone heading word.
 7. **Paths are distinct** — no two Relevance items anchor to the same file. Repeated paths multiply one observation into several findings; count them as one and record the rest as defects.
 
 Record each verified claim with the path you read. A gate 4 pass asserts you opened the files; it cannot be reached by reading the proposal alone.
@@ -116,11 +116,10 @@ Ask: **was this text produced by running something against this repository?**
 Two item shapes pass, and they pass for different reasons.
 
 - A **presence anchor** passes when it names a specific file, skill, agent, or workflow of this repo and says something about it that is true here and would be false elsewhere.
-- An **absence anchor** passes when you re-run **both** of its search commands — the narrow term and the broader term — and get zero from each. Its `→ 0 matches` is true of most repositories, so it never satisfies the would-be-false-elsewhere test; re-running the commands is what makes it a finding rather than a claim, and running them is the check. An anchor whose commands you did not re-run is `NOT RUN`, not a pass. An anchor recording only one command is a defect — one term at zero is the manufactured absence Phase 1c exists to prevent, not an anchor. An anchor whose commands now return matches is also a defect: what the entry recorded as searched-and-empty is neither, so the item rests on nothing. Report it as a stale anchor, and do not restate it as "the entry claims this repo has no X" — per Gate 2 Rule 3, the entry claims no such thing.
-  **This half is now mechanical**: `validate_research.py`'s `relevance_absence_anchor_refuted` and `relevance_absence_anchor_unparsed` checks (error severity, run by the validator) already re-execute every recorded absence-anchor command and fail the entry when its count disagrees or its shape does not reproduce. A clean validator result on those two checks means the re-run-and-compare step above has already happened by machine; this gate's own re-running of absence anchors is redundant with it and exists as a backstop for what the mechanical check cannot see — a `NOT RUN` scan (no `.git` above the entry, reported as `relevance_absence_anchors_unchecked`), and whether the surviving term is actually the resource-specific one Phase 1c step 1 asked for rather than a technically-correct but generic substitute. Spend this gate's judgment there, not on re-deriving counts a machine already verified.
+- An **absence anchor** passes when it lists every tool and query run, and you re-run at least one of them — a semantic tool when one is available — and nothing relevant comes back. Its "nothing relevant returned" is true of most repositories, so it never satisfies the would-be-false-elsewhere test; re-running the searches is what makes it a finding rather than a claim. An anchor you could not re-run is `NOT RUN`, not a pass. An anchor that lists no tool or query, or whose searches now return a relevant file, is a defect: report it as a stale anchor, and do not restate it as "the entry claims this repo has no X" — per Gate 2 Rule 3, the entry claims no such thing. An entry written before this shape records `git grep` commands with counts; the validator's absence-anchor checks re-run those, and this gate spends its judgment on whether the recorded searches fit the capability.
 - **FAILS** when an item carries neither shape — text that would survive a find-and-replace of this repo's name, generic advice ("could improve code quality", "useful for agent workflows", "fits well with this project's architecture") dressed as repo-specific findings.
 
-An entry whose Relevance section is entirely absence anchors passes this gate when every command re-runs to zero. It is a thin entry, not a failing one; record the count so the thinness is visible.
+An entry whose Relevance section is entirely absence anchors passes this gate when every re-run comes back empty. It is a thin entry, not a failing one; record the count so the thinness is visible.
 
 A gate 5 failure is a defect even when every individual sentence in gate 4 verified.
 
@@ -197,7 +196,7 @@ REPAIRS: {N} found, {N} checked, {N} unchecked
 UNCHECKED: (each unchecked line, verbatim)
 - [ ] D3 | gate {N} | ...
 
-VERDICT: PASS | FAIL
+VERDICT: PASS | FAIL | NOT RUN -- {reason}
 ```
 
 `PASS` requires every gate at PASS and no unchecked defect. Any gate at FAIL or NOT RUN, or any unchecked defect, is `FAIL` — an unchecked defect and a `PASS` verdict cannot both be true. A `NOT RUN` gate is a `FAIL` with no line for the worker; the orchestrator stops on it, naming the gate.

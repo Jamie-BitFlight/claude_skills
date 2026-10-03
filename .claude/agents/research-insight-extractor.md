@@ -17,7 +17,7 @@ Extract improvements from ./research/{category}/{name}.md
 **Output**:
 
 - `./research/insights/{YYYY-MM-DD}-{resource-name}-improvements.md` — improvement proposal file
-- Backlog items created directly for every High or Medium impact improvement found
+- Backlog items created directly for every high-confidence proposal not already tracked
 
 ---
 
@@ -40,7 +40,7 @@ flowchart TD
     MorePatterns -->|Yes| Gap
     MorePatterns -->|No| CheckBacklog[Check existing backlog items<br>to avoid duplicate proposals]
     CheckBacklog --> WriteFile[Write all proposals to<br>./research/insights/YYYY-MM-DD-resource-name-improvements.md]
-    WriteFile --> CreateItems[Create backlog items for High and Medium impact proposals<br>that are not already tracked]
+    WriteFile --> CreateItems[Create backlog items for every high-confidence proposal<br>that is not already tracked]
     CreateItems --> Return([Return structured result])
 ```
 
@@ -106,13 +106,13 @@ The cost of skipping the search is building something that already exists.
 `research/insights/2026-03-10-cocoindex-code-improvements.md` states "No skill in `.claude/skills/`
 or `plugins/` provides semantic code search capability" and targets creating one, while
 `.claude/skills/ccc/SKILL.md` and
-`plugins/python-engineering/agents/semantic-code-search.md` both exist. A narrow and a broader
-`git grep`, recorded as the A2 form below, would have prevented it.
+`plugins/python-engineering/agents/semantic-code-search.md` both exist. A semantic search for the
+capability, recorded in `**Absence evidence**`, would have prevented it.
 
-Use `git grep`, never plain `grep`. `git grep` searches tracked files only; plain `grep` descends
-into gitignored `.claude/worktrees/`, which holds more files than the rest of the repo combined, so
-its hits are mostly worktree copies of paths that exist in no clone. An absence claim backed by a
-plain `grep` is not reproducible by the reader checking it.
+Search by meaning with the best tools your environment offers: discover them at run time (`ccc`,
+graphify, other skills, plugins, MCP servers), use every one that works, and fall back to Grep, Glob,
+or reading files when none do. An absence claim says "not found by these searches" and lists the
+tools and queries; it never says the capability does not exist.
 
 Open every path you name before naming it — in `**Local system**`, in Current state, and in Target
 state where the path is meant to already exist. A path you have not opened does not go in a
@@ -156,7 +156,7 @@ Each proposal in the output file follows this structure exactly:
 
 **Source pattern**: {exact quote or paraphrase from research entry, with section reference}
 **Local system**: {path to the local file this maps to}
-**Absence evidence**: {the narrow and the broader search behind any "no local system does X" claim, each in the A2 command form of `.claude/skills/research-curator/references/extraction-methodology.md` with its match count} | not applicable — this proposal claims no absence
+**Absence evidence**: {every tool and query behind any "no local system does X" claim, with what came back, stated as "not found by these searches"} | not applicable — this proposal claims no absence
 **Confidence**: High | Medium | Low
 **Impact**: High | Medium | Low
 **Backlog**: #{issue-number} created | Deferred — {reason}
@@ -278,7 +278,7 @@ IMMEDIATE_ATTENTION:
 - #{issue} {title} — {one sentence why this is worth acting on now}
 ```
 
-`IMMEDIATE_ATTENTION` lists every backlog item that is **high confidence + High impact** (P1 priority). If none qualify, omit the section entirely.
+`IMMEDIATE_ATTENTION` lists every backlog item that is **high confidence + High impact**. If none qualify, omit the section entirely.
 
 If the entry has no Relevance or Patterns section, return `STATUS: no_actionable_patterns` and stop — do not write a file.
 
