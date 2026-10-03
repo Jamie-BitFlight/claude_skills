@@ -15,7 +15,7 @@
 **Integration mechanism**: CLI subprocess (gh aw extension discovery and invocation)
 **Replaces or adds**: Adds capability to define and execute AI-powered GitHub workflows declaratively using Markdown
 **Setup cost**: Low (gh-aw installs as GitHub CLI extension; the `engine: claude` workflow in the sketch also needs engine authentication: an `ANTHROPIC_API_KEY` repository secret or Anthropic Workload Identity Federation, per the gh-aw Claude engine docs)
-**Integration surface**: CLI extension `gh aw` with commands: `init`, `new`, `compile`, `run`, `logs`, `audit`, `doctor`, `add-wizard`, `status`, `fix`
+**Integration surface**: CLI extension `gh aw` with commands including: `init`, `new`, `compile`, `run`, `logs`, `audit`, `doctor`, `add-wizard`, `status`, `fix`
 
 ### Why this caller
 
@@ -104,6 +104,7 @@ on:
   workflow_run:
     workflows: [Code quality]  # matches `name:` in .github/workflows/code-quality.yml
     types: [completed]
+    branches: [main]           # triggers.md: the compiler warns when `branches` is omitted (errors in strict mode)
 engine: claude
 permissions:
   contents: read
@@ -114,8 +115,11 @@ tools:
   github:
     toolsets: [default, actions]  # `default` omits `actions`; `actions` covers workflows, runs, artifacts
 safe-outputs:
-  add-comment:
+  create-issue:                # workflow_run supplies no triggering issue or PR, so `add-comment` has no default target
+    title-prefix: "[ci-investigation] "
+    labels: [automation, agentic]
     max: 1
+    close-older-issues: true   # close the previous issue from this workflow
   noop:
 ---
 
@@ -126,7 +130,7 @@ When the code quality workflow fails, analyze the failure:
 1. Read the workflow run logs and artifact outputs
 2. Identify the root cause (syntax error, test failure, type mismatch, etc.)
 3. For each failure, suggest a specific fix with code if applicable
-4. Post one comment (via the `add-comment` safe output) with structured findings and next steps; call `noop` when the run did not fail
+4. Open one issue (via the `create-issue` safe output) with structured findings and next steps; call `noop` when the run did not fail
 
 Prioritize:
 - Test failures first (usually actionable)
@@ -135,6 +139,8 @@ Prioritize:
 
 Do NOT make fixes directly; only analyze and suggest.
 ```
+
+Why `create-issue` and not `add-comment`: the safe-outputs reference says `add-comment` "Defaults to triggering item; use `target: "*"` for any, or number for specific items". A `workflow_run` event carries no issue or pull request to comment on, so a comment would need an explicit `target` that this sketch has no source for. `create-issue` needs no target. `title-prefix`, `labels`, `max` and `close-older-issues` are documented `create-issue` options. This repository's `main-ci-health-check.yml` already opens a tracking issue for a red main; the investigation issue would add root-cause analysis and would not replace that check. Source: gh-aw v0.89.21 `docs/src/content/docs/reference/safe-outputs.md` (Issue Creation, Comment Creation), `docs/src/content/docs/reference/triggers.md` (Workflow Run Triggers).
 
 After writing this workflow:
 
