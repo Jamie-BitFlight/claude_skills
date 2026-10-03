@@ -5,13 +5,13 @@ subtitle: Python asyncio runtime for semantic supervision of coding agents with 
 research_date: 2026-10-02
 source_url: https://github.com/thruwire/foreman
 github_repository: https://github.com/thruwire/foreman
-version_at_research: main (2026-10-02 commit)
+version_at_research: 0.4.1 (commit e5d1aa45, 2026-09-28)
 license: MIT License
 freshness_tracking:
   last_verified: 2026-10-02
-  version_at_verification: main
+  version_at_verification: 0.4.1 (commit e5d1aa45, 2026-09-28)
   next_review: 2027-01-02
-  confidence_map: "Overview: high, Problem Addressed: high, Key Features: high, Technical Architecture: high, Installation & Usage: high, Limitations: high, Relevance: medium"
+  confidence_map: "Overview: high, Problem Addressed: high, Key Features: medium, Technical Architecture: medium, Installation & Usage: high, Limitations: high, Relevance: medium"
 ---
 
 # Foreman
@@ -92,7 +92,7 @@ Foreman is a native Python `asyncio` runtime that combines a coding agent loop w
 
 - `foreman demo --repo .` runs the complete runtime with deterministic mock worker and model implementations
 - Requires no API key, network, external CLI, or external repository
-- Exercise the same state persistence, event stream, responsibility routing, and terminal UI as a real run
+- Exercises the same state persistence, event stream, responsibility routing, and terminal UI as a real run
 
 ---
 
@@ -120,7 +120,7 @@ Both loops run simultaneously. Worker output and lifecycle events flow into the 
 
 **Policy Arbiter** (deterministic decision selection): Evaluates all active responsibility proposals in safety-first order. Returns one selected directive (e.g., `STOP_WORKER`, `STEER_WORKER`, `FINISH`). Policy logic is Python code, not Jev output; Jev only scores probabilities.
 
-**Persistence** (`state.json`, `events.jsonl`): State atomic swap; events append-only. Recovery parses state file and resumes from last known position. Event stream immutable, searchable for debuging.
+**Persistence** (`state.json`, `events.jsonl`): State atomic swap; events append-only. Recovery parses state file and resumes from last known position. Event stream immutable, searchable for debugging.
 
 ### Evidence Provider Architecture
 
@@ -289,10 +289,17 @@ Plugin forwards lifecycle events to `foreman hook --client codex`, allowing Fore
 
 ## References
 
-- [Foreman README](https://github.com/thruwire/foreman/blob/main/README.md) (accessed 2026-10-02)
-- [Foreman — Technical Architecture](https://github.com/thruwire/foreman/blob/main/docs/hooks.md) (accessed 2026-10-02)
-- [Foreman — Evidence Providers](https://github.com/thruwire/foreman/blob/main/docs/evidence.md) (accessed 2026-10-02)
-- [Foreman LICENSE (MIT)](https://github.com/thruwire/foreman/blob/main/LICENSE) (accessed 2026-10-02)
+- [Foreman README](https://github.com/thruwire/foreman/blob/main/README.md) (revision 0.4.1 (commit e5d1aa45, 2026-09-28); accessed 2026-10-03)
+- [Foreman — Runtime and event flow](https://github.com/thruwire/foreman/blob/main/docs/runtime.md) (H1 "Runtime and event flow"; sections "Components" and "One assessment cycle"; revision 0.4.1 (commit e5d1aa45, 2026-09-28); accessed 2026-10-03)
+- [Foreman — Coding-assistant hooks and attached workers](https://github.com/thruwire/foreman/blob/main/docs/hooks.md) (revision 0.4.1 (commit e5d1aa45, 2026-09-28); accessed 2026-10-03)
+- [Foreman — Live steering](https://github.com/thruwire/foreman/blob/main/docs/steering.md) (revision 0.4.1 (commit e5d1aa45, 2026-09-28); accessed 2026-10-03)
+- [Foreman — Responsibility configuration and routing](https://github.com/thruwire/foreman/blob/main/docs/routing.md) (revision 0.4.1 (commit e5d1aa45, 2026-09-28); accessed 2026-10-03)
+- [Foreman — Evidence providers](https://github.com/thruwire/foreman/blob/main/docs/evidence.md) (revision 0.4.1 (commit e5d1aa45, 2026-09-28); accessed 2026-10-03)
+- [Foreman src/foreman/config.py](https://github.com/thruwire/foreman/blob/main/src/foreman/config.py) (lines 54-55, 75-76, 80-81: periodic assessment 30.0 s, Jev timeout 10.0 s, `diff_limit` 20_000, `output_limit` 12_000, `event_history_limit` 30, `worker_history_limit` 10; read from clone, revision 0.4.1 (commit e5d1aa45, 2026-09-28); accessed 2026-10-03)
+- [Foreman src/foreman/workers/codex_app_server.py](https://github.com/thruwire/foreman/blob/main/src/foreman/workers/codex_app_server.py) (lines 327 and 403: `turn/start`, `turn/steer`; read from clone, revision 0.4.1 (commit e5d1aa45, 2026-09-28); accessed 2026-10-03)
+- [Foreman src/foreman/hooks.py](https://github.com/thruwire/foreman/blob/main/src/foreman/hooks.py) (line 158: `hashlib.sha256(identity.encode("utf-8")).hexdigest()`; read from clone, revision 0.4.1 (commit e5d1aa45, 2026-09-28); accessed 2026-10-03)
+- [Foreman src/foreman/responsibilities/definitions/*.toml](https://github.com/thruwire/foreman/tree/main/src/foreman/responsibilities/definitions) (`min_threshold` values 0.65 to 0.80 and `routing_threshold` 0.70; read from clone, revision 0.4.1 (commit e5d1aa45, 2026-09-28); accessed 2026-10-03)
+- [Foreman LICENSE (MIT)](https://github.com/thruwire/foreman/blob/main/LICENSE) (revision 0.4.1 (commit e5d1aa45, 2026-09-28); accessed 2026-10-03)
 - [TypeSafe AI Jev Documentation](https://docs.typesafe.ai/primitives) (referenced in Foreman docs, link noted 2026-10-02; page itself not fetched — accessed 2026-10-02 only as a reference)
 - [TypeSafe Python SDK](https://docs.typesafe.ai/sdk/python) (referenced in Foreman docs, link noted 2026-10-02; page itself not fetched — accessed 2026-10-02 only as a reference)
 

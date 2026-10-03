@@ -3,7 +3,7 @@
 **Research entry**: ./research/agent-frameworks/foreman.md
 **Generated**: 2026-10-03
 **Patterns assessed**: 13
-**Backlog items created**: 0. The backlog duplicate check failed (`mcp__plugin_dh_backlog__backlog_list` returned "GraphQL is unavailable in this environment"), so no item was created. Improvement 1 qualifies for P1 and is still waiting for a backlog item.
+**Backlog items created**: 1. Improvement 1 was filed as GitHub issue [#4032](https://github.com/Jamie-BitFlight/claude_skills/issues/4032) (label `priority:p1`). The in-session duplicate check had failed (`mcp__plugin_dh_backlog__backlog_list` returned "GraphQL is unavailable in this environment").
 **Deferred (confidence too low to backlog)**: 3
 **Skipped (already covered or tracked)**: 9
 
@@ -18,7 +18,7 @@ The entry's own "Relevance to Claude Code Development" section marks all four of
 **Absence evidence**: `git grep -n -c "first_renewed" -- plugins/development-harness/dh_core/ledger/derive.py plugins/development-harness/dh_core/ledger/queries.py` returns 0 matches (exit 1). Every remaining non-test reference to `first_renewed` writes it or resets it: `ledger_spec.py:957,1011`, `transitions.py:753,828,1764`, `store.py:1156,1226,1240-1241`. None reads it to make a decision. `ledger_spec.py` `CONFIG` declares only `lease.ttl_seconds` (1800) and `loop.max_attempts` (3).
 **Confidence**: High
 **Impact**: Medium
-**Backlog**: Not created. Priority P1 per the matrix. The duplicate check could not run because `backlog_list` failed with "GraphQL is unavailable in this environment". Create the item once the backlog server is reachable and the duplicate check passes.
+**Backlog**: [#4032](https://github.com/Jamie-BitFlight/claude_skills/issues/4032), label `priority:p1`.
 
 ### Current state
 
@@ -62,7 +62,7 @@ The entry's own "Relevance to Claude Code Development" section marks all four of
 | Liveness-based stuck-worker detection (`worker_stuck` as no-activity) | Already covered: `dh_core/ledger/derive.py` `stale_row` together with `work-loop.md` J8 (`reclaim --reason stale`). The duration gap that remains is Improvement 1. |
 | Retry bound with escalation to a human (iteration bounds; `ESCALATE`) | Already covered: `ledger_spec.CONFIG` `loop.max_attempts` (default 3), the `reclaim` refusal `attempts-exhausted` (`transitions.py:1622-1623`), and `work-loop.md` J15, which puts the attempt history to the user. |
 | Atomic state plus append-only event log (`state.json` / `events.jsonl`) | Already covered, in a stronger form: `dh_core/ledger/store.py` derives every materialised table as a fold over the `events` table (`fold_events`, `rebuild`), and each transition writes its state and its events in one transaction. |
-| Safety-first deterministic policy arbiter over scored proposals | Already covered in spirit: `work-loop.md`'s judge table (J1-J20) is a deterministic mapping from observed state to a single command. There is no probability input to arbitrate, because the local system does not score anything. |
+| Safety-first deterministic policy arbiter over scored proposals | Already covered in spirit: `work-loop.md`'s judge table (J1-J20) is a deterministic mapping from observed state to a single command. The judge table maps observed state to a command without a probability input. Search: `git grep -n -i -E 'probab\|score' -- plugins/development-harness/dh_core plugins/development-harness/docs/work-ledger` returned 0 matches (exit 1) on 2026-10-03. |
 | Jev probabilistic checks (`implementation_complete`, `tests_sufficient`, `needs_human`, and others) | Incompatible: they depend on TypeSafe AI's external authenticated service (`TYPESAFE_API_KEY`). The research entry's Integration Opportunities marks it out of scope, and its Limitations section says Jev's accuracy for this use is "unproven". |
 | `agents_md_drift` check | Covered by a different mechanism: `plugins/development-harness/agents/doc-drift-auditor.md` and `plugins/development-harness/skills/audit-documentation-drift/SKILL.md`. Foreman runs its check during a run; the local equivalents run on demand. A live check needs the scoring service already ruled out above. |
 | Size-bounded observations (20,000-char diff, 12,000-char output tails) | Incompatible: AGENTS.md "No Invented Limits" forbids truncating content a consumer needs to read. |
