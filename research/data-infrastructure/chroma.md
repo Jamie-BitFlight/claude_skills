@@ -348,3 +348,4 @@ Unit tests via `pytest` (configured in `pyproject.toml` with `asyncio_mode = "au
 | [pandera](./pandera.md) | data-infrastructure | referenced by pandera (data-infrastructure) |
 | [polars-documentation](./polars-documentation.md) | data-infrastructure | referenced by polars-documentation (data-infrastructure) |
 | [airllm](../llm-infrastructure/airllm.md) | llm-infrastructure | referenced by airllm (llm-infrastructure) |
+| [pageindex](../context-management/pageindex.md) | context-management | referenced by pageindex (context-management) |

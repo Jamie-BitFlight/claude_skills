@@ -397,4 +397,5 @@ node scripts/setup-package-manager.js --detect
 | [the-delegation](../research-agent-patterns/the-delegation.md) | research-agent-patterns | referenced by the-delegation (research-agent-patterns) |
 | [awesome-codex-skills-issue-triage](../skill-generation-tools/awesome-codex-skills-issue-triage.md) | skill-generation-tools | referenced by awesome-codex-skills-issue-triage (skill-generation-tools) |
 | [xyops](../task-management/xyops.md) | task-management | referenced by xyops (task-management) |
+| [ai-engineering-from-scratch](../ai-research-tools/ai-engineering-from-scratch.md) | ai-research-tools | referenced by ai-engineering-from-scratch (ai-research-tools) |
 | [foreman](./foreman.md) | agent-frameworks | referenced by foreman (agent-frameworks) |

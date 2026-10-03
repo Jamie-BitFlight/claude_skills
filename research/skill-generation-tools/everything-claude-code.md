@@ -298,6 +298,7 @@ export ECC_DISABLED_HOOKS="pre:bash:tmux-reminder,post:edit:typecheck"
 | [scrapling-skill](../developer-tools/scrapling-skill.md) | developer-tools | referenced by scrapling-skill (developer-tools) |
 | [codebase-recon-skill](./codebase-recon-skill.md) | skill-generation-tools | referenced by codebase-recon-skill (skill-generation-tools) |
 | [mattpocock-skills](./mattpocock-skills.md) | skill-generation-tools | referenced by mattpocock-skills (skill-generation-tools) |
+| [hashicorp-agent-skills](./hashicorp-agent-skills.md) | skill-generation-tools | referenced by hashicorp-agent-skills (skill-generation-tools) |
 
 ---
 

@@ -296,3 +296,4 @@ Agent Skills directly addresses the Claude Code ecosystem's need for agent disci
 | [awesome-codex-skills-issue-triage](./awesome-codex-skills-issue-triage.md) | skill-generation-tools | referenced by awesome-codex-skills-issue-triage (skill-generation-tools) |
 | [codebase-recon-skill](./codebase-recon-skill.md) | skill-generation-tools | referenced by codebase-recon-skill (skill-generation-tools) |
 | [composio-codebase-migrate](./composio-codebase-migrate.md) | skill-generation-tools | referenced by composio-codebase-migrate (skill-generation-tools) |
+| [ai-engineering-from-scratch](../ai-research-tools/ai-engineering-from-scratch.md) | ai-research-tools | referenced by ai-engineering-from-scratch (ai-research-tools) |

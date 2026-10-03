@@ -1256,6 +1256,7 @@ AI research newsletters, curated resource collections, and tools for staying cur
 
 | Document                                                  | Description                                                                                                                    | Last Updated |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------ |
+| [ai-engineering-from-scratch.md](./ai-research-tools/ai-engineering-from-scratch.md) | AI Engineering from Scratch - 523-lesson curriculum covering math, ML, agents, and production AI systems, with installable learning agent skills (MIT) | 2026-10-02 |
 | [awesome-ai-apps.md](./ai-research-tools/awesome-ai-apps.md) | Awesome AI Apps — curated collection of 76 AI agent projects across 6 categories (Starter, Simple, MCP, Memory, RAG, Advanced Agents); 8-lesson AWS Strands course; 10+ frameworks (Agno, LangChain, CrewAI, PydanticAI); 9,278 stars | 2026-03-17   |
 | [merly-mentor.md](./ai-research-tools/merly-mentor.md) | Merly Mentor - Logic-based AI code quality tool: deterministic analysis of 1M LOC/min across 15 languages, REST API, Docker/K8s deployment (Seed $6.8M) | 2026-03-18   |
 | [codewiki-google.md](./ai-research-tools/codewiki-google.md) | CodeWiki (Google) - AI-powered documentation platform: auto-generates wikis, diagrams, and Gemini chat for code repos after every commit (public preview, Nov 2025) | 2026-03-18   |

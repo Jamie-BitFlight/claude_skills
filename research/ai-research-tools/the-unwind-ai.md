@@ -165,3 +165,4 @@ Individual posts: https://www.theunwindai.com/p/{slug}
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [awesome-ai-apps](./awesome-ai-apps.md) | ai-research-tools | referenced by awesome-ai-apps (ai-research-tools) |
+| [ai-engineering-from-scratch](./ai-engineering-from-scratch.md) | ai-research-tools | referenced by ai-engineering-from-scratch (ai-research-tools) |

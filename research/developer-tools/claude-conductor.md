@@ -293,3 +293,4 @@ Conductor is a direct peer to the claude_skills repository: both are Claude Code
 | [claude-replay](../coding-agents/claude-replay.md) | coding-agents | referenced by claude-replay (coding-agents) |
 | [agent-deck](./agent-deck.md) | developer-tools | referenced by agent-deck (developer-tools) |
 | [ghost-desk](./ghost-desk.md) | developer-tools | referenced by ghost-desk (developer-tools) |
+| [jakubkrehel-skills](./jakubkrehel-skills.md) | developer-tools | referenced by jakubkrehel-skills (developer-tools) |

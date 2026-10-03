@@ -158,3 +158,10 @@ Each platform has dedicated installation documentation in the README:
 - [plugin.json — Plugin Manifest](https://github.com/EveryInc/compound-engineering-plugin/blob/main/.claude-plugin/plugin.json) (version 3.21.4, accessed 2026-08-11)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [ai-engineering-from-scratch](../ai-research-tools/ai-engineering-from-scratch.md) | ai-research-tools | referenced by ai-engineering-from-scratch (ai-research-tools) |
+| [jakubkrehel-skills](../developer-tools/jakubkrehel-skills.md) | developer-tools | referenced by jakubkrehel-skills (developer-tools) |

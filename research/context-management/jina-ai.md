@@ -216,3 +216,4 @@ curl https://api.jina.ai/v1/rerank \
 | [chroma](../data-infrastructure/chroma.md) | data-infrastructure | referenced by chroma (data-infrastructure) |
 | [scrapling-skill](../developer-tools/scrapling-skill.md) | developer-tools | referenced by scrapling-skill (developer-tools) |
 | [zvec](../ml-infrastructure/zvec.md) | ml-infrastructure | referenced by zvec (ml-infrastructure) |
+| [pageindex](./pageindex.md) | context-management | referenced by pageindex (context-management) |

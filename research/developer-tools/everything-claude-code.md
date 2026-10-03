@@ -417,3 +417,4 @@ This repository is the closest peer project to `claude_skills` in the Claude Cod
 | [agent-deck](./agent-deck.md) | developer-tools | referenced by agent-deck (developer-tools) |
 | [claude-code-cli-power-patterns](./claude-code-cli-power-patterns.md) | developer-tools | referenced by claude-code-cli-power-patterns (developer-tools) |
 | [tolaria](./tolaria.md) | developer-tools | referenced by tolaria (developer-tools) |
+| [jakubkrehel-skills](./jakubkrehel-skills.md) | developer-tools | referenced by jakubkrehel-skills (developer-tools) |

@@ -226,3 +226,4 @@ curl -fsSL https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/he
 | [prompt-optimizer](../prompt-engineering/prompt-optimizer.md) | prompt-engineering | referenced by prompt-optimizer (prompt-engineering) |
 | [takt](./takt.md) | research-agent-patterns | referenced by takt (research-agent-patterns) |
 | [mattpocock-skills](../skill-generation-tools/mattpocock-skills.md) | skill-generation-tools | referenced by mattpocock-skills (skill-generation-tools) |
+| [ai-engineering-from-scratch](../ai-research-tools/ai-engineering-from-scratch.md) | ai-research-tools | referenced by ai-engineering-from-scratch (ai-research-tools) |

@@ -438,3 +438,4 @@ GET /chat/sessions/<id>/messages
 | [tolaria](../ai-design-tools/tolaria.md) | ai-design-tools | referenced by tolaria (ai-design-tools) |
 | [zvec-grep](./zvec-grep.md) | ai-research-tools | referenced by zvec-grep (ai-research-tools) |
 | [graphify](../skill-generation-tools/graphify.md) | skill-generation-tools | referenced by graphify (skill-generation-tools) |
+| [pageindex](../context-management/pageindex.md) | context-management | referenced by pageindex (context-management) |
