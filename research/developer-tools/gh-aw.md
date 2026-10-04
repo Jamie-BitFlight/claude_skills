@@ -11,7 +11,7 @@ freshness_tracking:
   last_verified: 2026-10-03
   version_at_verification: v0.89.21
   next_review: 2027-01-03
-  confidence_map: "Overview: high | Problem Addressed: high | Key Features: medium (doc + code-read) | Technical Architecture: medium (doc + code-read) | Installation & Usage: high | Limitations & Caveats: high | Relevance: medium"
+  confidence_map: "Overview: high | Problem Addressed: high | Key Features: medium (doc + code-read) | Technical Architecture: medium (doc + code-read) | Installation & Usage: high | Limitations & Caveats: high"
 ---
 
 # GitHub Agentic Workflows
@@ -228,29 +228,6 @@ gh aw doctor --repo owner/repo
 - **Compilation required**: "Workflows must be compiled to `.lock.yml` files before running in GitHub Actions" (`create.md`).
 - **MCP scripts run outside the sandbox**: "MCP Scripts run outside the agent sandbox and must only implement READ-ONLY operations" (mcp-scripts reference).
 - **Permissions scoping**: "Safe outputs buffer configured writes, validate them, and apply them in separate jobs with scoped permissions. These controls are configurable, so workflow authors must review permissions, tools, network access, and generated files before deployment."
-
----
-
-## Relevance to Claude Code Development
-
-### Applications
-
-- **Per-workflow AI-engine selection** -> `./plugins/agent-orchestration/README.md`
-  - Term: `harness`
-  - Today: "A small set of skills and a contract for orchestrating sub-agents, portable across harnesses that support plugins, skills, and agents."
-  - Change: none — out of scope (gh-aw's `engine:` frontmatter field picks one of Copilot, Claude, Codex, Gemini or Pi for each workflow run. This repository has no such selector: `scripts/generate_harness_compatibility.py` line 36 `HARNESSES = ["claude-code", "codex", "hermes", "kimi"]` lists plugin host compatibility targets, and `load_verification_source()` (lines 111-133) only rejects verification evidence naming an unknown plugin or harness. `plugins/agent-orchestration/` documents sub-agent dispatch and ships only `harness-notes/claude-code.md`. a case-insensitive search for `engine` over the script and the plugin directory finds no matching file. The two systems answer different questions, so no edit follows)
-
-- **Markdown-based declarative workflow definitions** -> `./.claude/agents/backlog-mcp-validator.md`
-  - Term: `frontmatter`
-  - Today: "The `backlog` server is configured in this agent's `mcpServers` frontmatter."
-  - Change: none — `./.claude/agents/backlog-mcp-validator.md` already covers it: its line 391 states the `backlog` server is configured in the agent's `mcpServers` frontmatter and starts automatically when the agent is invoked
-
-### Integration Opportunities
-
-- **Inline typed tool definitions (`mcp-scripts`)** -> `.mcp.json`
-  - Term: `mcpServers`
-  - Today: "\"mcpServers\": {"
-  - Change: none — out of scope (gh-aw `mcp-scripts` declares typed tools (`type`, `required`, `default`, `enum`) inline in workflow frontmatter, run by an HTTP MCP server on the Actions runner outside the agent container. `.mcp.json` only registers external servers. Where this repository needs typed-input tools, `plugins/fastmcp-creator/skills/fastmcp-creator/SKILL.md` line 114 shows `@mcp.tool` on a typed function and `references/server-core.md` line 114 states FastMCP "Generates an input schema from type annotations", so the capability exists in FastMCP form. This repository has no gh-aw workflow that would host inline tools, so no gap in `.mcp.json` handling can be stated)
 
 ---
 

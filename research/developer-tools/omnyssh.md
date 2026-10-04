@@ -11,7 +11,7 @@ freshness_tracking:
   last_verified: 2026-10-02
   version_at_verification: 1.1.4
   next_review: 2027-01-02
-  confidence_map: "Overview: high | Problem Addressed: high | Features: high | Architecture: medium (code-read) | Usage: high | Limitations: low | Relevance: medium"
+  confidence_map: "Overview: high | Problem Addressed: high | Features: high | Architecture: medium (code-read) | Usage: high | Limitations: low"
 ---
 
 # OmnySSH
@@ -252,42 +252,6 @@ The app opens with an empty dashboard. It reads existing `~/.ssh/config` at star
 - **No confirmation step in SSH key setup flow**: When initiating the automated SSH key setup process (`Set up SSH key` button), "starting the flow means going through with it" — there is no intermediate confirmation prompt to cancel the operation after it begins. The server's `sshd_config` backup is created and password login is disabled with rollback protection, but the user cannot interrupt the flow once started.
 
 **Undocumented limitations**: The reviewed sources (README, CONTRIBUTING.md, crate documentation) document no additional limitations on compatibility, deployment environments, authentication methods, or operational constraints. (Confidence: low — absence of documented limitations does not confirm absence of limitations.)
-
----
-
-## Relevance to Claude Code Development
-
-### Applications
-
-- **PTY multiplexing and session management** -> `AGENTS.md`
-  - Term: `PTY`
-  - Today: "`rules/interactive-terminal-workarounds.md` for PTY providers and non-interactive equivalents."
-  - Change: already covered — `rules/interactive-terminal-workarounds.md` (lines 7-20) documents tmux as the current PTY provider for Claude Code. OmnySSH's vt100 screen model is a Rust library inside a GUI/TUI SSH client, not a callable tool for agent orchestration.
-
-- **Real-time metrics and monitoring** -> `rules/ci-workflows.md`
-  - Term: `metrics`
-  - Today: Line 116 documents post-processing decision: `Q3 -->|No — post-processing only: metrics, cache, coverage| Accept[Acceptable]` — `continue-on-error: true` is acceptable for metrics jobs
-  - Change: out-of-scope — the verified observation is that `rules/ci-workflows.md` uses "metrics" only as an example of a post-processing CI job whose `continue-on-error: true` is acceptable; it is about CI job sequencing, not about collecting or displaying host metrics, so OmnySSH's remote-command polling pattern has no edit target in that file. No repository-wide claim about metrics surfaces is made here.
-
-- **Event system architecture for async communication** -> `plugins/plugin-creator/skills/hook-creator/SKILL.md`
-  - Term: `event system`
-  - Today: "Create hooks that integrate with the Claude Code event system. Hooks automate validation, enforcement, and context injection across the session lifecycle."
-  - Change: out-of-scope — the verified observation is that `plugins/plugin-creator/skills/hook-creator/SKILL.md` describes hooks that "integrate with the Claude Code event system", i.e. consuming events the Claude Code harness defines, whereas `CoreEvent` is an in-process Rust enum sent over a `tokio` `mpsc` channel inside OmnySSH. The file gives no edit target for that pattern. No repository-wide claim about event buses is made here.
-
-### Patterns Worth Adopting
-
-- **Workspace-based multi-frontend architecture** -> `ARCHITECTURE.md`
-  - Term: `plugins`
-  - Today: "Entries are local directories under `plugins/`, plus external plugins pinned from other repositories."
-  - Change: out-of-scope — claude_skills already uses directory-based workspace architecture; the library/frontends pattern OmnySSH demonstrates (core engine depended on by UI implementations) is not a direct parallel to plugin composition
-
-### Integration Opportunities
-
-- **SSH configuration parsing and host discovery** -> nothing in `:/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md`
-  - Today: `git grep --full-name -il "SSH config" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md` → 0 matches
-  - Today: `git grep --full-name -il "ssh-config" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md` → 0 matches
-  - Today: `git grep --full-name -il "ProxyJump" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md` → 0 matches
-  - Change: none — these three terms found nothing in those six paths, which records only that they found nothing, not that no SSH handling exists elsewhere in this repository. Conditional note: if development-harness ever needs to discover and connect to remote CI/build infrastructure, OmnySSH's SSH config parser (`parse_ssh_config` in `crates/omnyssh-core/src/config/ssh_config.rs`, handling `ProxyJump` and `Include`) would be the reference to read.
 
 ---
 

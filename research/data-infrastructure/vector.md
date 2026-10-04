@@ -11,7 +11,7 @@ freshness_tracking:
   last_verified: 2026-10-03
   version_at_verification: v0.58.0
   next_review: 2027-01-03
-  confidence_map: "Overview: high | Problem Addressed: high | Key Features: high | Technical Architecture: medium (doc + code-read) | Installation & Usage: medium | Limitations and Caveats: medium | Relevance to Claude Code Development: medium"
+  confidence_map: "Overview: high | Problem Addressed: high | Key Features: high | Technical Architecture: medium (doc + code-read) | Installation & Usage: medium | Limitations and Caveats: medium"
 ---
 
 # Vector
@@ -147,31 +147,6 @@ vector test /etc/vector/vector.yaml
 - **Source builds need more than Rust**: see the prerequisites quoted under Installation (Source: `docs/DEVELOPING.md`).
 - **Performance and cost figures are vendor claims**: the "up to 10x faster" and "dramatic cost reduction" statements are README text with no methodology in the quoted sentence; no independent benchmark was reviewed.
 - **Other limitations** (resource usage, scaling limits, unsupported platforms): Not mentioned in documentation reviewed for this entry. Confidence: low for completeness.
-
----
-
-## Relevance to Claude Code Development
-
-### Applications
-
-- **observability** -> `plugins/development-harness/docs/change-impact-analysis-research.md`
-  - Term: `observability`
-  - Today: "- Impact analysis cannot discover unknown unknowns by itself. Diverse stakeholder review, staged exposure, observability, incident learning, and reversible deployment reduce but do not eliminate that limitation."
-  - Change: none — out of scope (the quoted line names observability as a mitigation for impact analysis; Vector is a runtime telemetry transport and nothing in this file operates one)
-
-### Patterns Worth Adopting
-
-- **backpressure-aware buffering** -> `plugins/development-harness/skills/code-review-nodejs/SKILL.md`
-  - Term: `backpressure`
-  - Today: "- Piping streams without handling backpressure is a blocking finding for high-throughput paths"
-  - Change: none — plugins/development-harness/skills/code-review-nodejs/SKILL.md already covers backpressure for Node.js streams; Vector's memory-or-disk buffer choice with load shedding has no counterpart to adopt in that review checklist
-
-### Integration Opportunities
-
-- **Log shipping and routing to external sinks** -> nothing in `plugins/`, `.claude/skills/`, `.claude/agents/`, `rules/`, `docs/`, `AGENTS.md`
-  - Today: `git grep --full-name -il "log shipping" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md` → 0 matches
-  - Today: `git grep --full-name -il "log shipper" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md` → 0 matches
-  - Change: a plugin that ships agent or hook telemetry to an external backend would have to exist first; these two terms returning nothing does not establish that no such capability exists here
 
 ---
 

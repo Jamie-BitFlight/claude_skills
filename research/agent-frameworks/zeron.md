@@ -221,26 +221,6 @@ Remote workspace file requests are subject to workspace-relative path containmen
 
 ---
 
-## Relevance to Claude Code Development
-
-### Integration Opportunities
-
-- **Multi-harness controller** → [AGENTS.md](../../AGENTS.md) orchestration guidance
-  - Today: `git grep --full-name -il "multi-harness" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md` → 0 matches
-  - Term: `orchestrate`
-  - Today: `git grep --full-name -il "orchestrate" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md` → 63 matches
-  - Quote from [AGENTS.md](../../AGENTS.md) line 15: "diagnosis. When the user says "can you", they mean "orchestrate this via sub-agents" — delegate"
-  - Change: already covered — `AGENTS.md` § Identity and Working Norms documents agent orchestration as a core pattern; multi-harness control would extend this to resource selection across harnesses, out of scope until Zeron integrates as a native Claude Code extension
-
-- **Durable append-only session/event log** -> [plugins/development-harness/dh_core/ledger/store.py](../../plugins/development-harness/dh_core/ledger/store.py)
-  - Term: `append-only`
-  - Today: `git grep --full-name -il "append-only" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md` → 15 matches
-  - Quote from [plugins/development-harness/dh_core/ledger/store.py](../../plugins/development-harness/dh_core/ledger/store.py) line 497: "The append-only log. ``ledger_spec.COLUMNS`` describes the tables materialised from it, not it."
-  - Observation: the Zeron-specific terms `local-first` returned 0 matches and `CRDT` returned 3 matches (all binary `hero.png` files under `plugins/`) over the same scope; the repo's own durable state is this SQLite event log, one database per repository.
-  - Change: none — out of scope (Zeron's Loro CRDT merge of one session document across devices has no counterpart in the ledger docstring read above, whose module docstring (`store.py` line 3) says "One SQLite database per repository holds every plan and task"; no edit is proposed)
-
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

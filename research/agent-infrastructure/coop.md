@@ -260,22 +260,6 @@ coop pull [INSTANCE]         # Sync guest workspace to local (rsync)
 
 ---
 
-## Relevance to Claude Code Development
-
-### Integration Opportunities
-
-- **Isolated agent execution** → `rules/commit-cadence-and-worktrees.md`
-  - Term: `worktree-isolated`
-  - Today: "invisible to worktree-isolated agents (see below)."
-  - Change: this rule file treats worktrees as the agent isolation unit; coop's documented VM boundary (docs/getting-started.md: "Each VM gets its own filesystem, network stack, and Docker daemon") is a different isolation tier that this file does not mention. Adding a note there would only be warranted if an orchestrator is written to launch agents through `coop claude`; no such launcher exists in the paths searched
-
-- **Bypass-mode agent launch** → `plugins/development-harness/skills/kage-bunshin/SKILL.md`
-  - Term: `dangerously-skip-permissions`
-  - Today: "Use when all sessions were spawned with `--dangerously-skip-permissions` (bypass mode). In bypass mode, no permission prompts can occur, so passive notification on completion or timeout is sufficient. Zero LLM tokens."
-  - Change: hypothesis to verify, not a finding: `plugins/development-harness/skills/kage-bunshin/scripts/spawn.py` launches `claude --dangerously-skip-permissions --worktree` on the host (line 604), and coop documents that its guest runs Claude Code in `bypassPermissions` mode with "the VM itself" as "the isolation boundary" (docs/commands.md, `claude`). Verification step: confirm whether tmux send-keys/capture-pane control works against `coop claude`, and how `--worktree`, `--tmux` and `--max-budget-usd` behave there; docs/commands.md documents only `ARGS...` "passed through to `claude`" (e.g. `coop claude my-project -- --model sonnet`), and does not mention those other flags
-
----
-
 ## Limitations and Caveats
 
 - **Platform support**: Primary test targets are macOS arm64 and Linux x86_64; Linux arm64 builds are available but untested

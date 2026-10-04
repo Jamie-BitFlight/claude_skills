@@ -11,7 +11,7 @@ freshness_tracking:
   last_verified: 2026-10-03
   version_at_verification: v4.0.0
   next_review: 2026-12-02
-  confidence_map: "Overview: medium (several claims appear only in PRD.md, a design document: port 7437, 8+ providers, SHA256 two-level cache, 30+ skill files, installer phases, persona) | Problem Addressed: medium (same PRD-only basis) | Key Features: medium (same PRD-only basis) | Technical Architecture: medium (doc-derived; no source files are listed in References) | Installation & Usage: medium (install flags checked against docs/non-interactive.md and docs/usage.md at clone 5140c5f, 2026-10-03) | Limitations and Caveats: medium (docs clone; partial coverage) | Relevance to Claude Code Development: high"
+  confidence_map: "Overview: medium (several claims appear only in PRD.md, a design document: port 7437, 8+ providers, SHA256 two-level cache, 30+ skill files, installer phases, persona) | Problem Addressed: medium (same PRD-only basis) | Key Features: medium (same PRD-only basis) | Technical Architecture: medium (doc-derived; no source files are listed in References) | Installation & Usage: medium (install flags checked against docs/non-interactive.md and docs/usage.md at clone 5140c5f, 2026-10-03) | Limitations and Caveats: medium (docs clone; partial coverage)"
 ---
 
 # Gentle-AI™
@@ -279,51 +279,6 @@ gentle-ai uninstall               # Remove managed configuration
 - **Pi runtime behavior is not owned by this binary**: "Installing or updating this binary does not itself establish Pi behavior parity." (Source: `README.md` line 171, same clone)
 - **Feature availability differs per agent**: the support tiers in Key Features (Full, Good, Partial, Minimal) mean delegation and RDD review are not uniform across the 17 integrations.
 - Not mentioned in documentation: measured performance, memory-store size limits, or concurrency guarantees for the shared `~/.engram/engram.db` across simultaneously running agents; none were found in the files read.
-
----
-
-## Relevance to Claude Code Development
-
-### Applications
-
-- **Multi-session context preservation** -> `plugins/development-harness/agents/backlog-item-groomer.md`
-  - Term: `cross-session`
-  - Today: "Your `memory: project` frontmatter field gives you a persistent, cross-session memory directory (see the platform's standard memory-directory conventions — do not hardcode its path here)."
-  - Change: none — `plugins/development-harness/agents/backlog-item-groomer.md` already gives this agent a persistent cross-session memory directory; Engram would add only a full-text-searchable store shared across harnesses, mapped under Integration Opportunities
-
-- **Deterministic workflow state machine** -> `plugins/development-harness/docs/backlog-lifecycle.md`
-  - Term: `item statuses`
-  - Today: "This document defines the desired item statuses, the route that writes each status, and the gates"
-  - Change: none — out of scope (this document already defines the statuses, the route that writes each status and the gates; ODD's authorization gate would duplicate it, and the entry documents no transition API that dh could call)
-
-- **Agent memory and skill management** -> `plugins/python-engineering/agents/code-reviewer.md`
-  - Term: `agent memory`
-  - Today: "Update your agent memory as you discover codepaths, patterns, library"
-  - Change: none — `plugins/python-engineering/agents/code-reviewer.md` already instructs per-agent memory updates; Engram's cross-agent SQLite + FTS5 store has no counterpart in that file
-
-- **Cross-agent skill synchronization** -> `AGENTS.md`
-  - Term: `cross-harness`
-  - Today: "Plugins are expected to be developed cross-harness compatible (claude-code, codex, hermes, kimi)."
-  - Change: none — `scripts/generate_harness_compatibility.py` and `AGENTS.md` line 94 already cover cross-harness generation, so gentle-ai's single-installer approach to 17 agents adds no missing mechanism here
-
-### Patterns Worth Adopting
-
-- **Pre-commit validation as a gate, not a suggestion** -> `.claude/agents/code-review.md`
-  - Term: `code review`
-  - Today: "You are a senior code reviewer ensuring high code quality, security, and consistency with established codebase/project patterns."
-  - Change: edit `.pre-commit-config.yaml` to add a local hook that runs an AI review of staged files against `AGENTS.md`; today `.claude/agents/code-review.md` is invoked only on request (its description reads "DO NOT use proactively"). The GGA invocation is not documented in this entry, so the hook's `entry:` command is unconfirmed
-
-### Integration Opportunities
-
-- **Persistent project memory across Claude Code sessions** -> `plugins/plugin-creator/skills/memory-and-rules/SKILL.md`
-  - Term: `persistent memory`
-  - Today: "Claude Code has two kinds of persistent memory:"
-  - Change: edit `plugins/development-harness/backlog_core/` to store architectural decisions and design rationale alongside task tracking, queryable like Engram's `mem_search`; Engram itself parallels the memory layers documented in this file but adds a full-text-searchable store
-
-- **Cross-session context preservation across agents** -> `plugins/development-harness/agents/classifier.md`
-  - Term: `cross-session`
-  - Today: "Your `memory: project` frontmatter field gives you a persistent, cross-session memory directory (see the platform's standard memory-directory conventions — do not hardcode its path here)."
-  - Change: none — dh agents already use `memory: project` for cross-session context; Engram would add only a shared database searchable across Claude Code, OpenCode and Cursor
 
 ---
 

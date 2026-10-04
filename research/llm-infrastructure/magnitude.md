@@ -11,7 +11,7 @@ freshness_tracking:
   last_verified: 2026-10-03
   version_at_verification: 0.2.4
   next_review: 2027-01-02
-  confidence_map: "Overview: high | Problem Addressed: high | Key Features: medium | Technical Architecture: medium | Installation & Usage: high | Limitations: medium | Relevance: medium"
+  confidence_map: "Overview: high | Problem Addressed: high | Key Features: medium | Technical Architecture: medium | Installation & Usage: high | Limitations: medium"
 ---
 
 # Magnitude
@@ -173,34 +173,6 @@ curl http://127.0.0.1:10100/inference/anthropic/v1/messages \
 - **GPU memory sharing**: On dedicated-GPU systems (non-unified-memory), GPU memory and system RAM are not interchangeable; a machine with 64 GB system RAM and 8 GB GPU does not have 72 GB available for models
 - **Context size trade-offs**: Longer context windows increase memory demand and can slow response generation. Soft caps (`contextLimits.softCapRatio`, `contextLimits.softCapMaxTokens`) allow user-configured context limits
 - **Unified memory constraints**: On Apple Silicon, macOS and other applications use the same memory pool as the GPU, so available memory for models may be less than total unified memory
-
----
-
-## Relevance to Claude Code Development
-
-### Applications
-
-- **Local model serving in plugins** -> `plugins/llamafile/README.md`
-  - Term: `local model`
-  - Today: "- Building developer tools (commit message generators, code reviewers) backed by local models"
-  - Change: none — out of scope (Magnitude's kernel tuning happens inside its own inference engine; this README documents how to run llamafile and has no engine-internals surface to edit)
-
-- **OpenAI-compatible API exposure** -> `plugins/llamafile/skills/llamafile/SKILL.md`
-  - Term: `OpenAI-compatible`
-  - Today: "Llamafile exposes these OpenAI-compatible endpoints when running with `--server`"
-  - Change: none — out of scope (this skill documents llamafile's OpenAI-compatible endpoints only; Magnitude's second, Anthropic-compatible endpoint has no counterpart to edit here, and `plugins/litellm/skills/litellm/SKILL.md` lines 27-31 list Anthropic only as a cloud provider)
-
-- **Model lifecycle management (residency: download, load, unload)** -> nothing in `plugins/`, `.claude/skills/`, `.claude/agents/`, `rules/`, `docs/`, `AGENTS.md`
-  - Today: `git grep --full-name -il "model residency" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md` → 0 matches
-  - Today: `git grep --full-name -il "residency" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md` → 0 matches
-  - Change: none — out of scope (Magnitude's `service/` owns model residency per the Technical Architecture section; no file here operates a model-residency manager, and these two terms returning nothing does not establish that no such capability exists here)
-
-### Patterns Worth Adopting
-
-- **Agent integration through a standard API** -> `plugins/litellm/skills/litellm/SKILL.md`
-  - Term: `OpenAI message format`
-  - Today: "- **Unified Format**: All requests use OpenAI message format"
-  - Change: none — `plugins/litellm/skills/litellm/SKILL.md` already routes the providers it lists (cloud: OpenAI, Anthropic, Google, Azure, AWS Bedrock; local: llamafile, Ollama, LocalAI, vLLM; lines 27-31) through one OpenAI message format rather than agent-specific adapters
 
 ---
 
