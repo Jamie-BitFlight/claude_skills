@@ -67,6 +67,10 @@ REQUIRED_BODY_SECTIONS = [
 # YAML frontmatter entries satisfy freshness via frontmatter keys instead.
 _REQUIRED_SECTIONS_TEXT_HEADER_ONLY = ["Freshness Tracking"]
 
+# Legacy sections that are inert: left as found, so an empty one is only a warning.
+# Authority: references/entry-quality-standards.md `## Scope`.
+_LEGACY_INERT_SECTIONS: frozenset[str] = frozenset({"Relevance to Claude Code Development"})
+
 # Alternative accepted spellings for section headings
 SECTION_ALIASES: dict[str, list[str]] = {"Installation & Usage": ["Installation and Usage"]}
 
@@ -269,13 +273,22 @@ def _check_section_completeness(sections: dict[str, tuple[int, int]], required: 
 def _check_empty_sections(lines: list[str], sections: dict[str, tuple[int, int]]) -> list[Issue]:
     """Check for sections that exist but have no content.
 
+    An empty heading named in ``_LEGACY_INERT_SECTIONS`` is reported as a warning, not an error.
+
     Returns:
         List of ``Issue`` dicts, one per empty section.
     """
     issues: list[Issue] = []
     for heading, (start, end) in sections.items():
         content = _section_content(lines, start - 1, end)
-        if not content:
+        if not content and heading in _LEGACY_INERT_SECTIONS:
+            issues.append({
+                "check": "empty_sections",
+                "severity": "warning",
+                "message": f"Empty legacy section: {heading} (inert; report only, not a --fix target)",
+                "line": start,
+            })
+        elif not content:
             issues.append({
                 "check": "empty_sections",
                 "severity": "error",
@@ -783,6 +796,9 @@ def validate_file(filepath: Path, research_root: Path) -> dict[str, Any]:
     return {"file": relative, "format": fmt, "status": status, "issues": all_issues}
 
 
+# Legacy and non-entry directories under research/. utilization/ holds older reports; its former
+# writer (research-utilization-assessor) now files GitHub issues and writes nothing under research/.
+# design-notes/ holds internal design notes.
 _NON_ENTRY_DIRS = frozenset({"utilization", "design-notes"})
 
 # Directory-level AI-facing instruction/navigation files, not comprehensive external-tool
@@ -795,9 +811,9 @@ def _is_research_entry(file: Path) -> bool:
 
     Excludes directory-level AI-facing instruction/navigation files (see
     ``_NON_ENTRY_FILENAMES`` -- e.g. ``README.md``, ``CLAUDE.md``, ``AGENTS.md``) and files
-    under non-entry artifact directories such as ``research/utilization/``
-    (utilization reports written by ``research-utilization-assessor``, which intentionally do
-    not follow the research entry template) and ``research/design-notes/`` (internal design/status notes for this project's
+    under the directories named in ``_NON_ENTRY_DIRS``: ``research/utilization/`` (a legacy
+    directory of older reports that do not follow the research entry template) and
+    ``research/design-notes/`` (internal design/status notes for this project's
     own features -- working investigations that inform an implementation decision, not
     comprehensive external-tool reference entries).
     """

@@ -6,19 +6,30 @@ Checks performed by `./scripts/validate_research.py` and severity mapping for th
 
 ## Check Definitions
 
+Not entries, and not checked: files whose name is in `_NON_ENTRY_FILENAMES`, and files under any
+directory named in `_NON_ENTRY_DIRS` (both in `validate_research.py`; the directories include
+legacy report directories that nothing writes to any more).
+
 ### Error Severity (must fix)
 
 - **section_completeness**: All required `##`-level sections must exist. The authoritative list is `REQUIRED_BODY_SECTIONS` (plus `_REQUIRED_SECTIONS_TEXT_HEADER_ONLY` for legacy text-header entries) in `validate_research.py`; the sections match `entry-template.md`'s Entry File Template except Limitations and Caveats and Cross-References, which the template carries and the validator does not require. Header fields (Research Date, Source URL, etc.) are checked separately via **header_fields**. The validator does not check `confidence_map` or Limitations and Caveats; the review rubric does (Gate 2 Rule 4, Gate 3).
-- **empty_sections**: Section heading exists but contains no content below it before the next heading. A validator issue against a pre-existing `## Relevance to Claude Code Development` section is reported and not fixed, and does not fail the entry; that section is inert (see `entry-quality-standards.md` `## Scope`).
-
-Not entries, excluded by the validator: `README.md`, `CLAUDE.md`, `AGENTS.md`, and any file under a `utilization` or `design-notes` directory.
+- **empty_sections**: Section heading exists but contains no content below it before the next
+  heading. Exception: an empty heading named in `_LEGACY_INERT_SECTIONS` (the legacy
+  `## Relevance to Claude Code Development` section) is reported at warning severity, is not a
+  `--fix` target, and does not fail the entry; that section is inert (see
+  `entry-quality-standards.md` `## Scope`).
 
 ### Warning Severity (should fix)
 
 - **header_fields**: Header block must contain Research Date, Source URL, Version at Research, License
-- **access_dates**: Every URL in the References section must have an access date in format `accessed YYYY-MM-DD` or `(YYYY-MM-DD)`
+- **access_dates**: Checked per line in the References section, not per URL: a line containing an
+  `http://` or `https://` URL must also contain, anywhere on that line, `accessed YYYY-MM-DD`
+  (lowercase `accessed`, no parentheses required) or `(YYYY-MM-DD)`. One date satisfies every URL on
+  its line; URLs with other schemes are not counted.
 - **freshness_tracking**: Freshness Tracking section must contain Last Verified, Version at Verification, Next Review Recommended fields
-- **url_format**: Flags a bare `www.` URL that lacks an `http://` or `https://` scheme; other schemes are not checked
+- **url_format**: Flags `www.` (case-insensitive) not directly preceded by `http://`, `https://`,
+  `(` or `<`, reported as a URL missing its scheme. No other URL form is validated: `ftp://example.com`
+  passes, while `ftp://www.example.com` is flagged.
 - **cross_references_absent**: Entry does not contain a `## Cross-References` section. Expected for entries created or last verified on or after 2026-03-12. Entries with Research Date or Last Verified before this date are exempt. Gated on the Research Date or Last Verified field value in `validate_research.py`'s `check_cross_references`.
 
 > **Handling differs by mode, not by severity.** `header_fields`, `access_dates`, `freshness_tracking`, and `url_format` stay warning-severity in the JSON output no matter who calls the script. For an entry that Default Mode, Batch Mode, or Rerun Mode created or refreshed *this invocation*, these are must-fix before the entry is reported complete — see [Validation Gate for New/Refreshed Entries](#validation-gate-for-newrefreshed-entries) below. `cross_references_absent` is excluded from this must-fix rule; its own date-based exemption above is unaffected. For pre-existing entries that Validate Mode scans, all remain report-only, per Validate Mode's Issue Handling in `SKILL.md`.
