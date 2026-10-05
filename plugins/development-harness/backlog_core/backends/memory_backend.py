@@ -385,7 +385,7 @@ class InMemoryBackend:
         return self._fetch_issue_graphql(repo, owner, repo_name, issue["number"])["body"]
 
     def create_issue_for_item(
-        self, repo: Repository, item: BacklogItem, dry_run: bool = False, output: Output | None = None
+        self, repo: Repository | None, item: BacklogItem, dry_run: bool = False, output: Output | None = None
     ) -> int | None:
         """Create an issue from a BacklogItem and return its number."""
         if dry_run:

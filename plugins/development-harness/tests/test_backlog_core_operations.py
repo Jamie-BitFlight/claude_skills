@@ -599,34 +599,35 @@ class TestAddItemCreatesLocalFile:
 
         mock_create.assert_not_called()
 
-    def test_add_item_local_only_pending_state_visible_via_list_and_view(
+    def test_add_item_native_memory_reference_visible_via_list_and_view(
         self, mocker: MockerFixture, plain_memory_backend: InMemoryBackend
     ) -> None:
-        """Verify a local-only create's pending state is visible on later reads, not just at creation.
+        """Verify native Memory creation remains visible through later reads.
 
-        Tests: item 2 of #2999's fix — a caller reading the item later (grooming,
-            RT-ICA, dispatch) via list_items/view_item, not the add_item() return
-            value itself, must still be able to tell the item has no backend issue.
-        How: Create a local-only item (GitHub unavailable), then read it back through
-             both list_items and view_item; assert the empty "issue" field is present
-             on both, exactly mirroring add_item's own item_ref=="" signal.
-        Why: _build_list_entry and view_result_from_local_item already emit "issue"
-             unconditionally (BacklogItem.issue defaults to ""), so this test locks in
-             that the read paths already carry the signal add_item now also returns —
-             no separate mechanism was needed for requirement 2.
+        Tests: a local integer-ID provider creates a selector without consulting
+            the unavailable GitHub capability, and list_items/view_item preserve it.
+        How: Create an item through Memory, then read it through list_items and
+            view_item using the returned native selector.
+        Why: Memory shares SQLite's local integer-ID dispatch branch. The direct
+            reads prove this provider remains addressable after creation.
         """
         assert plain_memory_backend.supports_github_extras is False
-        mocker.patch("backlog_core.operations.try_get_github", return_value=None)
+        mock_try_github = mocker.patch("backlog_core.operations.try_get_github", return_value=None)
         mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
-        add_item(title="Pending Local Only Item", description="desc", priority="P2")
+        created = add_item(title="Native Memory Item", description="desc", priority="P2")
+        selector = str(created["item_ref"])
+
+        assert selector == "#1"
+        assert created["warnings"] == []
+        mock_try_github.assert_not_called()
 
         listed = list_items(refresh=False)
         list_entries = cast("list[dict[str, str | bool]]", listed["items"])
-        entry = next(it for it in list_entries if it["title"] == "Pending Local Only Item")
-        assert entry["issue"] == ""
+        entry = next(it for it in list_entries if it["title"] == "Native Memory Item")
+        assert entry["issue"] == selector
 
-        viewed = view_item("Pending Local Only Item")
-        assert viewed.issue == ""
+        viewed = view_item(selector)
+        assert viewed.issue == selector
 
 
 class TestAddItemValidatesPriorityAndType:

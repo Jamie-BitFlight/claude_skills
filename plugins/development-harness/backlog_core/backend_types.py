@@ -249,7 +249,7 @@ class WorkItemBackend(Protocol):
 
     # Issue CRUD (generic subset)
     def create_issue_for_item(
-        self, repo: Repository, item: BacklogItem, dry_run: bool = False, output: Output | None = None
+        self, repo: Repository | None, item: BacklogItem, dry_run: bool = False, output: Output | None = None
     ) -> int | None: ...
     def close_github_issue(
         self,

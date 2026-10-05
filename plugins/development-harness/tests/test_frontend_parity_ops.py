@@ -164,6 +164,50 @@ async def test_backlog_list_parity(dh_env: dict[str, str]) -> None:
     assert "Parity Item" in mcp_titles
 
 
+@pytest.mark.integration
+async def test_backlog_add_returns_native_sqlite_selector_for_complete_cli_handoff(dh_env: dict[str, str]) -> None:
+    """SQLite creation returns a selector that the CLI and MCP can reuse."""
+    created = _run_cli(
+        [
+            "backlog",
+            "add",
+            "--title",
+            "Fix scientific-thinking CLI error-message typo",
+            "--description",
+            (
+                "Correct the user-visible error-message typo 'teh' to 'the' in the scientific-thinking plugin CLI tool "
+                "without changing behavior."
+            ),
+            "--priority",
+            "P2",
+            "--source",
+            "user report",
+            "--type",
+            "Bug",
+        ],
+        env=dh_env,
+    )
+
+    selector = created["item_ref"]
+    assert selector == "#1"
+    assert created["reference"] == selector
+    assert created["warnings"] == []
+
+    viewed = _run_cli(["backlog", "view", "--selector", selector], env=dh_env)
+    assert viewed["title"] == "Fix scientific-thinking CLI error-message typo"
+
+    updated = _run_cli(
+        ["backlog", "update", "--selector", selector, "--title", "Correct scientific-thinking CLI error-message typo"],
+        env=dh_env,
+    )
+    assert updated["renamed_to"] == "Correct scientific-thinking CLI error-message typo"
+
+    mcp_view = await call_mcp_tool(
+        backlog_mcp, "backlog_view", {"selector": selector, "summary": False, "include_content": True}
+    )
+    assert mcp_view["title"] == "Correct scientific-thinking CLI error-message typo"
+
+
 @pytest.mark.parametrize("allow_cached", [False, True])
 async def test_backlog_list_allow_cached_forwarding_parity(
     dh_env: dict[str, str], monkeypatch: pytest.MonkeyPatch, allow_cached: bool
