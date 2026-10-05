@@ -50,6 +50,94 @@ Keep explicit project overrides and existing host-specific project hints ahead
 of the Codex fallback. Development Harness uses this order: explicit override,
 workspace/IDE hints, Codex `PWD`, then process-cwd discovery.
 
+## Nested Codex CLI Runtime
+
+Use this setup when a Codex session must run another Codex CLI session and
+retain execution evidence. It prepares an isolated runtime; it does not
+establish an actual endpoint or a gold result.
+
+1. Freeze the source before setup. Record the source Git hash, archive or copy
+   that exact source, and use it for every later check. Keep the disposable
+   project, state, private Codex home, and artifacts beneath one runtime root.
+2. Create a private `CODEX_HOME`. Copy only the existing selected provider
+   configuration and its existing model catalog into it. Retain only the
+   provider authentication mechanism and environment variable names required
+   by that configuration. Never copy global plugins, global MCP entries,
+   credentials, or provider URLs into logs or documentation.
+3. For a DH backlog execution experiment, use a genuine disposable SQLite
+   backend. For another target, use that target's real isolated backend. Set
+   the project and state roots explicitly, then retain the backend identity and
+   state snapshot. Launch Codex through a filtered environment containing only
+   the provider variables and runtime variables the run requires.
+4. Set `UV_CACHE_DIR` to a writable, disposable directory under the project.
+   Warm harness prerequisites through the same isolated runtime before
+   recording a baseline. If the evaluated target installs a dependency, retain
+   that installation in the actor trace; it is part of the evaluated process.
+
+### Marketplace And Native MCP
+
+Give `codex plugin marketplace add` a marketplace **directory**, not a
+manifest file. After installing the plugin, derive the installed plugin root
+from retained private-cache evidence.
+
+Plugin delivery alone does not establish that Codex registered its MCP tools.
+When the package does not expose the needed native server, register the frozen
+source-backed entry explicitly in the private `CODEX_HOME`. Substitute the
+installed plugin directory into `cwd`; do not leave a shell variable literal
+in the configuration. Register only the server needed for the run and forward
+only its required environment variables, including the disposable project and
+SQLite state roots.
+
+When a registered native MCP server runs `uv`, forward the project-local
+`UV_CACHE_DIR` through its `env_vars` as well as the shell actor subprocess
+environment. Verify that both processes receive a writable disposable cache;
+record the variable name in the environment-name manifest, not its contents.
+Preserve the frozen source command and arguments, and do not forward
+credentials to the MCP server.
+
+Before proceeding, retain JSONL evidence of a native MCP call and its rendered
+result, and confirm that result agrees with the isolated SQLite state. This is
+an MCP availability check, not a complete packaging-validation claim.
+
+Use the callable native MCP surface verified by the preflight, and record the
+tool-to-server mapping. A successful preflight can call
+`tools.mcp__backlog__backlog_list(...)` inside `functions.exec`; do not infer an
+absent binding from final prose or a single `TypeError`. This proves the
+preflight call only. It does not validate an actual endpoint.
+
+### Launch, Resume, And Evidence
+
+Run each Codex invocation through `scripts/run_bounded.py`. Retain its JSONL,
+stderr, final message, resolved command, environment-name manifest, and a hash
+of the complete private rollout. Public JSONL can omit wrapped `functions.exec`
+events, so preserve the complete rollout separately and treat it as the source
+for execution evidence.
+
+When restoring workspace configuration for a cloned baseline, relocate MCP
+`cwd` values and the private model-catalog path to that clone before launch.
+
+For a resumed turn, use `codex exec resume --json` with the recorded thread in
+the same private `CODEX_HOME`, project working directory, filtered environment,
+and bounded launcher. Do not add initial-launch-only `--sandbox` or `--cd`
+options to the resume command. Append its JSONL, stderr, prompt-input hash, and
+state snapshot to the retained ordered rollout timeline.
+
+Bind a native skill to its exact installed path and record its hash. A skill
+name or an unpinned cache location is insufficient for source conformance.
+
+### Baseline And Conformance
+
+Create the baseline only after the preflight has produced the required native
+MCP result and isolated-state evidence. Clone that baseline before an actual
+run, and use the clone's project path in the actual command as well as its
+environment. Retain the baseline manifest and hashes with the launch record.
+
+After the actor stops, check the captured endpoint against the frozen source
+and record the result separately. Only then may a marking sheet be frozen.
+Do not start a blind hypothetical run from an unfrozen or unreviewed baseline.
+An actual run remains unadjudicated until this source-conformance check is
+captured; it is not a completed or gold result.
+
 ## Runtime Validation
 
 Validate through a fresh local marketplace and an interactive Codex MCP call.
