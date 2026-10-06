@@ -5,11 +5,11 @@ subtitle: Hardware-optimized local inference engine for AI agents
 research_date: 2026-10-06
 source_url: https://github.com/magnitudedev/magnitude
 github_repository: https://github.com/magnitudedev/magnitude
-version_at_research: 0.2.4 (@magnitudedev/cli, latest release tag from magnitudedev/magnitude)
-license: Apache 2.0
+version_at_research: 0.2.6 (@magnitudedev/cli package version in packages/launcher/package.json at commit 54a83cc, read 2026-10-06)
+license: Apache License 2.0 (LICENSE file at commit 54a83cc, read 2026-10-06)
 freshness_tracking:
   last_verified: 2026-10-06
-  version_at_verification: 0.2.4
+  version_at_verification: 0.2.6 (packages/launcher/package.json, commit 54a83cc)
   next_review: 2027-01-06
   confidence_map: "Overview: high | Problem Addressed: high | Key Features: medium | Technical Architecture: medium (doc + code-read) | Installation & Usage: high | Limitations and Caveats: medium"
 ---
@@ -79,7 +79,9 @@ Magnitude's inference stack is divided into three primary components, laid out a
 
 **Service** (`service/`): Owns the public HTTP API, model inventory management, hardware assessment, model residency (download/load/unload lifecycle), and worker supervision.
 
-The system uses a model catalog system (`catalog/`) that stores model metadata, compatibility information, and configuration. Models can be downloaded to `~/.magnitude/models` or a custom configured directory.
+The `inference/` layout table lists a `catalog/` directory described as "Model catalog and planner inputs" (`inference/README.md`). Downloaded models are stored in `~/.magnitude/models` (`docs/models.mdx`); `modelsDirectory` in `config.json` sets another folder, and absent means `~/.magnitude/models` (`docs/reference/configuration-file.mdx`).
+
+Source: `inference/README.md` — Layout table, `docs/models.mdx`, `docs/reference/configuration-file.mdx`
 
 ### Data flow
 
@@ -101,8 +103,10 @@ Source: `inference/README.md` — Layout table, `inference/docs/overview.md` —
 
 Magnitude exposes two API families:
 
-- **OpenAI-compatible endpoints**: `/inference/v1/chat/completions`, `/inference/v1/completions`, `/inference/v1/responses`, `/inference/v1/models`, `/health`
+- **OpenAI-compatible endpoints**: `/inference/v1/chat/completions`, `/inference/v1/responses`, `/inference/v1/models`, and `/health` (readiness, returns `200`)
 - **Anthropic-compatible endpoint**: `/inference/anthropic/v1/messages`, `/inference/anthropic/v1/messages/count_tokens`
+
+Source: the endpoint table in `docs/api/endpoints.mdx`.
 
 Both families support JSON and server-sent event (SSE) streaming responses. Default base URLs use localhost (`127.0.0.1:10100`), with network access optional via configuration.
 
@@ -110,10 +114,12 @@ Both families support JSON and server-sent event (SSE) streaming responses. Defa
 
 | Platform | Acceleration | Notes |
 |----------|--------------|-------|
-| Apple Silicon Mac | Metal (native, no separate toolkit) | Unified memory shared with GPU; app memory constraints apply |
-| Intel Mac | CPU | Intel Macs use CPU inference (`docs/installation/macos.mdx`); CUDA/Metal support on Intel Mac: Not mentioned in documentation |
-| Windows x64 | CPU, NVIDIA CUDA, Vulkan-compatible GPUs | CUDA targets Ampere-class (RTX 30/40 series) and newer |
-| Linux x64/ARM64 | CPU, NVIDIA CUDA, Vulkan-compatible GPUs | Same CUDA generation requirements as Windows |
+| Apple Silicon Mac | Metal GPU acceleration | "Metal support is supplied by macOS; you do not need a separate GPU toolkit." Unified memory is shared with the CPU and other apps (`docs/hardware.mdx`) |
+| Intel Mac | CPU | Intel Macs use CPU inference (`docs/hardware.mdx`, `docs/installation/macos.mdx`); CUDA/Metal support on Intel Mac: Not mentioned in documentation |
+| Windows x64 | CPU, supported NVIDIA CUDA GPUs, or supported Vulkan GPUs | `docs/hardware.mdx`: "The current CUDA builds target Ampere-class and newer GPUs"; Vulkan 1.1 or later required; no ROCm backend |
+| Linux x64/ARM64 | CPU, supported NVIDIA CUDA GPUs, or supported Vulkan GPUs | The CUDA statement in `docs/hardware.mdx` covers Linux and Windows |
+
+Source: the Supported configurations table in `docs/hardware.mdx`; the Intel Mac row is also in `docs/installation/macos.mdx`.
 
 ---
 
@@ -131,6 +137,8 @@ Both families support JSON and server-sent event (SSE) streaming responses. Defa
 The desktop app includes the `magnitude` CLI. No separate installation needed.
 
 ### CLI Reference
+
+Source: command tables in `docs/reference.mdx` (comments below paraphrase its Purpose column).
 
 ```bash
 # Run the service
@@ -155,6 +163,8 @@ magnitude hardware           # Inspect detected hardware and memory
 
 ### HTTP API Example
 
+Source: `docs/api/endpoints.mdx` (Chat completion and Anthropic Messages examples). Replace `MODEL_ID` with an ID from the models endpoint.
+
 OpenAI-compatible chat completion:
 
 ```bash
@@ -162,7 +172,7 @@ curl http://127.0.0.1:10100/inference/v1/chat/completions \
   -H 'Content-Type: application/json' \
   -d '{
     "model": "MODEL_ID",
-    "messages": [{"role": "user", "content": "Explain inference optimization."}],
+    "messages": [{"role": "user", "content": "Explain prompt caching in one paragraph."}],
     "max_tokens": 256
   }'
 ```
@@ -176,7 +186,7 @@ curl http://127.0.0.1:10100/inference/anthropic/v1/messages \
   -d '{
     "model": "MODEL_ID",
     "max_tokens": 256,
-    "messages": [{"role": "user", "content": "Explain inference optimization."}]
+    "messages": [{"role": "user", "content": "Explain prompt caching in one paragraph."}]
   }'
 ```
 
@@ -184,11 +194,11 @@ curl http://127.0.0.1:10100/inference/anthropic/v1/messages \
 
 ## Limitations and Caveats
 
-- **First-response latency**: Magnitude loads models on demand, so the first response after idle time takes longer than subsequent responses
+- **On-demand model loading**: `docs/models.mdx` states that "Magnitude loads a model on demand when an agent requests it and unloads it when idle or memory is tight". Any latency effect on the first response: Not mentioned in documentation
 - **API scope**: The HTTP API provides inference only (listing models and generating text). Per `docs/api/overview.mdx` (Scope): "Downloading models, managing them, and the Magnitude app itself are not available over the API"
-- **GPU memory sharing**: On dedicated-GPU systems (non-unified-memory), GPU memory and system RAM are not interchangeable; a machine with 64 GB system RAM and 8 GB GPU does not have 72 GB available for models
-- **Context size trade-offs**: Longer context windows increase memory demand and can slow response generation. Soft caps (`contextLimits.softCapRatio`, `contextLimits.softCapMaxTokens`) allow user-configured context limits
-- **Unified memory constraints**: On Apple Silicon, macOS and other applications use the same memory pool as the GPU, so available memory for models may be less than total unified memory
+- **GPU memory sharing**: On dedicated-GPU systems (non-unified-memory), GPU memory and system RAM are not interchangeable; `docs/hardware.mdx` gives the example that a machine with 64 GB of system RAM and an 8 GB GPU "does not have 72 GB of interchangeable GPU memory"
+- **Context size trade-offs**: `docs/hardware.mdx` states longer context "increases memory demand and can slow responses". Soft caps (`contextLimits.softCapRatio`, `contextLimits.softCapMaxTokens`) allow user-configured context limits
+- **Unified memory constraints**: On Apple Silicon, macOS and other applications use the same memory pool as the GPU, so available memory for models may be less than total unified memory (`docs/hardware.mdx`: a 32 GB Mac "does not have all 32 GB available for a model")
 
 ---
 
@@ -214,6 +224,10 @@ All paths below are files in the shallow clone of magnitudedev/magnitude at comm
 - `docs/api/overview.mdx` (accessed 2026-10-06, commit 54a83cc)
 - `docs/api/network-access.mdx` (accessed 2026-10-06, commit 54a83cc)
 - `docs/installation/macos.mdx` (accessed 2026-10-06, commit 54a83cc)
+- `docs/hardware.mdx` (accessed 2026-10-06, commit 54a83cc)
+- `docs/api/endpoints.mdx` (accessed 2026-10-06, commit 54a83cc)
+- `LICENSE` (accessed 2026-10-06, commit 54a83cc)
+- `packages/launcher/package.json` (accessed 2026-10-06, commit 54a83cc)
 - `cli/src/agent-docs/topics/custom-endpoints.md` (accessed 2026-10-06, commit 54a83cc)
 
 ---
