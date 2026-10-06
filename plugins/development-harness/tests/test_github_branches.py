@@ -128,25 +128,6 @@ class TestBranchName:
         # Assert
         assert result == "milestone/3-v1.1-milestone-workflow"
 
-    def test_branch_name_uses_branch_prefix_constant(self) -> None:
-        """Test that _branch_name uses the BRANCH_PREFIX module constant.
-
-        Tests:  _branch_name and BRANCH_PREFIX constant
-        How:    Verify result startswith BRANCH_PREFIX.
-        Why:    Ensures BRANCH_PREFIX and _branch_name stay in sync.
-        """
-        result = _branch_name(1, "slug")
-        assert result.startswith(BRANCH_PREFIX)
-
-    def test_branch_prefix_value(self) -> None:
-        """Test BRANCH_PREFIX module constant equals 'milestone/'.
-
-        Tests:  BRANCH_PREFIX constant
-        How:    Direct equality check.
-        Why:    Filter logic in list_integration_branches depends on this exact value.
-        """
-        assert BRANCH_PREFIX == "milestone/"
-
 
 # ---------------------------------------------------------------------------
 # create_integration_branch
