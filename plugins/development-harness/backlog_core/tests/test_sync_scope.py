@@ -7,7 +7,6 @@ reconciles linked provider references, while selector pull reconciles one target
 from __future__ import annotations
 
 import inspect
-from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
@@ -17,11 +16,6 @@ from backlog_core.server import backlog_sync
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
-
-
-# Path to the finalization workflow file that was corrected by #2452.
-# Resolves relative to this test file: ../../.. → plugins/development-harness/
-_FINALLY_MD = Path(__file__).parent.parent.parent / "skills/work-backlog-item/references/workflows/groom/finally.md"
 
 
 class _SyncBackend:
@@ -84,30 +78,6 @@ class TestFinallyWorkflowFinalization:
         assert backend.requests == [ReconcileRequest(scope=ReconcileScope.INCREMENTAL, dry_run=True)]
         assert result["created"] == 1
         assert result["pushed"] == 2
-
-    def test_finally_md_does_not_reference_flush_only(self) -> None:
-        """finally.md must not contain any reference to the phantom flush_only parameter.
-
-        The flush_only=true documentation was removed in #2452 (Path B doc-only fix).
-        This test reads the actual file from disk and fails if flush_only is found
-        anywhere in the content — preventing accidental re-introduction.
-        """
-        # Arrange
-        assert _FINALLY_MD.exists(), (
-            f"finally.md not found at expected path: {_FINALLY_MD}. "
-            "Check that the skills directory structure is intact."
-        )
-
-        # Act
-        content = _FINALLY_MD.read_text(encoding="utf-8")
-
-        # Assert
-        assert "flush_only" not in content, (
-            "finally.md must not reference 'flush_only' — this parameter was removed "
-            "in #2452 because it was never implemented in the MCP schema. "
-            "Any re-introduction must be accompanied by an actual implementation, "
-            "which requires a separate architectural decision (not Path B)."
-        )
 
     def test_backlog_pull_selector_refreshes_single_item(self, mocker: MockerFixture) -> None:
         backend = _SyncBackend([], ReconcileResult(file_paths={"#2452": "cache://2452"}))

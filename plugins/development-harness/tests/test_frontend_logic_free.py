@@ -10,14 +10,11 @@ bad patterns. As logic is extracted to dh_core.operations, the allowlist
 is tightened — eventually the only permitted import for business logic
 will be dh_core.operations.
 
-Additionally, a denylist of specific forbidden patterns (regexes) is
-maintained as a regression guard for known-leaked logic.
 """
 
 from __future__ import annotations
 
 import ast
-import re
 from pathlib import Path
 
 import pytest
@@ -122,17 +119,9 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     },
 }
 
+
 #: Specific forbidden regex patterns per file (regression guard).
 #: Grows as logic is extracted. Each entry is (filepath, pattern, description).
-FORBIDDEN_PATTERNS: list[tuple[str, str, str]] = [
-    # Phase 1 will add entries like:
-    # ("sam_schema/cli.py", r"from sam_schema\.core\.query import",
-    #  "CLI must import from dh_core.operations, not legacy query.py"),
-    # ("sam_schema/server.py", r"from sam_schema\.core\.gist_task_layer import",
-    #  "MCP server must use dh_core.operations, not GistTaskLayer directly"),
-]
-
-
 def _extract_import_roots(filepath: Path) -> set[str]:
     """Parse a Python file and extract all import root module names.
 
@@ -191,21 +180,4 @@ class TestFrontendLogicFree:
             f"{filepath} imports non-allowlisted modules: {sorted(violations)}.\n"
             f"Allowed: {sorted(allowed)}.\n"
             f"Business logic imports must go through dh_core.operations."
-        )
-
-    @pytest.mark.parametrize(
-        ("filepath", "pattern", "description"),
-        FORBIDDEN_PATTERNS or [("__none__", "__never_match__", "no patterns registered yet")],
-    )
-    def test_no_forbidden_patterns(self, filepath: str, pattern: str, description: str) -> None:
-        if filepath == "__none__":
-            pytest.skip("No forbidden patterns registered yet")
-        full_path = _plugin_root / filepath
-        if not full_path.exists():
-            pytest.skip(f"{filepath} does not exist yet")
-        content = full_path.read_text()
-        assert not re.search(pattern, content), (
-            f"{filepath} matches forbidden pattern: {pattern}\n"
-            f"Description: {description}\n"
-            f"This indicates business logic has leaked back into the frontend."
         )

@@ -104,25 +104,6 @@ class BackendName(StrEnum):
     memory = "memory"
 
 
-# ---------------------------------------------------------------------------
-# Artifact content comment constants
-# ---------------------------------------------------------------------------
-
-#: Maximum GitHub comment body size in characters.
-_GITHUB_COMMENT_MAX_CHARS = 65_536
-
-#: Regex matching the opening tag of an artifact content comment block.
-#: Captures ``type`` and ``path`` groups.
-_ARTIFACT_CONTENT_TAG_RE = re.compile(r"<!-- artifact-content:type=(?P<type>[^:]+):path=(?P<path>[^ >]+) -->")
-
-#: Closing tag for artifact content comment blocks.
-_ARTIFACT_CONTENT_END_TAG = "<!-- /artifact-content -->"
-
-#: Regex matching the complete artifact content block including delimiters.
-_ARTIFACT_CONTENT_BLOCK_RE = re.compile(
-    r"<!-- artifact-content:type=[^:]+:path=[^ >]+ -->.*?<!-- /artifact-content -->", re.DOTALL
-)
-
 #: Regex matching the Gist sentinel comment that links an issue to its Gist.
 #: Captures the ``gist_id`` group (hex string).
 _GIST_SENTINEL_RE = re.compile(r"<!-- artifact-gist:(?P<gist_id>[0-9a-f]+) -->")
@@ -176,78 +157,6 @@ def _require_int_item_id(cls_name: str, item_id: ItemId) -> int:
         )
         raise TypeError(msg)
     return item_id
-
-
-# ---------------------------------------------------------------------------
-# Artifact content comment helpers
-# ---------------------------------------------------------------------------
-
-
-def _build_artifact_content_comment(artifact_type: str, path: str, content: str) -> str:
-    """Build a structured GitHub comment body for storing artifact content.
-
-    The comment uses HTML comment delimiters for programmatic identification
-    and a ``<details>`` block to keep the issue visually uncluttered.
-
-    If *content* exceeds ``_GITHUB_COMMENT_MAX_CHARS`` it is truncated and a
-    warning notice is appended.
-
-    Args:
-        artifact_type: Artifact type string, e.g. ``"research"``.
-        path: Repo-relative path used as the comment identifier.
-        content: Full artifact content to embed.
-
-    Returns:
-        Complete comment body string ready for ``create_comment`` or
-        ``comment.edit()``.
-    """
-    opening_tag = f"<!-- artifact-content:type={artifact_type}:path={path} -->"
-    summary = f"Artifact: {artifact_type} — {path}"
-    # Build the wrapper without content to measure fixed overhead.
-
-    def _assemble(inner: str) -> str:
-        return (
-            f"{opening_tag}\n"
-            "<details>\n"
-            f"<summary>{summary}</summary>\n\n"
-            f"{inner}\n\n"
-            "</details>\n"
-            f"{_ARTIFACT_CONTENT_END_TAG}"
-        )
-
-    # Truncation notice added when content is cut — measure it first so the
-    # final assembled string stays within the GitHub limit.
-    notice = f"\n\n<!-- WARNING: content truncated — original length {len(content)} chars exceeded GitHub limit -->"
-    overhead = len(_assemble("")) + len(notice)
-    max_content = _GITHUB_COMMENT_MAX_CHARS - overhead
-
-    if len(content) > max_content:
-        return _assemble(content[:max_content] + notice)
-    return _assemble(content)
-
-
-def _extract_content_from_comment(comment_body: str) -> str:
-    """Extract the raw content from an artifact content comment body.
-
-    Parses the ``<details>`` block between the opening tag and closing
-    delimiter and returns the inner content (between the ``</summary>`` close
-    and the ``</details>`` open).
-
-    Args:
-        comment_body: Full GitHub comment body as returned by PyGithub.
-
-    Returns:
-        Extracted content string, or the full comment body when the expected
-        structure is not found.
-    """
-    # Find content between </summary> and </details>
-    summary_end = comment_body.find("</summary>")
-    details_end = comment_body.rfind("</details>")
-    if summary_end == -1 or details_end == -1:
-        return comment_body
-    # Skip the </summary> tag and surrounding blank lines.
-    raw = comment_body[summary_end + len("</summary>") : details_end]
-    return raw.strip()
 
 
 def _sanitize_gist_filename(path: str) -> str:
@@ -350,31 +259,19 @@ class ArtifactBackend(Protocol):
         ...
 
     def store_artifact_content(self, item_id: ItemId, artifact_type: str, path: str, content: str) -> None:
-        """Store artifact content as a GitHub issue comment.
-
-        Creates a structured collapsible comment identified by
-        ``artifact-content:type={artifact_type}:path={path}``.  When a
-        comment with the same type and path already exists it is edited
-        in-place rather than duplicated.
-
-        If *content* exceeds the GitHub comment size limit
-        (``_GITHUB_COMMENT_MAX_CHARS``), it is truncated and a warning
-        notice is appended.
+        """Store artifact content in the configured provider.
 
         Args:
             item_id: Backlog item identifier — positive integer for GitHub backends
                 or beads nanoid string for the beads backend.
             artifact_type: Artifact type string, e.g. ``"research"``.
-            path: Repo-relative path used as the comment identifier.
+            path: Repo-relative artifact path.
             content: Full artifact content to store.
         """
         ...
 
     def read_artifact_content_from_remote(self, item_id: ItemId, artifact_type: str, path: str) -> str | None:
-        """Search item comments for stored artifact content.
-
-        Scans the item's comments for an artifact content block whose
-        ``type`` and ``path`` match the given arguments.
+        """Read artifact content from the configured provider.
 
         Args:
             item_id: Backlog item identifier — positive integer for GitHub backends
@@ -383,8 +280,7 @@ class ArtifactBackend(Protocol):
             path: Repo-relative path to match.
 
         Returns:
-            The stored content string when found, or ``None`` when no
-            matching comment exists.
+            The stored content string when found, or ``None`` when absent.
         """
         ...
 

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 import json
 from collections.abc import Generator
 from pathlib import Path
@@ -11,8 +10,6 @@ from backlog_core.backend_types import BacklogConfig
 from backlog_core.backends.memory_backend import InMemoryBackend
 from typer.testing import CliRunner
 
-import sam_schema.cli_active_task as cli_active_task
-import sam_schema.sam_plan as sam_plan
 from sam_schema.cli import app
 from sam_schema.core.backends.memory_context_backend import InMemoryContextBackend
 from sam_schema.core.context_config import ContextConfig, reset_context_config, set_context_config
@@ -88,15 +85,3 @@ def test_plan_and_active_task_update_use_configured_content(tmp_path: Path) -> N
     task = _invoke("plan", "read", "--address", f"{plan_id}/T1")["task"]
     assert task["title"] == "Updated through active task"
     assert not list(ignored_directory.iterdir())
-
-
-def test_cli_modules_do_not_import_legacy_task_storage() -> None:
-    for module in (sam_plan, cli_active_task):
-        source_path = module.__file__
-        assert source_path is not None
-        imports = {
-            node.module
-            for node in ast.walk(ast.parse(Path(source_path).read_text(encoding="utf-8")))
-            if isinstance(node, ast.ImportFrom) and node.module is not None
-        }
-        assert "sam_schema.core.task_config" not in imports

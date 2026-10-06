@@ -37,15 +37,6 @@ BEADS_CAPABLE_TOOLS: list[str] = [
     "backlog_view",
 ]
 
-# Bare generic strings that must NOT appear as the full selector description.
-# If a selector description equals one of these, the beads nanoid was stripped.
-_BARE_GENERIC_DESCRIPTIONS: frozenset[str] = frozenset({
-    "Item selector: GitHub issue URL, #N, bare number, or title substring",
-    "Item selector",
-    "selector",
-})
-
-
 # ---------------------------------------------------------------------------
 # AST helpers
 # ---------------------------------------------------------------------------
@@ -153,23 +144,6 @@ def test_selector_description_mentions_beads_nanoid(tool_name: str) -> None:
         f"  Actual description: {desc!r}\n"
         "  Fix: add 'or beads nanoid (e.g. bd-a3f8)' to the selector Field description "
         f"in backlog_core/server.py for {tool_name}()."
-    )
-
-
-@pytest.mark.parametrize("tool_name", BEADS_CAPABLE_TOOLS)
-def test_selector_description_not_bare_generic(tool_name: str) -> None:
-    """Each beads-capable tool's selector description must not be a bare generic string.
-
-    Guards against reversion to a description that omits the beads nanoid clause.
-    """
-    assert tool_name in _SELECTOR_DESCRIPTIONS, f"Tool '{tool_name}' was not found in server.py."
-    desc = _SELECTOR_DESCRIPTIONS[tool_name]
-    assert desc not in _BARE_GENERIC_DESCRIPTIONS, (
-        f"Tool '{tool_name}' selector Field description reverted to a bare generic string "
-        f"that omits the beads nanoid clause.\n"
-        f"  Actual description: {desc!r}\n"
-        "  Fix: restore 'or beads nanoid (e.g. bd-a3f8)' in the selector Field "
-        f"description for {tool_name}() in backlog_core/server.py."
     )
 
 

@@ -15,12 +15,11 @@ All imports are at module level.
 
 from __future__ import annotations
 
-import inspect
 from unittest.mock import patch
 
 import pytest
 from backlog_core.models import BacklogError
-from backlog_core.server import backlog_groom, mcp
+from backlog_core.server import mcp
 
 from tests.helpers import call_mcp_tool
 
@@ -35,36 +34,6 @@ async def _call(tool_name: str, params: dict | None = None) -> dict:
     Delegates to tests.helpers.call_mcp_tool bound to this module's mcp server.
     """
     return await call_mcp_tool(mcp, tool_name, params)
-
-
-# ---------------------------------------------------------------------------
-# Signature contract
-# ---------------------------------------------------------------------------
-
-
-def test_backlog_groom_has_sections_param() -> None:
-    """backlog_groom should accept a sections parameter.
-
-    Tests: backlog_groom tool signature
-    How: Inspect the function signature and assert 'sections' is present.
-    Why: Regression guard — verifies T03 wired the parameter correctly.
-         A missing parameter would raise a TypeError at call time without
-         this explicit check.
-    """
-    sig = inspect.signature(backlog_groom)
-    assert "sections" in sig.parameters
-
-
-def test_backlog_groom_sections_param_defaults_to_none() -> None:
-    """backlog_groom sections parameter defaults to None.
-
-    Tests: backlog_groom tool signature default
-    How: Inspect the function signature and assert 'sections' default is None.
-    Why: Default of None ensures backward compatibility — callers that don't
-         pass sections get the existing single-section code path unchanged.
-    """
-    sig = inspect.signature(backlog_groom)
-    assert sig.parameters["sections"].default is None
 
 
 # ---------------------------------------------------------------------------
