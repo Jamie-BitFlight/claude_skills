@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 import pytest
 from ruamel.yaml import YAML
 from sam_schema.core.models import Complexity, Plan, Priority, Task, TaskStatus
+from sam_schema.core.query import load_plan
 from sam_schema.writers.yaml_writer import _task_to_dict, update_field, update_fields, write_plan
 
 if TYPE_CHECKING:
@@ -70,111 +71,31 @@ def _make_small_plan() -> Plan:
 # ---------------------------------------------------------------------------
 
 
-class TestWritePlanSingleFile:
-    """Verify write_plan produces correct single-file YAML output.
+def test_write_plan_single_file_round_trips_fields_and_omits_defaults(tmp_path: Path) -> None:
+    """A canonical writer output remains consumable with its intended values and omissions."""
+    output = write_plan(_make_small_plan(), tmp_path / "plan.yaml", force_single=True)
 
-    Tests: Single-file output path for plans under LINE_THRESHOLD.
-    How: Write a small plan, read back, verify structure.
-    Why: Single-file is the most common output — must produce valid YAML.
-    """
+    loaded = load_plan(output).plan
+    assert (loaded.feature, loaded.version, loaded.description) == ("writer-test", "1.0", "Plan for writer tests.")
+    assert [(task.id, task.status, task.dependencies) for task in loaded.tasks] == [
+        ("T1", TaskStatus.COMPLETE, []),
+        ("T2", TaskStatus.IN_PROGRESS, ["T1"]),
+        ("T3", TaskStatus.NOT_STARTED, ["T1", "T2"]),
+    ]
+    assert loaded.tasks[1].description == "A multiline\ndescription\nfor testing."
 
-    def test_write_plan_creates_yaml_file(self, tmp_path: Path) -> None:
-        """Verify write_plan creates a file at the expected path.
-
-        Tests: File creation.
-        How: Write plan to tmp_path, check file exists.
-        Why: Missing output file is a hard failure.
-        """
-        plan = _make_small_plan()
-        output = tmp_path / "plan.yaml"
-        result = write_plan(plan, output, force_single=True)
-        assert result.exists()
-        assert result.suffix == ".yaml"
-
-    def test_write_plan_single_file_contains_feature(self, tmp_path: Path) -> None:
-        """Verify written YAML contains the feature field."""
-        plan = _make_small_plan()
-        output = tmp_path / "plan.yaml"
-        write_plan(plan, output, force_single=True)
-        data = _load_yaml(output)
-        assert data["feature"] == "writer-test"
-
-    def test_write_plan_single_file_contains_version(self, tmp_path: Path) -> None:
-        """Verify written YAML contains the version field."""
-        plan = _make_small_plan()
-        output = tmp_path / "plan.yaml"
-        write_plan(plan, output, force_single=True)
-        data = _load_yaml(output)
-        assert data["version"] == "1.0"
-
-    def test_write_plan_single_file_contains_tasks_list(self, tmp_path: Path) -> None:
-        """Verify written YAML has a tasks list with correct count."""
-        plan = _make_small_plan()
-        output = tmp_path / "plan.yaml"
-        write_plan(plan, output, force_single=True)
-        data = _load_yaml(output)
-        assert "tasks" in data
-        assert len(data["tasks"]) == 3
-
-    def test_write_plan_single_file_task_has_correct_id(self, tmp_path: Path) -> None:
-        """Verify first task in written YAML has correct id."""
-        plan = _make_small_plan()
-        output = tmp_path / "plan.yaml"
-        write_plan(plan, output, force_single=True)
-        data = _load_yaml(output)
-        assert data["tasks"][0]["id"] == "T1"
-
-    def test_write_plan_single_file_task_has_correct_status(self, tmp_path: Path) -> None:
-        """Verify first task has correct status string."""
-        plan = _make_small_plan()
-        output = tmp_path / "plan.yaml"
-        write_plan(plan, output, force_single=True)
-        data = _load_yaml(output)
-        assert data["tasks"][0]["status"] == "complete"
-
-    def test_write_plan_single_file_omits_none_fields(self, tmp_path: Path) -> None:
-        """Verify None-valued fields are omitted from output.
-
-        Tests: Clean YAML output without null values.
-        How: Check first task does not have 'started' key (it is None).
-        Why: Null fields clutter YAML and confuse human readers.
-        """
-        plan = _make_small_plan()
-        output = tmp_path / "plan.yaml"
-        write_plan(plan, output, force_single=True)
-        data = _load_yaml(output)
-        first_task = data["tasks"][0]
-        assert "created" not in first_task
-        assert "github-issue" not in first_task
-
-    def test_write_plan_single_file_omits_empty_lists(self, tmp_path: Path) -> None:
-        """Verify empty list fields are omitted from output."""
-        plan = _make_small_plan()
-        output = tmp_path / "plan.yaml"
-        write_plan(plan, output, force_single=True)
-        data = _load_yaml(output)
-        first_task = data["tasks"][0]
-        assert "blocked-by" not in first_task
-        assert "parallelize-with" not in first_task
-        assert "skills" not in first_task
-
-    def test_write_plan_single_file_omits_default_analysis_method(self, tmp_path: Path) -> None:
-        """Verify analysis-method='none' is omitted (skip-if-default)."""
-        plan = _make_small_plan()
-        output = tmp_path / "plan.yaml"
-        write_plan(plan, output, force_single=True)
-        data = _load_yaml(output)
-        first_task = data["tasks"][0]
-        assert "analysis-method" not in first_task
-
-    def test_write_plan_single_file_omits_default_divergence_notes(self, tmp_path: Path) -> None:
-        """Verify divergence-notes=0 is omitted (skip-if-default)."""
-        plan = _make_small_plan()
-        output = tmp_path / "plan.yaml"
-        write_plan(plan, output, force_single=True)
-        data = _load_yaml(output)
-        first_task = data["tasks"][0]
-        assert "divergence-notes" not in first_task
+    raw = _load_yaml(output)
+    first_task = raw["tasks"][0]
+    assert {
+        "created",
+        "github-issue",
+        "blocked-by",
+        "parallelize-with",
+        "skills",
+        "analysis-method",
+        "divergence-notes",
+    }.isdisjoint(first_task)
+    assert "description: |" in output.read_text(encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -490,20 +411,18 @@ class TestUpdateFieldMultiTask:
 
 
 class TestUpdateFieldMultiline:
-    """Verify update_field handles multiline markdown content fields.
+    """Verify multiline updates retain their content through the plan reader."""
 
-    Tests: Multiline values wrapped as LiteralScalarString.
-    How: Update a markdown content field with newlines, verify block scalar.
-    Why: Multiline content must preserve line breaks in YAML.
-    """
+    def test_update_field_multiline_description_round_trips(self, tmp_path: Path) -> None:
+        """A multiline update stays literal in YAML and is visible to downstream readers."""
+        output = write_plan(_make_small_plan(), tmp_path / "plan.yaml", force_single=True)
+        expected_description = "Line one\nLine two\nLine three"
 
-    def test_update_field_multiline_description_uses_block_scalar(self, tmp_path: Path) -> None:
-        """Verify multiline description is written as block scalar."""
-        f = tmp_path / "task.yaml"
-        f.write_text("task: T1\ntitle: A task\nstatus: not-started\n")
-        update_field(f, "T1", "description", "Line one\nLine two\nLine three")
-        raw = f.read_text(encoding="utf-8")
-        assert "description: |" in raw or "description: |\n" in raw
+        update_field(output, "T2", "description", expected_description)
+
+        loaded = load_plan(output).plan
+        assert loaded.tasks[1].description == expected_description
+        assert "description: |" in output.read_text(encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -662,6 +581,7 @@ class TestUpdateFieldYamlFrontmatter:
         f.write_text(_FRONTMATTER_SINGLE_WITH_CODE_FENCE)
         update_field(f, "T1", "status", "complete")
         raw = f.read_text(encoding="utf-8")
+        assert raw.startswith("---\n")
         assert "nested: yaml" in raw
         assert "More prose." in raw
 
@@ -676,19 +596,6 @@ class TestUpdateFieldYamlFrontmatter:
         f.write_text(_FRONTMATTER_SINGLE)
         with pytest.raises(KeyError, match="T99"):
             update_field(f, "T99", "status", "complete")
-
-    def test_update_field_frontmatter_file_still_starts_with_delimiter(self, tmp_path: Path) -> None:
-        """Verify the written file still starts with --- after update.
-
-        Tests: Output format integrity.
-        How: Update field, verify file starts with opening ---.
-        Why: The file must remain valid yaml_frontmatter for downstream readers.
-        """
-        f = tmp_path / "task.md"
-        f.write_text(_FRONTMATTER_SINGLE)
-        update_field(f, "T1", "status", "complete")
-        raw = f.read_text(encoding="utf-8")
-        assert raw.startswith("---\n")
 
 
 class TestUpdateFieldsYamlFrontmatter:
