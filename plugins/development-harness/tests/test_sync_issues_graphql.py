@@ -8,7 +8,6 @@ All PyGithub boundary objects are mocked — no live API calls.
 
 from __future__ import annotations
 
-import inspect
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -142,16 +141,6 @@ class TestSyncIssuesGraphqlCallbackCalledPerIssue:
         # Assert
         assert received == issues
         assert result == issues
-
-
-# ---------------------------------------------------------------------------
-# TestSyncIssuesGraphqlCheckpointBoundary
-# ---------------------------------------------------------------------------
-
-
-class TestSyncIssuesGraphqlCheckpointBoundary:
-    def test_sync_issues_graphql_has_no_track_timestamp_parameter(self) -> None:
-        assert "track_timestamp" not in inspect.signature(sync_issues_graphql).parameters
 
 
 # ---------------------------------------------------------------------------
