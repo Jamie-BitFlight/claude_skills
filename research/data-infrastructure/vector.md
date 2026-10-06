@@ -2,15 +2,15 @@
 name: vector
 title: Vector
 subtitle: High-performance observability data pipeline for logs, metrics, and traces
-research_date: 2026-10-02
+research_date: 2026-10-06
 source_url: https://github.com/vectordotdev/vector
 github_repository: https://github.com/vectordotdev/vector
 version_at_research: v0.58.0
 license: MPL-2.0
 freshness_tracking:
-  last_verified: 2026-10-03
+  last_verified: 2026-10-06
   version_at_verification: v0.58.0
-  next_review: 2027-01-03
+  next_review: 2027-01-06
   confidence_map: "Overview: high | Problem Addressed: high | Key Features: medium (doc + code-read) | Technical Architecture: medium (doc + code-read) | Installation & Usage: medium | Limitations and Caveats: medium"
 ---
 
@@ -62,7 +62,7 @@ Per the architecture document, "Vector runs a configuration consisting of a dire
 
 **Design rationale**: the architecture document reviewed states what the system does and no motivation for the design choices: Not mentioned in documentation.
 
-**Component counts at v0.58.0 (counted 2026-10-03)**: entries in `src/sources/` 46, `src/sinks/` 54, `src/transforms/` 19, counted with `ls | wc -l` (files and directories, including `mod.rs`/helper modules, so not a count of component types). The documentation sources reviewed state no component count: Not mentioned in documentation.
+**Component counts at v0.58.0 (counted 2026-10-06)**: entries in `src/sources/` 46, `src/sinks/` 54, `src/transforms/` 19, counted with `ls | wc -l` (files and directories, including `mod.rs`/helper modules, so not a count of component types). The documentation sources reviewed state no component count: Not mentioned in documentation.
 
 **Topology**: `src/topology/mod.rs` opens with "Topology contains all topology based types ... the ability to start, stop and reload a config." `TopologyPieces` (Source: `src/topology/builder.rs:1111`) holds built components; `RunningTopology` (Source: `src/topology/running.rs:56`) runs them and exposes `reload_config_and_respawn` (Source: `src/topology/running.rs:295`). Config reloads compute a `ConfigDiff` (Source: `src/config/diff.rs:9` — struct ConfigDiff, fields `sources`, `transforms`, `sinks`, `enrichment_tables`, `components_to_reload`), used in `src/topology/running.rs:315`.
 
@@ -90,47 +90,25 @@ The installation script command is quoted from `website/content/en/docs/setup/qu
 
 ### Basic Configuration Example
 
-Field names below were checked against the v0.58.0 config structs (`include` in `src/sources/file.rs:67`, tagged `mode` and the `address` field of its `tcp` variant in `src/sources/syslog.rs:77-84`, `condition` in `src/transforms/filter.rs:28` with the value form taken from the test at `src/transforms/filter.rs:39`, `endpoints` in `src/sinks/elasticsearch/config.rs:102`, `bucket` and `key_prefix` in `src/sinks/aws_s3/config.rs`). The example has not been executed, and required options not shown (for example sink `encoding`, S3 `region`) were not checked. YAML, TOML and JSON config formats: Not mentioned in the sources reviewed for this entry.
+The configuration below is the example from the Vector quickstart (Source: `website/content/en/docs/setup/quickstart.md`, tag v0.58.0, accessed 2026-10-06). It defines a `stdin` source and a `console` sink whose `encoding.codec` of `text` prints events as plain text. The quickstart runs it with `echo 'Hello world!' | vector`. YAML, TOML and JSON config formats: Not mentioned in the sources reviewed for this entry.
 
-```yaml
+```yaml filename="vector.yaml"
 sources:
-  syslog_input:
-    type: syslog
-    mode: tcp
-    address: "0.0.0.0:514"
-
-  file_input:
-    type: file
-    include:
-      - "/var/log/app.log"
-
-transforms:
-  filter_errors:
-    type: filter
-    inputs:
-      - syslog_input
-      - file_input
-    condition: '.message == "value"'
+  in:
+    type: "stdin"
 
 sinks:
-  elasticsearch:
-    type: elasticsearch
+  out:
     inputs:
-      - filter_errors
-    endpoints:
-      - "https://elasticsearch.example.com"
-
-  s3_archive:
-    type: aws_s3
-    inputs:
-      - syslog_input
-    bucket: "log-archive"
-    key_prefix: "logs/"
+      - "in"
+    type: "console"
+    encoding:
+      codec: "text"
 ```
 
 ### Running Vector
 
-`src/cli.rs` defines `Validate(validate::Opts)` and `Test(unit_test::Opts)` subcommands, and a `--config` option (`short, long, env = "VECTOR_CONFIG"`, comma-delimited) whose doc comment says "`/etc/vector/vector.yaml` is targeted" by default (Source: `src/cli.rs:74-82`, tag v0.58.0, accessed 2026-10-06).
+`src/cli.rs` defines `Validate(validate::Opts)` and `Test(unit_test::Opts)` subcommands, and a `--config` option (`short, long, env = "VECTOR_CONFIG"`, comma-delimited) whose doc comment says "`/etc/vector/vector.yaml` is targeted" by default (Source: `src/cli.rs:74-82`, tag v0.58.0, accessed 2026-10-06). The `validate` and `test` subcommands each take positional config paths: the doc comments read "Any number of Vector config files to validate." (Source: `src/validate.rs:110-115`) and "Any number of Vector config files to test." (Source: `src/unit_test.rs:32-36`).
 
 ```bash
 vector validate /etc/vector/vector.yaml
@@ -152,13 +130,10 @@ vector test /etc/vector/vector.yaml
 
 ## References
 
-- [Vector GitHub Repository](https://github.com/vectordotdev/vector) (accessed 2026-10-03; README, docs and source read from tag v0.58.0)
-- [Vector Documentation Home](https://vector.dev/docs/) (accessed 2026-10-02)
-- [Vector Installation Guide](https://vector.dev/docs/setup/installation/) (accessed 2026-10-02)
-- [Vector Architecture Documentation](https://vector.dev/docs/architecture/) (accessed 2026-10-02)
-- Vector source code at tag v0.58.0: `src/topology/mod.rs`, `src/topology/running.rs`, `src/topology/builder.rs`, `src/config/diff.rs`, `src/sources/`, `src/sinks/`, `src/transforms/`, `docs/ARCHITECTURE.md`, `src/cli.rs`, `rust-toolchain.toml`, `src/sources/file.rs`, `src/sources/syslog.rs`, `src/sources/http_server.rs`, `src/sinks/*/config.rs`, `src/transforms/filter.rs`, `src/transforms/remap.rs`, `src/transforms/route.rs`, `lib/vector-core/src/event/`, `lib/vector-buffers/src/topology/channel/` (accessed 2026-10-03; clone of tag v0.58.0 at commit 2bcad9bbb84e201dcfd58c22b1f779290101b728, re-read 2026-10-06)
-- Vector documentation files at tag v0.58.0: `website/content/en/docs/architecture/guarantees.md`, `website/content/en/docs/architecture/end-to-end-acknowledgements.md`, `website/content/en/docs/setup/installation/_index.md`, `website/content/en/docs/setup/quickstart.md`, `website/content/en/docs/setup/deployment/roles.md`, `docs/DEVELOPING.md`, `README.md`, `LICENSE` (accessed 2026-10-03)
-- Vector Cargo.toml at tag v0.58.0: version 0.58.0, license MPL-2.0 (accessed 2026-10-03). The default branch `Cargo.toml` shows 0.59.0-dev, which is the next development version on master; this entry's `version_at_research` is the v0.58.0 release tag, so the two differ by design.
+- [Vector GitHub Repository](https://github.com/vectordotdev/vector) (accessed 2026-10-06; README, docs and source read from tag v0.58.0)
+- Vector source code at tag v0.58.0: `src/topology/mod.rs`, `src/topology/running.rs`, `src/topology/builder.rs`, `src/config/diff.rs`, `src/sources/`, `src/sinks/`, `src/transforms/`, `docs/ARCHITECTURE.md`, `src/cli.rs`, `src/validate.rs`, `src/unit_test.rs`, `rust-toolchain.toml`, `src/sources/file.rs`, `src/sources/syslog.rs`, `src/sources/http_server.rs`, `src/sinks/*/config.rs`, `src/transforms/filter.rs`, `src/transforms/remap.rs`, `src/transforms/route.rs`, `lib/vector-core/src/event/`, `lib/vector-buffers/src/topology/channel/` (accessed 2026-10-06; clone of tag v0.58.0 at commit 2bcad9bbb84e201dcfd58c22b1f779290101b728, re-read 2026-10-06)
+- Vector documentation files at tag v0.58.0: `website/content/en/docs/architecture/guarantees.md`, `website/content/en/docs/architecture/end-to-end-acknowledgements.md`, `website/content/en/docs/setup/installation/_index.md`, `website/content/en/docs/setup/quickstart.md`, `website/content/en/docs/setup/deployment/roles.md`, `docs/DEVELOPING.md`, `README.md`, `LICENSE` (accessed 2026-10-06)
+- Vector Cargo.toml at tag v0.58.0: version 0.58.0, license MPL-2.0 (accessed 2026-10-06). The default branch `Cargo.toml` shows 0.59.0-dev, which is the next development version on master; this entry's `version_at_research` is the v0.58.0 release tag, so the two differ by design.
 
 ---
 
