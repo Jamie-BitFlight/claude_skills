@@ -2,16 +2,16 @@
 name: zeron
 title: Zeron
 subtitle: Local-first multi-agent controller with optional device sync
-research_date: 2026-10-02
+research_date: 2026-10-06
 source_url: https://github.com/zeronsh/zeron
 github_repository: https://github.com/zeronsh/zeron
 version_at_research: v0.2.102
 license: MIT
 freshness_tracking:
-  last_verified: 2026-10-02
+  last_verified: 2026-10-06
   version_at_verification: v0.2.102
-  next_review: 2027-01-02
-  confidence_map: "Overview: medium, Problem Addressed: medium, Key Features: medium, Technical Architecture: medium (doc + code-read), Installation & Usage: high, Limitations and Caveats: low"
+  next_review: 2027-01-06
+  confidence_map: "Overview: medium, Problem Addressed: medium, Key Features: medium (doc + code-read), Technical Architecture: medium (doc + code-read), Installation & Usage: high, Limitations and Caveats: low"
 ---
 
 # Zeron
@@ -42,7 +42,7 @@ Zeron abstracts the control interface across multiple coding agents through a pl
 
 ### Local-First Session Persistence
 
-Sessions persist to the device's local store by default. The session document schema—a Loro CRDT structure porting the original zeron implementation—includes a transcript with messages stored as LoroText values (measuring 1.03× oplog overhead), a durable command queue for send/steer/interrupt operations, and metadata. Each session remains under `{data_dir}/profiles/local/` when running in local-only mode. When a user signs in to enable sync, the profile switches to `{data_dir}/orgs/{org_id}/{user_id}/`, preserving the same session doc structure but enabling CloudFlare Durable Object synchronization.
+Sessions persist to the device's local store by default. The session document schema—a Loro CRDT structure porting the original zeron implementation—includes a transcript with messages stored as LoroText values (ARCHITECTURE.md line 101 calls this "the measured 1.03× oplog shape"; the file states no measurement method), a durable command queue for send/steer/interrupt operations, and metadata. Each session remains under `{data_dir}/profiles/local/` when running in local-only mode. When a user signs in to enable sync, the profile switches to `{data_dir}/orgs/{org_id}/{user_id}/`, preserving the same session doc structure but enabling CloudFlare Durable Object synchronization.
 
 ### Optional Multi-Device Synchronization
 
@@ -50,10 +50,10 @@ Authentication and workspace management are deliberately decoupled: signing in v
 
 ### Native UI with gpui
 
-The interface is built in gpui (a pinned Zed revision with custom extensions for blur, edge fades, and GPU memory bounds). The UI organizes around a searchable spaces sidebar with session tabs as a device-local viewport (opening/closing tabs is local-only; archiving is explicit). Key UI components include:
+The interface is built in gpui, pinned to one Zed revision (ARCHITECTURE.md line 174). The UI organizes around a searchable spaces sidebar with session tabs as a device-local viewport (opening/closing tabs is local-only; archiving is explicit). Key UI components include (figures below are as stated in ARCHITECTURE.md and `crates/ui/src/composer.rs` at v0.2.102, read 2026-10-06):
 
 - **Transcript**: Virtualized list with spring-based stick-to-bottom tracking (interrupted by user input, re-engages within 70px per ARCHITECTURE.md line 179), block-granular rows with incremental streaming markdown re-parse, and scroll-anchor absorption.
-- **Composer**: Hand-rolled text input with auto-grow (76–260px), IME support, question panel (1-9 keys, 220ms auto-advance per ARCHITECTURE.md line 198; `AUTO_ADVANCE_MS: u64 = 220` in `crates/ui/src/composer.rs`) for multi-choice scenarios, and attachment/image drag-drop.
+- **Composer**: Hand-rolled text input with auto-grow (76–260px), IME support, question panel (1-9 keys, 220ms auto-advance per ARCHITECTURE.md line 198; `pub const AUTO_ADVANCE_MS: u64 = 220` in `crates/ui/src/composer.rs` at v0.2.102) for multi-choice scenarios, and attachment/image drag-drop.
 - **Terminal**: Alacritty VTE terminal emulation with portable-pty backend, tab drag-reorder, 150ms sliding animations, 12ms input coalescing, and 1MB replay (ARCHITECTURE.md line 203).
 - **Diff Pane**: Unified-patch virtualized viewer with per-file collapse animation (180ms), time-sliced syntax highlighting, and 200ms width transitions.
 - **Theme System**: Device-local independent light/dark variants with optional VS Code file/package import and custom family support, accent overrides for interaction roles only.
@@ -64,7 +64,7 @@ One binary, two modes: headed mode launches a gpui window and optionally hosts a
 
 ### Cargo Workspace Architecture
 
-In the main-branch clone read on 2026-10-05 (commit 3d4bfd1), the root `Cargo.toml` lists 18 workspace members: 17 crates under `crates/` plus the `apps/zeron` application. The list below covers the crates under `crates/`:
+In the v0.2.102 snapshot (commit 64ad6f6, read 2026-10-06), the root `Cargo.toml` lists 18 workspace members: 17 crates under `crates/` plus the `apps/zeron` application. The list below covers the crates under `crates/`:
 
 - **zeron-proto**: Wire types (AgentEvent, ToolCall, RunRequest, Model), serde+ndjson framing, and pure derivations both frontends share (sort orders, staleness gating, grouping).
 - **zeron-doc**: Session doc + workspace registry schemas, Loro mirror layer with incremental diff application, parts folding, command ledger, continuation splitting at 256KB.
@@ -75,7 +75,14 @@ In the main-branch clone read on 2026-10-05 (commit 3d4bfd1), the root `Cargo.to
 - **zeron-ui**: gpui app shell, sidebar, conversation, composer, terminal, diff, settings, animation kit.
 - **zeron-preview**: "Project-scoped HTTP discovery, stable local routing, and authenticated peers" (`crates/preview/src/lib.rs` line 1).
 - **zeron-update**: "release checking and self-update, shared by the engine (the background checker + `ApplyUpdate`), the CLI (`zeron update`), and the UI" (`crates/update/src/lib.rs` lines 1-3).
-- **zeron-theme**, **zeron-voice**, **zeron-markdown**, **zeron-syntax**, **zeron-text**, **zeron-mcp**, **zeron-mobile**, **zeron-client**: Specialized support crates.
+- **zeron-theme**: "Zeron's source-neutral theme domain model" (`crates/theme/src/lib.rs` line 1).
+- **zeron-voice**: "Desktop-local Parakeet v3. No engine, document, RPC or audio persistence." (`crates/voice/src/lib.rs` line 1).
+- **zeron-markdown**: "Block-level markdown over pulldown-cmark, shared by every frontend." (`crates/markdown/src/lib.rs` line 1).
+- **zeron-syntax**: "Syntax-highlighting contracts shared by Zeron's desktop surfaces." (`crates/syntax/src/lib.rs` line 1).
+- **zeron-text**: "Analytic text measurement and line layout (pretext-style prepare/layout split) for virtualized transcripts" (`crates/text/Cargo.toml` description).
+- **zeron-mcp**: "a Model Context Protocol server over the running engine" (`crates/mcp/src/lib.rs` line 1).
+- **zeron-mobile**: "the UniFFI surface shared by the iOS and Android apps" (`crates/mobile/src/lib.rs` line 1).
+- **zeron-client**: "the engine-free thin client ("viewer device")" (`crates/client/src/lib.rs` line 1).
 
 Async runtime: tokio throughout; in-process UI bridges via `gpui_tokio` (futures surfaced as gpui Tasks).
 
@@ -106,7 +113,7 @@ gpui UI ─ in-proc/localhost RPC ─ engine A ══ DeviceRoom DO relay ══
 
 Two persistent document kinds persist identically whether sync is enabled:
 
-1. **Session doc** (per chat): Schema is a Rust port of the original zeron's `packages/session-doc`, carrying `meta` (map), `messages` (list of maps with LoroText bodies), and `commands` (list with append-only per-device entries, host-only outcomes, dedupe/TTL/supersede evaluation). Constants: `STREAM_COMMIT_MS=120`, `DO_FLUSH_MS=5s`, compaction at 8MB, 30-day retention, 64-message tail (ARCHITECTURE.md lines 104-105). Continuation splitting at 256KB, render-only tool parts (full inputs in host's local run journal).
+1. **Session doc** (per chat): Schema is a Rust port of the original zeron's `packages/session-doc`, carrying `meta` (map), `messages` (list of maps with LoroText bodies), and `commands` (list with append-only per-device entries, host-only outcomes, dedupe/TTL/supersede evaluation). Constants (v0.2.102, read 2026-10-06): `STREAM_COMMIT_MS=120`, `DO_FLUSH_MS=5s`, compaction at 8MB, 30-day retention, 64-message tail (ARCHITECTURE.md lines 104-105). Continuation splitting at 256KB, render-only tool parts (full inputs in host's local run journal).
 
 2. **Workspace registry doc** (per profile): Stores spaces (id, deviceId, path, name, gitDetected, checkoutId), chat index (id, deviceId, title, archived, cwd, branch, checkoutId, spaceId, lastSeenAt, lastMessagePreview/At, config), devices, session-status rows, and checkout-diff summary pointers. Writer discipline: each device writes its own rows, creates/renames/archives are LWW sets, presence uses ephemeral room frames.
 
@@ -189,6 +196,8 @@ The desktop app checks for new releases on startup, every hour while running, an
 
 ### Excluded Features
 
+Statements in this section are from ARCHITECTURE.md at v0.2.102, read 2026-10-06.
+
 Token-usage display (profile heatmap, lifetime stats, per-message token columns, `WatchUsage`) is excluded. ARCHITECTURE.md (line 10) lists the goal as "Feature parity with zeron **except token-usage display** (poor fit for CRDTs; excluded)." and line 257 repeats the exclusion.
 
 ### Privacy Boundary
@@ -213,8 +222,22 @@ Remote workspace file requests are subject to workspace-relative path containmen
 
 ## References
 
-- [Zeron Repository](https://github.com/zeronsh/zeron) (accessed 2026-10-02)
-- [Zeron ARCHITECTURE.md](https://github.com/zeronsh/zeron/blob/main/ARCHITECTURE.md) (accessed 2026-10-02)
-- [Zeron README](https://github.com/zeronsh/zeron/blob/main/README.md) (accessed 2026-10-02)
-- [Zeron CONTEXT.md](https://github.com/zeronsh/zeron/blob/main/CONTEXT.md) (accessed 2026-10-02)
-- [Zeron Cargo.toml](https://github.com/zeronsh/zeron/blob/main/Cargo.toml) (accessed 2026-10-02)
+All repository sources below were read from a shallow clone of tag v0.2.102 (commit 64ad6f6ef03a8282c1847329804542f014c97d54, committed 2026-10-02), accessed 2026-10-06.
+
+- [Zeron Repository](https://github.com/zeronsh/zeron/tree/v0.2.102) (v0.2.102, accessed 2026-10-06)
+- [Zeron ARCHITECTURE.md](https://github.com/zeronsh/zeron/blob/v0.2.102/ARCHITECTURE.md) (v0.2.102, accessed 2026-10-06)
+- [Zeron README](https://github.com/zeronsh/zeron/blob/v0.2.102/README.md) (v0.2.102, accessed 2026-10-06)
+- [Zeron CONTEXT.md](https://github.com/zeronsh/zeron/blob/v0.2.102/CONTEXT.md) (v0.2.102, accessed 2026-10-06)
+- [Zeron Cargo.toml](https://github.com/zeronsh/zeron/blob/v0.2.102/Cargo.toml) (v0.2.102, accessed 2026-10-06)
+- [crates/ui/src/composer.rs](https://github.com/zeronsh/zeron/blob/v0.2.102/crates/ui/src/composer.rs) (v0.2.102, accessed 2026-10-06)
+- [crates/harness/src/ (directory listing only, including cursor/)](https://github.com/zeronsh/zeron/tree/v0.2.102/crates/harness/src) (v0.2.102, accessed 2026-10-06)
+- [crates/preview/src/lib.rs](https://github.com/zeronsh/zeron/blob/v0.2.102/crates/preview/src/lib.rs) (v0.2.102, accessed 2026-10-06)
+- [crates/update/src/lib.rs](https://github.com/zeronsh/zeron/blob/v0.2.102/crates/update/src/lib.rs) (v0.2.102, accessed 2026-10-06)
+- [crates/theme/src/lib.rs](https://github.com/zeronsh/zeron/blob/v0.2.102/crates/theme/src/lib.rs) (v0.2.102, accessed 2026-10-06)
+- [crates/voice/src/lib.rs](https://github.com/zeronsh/zeron/blob/v0.2.102/crates/voice/src/lib.rs) (v0.2.102, accessed 2026-10-06)
+- [crates/markdown/src/lib.rs](https://github.com/zeronsh/zeron/blob/v0.2.102/crates/markdown/src/lib.rs) (v0.2.102, accessed 2026-10-06)
+- [crates/syntax/src/lib.rs](https://github.com/zeronsh/zeron/blob/v0.2.102/crates/syntax/src/lib.rs) (v0.2.102, accessed 2026-10-06)
+- [crates/text/Cargo.toml](https://github.com/zeronsh/zeron/blob/v0.2.102/crates/text/Cargo.toml) (v0.2.102, accessed 2026-10-06)
+- [crates/mcp/src/lib.rs](https://github.com/zeronsh/zeron/blob/v0.2.102/crates/mcp/src/lib.rs) (v0.2.102, accessed 2026-10-06)
+- [crates/mobile/src/lib.rs](https://github.com/zeronsh/zeron/blob/v0.2.102/crates/mobile/src/lib.rs) (v0.2.102, accessed 2026-10-06)
+- [crates/client/src/lib.rs](https://github.com/zeronsh/zeron/blob/v0.2.102/crates/client/src/lib.rs) (v0.2.102, accessed 2026-10-06)
