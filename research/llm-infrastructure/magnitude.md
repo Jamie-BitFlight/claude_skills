@@ -75,7 +75,7 @@ Magnitude's inference stack is divided into three primary components, laid out a
 
 **Engine** (`engine/`): Owns model interpretation, generation, scheduling, and state management. Handles model loading, prompt processing, and response generation.
 
-**Seismic** (`seismic/`): Owns numerical compilation, device resource allocation, and execution across CPU, Metal (Apple Silicon), CUDA (NVIDIA), and Vulkan (AMD/other GPUs). Compiles and tunes kernels at deployment time.
+**Seismic** (`seismic/`): Owns numerical compilation, device resource allocation, and execution across CPU, Metal (Apple Silicon), CUDA (NVIDIA), and Vulkan (AMD/other GPUs). Compiles and tunes kernels on the user's device before a model runs (`README.md`).
 
 **Service** (`service/`): Owns the public HTTP API, model inventory management, hardware assessment, model residency (download/load/unload lifecycle), and worker supervision.
 
