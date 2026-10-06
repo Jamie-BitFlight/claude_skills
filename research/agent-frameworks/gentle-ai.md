@@ -82,7 +82,7 @@ Gentle-AI configures any of 17 AI coding agents. Which ecosystem components each
 
 **Supported agents** (the 17 listed in `docs/agents.md`): Claude Code, OpenCode, Kilo Code, Gemini CLI, Cursor, VS Code Copilot, Codex, Windsurf, Antigravity, Kimi Code, Qwen Code, Kiro IDE, OpenClaw, Trae, Pi, Hermes, Conductor
 
-**Ecosystem support tiers**:
+**Ecosystem support tiers** (per `PRD.md`; the SDD items are PRD.md descriptions, and `docs/components.md` line 24 states the SDD component is retired since v4.0.0, see SDD source conflict below):
 - **Full** (Claude Code, OpenCode): Engram plugin, MCP servers, skills, SDD orchestrator, GGA integration, persona, theme, permissions, statusline, hooks
 - **Good** (Cursor, VS Code): Skills, MCP servers, SDD (inline mode), GGA as review provider, persona rules
 - **Partial** (Gemini CLI, Codex, Windsurf): Skills via system instructions, MCP where supported, GGA provider config, persona
@@ -148,23 +148,23 @@ The installer (`gentle-ai install`) runs seven phases:
 3. **Backup**: Snapshots existing configs to `~/.gentle-ai-backup-TIMESTAMP/` before any changes
 4. **Dependencies**: `PRD.md` (a design document) specifies installing base tools (Homebrew, Node.js 20+, git) and showing the dependency tree (`PRD.md` lines 102-126, 167). The current `docs/quickstart.md` (line 38) states Node.js 18+ and npm are checked as prerequisites with a warning and install hint, and that `gentle-ai install` "does not install them for you"; the two sources differ, and the quickstart describes the shipped behavior
 5. **Core Components**: Installs Engram binary, GGA binary, missing agents
-6. **Agent Configuration**: For each selected agent, injects Engram plugin/MCP, copies skills, configures SDD orchestrator, applies persona and theme
+6. **Agent Configuration**: For each selected agent, injects Engram plugin/MCP, copies skills, applies persona and theme; `PRD.md` also lists configuring an SDD orchestrator, which `docs/components.md` line 24 states is retired since v4.0.0
 7. **Verification**: Health checks (Engram port 7437, skills files, MCP configs, GGA binary) before completion
 
-Source repositories fetched at install time:
-- `Gentleman-Programming/sdd-agent-team` — SDD skills
+Source repositories fetched at install time (per `PRD.md`; `docs/components.md` line 24 states the SDD skills are retired since v4.0.0):
+- `Gentleman-Programming/sdd-agent-team` — SDD skills (PRD.md)
 - `Gentleman-Programming/engram` — Engram binary and plugins
 - `Gentleman-Programming/gentleman-guardian-angel` — GGA binary
 - Skills Registry — 30+ skill files
 
 ### Agent Configuration Strategy
 
-Per-agent injection points differ (listed below), and the support tiers under Key Features show that not every agent receives every component. Design rationale: Not mentioned in documentation for the installer pipeline, the agent configuration strategy, or the component ownership split, in the files read (README.md, docs/*.md, PRD.md). For the agents that integrate Engram, the Engram server and `~/.engram/engram.db` are shared (see Engram Memory System).
+Per-agent injection points differ (listed below), and the support tiers under Key Features show that not every agent receives every component. Design rationale: Not mentioned in documentation for the installer pipeline, the agent configuration strategy, or the component ownership split, in the files read (README.md, PRD.md, go.mod, docs/agents.md, docs/architecture.md, docs/components.md, docs/engram.md, docs/intended-usage.md, docs/non-interactive.md, docs/quickstart.md, docs/review-integration.md, docs/rollback.md, docs/skill-registry.md, docs/usage.md). For the agents that integrate Engram, the Engram server and `~/.engram/engram.db` are shared (see Engram Memory System).
 
-**Per-agent injection points**:
-- **Claude Code** (`~/.claude/`): CLAUDE.md (persona + SDD orchestrator), settings.json (permissions, theme), skills/, plugins/ (Engram plugin), ~/.claude.json (MCP servers)
-- **OpenCode** (`~/.config/opencode/`): opencode.json (agents, MCP, Engram plugin, theme), skill/ (SDD + coding skills), commands/ (SDD slash commands), plugins/ (engram.ts)
-- **Cursor** (`~/.cursor/`): .cursorrules (persona + SDD inline), skills/, MCP config
+**Per-agent injection points** (from `PRD.md`, a design document; its SDD items are subject to the SDD source conflict under Key Features):
+- **Claude Code** (`~/.claude/`): CLAUDE.md (persona; PRD.md SDD orchestrator), settings.json (permissions, theme), skills/, plugins/ (Engram plugin), ~/.claude.json (MCP servers)
+- **OpenCode** (`~/.config/opencode/`): opencode.json (agents, MCP, Engram plugin, theme), skill/ (coding skills; PRD.md SDD skills), commands/ (PRD.md SDD slash commands), plugins/ (engram.ts)
+- **Cursor** (`~/.cursor/`): .cursorrules (persona; PRD.md SDD inline), skills/, MCP config
 - **Gemini CLI** (`~/.gemini/`): settings.json (MCP: Engram), system.md (memory protocol + persona)
 - **GGA** (`~/.config/gga/`): config (provider selection, timeout)
 
@@ -182,14 +182,14 @@ Per-agent injection points differ (listed below), and the support tiers under Ke
 4. Agent calls `mem_save(observation, type: decision|bug|pattern)`
 5. Session ends → Plugin calls `mem_session_summary(goal, discoveries, accomplished, files)`
 
-**Cross-agent sync**: Agents with the Engram integration (the Full, Good and Partial tiers under Key Features) read and write the same `~/.engram/engram.db`. The Minimal tier is listed with persona and coding-convention rules only, no Engram. Which agents beyond Claude Code and OpenCode have a documented Engram plugin is Not mentioned in documentation in the files read.
+**Cross-agent sync**: Agents with a stated Engram integration (Claude Code, OpenCode, Gemini CLI and Codex, per the Integration bullet under Key Features) use the shared Engram server and `~/.engram/engram.db` (per `PRD.md`). Engram integration for any other agent is Not mentioned in documentation in the files read.
 
 ### Component Ownership
 
 - **Installer**: Dependency resolution, binary installation, config generation, skill file copying, backup/restore, health verification
 - **Engram**: Memory persistence, session tracking, FTS5 search, cross-agent sync, git sync for teams
 - **GGA**: Pre-commit review, file caching, multi-provider routing, PR/CI modes
-- **Agent**: Code generation, skill interpretation, SDD orchestration, MCP tool usage, persona behavior
+- **Agent**: Code generation, skill interpretation, SDD orchestration (per PRD.md; see the SDD source conflict), MCP tool usage, persona behavior
 - **User**: API keys & auth, AGENTS.md rules, project-level .gga config, which agents to use
 
 ---
@@ -205,7 +205,7 @@ brew install gentleman-programming/tap/gentle-ai
 # macOS / Linux (curl)
 curl -fsSL https://raw.githubusercontent.com/Gentleman-Programming/gentle-ai/main/scripts/install.sh | bash
 
-# Windows (PowerShell) — source install of the latest release, needs Go 1.25.10+
+# Windows (PowerShell) — source install of v4.0.0 (README.md at fdc3fab, 2026-10-06), needs Go 1.25.10+
 go install github.com/gentleman-programming/gentle-ai/v4/cmd/gentle-ai@v4.0.0
 ```
 
@@ -236,12 +236,16 @@ Source: `docs/non-interactive.md` lines 50-57 (shown there as `go run ./cmd/gent
 
 **Small change (ODD read-only)**:
 
+Source: `docs/intended-usage.md` lines 12-14.
+
 ```text
 describe task → agent explores → asks clarifying questions → implements
 (no persistent task file for small changes)
 ```
 
 **Large feature (ODD with task artifact)**:
+
+Source: `docs/intended-usage.md` lines 14 and 26 (task artifact, Engram copy, `skill-registry refresh --force`).
 
 ```text
 gentle-ai skill-registry refresh --force
@@ -251,19 +255,24 @@ describe feature → agent creates odd/tasks/feature-name.md → explores → im
 
 **On commit**:
 
+Source: `PRD.md` line 292 (a design document).
+
 ```text
 git commit → GGA pre-hook runs → validates against AGENTS.md rules → allows or blocks
 ```
 
 **Review**:
 
+Source: `docs/review-integration.md` lines 12 and 215 (`gentle-ai review mode enable` is the command rendered when RDD is disabled; `gentle-ai review mode disable` opts out); `README.md` line 151.
+
 ```text
 gentle-ai review mode enable      # Enable RDD
-(on suitable changes, agent documents risk assessment)
-gentle-ai review mode disable     # Turn off RDD if not needed
+gentle-ai review mode disable     # Turn off RDD
 ```
 
 **Maintenance**:
+
+Source: `docs/intended-usage.md` line 32.
 
 ```bash
 gentle-ai update                  # Check and upgrade the binary
