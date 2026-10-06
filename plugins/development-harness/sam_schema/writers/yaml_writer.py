@@ -192,25 +192,6 @@ def _serialize_to_string(data: dict[str, Any]) -> str:
     return buf.getvalue()
 
 
-def _estimate_line_count(plan: Plan) -> int:
-    """Estimate the number of YAML lines a plan would produce as a single file.
-
-    Serializes the full plan and counts lines. Used to decide between
-    single-file and directory output.
-
-    Args:
-        plan: Plan to estimate.
-
-    Returns:
-        Estimated line count of the full serialized YAML.
-    """
-    meta = _plan_metadata_dict(plan)
-    task_list = [_task_to_dict(t) for t in plan.tasks]
-    full: dict[str, Any] = {**meta, "tasks": task_list}
-    serialized = _serialize_to_string(full)
-    return serialized.count("\n")
-
-
 def _write_single_file(plan: Plan, output_path: Path) -> Path:
     """Write the plan as a single YAML file.
 
@@ -301,8 +282,6 @@ def write_plan(plan: Plan, output_path: Path, *, force_single: bool = False) -> 
         return _write_single_file(plan, target)
 
     # Serialize once; use the result for both the threshold check and the write.
-    # This avoids the double serialization that occurred when _estimate_line_count
-    # serialized the plan and _write_single_file then serialized it again.
     meta = _plan_metadata_dict(plan)
     task_list = [_task_to_dict(t) for t in plan.tasks]
     full: dict[str, Any] = {**meta, "tasks": task_list}
