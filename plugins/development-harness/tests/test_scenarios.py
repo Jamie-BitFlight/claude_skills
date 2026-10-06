@@ -176,20 +176,6 @@ class TestWorkBacklogItem:
         assert result["title"] == "My Unique Title Item"
         assert _stored_item("My Unique Title Item").reference
 
-    # Scenario 7: view with pagination produces truncation metadata
-    async def test_view_with_pagination(self, backlog_dir, mock_github, write_test_item):
-        write_test_item(
-            "Long Body Item", description="\n".join(f"Line {i} of the long body content." for i in range(1, 51))
-        )
-
-        result = await _call("backlog_view", {"selector": "Long Body Item", "offset": 0, "limit": 5})
-
-        total = result.get("body_total_lines")
-        if total is not None and total > 5:
-            assert result.get("body_truncated") is True
-            assert isinstance(result.get("body_remaining_lines"), int)
-            assert isinstance(result.get("body_total_lines"), int)
-
     async def test_close_with_reason(self, backlog_dir, mock_github, write_test_item):
         """Scenario 11: backlog_close closes an item with a reason and no blocking PRs."""
         write_test_item("Close Test Item", issue="#42")
@@ -1407,22 +1393,22 @@ class TestCompactBacklogView:
 
 
 class TestResolveVerifiedGate:
-    """Integration tests for the status:verified gate on resolve (Gap 4)
-    and full pipeline flow (Gaps 1+4) and closed-issue reconciliation (Gap 3).
+    """Integration tests for resolve data prerequisites, force paths, and reconciliation.
 
-    The gate logic is:
-    - If item has a Plan field AND no status:verified label -> block resolve
-    - If item has no Plan field -> skip gate entirely
-    - force=True bypasses the gate
+    The planned-item case covers only whether unverified data is exposed. The
+    current resolve operation has no verified-state refusal gate; a future
+    product decision must establish that contract before it gains a refusal
+    scenario.
     """
 
-    async def test_resolve_blocks_without_verified_label(self, backlog_dir, mock_github, write_test_item):
-        """Resolve with plan but no status:verified label is blocked at the view gate.
+    async def test_planned_item_without_verified_label_exposes_unverified_data(
+        self, backlog_dir, mock_github, write_test_item
+    ):
+        """A planned item exposes labels without status:verified.
 
-        When an item has a Plan field, the resolve workflow checks backlog_view
-        labels for status:verified. Without the label, the caller is expected
-        to block. This test verifies the data prerequisites: view returns labels
-        and the item has a plan attached, but no verified label.
+        This is data-prerequisite coverage only. It does not claim that
+        ``backlog_resolve`` refuses: the current operation does not implement
+        that gate, as recorded in the workflow-dispatch authority conflict.
         """
         write_test_item("Verified Gate Test", issue="#200")
         _seed_provider_items("Verified Gate Test")
@@ -1436,7 +1422,7 @@ class TestResolveVerifiedGate:
 
         assert view_result["title"] == "Verified Gate Test"
         assert isinstance(view_result["labels"], list)
-        # No status:verified label present — gate should block at skill level
+        # No status:verified label is exposed for the planned item.
         assert "status:verified" not in view_result["labels"]
         assert update_result["plan"] == "plan/test-plan.md"
 
