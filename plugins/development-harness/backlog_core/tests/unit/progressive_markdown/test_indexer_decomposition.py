@@ -96,7 +96,7 @@ def document():
 
 
 # ---------------------------------------------------------------------------
-# Compound output contracts (coexist with the granular characterisation tests)
+# Compound output contracts
 # ---------------------------------------------------------------------------
 
 
