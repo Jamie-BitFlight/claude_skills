@@ -78,3 +78,27 @@ def test_cli_update_persists_structured_acceptance_criteria(content_backend: Con
             "expected_final": "pass",
         }
     ]
+
+
+def test_cli_update_rejects_incomplete_structured_criterion_without_persisting(
+    content_backend: ContentTaskProvider,
+) -> None:
+    plan = content_backend.create_plan("structured-rejection", "reject incomplete criteria", [])
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "plan",
+            "update",
+            "--plan-address",
+            plan["plan_id"],
+            "--acceptance-criteria-structured-json",
+            json.dumps([{"criterion-id": "AC-1"}], separators=(",", ":")),
+        ],
+        env={"NO_COLOR": "1"},
+    )
+
+    assert result.exit_code != 0
+    provider = get_config().backend
+    assert isinstance(provider, ContentProvider)
+    assert "acceptance_criteria_structured" not in ContentTaskProvider(provider).read_plan(plan["plan_id"])

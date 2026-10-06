@@ -103,6 +103,41 @@ def test_resolve_plan_address_zero_padded_input_matches_file(plan_dir: Path) -> 
     assert result.name == "P001-test.yaml"
 
 
+@pytest.mark.parametrize(
+    ("address", "entries", "expected"),
+    [
+        ("1", ("P1-unpadded.yaml",), "P1-unpadded.yaml"),
+        ("9999", ("P9999-four-digits.yaml",), "P9999-four-digits.yaml"),
+        ("P1", ("P001-prefixed.yaml",), "P001-prefixed.yaml"),
+        ("auth", ("P001-auth-system.yaml",), "P001-auth-system.yaml"),
+        ("feature", ("P001-feature-alpha.yaml", "P002-feature-beta.yaml"), "P001-feature-alpha.yaml"),
+    ],
+    ids=["unpadded-file", "four-digit", "p-prefix", "slug-substring", "deterministic-slug-tie"],
+)
+def test_resolve_plan_address_preserves_pnnn_variants(
+    plan_dir: Path, address: str, entries: tuple[str, ...], expected: str
+) -> None:
+    for entry in entries:
+        (plan_dir / entry).touch()
+
+    assert resolve_plan_address(address, plan_dir).name == expected
+
+
+def test_resolve_plan_address_rejects_file_directory_number_collision(plan_dir: Path) -> None:
+    (plan_dir / "P004-file.yaml").touch()
+    (plan_dir / "P004-directory").mkdir()
+
+    with pytest.raises(AddressingError):
+        resolve_plan_address("4", plan_dir)
+
+
+def test_resolve_plan_address_prefers_canonical_p_file(plan_dir: Path) -> None:
+    (plan_dir / "P005-canonical.yaml").touch()
+    (plan_dir / "tasks-5-legacy.md").touch()
+
+    assert resolve_plan_address("5", plan_dir).name == "P005-canonical.yaml"
+
+
 def test_resolve_plan_address_numeric_no_match_raises_addressing_error(plan_dir_with_p_files: Path) -> None:
     # Arrange — no P099-* file exists
     # Act / Assert
