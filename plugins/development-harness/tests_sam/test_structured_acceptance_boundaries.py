@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from backlog_core.backend_protocol import get_config
 from backlog_core.backend_types import ContentProvider
 from sam_schema.cli import app
-from sam_schema.core.action_models import CreatePlanConfig
+from sam_schema.core.action_models import CreatePlanConfig, TaskDefinition
 from sam_schema.core.backends.content import ContentTaskProvider
 from sam_schema.core.models import CreatePlanResult
 from sam_schema.server import sam_plan
@@ -48,7 +48,9 @@ def test_mcp_create_persists_structured_acceptance_criteria(
 
 def test_cli_update_persists_structured_acceptance_criteria(content_backend: ContentTaskProvider) -> None:
     # Given: an existing provider plan and a compact JSON criteria payload.
-    plan = content_backend.create_plan("structured-update", "persist structured criteria", [])
+    plan = content_backend.create_plan(
+        "structured-update", "persist structured criteria", [], acceptance_criteria="Keep this prose."
+    )
     criteria = [{"criterion-id": "AC-2", "check-command": "uv run ty check .", "expected-final": "pass"}]
 
     # When: the grouped CLI update applies the structured criteria field.
@@ -78,6 +80,45 @@ def test_cli_update_persists_structured_acceptance_criteria(content_backend: Con
             "expected_final": "pass",
         }
     ]
+    assert ContentTaskProvider(provider).read_plan(plan["plan_id"])["acceptance_criteria"] == "Keep this prose."
+
+
+def test_mcp_create_persists_task_scalar_variants(content_backend: ContentTaskProvider) -> None:
+    tasks = [
+        TaskDefinition(
+            id=f"T{priority}",
+            title=f"Task {priority}",
+            status="not-started",
+            agent="agent",
+            priority=priority,
+            complexity=complexity,
+            issue_classification=classification,
+            analysis_method=method,
+        )
+        for priority, complexity, classification, method in [
+            (1, "low", "procedural", "none"),
+            (2, "medium", "defect", "5-whys"),
+            (3, "high", "recurring-pattern", "none"),
+            (4, "low", "procedural", "5-whys"),
+            (5, "medium", "defect", "none"),
+        ]
+    ]
+    result = sam_plan(config=CreatePlanConfig(slug="scalar-variants", goal="persist scalar variants", tasks=tasks))
+
+    assert isinstance(result, CreatePlanResult)
+    provider = get_config().backend
+    assert isinstance(provider, ContentProvider)
+    persisted = ContentTaskProvider(provider).read_plan(result.plan_id)["tasks"]
+    assert [task["priority"] for task in persisted] == [1, 2, 3, 4, 5]
+    assert [task["complexity"] for task in persisted] == ["low", "medium", "high", "low", "medium"]
+    assert [task["issue_classification"] for task in persisted] == [
+        "procedural",
+        "defect",
+        "recurring-pattern",
+        "procedural",
+        "defect",
+    ]
+    assert [task["analysis_method"] for task in persisted] == ["none", "5-whys", "none", "5-whys", "none"]
 
 
 def test_cli_update_rejects_incomplete_structured_criterion_without_persisting(

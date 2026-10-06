@@ -65,6 +65,13 @@ def test_normalize_task_canonical_status_preserved() -> None:
     assert task.status == TaskStatus.IN_PROGRESS
 
 
+@pytest.mark.parametrize("status", ["failed", "FAILED", "[FAILED]"])
+def test_normalize_task_failed_status_variants_map_to_failed(status: str) -> None:
+    task, _ = normalize_task({"task": "T1", "title": "T", "status": status}, FormatType.YAML_FRONTMATTER)
+
+    assert task.status == TaskStatus.FAILED
+
+
 def test_normalize_task_space_separated_status_mapped() -> None:
     raw = {"task": "T1", "title": "T", "status": "NOT STARTED"}
     task, _ = normalize_task(raw, FormatType.YAML_FRONTMATTER)
@@ -157,6 +164,16 @@ def test_normalize_task_lenient_valid_dict_returns_task() -> None:
     task, _ = normalize_task_lenient(raw, FormatType.PURE_YAML)
     assert task is not None
     assert task.id == "T1"
+
+
+def test_normalize_task_lenient_rejects_invalid_bookend_type_as_gap() -> None:
+    task, gaps = normalize_task_lenient(
+        {"task": "T0", "title": "Baseline", "status": "not-started", "is-bookend": True, "bookend-type": "invalid"},
+        FormatType.YAML_FRONTMATTER,
+    )
+
+    assert task is None
+    assert gaps[0].gap_type == "invalid_value"
 
 
 # ---------------------------------------------------------------------------

@@ -179,6 +179,36 @@ def test_status_returns_normal_data_after_finalize(memory_backend: InMemoryTaskP
     assert status.total_tasks == 1
 
 
+def test_status_preserves_non_default_autonomy_and_task_summary(memory_backend: InMemoryTaskProvider) -> None:
+    from sam_schema.core.action_models import StatusPlanConfig
+
+    result = sam_plan(
+        config=CreatePlanConfig(
+            slug="checkpoint-plan",
+            goal="Status envelope",
+            tasks=[
+                TaskDefinition(id="T1", title="Ready", status="not-started", agent="a", dependencies=[]),
+                TaskDefinition(id="T2", title="Blocked", status="not-started", agent="a", dependencies=["T1"]),
+            ],
+        )
+    )
+    assert isinstance(result, CreatePlanResult)
+    memory_backend.update_plan_fields(result.plan_id, set_fields={"autonomy": "checkpoint"})
+
+    status = sam_plan(config=StatusPlanConfig(), plan=result.plan_id)
+
+    assert isinstance(status, PlanStatus)
+    assert status.feature == "checkpoint-plan"
+    assert status.total_tasks == 2
+    assert status.by_status == {"not-started": 2}
+    assert status.ready_tasks == ["T1"]
+    assert status.blocked_tasks == [{"T2": ["T1"]}]
+    assert not status.completion_pct
+    assert status.has_cycles is False
+    assert status.state is PlanState.READY
+    assert status.autonomy == "checkpoint"
+
+
 def test_ready_returns_normal_data_after_finalize(memory_backend: InMemoryTaskProvider) -> None:
     """sam_plan(action='ready') returns ready tasks after finalize clears drafting.
 
