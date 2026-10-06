@@ -1,14 +1,8 @@
-"""Assert frontend files contain no business logic.
+"""Assert frontend import roots stay within their declared allowlists.
 
-Frontends are thin adapters: parse args, call operations, format output.
-This test uses AST-based import analysis to enforce that frontend files
-only import from an allowlist of permitted modules.
-
-The allowlist approach is stronger than a regex denylist because it catches
-the general case (any import not on the list) rather than specific known
-bad patterns. As logic is extracted to dh_core.operations, the allowlist
-is tightened — eventually the only permitted import for business logic
-will be dh_core.operations.
+This AST check guards the frontend dependency architecture: an unapproved
+import root cannot enter a declared frontend. It does not establish that the
+file has no inline business logic or that broad permitted roots contain none.
 
 """
 
@@ -22,7 +16,7 @@ import pytest
 # Ensure plugin root resolves relative paths.
 _plugin_root = Path(__file__).resolve().parent.parent
 
-#: Frontend files that must remain logic-free.
+#: Frontend files whose import roots are bounded by ``ALLOWED_IMPORTS``.
 FRONTEND_FILES: list[str] = [
     "sam_schema/cli.py",
     "sam_schema/server.py",
@@ -36,8 +30,6 @@ FRONTEND_FILES: list[str] = [
 
 #: Allowed import roots for each frontend file.
 #: During the transition, frontends still import from legacy modules.
-#: As operations are extracted, entries are removed from the allowlist
-#: and the forbidden_patterns list grows.
 ALLOWED_IMPORTS: dict[str, set[str]] = {
     "sam_schema/cli.py": {
         "__future__",
@@ -157,12 +149,12 @@ def _extract_import_roots(filepath: Path) -> set[str]:
     return roots
 
 
-class TestFrontendLogicFree:
-    """Frontend files must not contain business logic."""
+class TestFrontendImportRoots:
+    """Frontend import roots remain within the declared architecture boundary."""
 
     @pytest.mark.parametrize("filepath", FRONTEND_FILES)
-    def test_imports_are_allowlisted(self, filepath: str) -> None:
-        """Every import in a frontend file must be on the allowlist."""
+    def test_import_roots_are_allowlisted(self, filepath: str) -> None:
+        """Every absolute import root in a frontend file is declared."""
         full_path = _plugin_root / filepath
         if not full_path.exists():
             pytest.skip(f"{filepath} does not exist")
@@ -179,5 +171,5 @@ class TestFrontendLogicFree:
         assert not violations, (
             f"{filepath} imports non-allowlisted modules: {sorted(violations)}.\n"
             f"Allowed: {sorted(allowed)}.\n"
-            f"Business logic imports must go through dh_core.operations."
+            "Frontend import roots must be declared in ALLOWED_IMPORTS."
         )

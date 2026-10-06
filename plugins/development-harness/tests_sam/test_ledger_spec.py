@@ -7,11 +7,14 @@ in the design, found before ``dh_core/ledger.py`` exists.
 
 from __future__ import annotations
 
+import json
 import re
 from collections import Counter
+from pathlib import Path
 
 import pytest
 from dh_core import ledger_spec as spec
+from dh_core.ledger import store, transitions
 
 TASK_COMMANDS = [c for c in spec.COMMANDS if c.scope == spec.Scope.TASK]
 PLAN_COMMANDS = [c for c in spec.COMMANDS if c.scope == spec.Scope.PLAN]
@@ -162,14 +165,37 @@ def test_report_check_columns_exist() -> None:
     assert {"name", "attempt", "content"} <= {c.name for c in spec.COLUMNS if c.table == "sections"}
 
 
-def test_no_session_or_agent_id_anywhere() -> None:
-    import inspect
+def test_create_does_not_persist_ambient_session_or_agent_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A real create stores plan/task data without ambient identity leakage."""
+    sentinel = "session-that-must-not-reach-the-ledger"
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", sentinel)
+    conn = store.open_ledger(tmp_path / store.DATABASE_NAME)
+    try:
+        result = transitions.create(
+            conn,
+            slug="privacy-boundary",
+            goal="persist work without session identity",
+            owner_reference="issue#123",
+            tasks=[{"id": "T1", "title": "role-bearing task", "agent": "reviewer"}],
+        )
+        assert result.plan is not None
+        plan = str(result.plan)
+        payloads = [
+            json.loads(str(row["payload"]))
+            for row in conn.execute("SELECT payload FROM events WHERE plan = :plan ORDER BY seq", {"plan": plan})
+        ]
+        rows = [
+            dict(conn.execute("SELECT * FROM plans WHERE plan_id = :plan", {"plan": plan}).fetchone()),
+            dict(conn.execute("SELECT * FROM tasks WHERE plan = :plan", {"plan": plan}).fetchone()),
+        ]
+    finally:
+        conn.close()
 
-    source = inspect.getsource(spec)
-    forbidden = re.findall(r"session_id|agent_id|CLAUDE_CODE_SESSION_ID|\bbinding\b", source)
-    assert forbidden == ["session id", "agent id"] or not [f for f in forbidden if "_" in f], (
-        f"identity keys present: {forbidden}"
-    )
+    for record in [*payloads, *rows]:
+        assert {"session_id", "agent_id"}.isdisjoint(record)
+        assert sentinel not in json.dumps(record, sort_keys=True)
 
 
 def test_model_fields_match_models() -> None:
