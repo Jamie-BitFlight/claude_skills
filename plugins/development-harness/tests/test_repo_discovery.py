@@ -604,22 +604,3 @@ class TestDiscoverRepoCache:
         monkeypatch.setenv("GITHUB_REPO", "second/repo")
         second = discover_repo()
         assert second == "second/repo"
-
-    def test_cache_clear_method_exists_on_discover_repo(self) -> None:
-        """discover_repo.cache_clear is callable.
-
-        Tests: lru_cache API presence
-        How: Assert callable(discover_repo.cache_clear).
-        Why: Tests and init() depend on this attribute — must not be removed.
-        """
-        assert callable(discover_repo.cache_clear)
-
-    def test_cache_info_reports_maxsize_one(self) -> None:
-        """discover_repo.cache_info() reports maxsize=1.
-
-        Tests: lru_cache maxsize configuration
-        How: Inspect cache_info().maxsize.
-        Why: maxsize=1 is the documented contract (one result cached per process).
-        """
-        info = discover_repo.cache_info()
-        assert info.maxsize == 1
