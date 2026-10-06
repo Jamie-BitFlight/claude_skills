@@ -11,7 +11,7 @@ freshness_tracking:
   last_verified: 2026-10-02
   version_at_verification: v0.2.102
   next_review: 2027-01-02
-  confidence_map: "Overview: medium, Problem Addressed: medium, Key Features: medium, Technical Architecture: medium (doc + code-read), Installation & Usage: high, Limitations: low"
+  confidence_map: "Overview: medium, Problem Addressed: medium, Key Features: medium, Technical Architecture: medium (doc + code-read), Installation & Usage: high, Limitations and Caveats: low"
 ---
 
 # Zeron
@@ -38,7 +38,7 @@ Zeron is a native Rust application that provides local-first control of multiple
 
 ### Multi-Agent Harness Support
 
-Zeron abstracts the control interface across multiple coding agents through a pluggable harness system. Each harness is a trait implementation that handles agent-specific communication protocols—Claude Code via stream-json subprocess protocol, Codex via app-server JSON-RPC, with a mock harness. The README names Cursor, Devin, Grok, Hermes, Pi and Antigravity as controlled agents (README.md line 3), but the per-harness implementation status for those is not verified beyond directory names: `crates/harness/src/` at v0.2.102 contains `claude/`, `codex/`, `cursor/`, `acp/`, `opencode/`, `pi/` and `mock.rs`, and their contents were not read. A single unified UI and command queue system manages all harness types without divergence.
+Zeron abstracts the control interface across multiple coding agents through a pluggable harness system. Each harness is a trait implementation that handles agent-specific communication protocols—Claude Code via stream-json subprocess protocol, Codex via app-server JSON-RPC, with a mock harness. The README names Cursor, Devin, Grok, Hermes, Pi and Antigravity as controlled agents (README.md line 3), but the per-harness implementation status for those is not verified beyond directory names: `crates/harness/src/` at v0.2.102 contains `claude/`, `codex/`, `cursor/`, `acp/`, `opencode/`, `pi/` and `mock.rs`, and their contents were not read.
 
 ### Local-First Session Persistence
 
@@ -52,9 +52,9 @@ Authentication and workspace management are deliberately decoupled: signing in v
 
 The interface is built in gpui (a pinned Zed revision with custom extensions for blur, edge fades, and GPU memory bounds). The UI organizes around a searchable spaces sidebar with session tabs as a device-local viewport (opening/closing tabs is local-only; archiving is explicit). Key UI components include:
 
-- **Transcript**: Virtualized list with spring-based stick-to-bottom tracking (interrupted by user input, re-engages within 70px), block-granular rows with incremental streaming markdown re-parse, and scroll-anchor absorption.
-- **Composer**: Hand-rolled text input with auto-grow (76–260px), IME support, question panel (1-9 keys, 220ms auto-advance) for multi-choice scenarios, and attachment/image drag-drop.
-- **Terminal**: Alacritty VTE terminal emulation with portable-pty backend, tab drag-reorder, 150ms sliding animations, 12ms input coalescing, and 1MB replay.
+- **Transcript**: Virtualized list with spring-based stick-to-bottom tracking (interrupted by user input, re-engages within 70px per ARCHITECTURE.md line 179), block-granular rows with incremental streaming markdown re-parse, and scroll-anchor absorption.
+- **Composer**: Hand-rolled text input with auto-grow (76–260px), IME support, question panel (1-9 keys, 220ms auto-advance per ARCHITECTURE.md line 198; `AUTO_ADVANCE_MS: u64 = 220` in `crates/ui/src/composer.rs`) for multi-choice scenarios, and attachment/image drag-drop.
+- **Terminal**: Alacritty VTE terminal emulation with portable-pty backend, tab drag-reorder, 150ms sliding animations, 12ms input coalescing, and 1MB replay (ARCHITECTURE.md line 203).
 - **Diff Pane**: Unified-patch virtualized viewer with per-file collapse animation (180ms), time-sliced syntax highlighting, and 200ms width transitions.
 - **Theme System**: Device-local independent light/dark variants with optional VS Code file/package import and custom family support, accent overrides for interaction roles only.
 
@@ -64,7 +64,7 @@ One binary, two modes: headed mode launches a gpui window and optionally hosts a
 
 ### Cargo Workspace Architecture
 
-The root `Cargo.toml` lists 18 workspace members: 17 crates under `crates/` plus the `apps/zeron` application. The list below covers the crates under `crates/`:
+In the main-branch clone read on 2026-10-05 (commit 3d4bfd1), the root `Cargo.toml` lists 18 workspace members: 17 crates under `crates/` plus the `apps/zeron` application. The list below covers the crates under `crates/`:
 
 - **zeron-proto**: Wire types (AgentEvent, ToolCall, RunRequest, Model), serde+ndjson framing, and pure derivations both frontends share (sort orders, staleness gating, grouping).
 - **zeron-doc**: Session doc + workspace registry schemas, Loro mirror layer with incremental diff application, parts folding, command ledger, continuation splitting at 256KB.
@@ -106,7 +106,7 @@ gpui UI ─ in-proc/localhost RPC ─ engine A ══ DeviceRoom DO relay ══
 
 Two persistent document kinds persist identically whether sync is enabled:
 
-1. **Session doc** (per chat): Schema is a Rust port of the original zeron's `packages/session-doc`, carrying `meta` (map), `messages` (list of maps with LoroText bodies), and `commands` (list with append-only per-device entries, host-only outcomes, dedupe/TTL/supersede evaluation). Constants: `STREAM_COMMIT_MS=120`, `DO_FLUSH_MS=5s`, compaction at 8MB, 30-day retention, 64-message tail. Continuation splitting at 256KB, render-only tool parts (full inputs in host's local run journal).
+1. **Session doc** (per chat): Schema is a Rust port of the original zeron's `packages/session-doc`, carrying `meta` (map), `messages` (list of maps with LoroText bodies), and `commands` (list with append-only per-device entries, host-only outcomes, dedupe/TTL/supersede evaluation). Constants: `STREAM_COMMIT_MS=120`, `DO_FLUSH_MS=5s`, compaction at 8MB, 30-day retention, 64-message tail (ARCHITECTURE.md lines 104-105). Continuation splitting at 256KB, render-only tool parts (full inputs in host's local run journal).
 
 2. **Workspace registry doc** (per profile): Stores spaces (id, deviceId, path, name, gitDetected, checkoutId), chat index (id, deviceId, title, archived, cwd, branch, checkoutId, spaceId, lastSeenAt, lastMessagePreview/At, config), devices, session-status rows, and checkout-diff summary pointers. Writer discipline: each device writes its own rows, creates/renames/archives are LWW sets, presence uses ephemeral room frames.
 
@@ -218,11 +218,3 @@ Remote workspace file requests are subject to workspace-relative path containmen
 - [Zeron README](https://github.com/zeronsh/zeron/blob/main/README.md) (accessed 2026-10-02)
 - [Zeron CONTEXT.md](https://github.com/zeronsh/zeron/blob/main/CONTEXT.md) (accessed 2026-10-02)
 - [Zeron Cargo.toml](https://github.com/zeronsh/zeron/blob/main/Cargo.toml) (accessed 2026-10-02)
-
----
-
-## Cross-References
-
-| Entry | Category | Relationship |
-|-------|----------|--------------|
-
