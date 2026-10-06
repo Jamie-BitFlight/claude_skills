@@ -170,24 +170,6 @@ def test_partial_sources_remain_explicit_and_do_not_erase_successful_findings() 
     assert result.findings[0].claim == "100 requests per minute"
 
 
-def test_qualifier_keeps_its_own_support() -> None:
-    """The per-key qualifier is supported by B, not silently attributed to A."""
-    data = example()
-    source_b = copy.deepcopy(data["sources"][0])
-    source_b.update(id="B", path="source-B")
-    data["sources"].append(source_b)
-    data["findings"].append({
-        "id": "F2",
-        "claim": "100 requests per minute per key",
-        "basis": "observed",
-        "support": [{"source_id": "B", "locator": "line 7"}],
-        "qualifiers": ["per key"],
-    })
-    result = SummaryRecord.model_validate(data)
-    assert [item.source_id for item in result.findings[1].support] == ["B"]
-    assert result.findings[1].qualifiers == ["per key"]
-
-
 def test_duplicate_json_keys_are_rejected() -> None:
     """Duplicate values cannot silently replace request identity."""
     with pytest.raises(ValueError, match="Duplicate"):

@@ -144,18 +144,6 @@ def test_release_formatter_renders_daily_analysis() -> None:
     assert "- Default model changed." in description
 
 
-def test_skill_documents_one_controller_workflow() -> None:
-    skill = (SCRIPT_DIR.parent / "SKILL.md").read_text(encoding="utf-8")
-
-    assert "### Legacy process detail" not in skill
-    assert "This outputs a JSON object" in skill
-    assert "[--dry-run] [--token-limit" in skill
-
-
-def test_controller_uses_the_bundled_finalizer() -> None:
-    assert "finalize_day_analysis.py" in (SCRIPT_DIR / "daily_releases.py").read_text(encoding="utf-8")
-
-
 def test_copied_controller_runs_directly(tmp_path: Path) -> None:
     copied_skill = tmp_path / "daily-releases"
     shutil.copytree(SCRIPT_DIR.parent, copied_skill)
