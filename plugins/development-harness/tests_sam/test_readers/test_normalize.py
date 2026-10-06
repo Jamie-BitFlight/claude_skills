@@ -176,6 +176,24 @@ def test_normalize_task_lenient_rejects_invalid_bookend_type_as_gap() -> None:
     assert gaps[0].gap_type == "invalid_value"
 
 
+@pytest.mark.parametrize(
+    "raw",
+    [
+        {"task": "invalid-id", "title": "T", "status": "not-started"},
+        {"task": "T1", "status": "not-started"},
+        {"task": "T1", "title": "", "status": "not-started"},
+        {"task": "T1", "title": "x" * 201, "status": "not-started"},
+        {"task": "T1", "title": "T", "status": "invented"},
+    ],
+    ids=["malformed-id", "missing-title", "empty-title", "long-title", "invalid-status"],
+)
+def test_normalize_task_lenient_rejects_invalid_task_input(raw: dict[str, str]) -> None:
+    task, gaps = normalize_task_lenient(raw, FormatType.PURE_YAML)
+
+    assert task is None
+    assert gaps[0].gap_type == "invalid_value"
+
+
 # ---------------------------------------------------------------------------
 # normalize_plan — end-to-end from fixture files
 # ---------------------------------------------------------------------------
