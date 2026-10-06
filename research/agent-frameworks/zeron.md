@@ -88,7 +88,7 @@ Async runtime: tokio throughout; in-process UI bridges via `gpui_tokio` (futures
 
 ### Edge Infrastructure (TypeScript)
 
-ARCHITECTURE.md (lines 28-30, 244-248, (v0.2.102, read 2026-10-06)) labels the edge "TypeScript" and places it in `edge/`; the Worker routes are listed in `edge/src/index.ts`. The backend for multi-device sync runs as CloudFlare Workers + Durable Objects, absorbing responsibilities from the original zeron server:
+ARCHITECTURE.md (lines 28-30, 244-248, v0.2.102, read 2026-10-06) labels the edge "TypeScript" and places it in `edge/`; the Worker routes are listed in `edge/src/index.ts`. The backend for multi-device sync runs as CloudFlare Workers + Durable Objects, absorbing responsibilities from the original zeron server:
 
 Source: ARCHITECTURE.md — Edge (TypeScript); `edge/src/index.ts` — Worker route list; `edge/src/auth-routes.ts` — `/auth/exchange`, `/auth/refresh`; `edge/src/env.ts` — `reg1/{orgId}/{userId}` registry rooms.
 
@@ -124,14 +124,14 @@ Two persistent document kinds persist identically whether sync is enabled:
 
 ### Command Plane
 
-Send/steer/interrupt/respondInput are durable command entries in the session doc (`QueueCommand`), executed by the chat's host device. Offline sends queue in the doc; mark-processed before execute; steer with no live run dispatches as next turn. ARCHITECTURE.md (line 125, (v0.2.102, read 2026-10-06)) describes this as "zeron's proven design, kept verbatim"; that is the project's own assessment.
+Send/steer/interrupt/respondInput are durable command entries in the session doc (`QueueCommand`), executed by the chat's host device. Offline sends queue in the doc; mark-processed before execute; steer with no live run dispatches as next turn. ARCHITECTURE.md (line 125, v0.2.102, read 2026-10-06) describes this as "zeron's proven design, kept verbatim"; that is the project's own assessment.
 
 ### Authentication and Workspace Scope
 
 - **AuthState**: Live credential state (`SignedOut`, `NeedsOrganization`, or `SignedIn`).
-- **WorkspaceScope**: Immutable storage boundary set at engine startup: `Local`, `Synced`, or explicit `Development`. ARCHITECTURE.md (line 51, (v0.2.102, read 2026-10-06)) states: "The engine never re-resolves an open store because `AuthState` changed. This prevents a sign-in, token refresh, or revocation from silently swapping databases or attaching online transports to a runtime that started local-only."
+- **WorkspaceScope**: Immutable storage boundary set at engine startup: `Local`, `Synced`, or explicit `Development`. ARCHITECTURE.md (line 51, v0.2.102, read 2026-10-06) states: "The engine never re-resolves an open store because `AuthState` changed. This prevents a sign-in, token refresh, or revocation from silently swapping databases or attaching online transports to a runtime that started local-only."
 
-Source: `crates/proto/src/workspace.rs` — `WorkspaceScope`; `crates/engine/src/auth.rs` — `AuthState`; ARCHITECTURE.md lines 54-59 (startup table, (v0.2.102, read 2026-10-06)).
+Source: `crates/proto/src/workspace.rs` — `WorkspaceScope`; `crates/engine/src/auth.rs` — `AuthState`; ARCHITECTURE.md lines 54-59 (startup table, v0.2.102, read 2026-10-06).
 
 Startup behavior:
 
