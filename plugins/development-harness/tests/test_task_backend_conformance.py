@@ -304,28 +304,21 @@ class TestTaskBackendConformance:
         assert "Updated context narrative" in plan["context"]
 
     def test_append_task_section(self, backend: TaskBackend) -> None:
-        """Appending to a named YAML field should persist the content on read_task.
+        """Appending a section preserves its content through ``read_task``.
 
-        Uses ``context_notes`` as the section name — a concrete TaskData field
-        that LocalYamlTaskProvider maps to the ``context_notes`` YAML key.
-        InMemoryTaskProvider writes to the same field by name.
+        The TaskBackend contract permits provider-specific ``body`` or
+        ``context_notes`` storage, so the test observes their authoritative
+        projection instead of naming one implementation field.
         """
-        if isinstance(backend, BeadsTaskProvider):
-            pytest.xfail(
-                "BeadsTaskProvider appends sections to bd issue notes (accessed via task['body']), "
-                "not to a named TaskData field. task['context_notes'] is never populated."
-            )
         # Arrange
         created = backend.create_plan("my-plan", "Goal", [_make_task_def("T01", "Task")])
         plan_id = created["plan_id"]
 
-        # Act — use a known TaskData field name as the section identifier
-        backend.append_task_section(plan_id, "T01", "context_notes", "Found something important.")
+        backend.append_task_section(plan_id, "T01", "Findings", "Found something important.")
 
-        # Assert
         task = backend.read_task(plan_id, "T01")
-        context_notes = task.get("context_notes", "")
-        assert "Found something important." in context_notes
+        persisted_content = "\n".join(str(task.get(field, "")) for field in ("body", "context_notes"))
+        assert "Found something important." in persisted_content
 
     # ------------------------------------------------------------------
     # Dependency resolution
