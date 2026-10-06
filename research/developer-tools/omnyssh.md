@@ -18,7 +18,7 @@ freshness_tracking:
 
 ## Overview
 
-OmnySSH is an open-source SSH client and server management tool providing "Every server you manage, in one window." It combines a live dashboard with real-time metrics collection, multi-tab PTY terminals, two-panel SFTP file management, and command snippets with broadcast execution. Available as both a terminal user interface (TUI) and a Tauri 2-based desktop GUI, it reads existing `~/.ssh/config` without modification and requires no account or telemetry. Designed to replace tmux/ssh workflows with a cohesive visual interface while remaining lightweight; the README states "Around 130 MB of RAM with several sessions open, on a 20 MB download" (source: README, accessed 2026-10-06).
+OmnySSH is an open-source SSH client and server management tool providing "Every server you manage, in one window." It combines a live dashboard with real-time metrics collection, multi-tab PTY terminals, two-panel SFTP file management, and command snippets with broadcast execution. Available as both a terminal user interface (TUI) and a Tauri 2-based desktop GUI, it reads existing `~/.ssh/config` without modification and requires no account and has no telemetry (README: "No account, no login screen, no telemetry."). The README compares it with Termius and "tmux + ssh" in a table and says of tmux that it "wins on weight and loses on everything visual". The README states "Around 130 MB of RAM with several sessions open, on a 20 MB download" (source: README, accessed 2026-10-06).
 
 ---
 
@@ -27,7 +27,7 @@ OmnySSH is an open-source SSH client and server management tool providing "Every
 | Problem | Solution |
 |---------|----------|
 | Managing multiple SSH connections scattered across terminal tabs and tmux sessions | Unified dashboard organizing all hosts as cards with live status and one-click connection switching |
-| Manual SSH key setup and secure credential management | Automated SSH key generation, `authorized_keys` configuration with rollback protection, and passphrase caching |
+| Manual SSH key setup and secure credential management | Automated SSH key generation, `authorized_keys` configuration with rollback protection, and in-memory passphrase caching |
 | Lack of visibility into remote server health | Live dashboard displaying CPU, RAM, disk usage, uptime, OS version, and top processes per host; bars turn yellow/red as thresholds breach |
 | Inefficient file transfer workflows | Two-panel SFTP browser (local left, remote right) with progress bars and bulk operations; select files and move across panels |
 | Repetitive command execution across hosts | Snippets with parameter substitution; execute a single snippet across multiple selected hosts at once |
@@ -50,7 +50,7 @@ OmnySSH is an open-source SSH client and server management tool providing "Every
 ### Real Terminals
 
 - Full PTY sessions in tabs (source: `crates/omnyssh-core/src/ssh/pty.rs` — `PtyManager`, `feed_parser`; vt100 screen model)
-- Multi-session terminal management: each session is its own `PtyManager` session task over a russh channel; the README states no connection limit (Not mentioned in documentation)
+- Multi-session terminal management: each session is its own `PtyManager` session task over a russh channel; A connection limit is Not mentioned in documentation
 - Switch between open sessions via sidebar
 - Sessions persist while working in dashboard
 - Terminal search and session navigation via fuzzy search (`⌘K` or `/`)
@@ -114,7 +114,7 @@ OmnySSH is structured as a **Rust cargo workspace with frontend-agnostic archite
 
 **SSH Identity & Authentication**:
 
-- Passphrase handling for encrypted keys: Source: `crates/omnyssh-core/src/ssh/identity.rs` — `IdentityError`, `ask_passphrase`, `unlock`
+- Passphrase handling for encrypted keys; its module documentation states "Passphrases are cached in process memory only — never written to disk". Source: `crates/omnyssh-core/src/ssh/identity.rs` — `IdentityError`, `ask_passphrase`, `unlock`
 - Password authentication with retry flag: a `Prompter` sends `CoreEvent::PasswordRequired` (which carries a `retry` field) and waits for `answer`. Source: `crates/omnyssh-core/src/ssh/password.rs` — `Prompter`, `answer`, `PasswordError`
 - Known hosts verification against `~/.ssh/known_hosts`. Source: `crates/omnyssh-core/src/ssh/known_hosts.rs` — `check`, `learn` (both `pub(crate)`), `crates/omnyssh-core/src/ssh/session.rs` — `KnownHostsHandler`
 - Automated SSH key setup: Ed25519 is the only `KeyType` variant; the flow is a step state machine with commands that append to `authorized_keys`, disable password login, reload sshd, and roll back. Source: `crates/omnyssh-core/src/ssh/key_setup.rs` — `KeyType`, `KeySetupMachine`, `generate_key_pair`, `build_authorized_keys_command`, `build_disable_password_command`, `build_reload_sshd_command`, `build_rollback_command`, `setup_key_for_host`
@@ -191,7 +191,7 @@ Optional flags:
 - `--tui` — install TUI only
 - `--both` — install both GUI and TUI
 
-Installs to `/Applications` (macOS) or system app menu (Linux), or `Program Files` (Windows).
+Installs to `/Applications` (macOS) or the app menu (Linux), per the README.
 
 **Manual download** from [Releases](https://github.com/timhartmann7/omnyssh/releases/latest):
 - macOS Apple Silicon: `OmnySSH-aarch64-apple-darwin.dmg`
@@ -242,7 +242,7 @@ man omny
 
 ### First Run
 
-The app opens with an empty dashboard. It reads existing `~/.ssh/config` at startup (hosts behind `ProxyJump` bastion included) but never writes to it. Manually added hosts are stored in the application's local configuration (source: README, no details on storage mechanism provided).
+The app opens with an empty dashboard. It reads existing `~/.ssh/config` at startup (hosts behind `ProxyJump` bastion included) but never writes to it. Manually added hosts are stored in `~/.config/omnyssh/hosts.toml`, merged with hosts from `~/.ssh/config`. Source: `crates/omnyssh-core/src/config/mod.rs` — `load_hosts`, `save_hosts`, `load_all_hosts`. The README's description of where manually added hosts are stored: Not mentioned in documentation.
 
 ---
 
@@ -274,6 +274,9 @@ All rows read at tag `v1.1.4` (commit `849acb72981e49f628fb923e1bb57ec246f4f90d`
 - [omnyssh-core/src/config/](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/crates/omnyssh-core/src/config) — ssh_config.rs, app_config.rs, snippets.rs, mod.rs (accessed 2026-10-06)
 - [omnyssh-core/src/ssh/](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/crates/omnyssh-core/src/ssh) — client.rs, pool.rs, session.rs, sftp.rs, pty.rs, metrics.rs, discovery.rs, probe.rs, identity.rs, password.rs, known_hosts.rs, key_setup.rs, tunnel.rs, jump.rs (accessed 2026-10-06)
 - [omnyssh-core/src/ssh/services/](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/crates/omnyssh-core/src/ssh/services) — docker.rs, nginx.rs, nodejs.rs, postgresql.rs, redis.rs, mod.rs (accessed 2026-10-06)
+- [omnyssh/src/app/snippets.rs](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/crates/omnyssh/src/app/snippets.rs) — TUI snippet execution (accessed 2026-10-06)
+- [omnyssh-gui/ui/src/lib/stores/streamer.ts](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/crates/omnyssh-gui/ui/src/lib/stores/streamer.ts) — GUI streamer-mode state (accessed 2026-10-06)
+- [omnyssh-gui/ui/src/lib/components/CommandPalette.svelte](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/crates/omnyssh-gui/ui/src/lib/components/CommandPalette.svelte) — GUI fuzzy-search palette (accessed 2026-10-06)
 - [install.sh](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/install.sh) — one-line installer and `--tui`/`--both` flags (accessed 2026-10-06)
 - [doc/omny.1](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/doc/omny.1) — man page for the TUI (accessed 2026-10-06)
 - [Releases](https://github.com/timhartmann7/omnyssh/releases/latest) — manual download artifacts (accessed 2026-10-06)
