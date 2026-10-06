@@ -66,6 +66,122 @@ def _make_small_plan() -> Plan:
     return Plan(feature="writer-test", version="1.0", description="Plan for writer tests.", tasks=tasks)
 
 
+def test_legacy_task_aliases_survive_read_write_read(tmp_path: Path) -> None:
+    """Legacy kebab-case task aliases remain readable and canonical on disk."""
+    source = tmp_path / "legacy-aliases.yaml"
+    source.write_text(
+        """feature: legacy-aliases
+tasks:
+  - task: T2
+    title: Legacy aliases
+    status: not-started
+    blocked-by: [T1]
+    last-activity: 2026-10-06T10:00:00+00:00
+    github-issue: 42
+    issue-classification: defect
+    analysis-method: 5-whys
+    expected-outputs: report.md
+    divergence-notes: 2
+"""
+    )
+
+    first_plan = load_plan(source).plan
+    first = first_plan.tasks[0]
+    assert first.blocked_by == ["T1"]
+    assert first.last_activity is not None
+    assert first.last_activity.isoformat() == "2026-10-06T10:00:00+00:00"
+    assert first.github_issue == 42
+    assert first.issue_classification == "defect"
+    assert first.analysis_method == "5-whys"
+    assert first.expected_outputs == "report.md"
+    assert first.divergence_notes == 2
+
+    output = tmp_path / "canonical.yaml"
+    write_plan(first_plan, output, force_single=True)
+    serialized = _load_yaml(output)["tasks"][0]
+    assert {
+        key: serialized[key]
+        for key in {
+            "blocked-by",
+            "last-activity",
+            "github-issue",
+            "issue-classification",
+            "analysis-method",
+            "expected-outputs",
+            "divergence-notes",
+        }
+    } == {
+        "blocked-by": ["T1"],
+        "last-activity": "2026-10-06T10:00:00Z",
+        "github-issue": 42,
+        "issue-classification": "defect",
+        "analysis-method": "5-whys",
+        "expected-outputs": "report.md",
+        "divergence-notes": 2,
+    }
+
+    reread = load_plan(output).plan.tasks[0]
+    assert reread.blocked_by == ["T1"]
+    assert reread.last_activity is not None
+    assert reread.last_activity.isoformat() == "2026-10-06T10:00:00+00:00"
+    assert reread.github_issue == 42
+    assert reread.issue_classification == "defect"
+    assert reread.analysis_method == "5-whys"
+    assert reread.expected_outputs == "report.md"
+    assert reread.divergence_notes == 2
+
+
+def test_legacy_minimal_defaults_survive_read_write_read(tmp_path: Path) -> None:
+    """Supported minimal legacy YAML gains only the canonical task and plan defaults."""
+    source = tmp_path / "legacy-defaults.yaml"
+    source.write_text(
+        """feature: legacy-defaults
+tasks:
+  - task: T1
+    title: Legacy task
+"""
+    )
+
+    first = load_plan(source).plan
+    task = first.tasks[0]
+    assert first.version == "1.0"
+    assert first.description == ""
+    assert task.status == "not-started"
+    assert task.dependencies == []
+    assert task.priority == Priority.MEDIUM
+    assert task.complexity == Complexity.MEDIUM
+    assert task.skills == []
+    assert task.analysis_method == "none"
+    assert task.divergence_notes == 0
+    assert task.agent is None
+    assert task.expected_outputs == ""
+
+    output = tmp_path / "canonical-defaults.yaml"
+    write_plan(first, output, force_single=True)
+    serialized = _load_yaml(output)
+    task_data = serialized["tasks"][0]
+    assert serialized["version"] == "1.0"
+    assert serialized["description"] == ""
+    assert task_data["status"] == "not-started"
+    assert task_data["priority"] == 3
+    assert task_data["complexity"] == "medium"
+    for omitted in ("dependencies", "skills", "analysis-method", "divergence-notes", "agent", "expected-outputs"):
+        assert omitted not in task_data
+
+    reread = load_plan(output).plan
+    assert reread.version == "1.0"
+    assert reread.description == ""
+    assert reread.tasks[0].status == "not-started"
+    assert reread.tasks[0].dependencies == []
+    assert reread.tasks[0].priority == Priority.MEDIUM
+    assert reread.tasks[0].complexity == Complexity.MEDIUM
+    assert reread.tasks[0].skills == []
+    assert reread.tasks[0].analysis_method == "none"
+    assert reread.tasks[0].divergence_notes == 0
+    assert reread.tasks[0].agent is None
+    assert reread.tasks[0].expected_outputs == ""
+
+
 # ---------------------------------------------------------------------------
 # write_plan — single file
 # ---------------------------------------------------------------------------

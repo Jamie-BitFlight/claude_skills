@@ -66,6 +66,15 @@ _SINGLE_TASK_LIST = [
     }
 ]
 
+_INVALID_TASK_INPUTS = [
+    pytest.param({"title": "Missing ID"}, id="missing-id"),
+    pytest.param({"id": "T1"}, id="missing-title"),
+    pytest.param({"id": "not-an-id", "title": "Bad ID"}, id="invalid-id"),
+    pytest.param({"id": "T1", "title": "Bad dependency", "dependencies": ["not-an-id"]}, id="invalid-dependency"),
+    pytest.param({"id": "T1", "title": ""}, id="empty-title"),
+    pytest.param({"id": "T1", "title": "x" * 201}, id="long-title"),
+]
+
 
 from tests_sam.conftest import make_task_def as task_def
 
@@ -530,6 +539,53 @@ async def test_sam_plan_create_invalid_task_missing_id_raises_tool_error(client:
                 }
             },
         )
+
+
+@pytest.mark.parametrize("action", ["create", "append_task"])
+@pytest.mark.parametrize("task", _INVALID_TASK_INPUTS)
+async def test_sam_plan_rejects_invalid_task_without_persisting_it(
+    client: Client, action: str, task: dict[str, object]
+) -> None:
+    """Invalid public task input is refused before it mutates a plan."""
+    plan_id = ""
+    if action == "create":
+        before = (await client.call_tool("sam_plan", {"config": {"action": "list", "limit": 100}})).data.items
+        payload = {"config": {"action": "create", "slug": "invalid", "goal": "Invalid input", "tasks": [task]}}
+    else:
+        created = await client.call_tool(
+            "sam_plan", {"config": {"action": "create", "slug": "draft", "goal": "Draft", "tasks": []}}
+        )
+        plan_id = created.data.plan_id
+        before = (await client.call_tool("sam_plan", {"plan": plan_id, "config": {"action": "read"}})).data.plan.tasks
+        payload = {"plan": plan_id, "config": {"action": "append_task", "task": task}}
+
+    with pytest.raises(ToolError):
+        await client.call_tool("sam_plan", payload)
+
+    if action == "create":
+        after = (await client.call_tool("sam_plan", {"config": {"action": "list", "limit": 100}})).data.items
+    else:
+        after = (await client.call_tool("sam_plan", {"plan": plan_id, "config": {"action": "read"}})).data.plan.tasks
+    assert after == before
+
+
+async def test_sam_plan_task_authoring_defaults_an_omitted_status(client: Client) -> None:
+    """The public task-definition boundary accepts an omitted status as not-started."""
+    created = await client.call_tool(
+        "sam_plan",
+        {
+            "config": {
+                "action": "create",
+                "slug": "default-status",
+                "goal": "Default status",
+                "tasks": [{"id": "T1", "title": "Task"}],
+            }
+        },
+    )
+
+    read = await client.call_tool("sam_plan", {"plan": created.data.plan_id, "config": {"action": "read"}})
+
+    assert read.data.plan.tasks[0].status == "not-started"
 
 
 # ===========================================================================
