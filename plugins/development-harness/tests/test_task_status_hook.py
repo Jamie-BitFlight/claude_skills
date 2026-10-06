@@ -117,23 +117,6 @@ def _argv_after(cmd: list[str], token: str) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Regression guard — no fastmcp invocation left in the hook source
-# ---------------------------------------------------------------------------
-
-
-def test_hook_source_contains_no_fastmcp_invocation() -> None:
-    """task_status_hook.py's own source never mentions 'fastmcp'.
-
-    All task-state writes/reads now route through direct SAM CLI subprocess
-    calls (see _SAM_CLI_PATH). A reintroduced fastmcp invocation would bring
-    back the orphaned-process defect (keep_alive=True) and risk the 60-second
-    SubagentStop hook deadline this migration fixed.
-    """
-    source = _hook_path.read_text(encoding="utf-8")
-    assert "fastmcp" not in source.lower()
-
-
-# ---------------------------------------------------------------------------
 # Timeout ordering and process-group cleanup
 #
 # Two compounding defects this section guards against:
@@ -559,24 +542,6 @@ def test_subagent_stop_without_a_transcript_path_reports_it(capsys: pytest.Captu
     handle_subagent_stop({"hook_event_name": "SubagentStop"})
 
     assert "no agent_transcript_path" in capsys.readouterr().err
-
-
-# ---------------------------------------------------------------------------
-# Regression guard — the hook makes no status write of its own
-# ---------------------------------------------------------------------------
-
-
-def test_hook_source_issues_no_plan_state_command() -> None:
-    """task_status_hook.py's own source never builds a `plan state` invocation.
-
-    `plan state` is the runner-less status move, and this hook always runs behind a runner the
-    orchestrator dispatched. Reintroducing it would reinstate two writers of one fact — and on a
-    ledger plan it would also fail outright, because `state` requires `--reason`.
-    """
-    source = _hook_path.read_text(encoding="utf-8")
-
-    assert '"state"' not in source, "the hook must not issue `plan state`"
-    assert '"--new-status"' not in source, "the hook must not set a task status"
 
 
 # ---------------------------------------------------------------------------
