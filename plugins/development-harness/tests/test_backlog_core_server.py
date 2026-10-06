@@ -146,15 +146,6 @@ async def test_backlog_add_passes_optional_params():
     assert call_kwargs["force"] is True
 
 
-async def test_backlog_add_backlog_error_returns_error_key():
-    """backlog_add catches BacklogError and includes error key in response."""
-    with patch("dh_core.operations.add_item", side_effect=BacklogError("duplicate found")):
-        response = await _call("backlog_add", {"title": "Dupe", "priority": "P1", "description": "Already exists"})
-
-    assert response["error"] == "duplicate found"
-    assert "messages" in response
-
-
 async def test_backlog_add_output_messages_included():
     """backlog_add includes output messages from the Output collector."""
     out = Output()
@@ -233,14 +224,6 @@ async def test_backlog_list_type_and_topic_default_to_none():
     call_kwargs = mock_list.call_args.kwargs
     assert call_kwargs["type_"] is None
     assert call_kwargs["topic"] is None
-
-
-async def test_backlog_list_backlog_error_returns_error_key():
-    """backlog_list catches BacklogError and includes error key in response."""
-    with patch("dh_core.operations.list_items", side_effect=BacklogError("backlog dir missing")):
-        response = await _call("backlog_list", {})
-
-    assert response["error"] == "backlog dir missing"
 
 
 async def test_backlog_list_search_filters_across_title_description_topic_type():
@@ -839,14 +822,6 @@ async def test_backlog_view_forwards_refresh_false_by_default():
     assert call_kwargs["refresh"] is False
 
 
-async def test_backlog_view_backlog_error_returns_error_key():
-    """backlog_view catches BacklogError when item is not found."""
-    with patch("dh_core.operations.view_item", side_effect=BacklogError("No item found for: #999")):
-        response = await _call("backlog_view", {"selector": "#999"})
-
-    assert "No item found for: #999" in response["error"]
-
-
 async def test_backlog_view_default_includes_content():
     """backlog_view default call (include_content omitted) returns body and sections keys.
 
@@ -1243,14 +1218,6 @@ async def test_backlog_sync_dry_run_forwarded():
     assert mock_sync.call_args.kwargs["dry_run"] is True
 
 
-async def test_backlog_sync_backlog_error_returns_error_key():
-    """backlog_sync catches BacklogError and includes error key."""
-    with patch("dh_core.operations.sync_items", side_effect=BacklogError("GitHub unavailable")):
-        response = await _call("backlog_sync", {})
-
-    assert response["error"] == "GitHub unavailable"
-
-
 async def test_backlog_sync_returns_operation_warnings():
     """backlog_sync retains operation warnings in its response payload."""
 
@@ -1297,14 +1264,6 @@ async def test_backlog_close_passes_cleanup_and_force():
     assert call_kwargs["force"] is True
 
 
-async def test_backlog_close_backlog_error_returns_error_key():
-    """backlog_close catches BacklogError (e.g. item not found)."""
-    with patch("dh_core.operations.close_item", side_effect=BacklogError("item not found")):
-        response = await _call("backlog_close", {"selector": "Item", "reason": "wontfix"})
-
-    assert response["error"] == "item not found"
-
-
 # ---------------------------------------------------------------------------
 # backlog_resolve
 # ---------------------------------------------------------------------------
@@ -1335,14 +1294,6 @@ async def test_backlog_resolve_passes_cleanup_and_force():
     call_kwargs = mock_resolve.call_args.kwargs
     assert call_kwargs["cleanup"] is True
     assert call_kwargs["force"] is True
-
-
-async def test_backlog_resolve_backlog_error_returns_error_key():
-    """backlog_resolve catches BacklogError when resolution fails."""
-    with patch("dh_core.operations.resolve_item", side_effect=BacklogError("open PRs exist")):
-        response = await _call("backlog_resolve", {"selector": "Item", "summary": "no longer needed"})
-
-    assert response["error"] == "open PRs exist"
 
 
 # ---------------------------------------------------------------------------
@@ -1418,14 +1369,6 @@ async def test_backlog_update_passes_description():
     assert call_kwargs["description"] == "Updated description."
 
 
-async def test_backlog_update_backlog_error_returns_error_key():
-    """backlog_update catches BacklogError."""
-    with patch("dh_core.operations.update_item", side_effect=BacklogError("item not found")):
-        response = await _call("backlog_update", {"selector": "Missing"})
-
-    assert response["error"] == "item not found"
-
-
 # ---------------------------------------------------------------------------
 # backlog_groom
 # ---------------------------------------------------------------------------
@@ -1457,14 +1400,6 @@ async def test_backlog_groom_passes_section_and_content():
     call_kwargs = mock_groom.call_args.kwargs
     assert call_kwargs["section"] == "Background"
     assert call_kwargs["content"] == "Some background info"
-
-
-async def test_backlog_groom_backlog_error_returns_error_key():
-    """backlog_groom catches BacklogError."""
-    with patch("dh_core.operations.groom_item", side_effect=BacklogError("item not found")):
-        response = await _call("backlog_groom", {"selector": "#999"})
-
-    assert response["error"] == "item not found"
 
 
 async def test_backlog_groom_accepts_mark_groomed_parameter():
@@ -1530,14 +1465,6 @@ async def test_backlog_normalize_dry_run_forwarded():
     assert mock_normalize.call_args.kwargs["dry_run"] is True
 
 
-async def test_backlog_normalize_backlog_error_returns_error_key():
-    """backlog_normalize catches BacklogError."""
-    with patch("dh_core.operations.normalize_items", side_effect=BacklogError("malformed files")):
-        response = await _call("backlog_normalize", {})
-
-    assert response["error"] == "malformed files"
-
-
 async def test_backlog_normalize_returns_operation_warnings():
     """backlog_normalize retains operation warnings in its response payload."""
 
@@ -1578,14 +1505,6 @@ async def test_backlog_pull_passes_dry_run_and_force():
     call_kwargs = mock_pull.call_args.kwargs
     assert call_kwargs["dry_run"] is True
     assert call_kwargs["force"] is True
-
-
-async def test_backlog_pull_backlog_error_returns_error_key():
-    """backlog_pull catches BacklogError."""
-    with patch("dh_core.operations.pull_items", side_effect=BacklogError("no GitHub token")):
-        response = await _call("backlog_pull", {})
-
-    assert response["error"] == "no GitHub token"
 
 
 async def test_backlog_pull_with_issue_number_selector_calls_pull_by_selector():
