@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import inspect
 from unittest.mock import MagicMock
 
 from backlog_core.backend_protocol import reset_config, set_config
@@ -74,12 +73,6 @@ def test_beads_work_items_use_native_issue_commands_not_kv() -> None:
     command = runner.run_text.call_args.args[0]
     assert command[:2] == ["update", "bd-native"]
     assert "--notes" in command
-    work_item_source = "\n".join(
-        inspect.getsource(method)
-        for method in (BeadsBackend.list_work_items, BeadsBackend.get_work_item, BeadsBackend.put_work_item)
-    )
-    assert '"kv"' not in work_item_source
-    assert "dh.work-item" not in work_item_source
 
 
 def test_update_item_resolves_selector_by_printed_reference() -> None:

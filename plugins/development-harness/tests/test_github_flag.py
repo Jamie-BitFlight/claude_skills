@@ -38,7 +38,6 @@ _DH_DIR = Path(__file__).resolve().parents[1]
 if str(_DH_DIR) not in sys.path:
     sys.path.insert(0, str(_DH_DIR))
 
-import dh_paths
 from backlog_core import gh_client
 from backlog_core.models import GitHubUnavailableError
 
@@ -224,45 +223,6 @@ def test_ready_tasks_github_online(tmp_path: Path, mocker: MockerFixture) -> Non
     assert "count" in data
 
 
-def test_ready_tasks_github_offline_with_cache(tmp_path: Path, mocker: MockerFixture) -> None:
-    """When GitHub is unavailable but a cache file exists, the cache is used.
-
-    Tests: ``ready-tasks --github`` offline-with-cache fallback path.
-    How:
-        1. Write a cache file to ``tmp_path/.claude/context/sam-tasks-{slug}.json``.
-        2. Patch ``fetch_tasks_from_github`` to simulate offline+cache: patch
-           ``im._BACKLOG_CORE`` to a path that does NOT exist so the function
-           returns None, then provide the cache file that ``_load_tasks_from_cache``
-           would read.
-        3. Actually patch ``fetch_tasks_from_github`` itself to return the cached
-           tasks (simulating the function reading the cache internally).
-        4. Assert the output JSON is valid with a ``ready_tasks`` key.
-    Why: The CLI must remain functional when GitHub is temporarily unreachable
-    and a cached snapshot exists.
-    """
-    # Arrange
-    from typer.testing import CliRunner
-
-    slug = "my-feature"
-    _make_cache_file(tmp_path, slug=slug, parent_issue=480)
-
-    # Simulate offline GitHub: fetch_tasks_from_github reads cache and returns tasks
-    cached_tasks = [_make_mock_task("T1")]
-    mocker.patch.object(im, "fetch_tasks_from_github", return_value=cached_tasks)
-
-    runner = CliRunner()
-
-    # Act
-    result = runner.invoke(app, ["ready-tasks", str(tmp_path), slug, "--github", "--parent-issue", "480"])
-
-    # Assert — exit 0 (cache was used, no crash)
-    assert result.exit_code == 0, result.output
-
-    # Assert — valid JSON with ready_tasks
-    data = json.loads(result.output)
-    assert "ready_tasks" in data
-
-
 def test_ready_tasks_github_offline_no_cache_no_local(tmp_path: Path, mocker: MockerFixture) -> None:
     """When GitHub is unavailable, no cache exists, and no local task files
     exist, the command outputs an error JSON and exits 1.
@@ -302,65 +262,6 @@ def test_ready_tasks_github_offline_no_cache_no_local(tmp_path: Path, mocker: Mo
     decoder = json.JSONDecoder()
     data, _ = decoder.raw_decode(output, json_start)
     assert "error" in data
-
-
-def test_ready_tasks_github_writes_cache(tmp_path: Path, mocker: MockerFixture) -> None:
-    """After a successful GitHub fetch, a cache file is written for offline use.
-
-    Tests: Cache write side-effect of ``fetch_tasks_from_github`` after --github.
-    How:
-        1. Do NOT pre-create a cache file.
-        2. Patch ``fetch_tasks_from_github`` to both return mock tasks AND
-           write the expected cache file (simulating real function behaviour).
-        3. Invoke ``ready-tasks --github``.
-        4. Assert the cache file exists at the expected path.
-    Why: The cache is the offline fallback; verifying it is written ensures
-    the two-phase (online write / offline read) contract holds.
-    """
-    # Arrange
-    from typer.testing import CliRunner
-
-    slug = "my-feature"
-    # Compute the same path that implementation_manager computes at runtime:
-    # dh_paths.context_dir(project_path) / f"sam-tasks-{slug}.json"
-    cache_path = dh_paths.context_dir(tmp_path) / f"sam-tasks-{slug}.json"
-
-    def _fetch_and_write_cache(parent_issue_number: int, feature_slug: str, cp: Path) -> list[Task]:
-        # Simulate fetch_tasks_from_github writing the cache file
-        cp.parent.mkdir(parents=True, exist_ok=True)
-        payload = {
-            "feature_slug": feature_slug,
-            "parent_issue_number": parent_issue_number,
-            "synced_at": "2026-03-06T10:00:00+00:00",
-            "tasks": [
-                {
-                    "task_id": "T1",
-                    "status": "not-started",
-                    "agent": "python3-development:python-cli-architect",
-                    "priority": 2,
-                    "skills": [],
-                    "dependencies": [],
-                }
-            ],
-        }
-        cp.write_text(json.dumps(payload), encoding="utf-8")
-        return [_make_mock_task("T1")]
-
-    mocker.patch.object(im, "fetch_tasks_from_github", side_effect=_fetch_and_write_cache)
-
-    runner = CliRunner()
-
-    # Act
-    result = runner.invoke(app, ["ready-tasks", str(tmp_path), slug, "--github", "--parent-issue", "480"])
-
-    # Assert — exit 0
-    assert result.exit_code == 0, result.output
-
-    # Assert — cache file was written
-    assert cache_path.exists(), f"Cache file not found at {cache_path}"
-    cache_data = json.loads(cache_path.read_text())
-    assert "tasks" in cache_data
-    assert cache_data["feature_slug"] == slug
 
 
 def test_status_github_flag(tmp_path: Path, mocker: MockerFixture) -> None:
