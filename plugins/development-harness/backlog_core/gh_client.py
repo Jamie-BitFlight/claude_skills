@@ -1773,9 +1773,9 @@ def _resolve_labels_graphql(repo: Repository, repo_owner: str, repo_name: str, l
             one any caller sees today: nothing in the project calls this helper.  Its
             only reference is ``GitHubBackend._resolve_labels_graphql``
             (``backends/github_backend.py``), a ``WorkItemBackend`` protocol delegate
-            that no production code invokes; the direct callers are the tests in
-            ``tests/test_graphql_helpers.py``.  ``_resolve_label_ids_graphql`` is the
-            sibling that is live, through ``_apply_status_label``.
+            that no production code invokes; it has no direct test caller.
+            ``_resolve_label_ids_graphql`` is the sibling that is live, through
+            ``_apply_status_label``.
         BacklogError: If the GraphQL request fails (auth, network, permissions).
     """
     if not label_names:
