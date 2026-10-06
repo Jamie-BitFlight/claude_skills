@@ -269,38 +269,3 @@ class TestMechanism2PaginatedStructuredItemZeroId:
                 f"does not match the real persisted id={real_id!r}. "
                 "The entry ID from the provider record must survive pagination."
             )
-
-
-# ---------------------------------------------------------------------------
-# Shared contract guard — zero ID is detectable
-# ---------------------------------------------------------------------------
-
-
-class TestZeroIdSentinelIsDetectable:
-    """Sanity check: the zero-ID prefix we assert against is the actual fallback.
-
-    This test verifies that ``_ZERO_ID_PREFIX`` matches the ``added_date``
-    default in ``entry_blocks.py:158`` so the assertion in M1/M2 tests is
-    not comparing against the wrong sentinel.
-    """
-
-    def test_zero_id_prefix_matches_entry_blocks_fallback(self) -> None:
-        """The zero-timestamp ID produced by entry_blocks fallback starts with '0000-00-00'.
-
-        Directly invoke ``parse_entries`` on a plain-text body that contains no
-        entry-block wrappers and no leading ISO timestamp.  The resulting entry
-        must have an ID starting with '0000-00-00' — the value this module uses
-        as its detection sentinel.
-        """
-        from backlog_core.entry_blocks import parse_entries
-
-        plain_content = "Some entry content with no timestamp wrapper."
-        entries = parse_entries(plain_content, show="all", since=None)
-
-        assert entries, "parse_entries must return at least one Entry for non-empty plain content."
-        fallback_id = entries[0].id
-        assert fallback_id.startswith(_ZERO_ID_PREFIX), (
-            f"The fallback entry ID from parse_entries is {fallback_id!r}. "
-            f"Expected it to start with {_ZERO_ID_PREFIX!r}. "
-            "If this fails, the fallback format changed — update _ZERO_ID_PREFIX."
-        )

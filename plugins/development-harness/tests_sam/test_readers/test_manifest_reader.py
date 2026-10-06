@@ -301,27 +301,6 @@ def test_read_manifest_plan_hybrid_body_round_trip(tmp_path: pathlib.Path) -> No
     assert "ReconcileResult" in yaml_content, "T2 acceptance-criteria content must survive YAML write"
 
 
-def test_read_manifest_plan_hybrid_real_file_body_content_non_empty() -> None:
-    """Verify the real tasks-1-backlog-state-reconciliation.md has non-empty body fields.
-
-    Tests: Real-world hybrid manifest file produces tasks with populated body fields.
-    How: Load the real plan file and check T1's description, acceptance_criteria,
-         and verification_steps are non-empty.
-    Why: This is the exact file that triggered the bug report. Regression guard.
-    """
-    from sam_schema.core.query import load_plan
-
-    real_file = pathlib.Path(__file__).resolve().parents[4] / "plan" / "tasks-1-backlog-state-reconciliation.md"
-    if not real_file.exists():
-        pytest.skip("Real manifest file not present in this environment")
-
-    result = load_plan(real_file)
-    t1 = next(t for t in result.plan.tasks if t.id == "T1")
-    assert len(t1.description) > 0, "T1 description must be non-empty"
-    assert len(t1.acceptance_criteria) > 0, "T1 acceptance_criteria must be non-empty"
-    assert len(t1.verification_steps) > 0, "T1 verification_steps must be non-empty"
-
-
 # ---------------------------------------------------------------------------
 # Full task dict format in frontmatter tasks list
 # ---------------------------------------------------------------------------

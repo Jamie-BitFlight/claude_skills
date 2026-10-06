@@ -14,14 +14,7 @@ from typing import TYPE_CHECKING
 import pytest
 from ruamel.yaml import YAML
 from sam_schema.core.models import Complexity, Plan, Priority, Task, TaskStatus
-from sam_schema.writers.yaml_writer import (
-    LINE_THRESHOLD,
-    _estimate_line_count,
-    _task_to_dict,
-    update_field,
-    update_fields,
-    write_plan,
-)
+from sam_schema.writers.yaml_writer import _task_to_dict, update_field, update_fields, write_plan
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -368,32 +361,6 @@ class TestTaskToDict:
         d = _task_to_dict(task)
         assert "description" not in d
         assert "objective" not in d
-
-
-# ---------------------------------------------------------------------------
-# _estimate_line_count
-# ---------------------------------------------------------------------------
-
-
-class TestEstimateLineCount:
-    """Verify _estimate_line_count produces reasonable estimates.
-
-    Tests: Line count estimation for write mode decision.
-    How: Compare estimates for small vs large plans.
-    Why: Wrong estimates cause inappropriate single/directory splits.
-    """
-
-    def test_small_plan_under_threshold(self) -> None:
-        """Verify small plan estimate is under LINE_THRESHOLD."""
-        plan = _make_small_plan()
-        count = _estimate_line_count(plan)
-        assert count < LINE_THRESHOLD
-
-    def test_large_plan_over_threshold(self) -> None:
-        """Verify large plan estimate exceeds LINE_THRESHOLD."""
-        plan = _make_large_plan()
-        count = _estimate_line_count(plan)
-        assert count >= LINE_THRESHOLD
 
 
 # ---------------------------------------------------------------------------

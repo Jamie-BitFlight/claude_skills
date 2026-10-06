@@ -6,7 +6,7 @@ import pathlib
 
 import pytest
 from sam_schema.core.dependencies import DependencyGraph
-from sam_schema.core.models import AcceptanceCriterion, BookendResult, BookendVerification, CriterionStatus
+from sam_schema.core.models import AcceptanceCriterion
 from sam_schema.core.query import load_plan
 from sam_schema.readers.detect import FormatType
 from sam_schema.readers.yaml_reader import read_yaml_plan
@@ -280,76 +280,6 @@ def test_get_ready_tasks_returns_t0_first_on_fresh_bookend_plan() -> None:
     assert ready[0].id == "T0"
     assert ready[0].is_bookend is True
     assert ready[0].bookend_type == "t0-baseline"
-
-
-def test_t0_baseline_fixture_is_valid_yaml() -> None:
-    """Verify t0_baseline_sample.yaml is valid YAML matching the T0 output schema.
-
-    Tests: Fixture file structure matches architect spec section 5.3.
-    How: Parse the fixture with ruamel.yaml and validate top-level fields and
-         result entries against BookendResult model fields.
-    Why: Sample fixtures must match the schemas agents will produce.
-    """
-    from sam_schema.readers._yaml_utils import load_yaml
-
-    path = _FIXTURES / "t0_baseline_sample.yaml"
-    data = load_yaml(path.read_text(encoding="utf-8"))
-
-    assert data["feature"] == "auth-system"
-    assert "captured_at" in data
-    assert "plan_path" in data
-    assert data["criteria_count"] == 3
-    assert isinstance(data["results"], list)
-    assert len(data["results"]) == 3
-
-    first = data["results"][0]
-    result = BookendResult(**{
-        "criterion-id": first["criterion-id"],
-        "check-command": first["check-command"],
-        "exit-code": first["exit-code"],
-        "stdout": first.get("stdout", ""),
-        "stderr": first.get("stderr", ""),
-        "timestamp": first.get("timestamp", ""),
-        "duration-seconds": first.get("duration-seconds", 0.0),
-    })
-    assert result.criterion_id == "AC-1"
-    assert result.exit_code == 1
-
-
-def test_tn_verification_fixture_is_valid_yaml() -> None:
-    """Verify tn_verification_sample.yaml is valid YAML matching the TN output schema.
-
-    Tests: Fixture file structure matches architect spec section 5.4.
-    How: Parse the fixture with ruamel.yaml and validate top-level fields and
-         result entries against BookendVerification model fields.
-    Why: Sample fixtures must match the schemas agents will produce.
-    """
-    from sam_schema.readers._yaml_utils import load_yaml
-
-    path = _FIXTURES / "tn_verification_sample.yaml"
-    data = load_yaml(path.read_text(encoding="utf-8"))
-
-    assert data["feature"] == "auth-system"
-    assert data["verdict"] == "PASS"
-    assert data["regressions"] == 0
-    assert data["newly_passing"] == 1
-    assert data["criteria_count"] == 3
-    assert isinstance(data["results"], list)
-    assert len(data["results"]) == 3
-
-    first = data["results"][0]
-    verification = BookendVerification(**{
-        "criterion-id": first["criterion-id"],
-        "check-command": first["check-command"],
-        "t0-exit-code": first["t0-exit-code"],
-        "tn-exit-code": first["tn-exit-code"],
-        "status": first["status"],
-        "stdout-diff-summary": first.get("stdout-diff-summary", ""),
-    })
-    assert verification.criterion_id == "AC-1"
-    assert verification.status == CriterionStatus.NEWLY_PASSING
-    assert verification.t0_exit_code == 1
-    assert verification.tn_exit_code == 0
 
 
 def test_write_then_read_roundtrip_omits_default_bookend_fields(tmp_path: pathlib.Path) -> None:

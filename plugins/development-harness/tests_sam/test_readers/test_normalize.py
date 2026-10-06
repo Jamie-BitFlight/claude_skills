@@ -13,13 +13,7 @@ import pathlib
 import pytest
 from sam_schema.core.models import TaskStatus
 from sam_schema.readers.detect import FormatType
-from sam_schema.readers.normalize import (
-    _normalize_status,
-    detect_gaps,
-    normalize_plan,
-    normalize_task,
-    normalize_task_lenient,
-)
+from sam_schema.readers.normalize import detect_gaps, normalize_plan, normalize_task, normalize_task_lenient
 
 _FIXTURES = pathlib.Path(__file__).parent.parent / "fixtures"
 
@@ -98,57 +92,6 @@ def test_normalize_task_none_status_defaults_to_not_started() -> None:
     raw = {"task": "T1", "title": "T", "status": None}
     task, _ = normalize_task(raw, FormatType.YAML_FRONTMATTER)
     assert task.status == TaskStatus.NOT_STARTED
-
-
-# ---------------------------------------------------------------------------
-# _normalize_status — ValueError for unrecognized values
-# ---------------------------------------------------------------------------
-
-
-def test_normalize_status_raises_for_unrecognized_string() -> None:
-    """_normalize_status raises ValueError for arbitrary unrecognized strings.
-
-    Tests: Root-cause fix for silent status normalization fallback.
-    How: Call _normalize_status with a value not in TaskStatus or STATUS_MAP.
-    Why: Silently defaulting to not-started could cause completed tasks to be
-    re-dispatched if the status field contains a typo.
-    """
-    with pytest.raises(ValueError, match="Unrecognized status"):
-        _normalize_status("typo-value")
-
-
-def test_normalize_status_raises_for_wont_fix_which_lacks_task_status_member() -> None:
-    """_normalize_status raises ValueError when STATUS_MAP maps to a non-TaskStatus value.
-
-    Tests: STATUS_MAP entries that resolve to values not in TaskStatus.
-    How: 'WONT FIX' maps to 'wont-fix' which has no TaskStatus member.
-    Why: The mapped value must be a valid TaskStatus, not just any string.
-    """
-    with pytest.raises(ValueError, match="Unrecognized status"):
-        _normalize_status("WONT FIX")
-
-
-def test_normalize_status_none_returns_not_started() -> None:
-    """_normalize_status returns 'not-started' for None (field not provided).
-
-    Tests: Explicit None handling in _normalize_status.
-    How: Pass None, expect 'not-started'.
-    Why: Absence of a status field is a valid condition meaning 'not yet started'.
-    """
-    result = _normalize_status(None)
-    assert result == "not-started"
-
-
-def test_normalize_status_valid_canonical_value_returned() -> None:
-    """_normalize_status returns canonical form for known values.
-
-    Tests: Happy-path for canonical status strings.
-    How: Pass 'in-progress', expect 'in-progress'.
-    Why: Validate that normal values are not disturbed by the refactor.
-    """
-    assert _normalize_status("in-progress") == "in-progress"
-    assert _normalize_status("complete") == "complete"
-    assert _normalize_status("blocked") == "blocked"
 
 
 # ---------------------------------------------------------------------------

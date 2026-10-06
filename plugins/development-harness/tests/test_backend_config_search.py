@@ -52,7 +52,7 @@ def _patch_dh_paths(
     """Patch dh_paths in the shim module (when present) and in dh_config.
 
     task_config and context_config no longer hold dh_paths; they delegate entirely to DHConfig.
-    Only backend_protocol retains dh_paths for its _auto_detect_beads() function.
+    backend_protocol retains dh_paths for its SQLite state path.
     """
     dh_mock = _make_dh_paths_mock(project_root, user_dh_root=tmp_path / "fakehome" / ".dh")
     if hasattr(module, "dh_paths"):
@@ -218,84 +218,6 @@ def test_sqlite_factory_uses_persistent_project_state(tmp_path: Path, monkeypatc
 
     assert isinstance(backend, SQLiteBackend)
     assert (state_root / "backlog.sqlite3").is_file()
-
-
-# ---------------------------------------------------------------------------
-# Auto-detect _auto_detect_beads
-# ---------------------------------------------------------------------------
-
-
-def test_auto_detect_beads_found_when_opt_in_marker_exists(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """_auto_detect_beads() returns 'beads' when .beads/dh-backend marker file exists.
-
-    Why: Auto-detect requires an explicit opt-in marker file. A project that has
-         .beads/ for other purposes must not be silently routed to the beads backend.
-    """
-    project_root = tmp_path / "project"
-    (project_root / BEADS_DIR).mkdir(parents=True)
-    (project_root / BEADS_DIR / BEADS_OPT_IN_MARKER).write_text("", encoding="utf-8")
-    dh_mock = _make_dh_paths_mock(project_root)
-    monkeypatch.setattr(bp, "dh_paths", dh_mock)
-
-    assert bp._auto_detect_beads() == "beads"
-
-
-def test_auto_detect_beads_returns_none_when_only_dot_beads_dir(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """_auto_detect_beads() returns None when .beads/ exists but the opt-in marker is absent.
-
-    Why: T33 requirement — BEADS_DIR alone must not trigger auto-detection.
-         Projects using .beads/ for other purposes would be silently mis-routed
-         to the beads backend without the explicit opt-in marker file.
-    """
-    project_root = tmp_path / "project"
-    (project_root / BEADS_DIR).mkdir(parents=True)
-    # No BEADS_OPT_IN_MARKER file — directory alone must not trigger detection
-    dh_mock = _make_dh_paths_mock(project_root)
-    monkeypatch.setattr(bp, "dh_paths", dh_mock)
-
-    assert bp._auto_detect_beads() is None
-
-
-def test_auto_detect_beads_not_found_when_dot_beads_absent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """_auto_detect_beads() returns None when BEADS_DIR does not exist.
-
-    Why: Returning 'beads' when BEADS_DIR is absent would route all non-beads
-         projects to the beads backend, breaking github/sqlite/memory users.
-    """
-    project_root = tmp_path / "project"
-    project_root.mkdir()
-    dh_mock = _make_dh_paths_mock(project_root)
-    monkeypatch.setattr(bp, "dh_paths", dh_mock)
-
-    assert bp._auto_detect_beads() is None
-
-
-def test_auto_detect_beads_returns_none_when_dh_paths_absent(monkeypatch: pytest.MonkeyPatch) -> None:
-    """_auto_detect_beads() returns None when dh_paths is None.
-
-    Why: dh_paths is an optional import (absent in test environments without the
-         plugin installed).  None must not propagate as a AttributeError crash.
-    """
-    monkeypatch.setattr(bp, "dh_paths", None)
-
-    assert bp._auto_detect_beads() is None
-
-
-def test_auto_detect_beads_file_not_dir_returns_none(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """_auto_detect_beads() returns None when .beads is a plain file, not a directory.
-
-    Why: When BEADS_DIR is a plain file (not a directory), the marker file path
-         cannot exist, so auto-detection must return None rather than crashing.
-    """
-    project_root = tmp_path / "project"
-    project_root.mkdir()
-    (project_root / BEADS_DIR).write_text("not a directory", encoding="utf-8")
-    dh_mock = _make_dh_paths_mock(project_root)
-    monkeypatch.setattr(bp, "dh_paths", dh_mock)
-
-    assert bp._auto_detect_beads() is None
 
 
 def test_config_yaml_takes_precedence_over_auto_detect(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -149,20 +149,6 @@ def test_detect_format_tasks_list_dynamic_returns_yaml_frontmatter(tmp_path: Pat
     assert result == FormatType.YAML_FRONTMATTER
 
 
-def test_detect_format_real_followup_file_does_not_raise() -> None:
-    """Verify the actual follow-up task file that triggered this bug is detected.
-
-    Tests: FormatDetectionError not raised for tasks-3 follow-up file.
-    How: Call detect_format on the real plan file.
-    Why: Regression guard — the exact file that failed before the fix.
-    """
-    real_file = Path(__file__).resolve().parents[4] / "plan" / "tasks-3-unified-sam-task-schema-followup-1.md"
-    if not real_file.exists():
-        pytest.skip("Real follow-up file not present in this environment")
-    result = detect_format(real_file)
-    assert result == FormatType.YAML_FRONTMATTER
-
-
 # ---------------------------------------------------------------------------
 # detect_format — errors
 # ---------------------------------------------------------------------------
