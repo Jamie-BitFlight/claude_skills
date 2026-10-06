@@ -11,7 +11,7 @@ freshness_tracking:
   last_verified: 2026-10-06
   version_at_verification: v0.2.102
   next_review: 2027-01-06
-  confidence_map: "Overview: medium, Problem Addressed: medium, Key Features: medium (doc + code-read), Technical Architecture: medium (doc + code-read), Installation & Usage: high, Limitations and Caveats: low"
+  confidence_map: "Overview: medium, Problem Addressed: medium, Key Features: medium (doc + code-read), Technical Architecture: medium (doc + partial code-read: WorkspaceScope, AuthState, edge route headers, crate descriptions), Installation & Usage: high, Limitations and Caveats: low"
 ---
 
 # Zeron
@@ -42,7 +42,7 @@ Zeron abstracts the control interface across multiple coding agents through a pl
 
 ### Local-First Session Persistence
 
-Sessions persist to the device's local store by default. The session document schema—a Loro CRDT structure porting the original zeron implementation—includes a transcript with messages stored as LoroText values (ARCHITECTURE.md line 101 calls this "the measured 1.03× oplog shape"; the file states no measurement method), a durable command queue for send/steer/interrupt operations, and metadata. Each session remains under `{data_dir}/profiles/local/` when running in local-only mode. When a user signs in to enable sync, the profile switches to `{data_dir}/orgs/{org_id}/{user_id}/`, preserving the same session doc structure but enabling CloudFlare Durable Object synchronization.
+Sessions persist to the device's local store by default. The session document schema—a Loro CRDT structure porting the original zeron implementation—includes a transcript with messages stored as LoroText values (ARCHITECTURE.md line 101 (v0.2.102, read 2026-10-06) calls this "the measured 1.03× oplog shape"; the file states no measurement method), a durable command queue for send/steer/interrupt operations, and metadata. Each session remains under `{data_dir}/profiles/local/` when running in local-only mode. When a user signs in to enable sync, the profile switches to `{data_dir}/orgs/{org_id}/{user_id}/`, preserving the same session doc structure but enabling CloudFlare Durable Object synchronization.
 
 ### Optional Multi-Device Synchronization
 
@@ -60,7 +60,7 @@ The interface is built in gpui, pinned to one Zed revision (ARCHITECTURE.md line
 
 ### Headless and Headed Modes
 
-One binary, two modes: headed mode launches a gpui window and optionally hosts a local engine over IPC if no daemon is running; `zeron headless` runs the engine as a daemon only. In-process mode uses an in-memory RPC transport (same protocol as external daemons, no serialization shortcuts), keeping the boundary honest. Headless mode serves the local profile over localhost IPC and, when authenticated and synced, also hosts its DeviceRoom for remote peers.
+One binary, two modes: headed mode launches a gpui window and optionally hosts a local engine over IPC if no daemon is running; `zeron headless` runs the engine as a daemon only. In-process mode uses an in-memory RPC transport (same protocol as external daemons, no serialization shortcuts), which ARCHITECTURE.md (line 38) describes as "so the boundary stays honest". Headless mode serves the local profile over localhost IPC and, when authenticated and synced, also hosts its DeviceRoom for remote peers.
 
 ### Cargo Workspace Architecture
 
@@ -88,13 +88,16 @@ Async runtime: tokio throughout; in-process UI bridges via `gpui_tokio` (futures
 
 ### Edge Infrastructure (TypeScript)
 
-The backend for multi-device sync runs as CloudFlare Workers + Durable Objects, absorbing responsibilities from the original zeron server:
+ARCHITECTURE.md (lines 28-30, 244-248, (v0.2.102, read 2026-10-06)) labels the edge "TypeScript" and places it in `edge/`; the Worker routes are listed in `edge/src/index.ts`. The backend for multi-device sync runs as CloudFlare Workers + Durable Objects, absorbing responsibilities from the original zeron server:
+
+Source: ARCHITECTURE.md — Edge (TypeScript); `edge/src/index.ts` — Worker route list; `edge/src/auth-routes.ts` — `/auth/exchange`, `/auth/refresh`; `edge/src/env.ts` — `reg1/{orgId}/{userId}` registry rooms.
+
 
 - **ChatRoom DO**: Per-chat session document sync using Zeron's chat2 row protocol (loro updates as append-only rows + Range-resumable checkpoints).
 - **DeviceRoom DO**: Per-device byte relay, nudges, and sidecar slots for diff/tail data.
 - **WorkspaceRegistry**: Private per-user room (`reg1/{orgId}/{userId}`) with authenticated row sync and ephemeral presence.
 - **Auth Routes**: `/auth/exchange` and `/auth/refresh` for WorkOS integration, orgs onboarding.
-- **R2 Attachments**: Cloud storage with per-account cache under `{data_dir}/orgs/{org_id}/{user_id}/uploads/`.
+- **R2 Attachments**: listed among the edge components (ARCHITECTURE.md line 30); no further detail was read.
 
 ---
 
@@ -117,24 +120,26 @@ Two persistent document kinds persist identically whether sync is enabled:
 
 2. **Workspace registry doc** (per profile): Stores spaces (id, deviceId, path, name, gitDetected, checkoutId), chat index (id, deviceId, title, archived, cwd, branch, checkoutId, spaceId, lastSeenAt, lastMessagePreview/At, config), devices, session-status rows, and checkout-diff summary pointers. Writer discipline: each device writes its own rows, creates/renames/archives are LWW sets, presence uses ephemeral room frames.
 
-**Mirror layer** (`zeron-doc` crate): Rust equivalent of loro-mirror—typed structs for schema, incremental application of `doc.subscribe` diffs (no full re-hydration per change), and diff-reconcile write path. UI renders mirror state directly with per-entry change notifications.
+**Mirror layer** (`zeron-doc` crate): Rust equivalent of loro-mirror—typed structs for schema, incremental application of `doc.subscribe` diffs (no full re-hydration per change), and diff-reconcile write path. UI renders mirror state directly with per-entry change notifications. Source: ARCHITECTURE.md lines 113-118 (v0.2.102, read 2026-10-06); the `zeron-doc` code was not read.
 
 ### Command Plane
 
-Send/steer/interrupt/respondInput are durable command entries in the session doc (`QueueCommand`), executed by the chat's host device. Offline sends queue in the doc; mark-processed before execute; steer with no live run dispatches as next turn. This is zeron's proven design, kept verbatim.
+Send/steer/interrupt/respondInput are durable command entries in the session doc (`QueueCommand`), executed by the chat's host device. Offline sends queue in the doc; mark-processed before execute; steer with no live run dispatches as next turn. ARCHITECTURE.md (line 125, (v0.2.102, read 2026-10-06)) describes this as "zeron's proven design, kept verbatim"; that is the project's own assessment.
 
 ### Authentication and Workspace Scope
 
 - **AuthState**: Live credential state (`SignedOut`, `NeedsOrganization`, or `SignedIn`).
-- **WorkspaceScope**: Immutable storage boundary set at engine startup: `Local`, `Synced`, or explicit `Development`. ARCHITECTURE.md (line 51) states: "The engine never re-resolves an open store because `AuthState` changed. This prevents a sign-in, token refresh, or revocation from silently swapping databases or attaching online transports to a runtime that started local-only."
+- **WorkspaceScope**: Immutable storage boundary set at engine startup: `Local`, `Synced`, or explicit `Development`. ARCHITECTURE.md (line 51, (v0.2.102, read 2026-10-06)) states: "The engine never re-resolves an open store because `AuthState` changed. This prevents a sign-in, token refresh, or revocation from silently swapping databases or attaching online transports to a runtime that started local-only."
+
+Source: `crates/proto/src/workspace.rs` — `WorkspaceScope`; `crates/engine/src/auth.rs` — `AuthState`; ARCHITECTURE.md lines 54-59 (startup table, (v0.2.102, read 2026-10-06)).
 
 Startup behavior:
 
 | Condition | WorkspaceScope | Online transports |
 | --- | --- | --- |
-| WorkOS enabled, no saved session | `Local` | Disabled |
-| Saved WorkOS session with bearer | `Synced` | Enabled when bearer available |
-| WorkOS disabled, no dev bearer | `Development` | Disabled |
+| WorkOS enabled, no parseable saved `session.json` | `Local` | Disabled |
+| Parseable saved WorkOS session | `Synced` | Enabled when a bearer is available |
+| WorkOS disabled without a dev bearer | `Development` | Disabled |
 | Explicit non-empty dev bearer | `Development` | Enabled |
 
 ---
@@ -188,7 +193,7 @@ zeron daemon start
 
 ### Updates
 
-The desktop app checks for new releases on startup, every hour while running, and after machine sleep. Updates download in the background; the sidebar shows **Update ready — restart to apply**. Check manually via **Zeron → Check for Updates…** (macOS) or the account menu (Windows/Linux). Set `ZERON_AUTO_UPDATE=0` to disable background downloads. Linux installs from the release tarball use `~/.zeron/app` and update in place; daemon services restart on idle; `zeron update` updates headless installs on demand.
+Per the README (line 60, v0.2.102, read 2026-10-06), the desktop app checks for new releases on startup, every hour while running, and after machine sleep. Updates download in the background; the sidebar shows **Update ready — restart to apply**. Check manually via **Zeron → Check for Updates…** (macOS) or the account menu (Windows/Linux). Set `ZERON_AUTO_UPDATE=0` to disable background downloads. Linux installs from the release tarball use `~/.zeron/app` and update in place; daemon services restart on idle; `zeron update` updates headless installs on demand.
 
 ---
 
@@ -211,7 +216,7 @@ Items 1-4 are deferred product work; item 5 is recorded separately as a mileston
 1. Explicit session selection and copy between local and synced profiles, including attachment copying, provenance, and conflict behavior.
 2. Browsing both scopes simultaneously or switching visible scope without engine restart.
 3. Supported self-hosted backend contract (current endpoint and bearer overrides remain development seams).
-4. Cursor harness implementation, per ARCHITECTURE.md (its M5 gaps line and Open question 3, "parity item, scheduled after Codex"). The file carries no date of its own; it is from the v0.2.102 clone, whose commit is dated 2026-10-02. This conflicts with the README listing Cursor as a controlled agent and with `crates/harness/src/cursor/` existing (`catalog.rs`, `mod.rs`, `shim.mjs`, `state.rs`), so the statement may be stale. Whether Cursor, ACP, OpenCode or Pi harnesses are functional is not verified beyond directory names.
+4. Cursor harness implementation, per ARCHITECTURE.md (its M5 gaps line and Open question 3, "parity item, scheduled after Codex"). The file carries no date of its own; it is from the v0.2.102 clone, whose commit is dated 2026-10-02. This conflicts with the README listing Cursor as a controlled agent and with `crates/harness/src/cursor/` existing (file names `catalog.rs`, `mod.rs`, `shim.mjs`, `state.rs` from the directory listing at v0.2.102), so the statement may be stale. Whether Cursor, ACP, OpenCode or Pi harnesses are functional is not verified beyond directory names.
 5. Prefers-reduced-motion support and engine hardening (instance lock, watchdogs) are listed as gaps of the M6 Polish milestone in ARCHITECTURE.md (lines 288-290). The same file says at line 194 that `prefers-reduced-motion` is honored, so the source contradicts itself on this point; it is not described as intentionally deferred.
 
 ### Workspace File Trust
@@ -222,13 +227,18 @@ Remote workspace file requests are subject to workspace-relative path containmen
 
 ## References
 
-All repository sources below were read from a shallow clone of tag v0.2.102 (commit 64ad6f6ef03a8282c1847329804542f014c97d54, committed 2026-10-02), accessed 2026-10-06.
+The files below were read from a shallow clone of tag v0.2.102 (commit 64ad6f6ef03a8282c1847329804542f014c97d54, committed 2026-10-02), accessed 2026-10-06, except that the `crates/harness/src/` row (including `cursor/`) is a directory listing only.
 
 - [Zeron Repository](https://github.com/zeronsh/zeron/tree/v0.2.102) (v0.2.102, accessed 2026-10-06)
 - [Zeron ARCHITECTURE.md](https://github.com/zeronsh/zeron/blob/v0.2.102/ARCHITECTURE.md) (v0.2.102, accessed 2026-10-06)
 - [Zeron README](https://github.com/zeronsh/zeron/blob/v0.2.102/README.md) (v0.2.102, accessed 2026-10-06)
 - [Zeron CONTEXT.md](https://github.com/zeronsh/zeron/blob/v0.2.102/CONTEXT.md) (v0.2.102, accessed 2026-10-06)
 - [Zeron Cargo.toml](https://github.com/zeronsh/zeron/blob/v0.2.102/Cargo.toml) (v0.2.102, accessed 2026-10-06)
+- [crates/proto/src/workspace.rs](https://github.com/zeronsh/zeron/blob/v0.2.102/crates/proto/src/workspace.rs) (v0.2.102, accessed 2026-10-06)
+- [crates/engine/src/auth.rs](https://github.com/zeronsh/zeron/blob/v0.2.102/crates/engine/src/auth.rs) (v0.2.102, accessed 2026-10-06)
+- [edge/src/index.ts](https://github.com/zeronsh/zeron/blob/v0.2.102/edge/src/index.ts) (v0.2.102, accessed 2026-10-06)
+- [edge/src/auth-routes.ts](https://github.com/zeronsh/zeron/blob/v0.2.102/edge/src/auth-routes.ts) (v0.2.102, accessed 2026-10-06)
+- [edge/src/env.ts](https://github.com/zeronsh/zeron/blob/v0.2.102/edge/src/env.ts) (v0.2.102, accessed 2026-10-06)
 - [crates/ui/src/composer.rs](https://github.com/zeronsh/zeron/blob/v0.2.102/crates/ui/src/composer.rs) (v0.2.102, accessed 2026-10-06)
 - [crates/harness/src/ (directory listing only, including cursor/)](https://github.com/zeronsh/zeron/tree/v0.2.102/crates/harness/src) (v0.2.102, accessed 2026-10-06)
 - [crates/preview/src/lib.rs](https://github.com/zeronsh/zeron/blob/v0.2.102/crates/preview/src/lib.rs) (v0.2.102, accessed 2026-10-06)
