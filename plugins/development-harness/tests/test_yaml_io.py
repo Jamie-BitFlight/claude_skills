@@ -1,750 +1,16 @@
-"""Tests for backlog_core.yaml_io — YAML file I/O and format detection.
-
-Covers load_item, save_item, detect_format, and load_item_text with both
-.yaml and legacy .md paths.  Uses real parse_item_file and real YAML loading
-to maintain integration fidelity.
-"""
+"""Consumer contracts for backlog YAML persistence and legacy readers."""
 
 from __future__ import annotations
 
-import warnings
 from pathlib import Path
 
 import backlog_core.operations as ops
 import pytest
 from backlog_core.models import BacklogItem, Entry, GroomedData, Section
 from backlog_core.yaml_io import detect_format, load_item, load_item_text, save_item
-
-# ---------------------------------------------------------------------------
-# Fixture directory
-# ---------------------------------------------------------------------------
+from ruamel.yaml import YAML
 
 _FIXTURES_DIR = Path(__file__).parent / "fixtures"
-
-
-# ---------------------------------------------------------------------------
-# detect_format
-# ---------------------------------------------------------------------------
-
-
-class TestDetectFormat:
-    """detect_format: returns format literal from path suffix."""
-
-    def test_detect_format_yaml_returns_yaml(self) -> None:
-        """detect_format returns 'yaml' for a .yaml file path.
-
-        Verifies the dispatch key used by load_item to choose the YAML parser.
-        """
-        # Arrange
-        path = Path("/some/dir/item.yaml")
-
-        # Act
-        result = detect_format(path)
-
-        # Assert
-        assert result == "yaml"
-
-    def test_detect_format_md_returns_legacy_md(self) -> None:
-        """detect_format returns 'legacy_md' for a .md file path.
-
-        Verifies the dispatch key used by load_item to choose the legacy parser.
-        """
-        # Arrange
-        path = Path("/some/dir/item.md")
-
-        # Act
-        result = detect_format(path)
-
-        # Assert
-        assert result == "legacy_md"
-
-    def test_detect_format_unsupported_raises_value_error(self) -> None:
-        """detect_format raises ValueError for unsupported file extensions.
-
-        .txt is not a supported backlog item format and must fail fast.
-        """
-        # Arrange
-        path = Path("/some/dir/item.txt")
-
-        # Act / Assert
-        with pytest.raises(ValueError, match="Unsupported file extension"):
-            detect_format(path)
-
-    def test_detect_format_json_raises_value_error(self) -> None:
-        """detect_format raises ValueError for .json extension.
-
-        Only .yaml and .md are valid backlog item extensions.
-        """
-        # Arrange
-        path = Path("/some/dir/item.json")
-
-        # Act / Assert
-        with pytest.raises(ValueError, match="Unsupported file extension"):
-            detect_format(path)
-
-
-# ---------------------------------------------------------------------------
-# load_item — .yaml files
-# ---------------------------------------------------------------------------
-
-
-class TestLoadItemYaml:
-    """load_item: reads BacklogItem from .yaml files."""
-
-    def test_load_item_returns_backlog_item(self, tmp_path: Path) -> None:
-        """load_item returns a BacklogItem instance from a valid .yaml file.
-
-        Checks the basic contract that load_item produces the right type.
-        """
-        # Arrange
-        src = _FIXTURES_DIR / "sample_item.yaml"
-        dest = tmp_path / "item.yaml"
-        dest.write_bytes(src.read_bytes())
-
-        # Act
-        result = load_item(dest)
-
-        # Assert
-        assert isinstance(result, BacklogItem)
-
-    def test_load_item_title_field(self, tmp_path: Path) -> None:
-        """load_item populates the title field from the YAML file.
-
-        Title must match the value written in the fixture to verify field mapping.
-        """
-        # Arrange
-        src = _FIXTURES_DIR / "sample_item.yaml"
-        dest = tmp_path / "item.yaml"
-        dest.write_bytes(src.read_bytes())
-
-        # Act
-        result = load_item(dest)
-
-        # Assert
-        assert result.title == "Add YAML-based backlog item storage"
-
-    def test_load_item_metadata_priority(self, tmp_path: Path) -> None:
-        """load_item populates metadata.priority from the YAML file.
-
-        Priority must be accessible through both the flat field and metadata.
-        """
-        # Arrange
-        src = _FIXTURES_DIR / "sample_item.yaml"
-        dest = tmp_path / "item.yaml"
-        dest.write_bytes(src.read_bytes())
-
-        # Act
-        result = load_item(dest)
-
-        # Assert
-        assert result.priority == "P1"
-        assert result.metadata.priority == "P1"
-
-    def test_load_item_description_field(self, tmp_path: Path) -> None:
-        """load_item populates the description field correctly.
-
-        Description field maps directly to BacklogItem.description.
-        """
-        # Arrange
-        src = _FIXTURES_DIR / "sample_item.yaml"
-        dest = tmp_path / "item.yaml"
-        dest.write_bytes(src.read_bytes())
-
-        # Act
-        result = load_item(dest)
-
-        # Assert
-        assert "pure-YAML file I/O" in result.description
-
-    def test_load_item_file_path_set_to_resolved(self, tmp_path: Path) -> None:
-        """load_item sets file_path to the resolved absolute path.
-
-        file_path is used downstream for issue linking and must be absolute.
-        """
-        # Arrange
-        src = _FIXTURES_DIR / "sample_item.yaml"
-        dest = tmp_path / "item.yaml"
-        dest.write_bytes(src.read_bytes())
-
-        # Act
-        result = load_item(dest)
-
-        # Assert
-        assert result.file_path == str(dest.resolve())
-
-    def test_load_item_empty_sections(self, tmp_path: Path) -> None:
-        """load_item returns empty sections dict when YAML has no sections.
-
-        sample_item.yaml has sections: {} — BacklogItem.sections must be empty.
-        """
-        # Arrange
-        src = _FIXTURES_DIR / "sample_item.yaml"
-        dest = tmp_path / "item.yaml"
-        dest.write_bytes(src.read_bytes())
-
-        # Act
-        result = load_item(dest)
-
-        # Assert
-        assert result.sections == {}
-
-    def test_load_item_all_four_section_types(self, tmp_path: Path) -> None:
-        """load_item parses all four section types from the groomed fixture.
-
-        fact_check, rt_ica, issue_classification, and groomed sections must
-        all be present after loading sample_item_groomed.yaml.
-        """
-        # Arrange
-        src = _FIXTURES_DIR / "sample_item_groomed.yaml"
-        dest = tmp_path / "groomed.yaml"
-        dest.write_bytes(src.read_bytes())
-
-        # Act
-        result = load_item(dest)
-
-        # Assert
-        assert "fact_check" in result.sections
-        assert "rt_ica" in result.sections
-        assert "issue_classification" in result.sections
-        assert "groomed" in result.sections
-
-    def test_load_item_section_types_are_correct_models(self, tmp_path: Path) -> None:
-        """load_item maps entry-bearing sections to Section and groomed to GroomedData.
-
-        The discriminator in BacklogItem.sections must produce the right model types.
-        """
-        # Arrange
-        src = _FIXTURES_DIR / "sample_item_groomed.yaml"
-        dest = tmp_path / "groomed.yaml"
-        dest.write_bytes(src.read_bytes())
-
-        # Act
-        result = load_item(dest)
-
-        # Assert
-        assert isinstance(result.sections["fact_check"], Section)
-        assert isinstance(result.sections["groomed"], GroomedData)
-
-    def test_load_item_groomed_date(self, tmp_path: Path) -> None:
-        """load_item populates GroomedData.date from the groomed section.
-
-        date field in the groomed section must survive the YAML round-trip.
-        """
-        # Arrange
-        src = _FIXTURES_DIR / "sample_item_groomed.yaml"
-        dest = tmp_path / "groomed.yaml"
-        dest.write_bytes(src.read_bytes())
-
-        # Act
-        result = load_item(dest)
-        groomed = result.sections.get("groomed")
-
-        # Assert
-        assert isinstance(groomed, GroomedData)
-        assert groomed.date == "2026-01-15"
-
-    def test_load_item_groomed_subsections(self, tmp_path: Path) -> None:
-        """load_item populates GroomedData.subsections from the groomed section.
-
-        Subsection keys must match what was written in the fixture.
-        """
-        # Arrange
-        src = _FIXTURES_DIR / "sample_item_groomed.yaml"
-        dest = tmp_path / "groomed.yaml"
-        dest.write_bytes(src.read_bytes())
-
-        # Act
-        result = load_item(dest)
-        groomed = result.sections.get("groomed")
-
-        # Assert
-        assert isinstance(groomed, GroomedData)
-        assert "Priority" in groomed.subsections
-        assert "Impact" in groomed.subsections
-
-    def test_load_item_struck_entry_struck_true(self, tmp_path: Path) -> None:
-        """load_item sets Entry.struck=True for entries with struck=true in YAML.
-
-        Struck entries must be identifiable so merge and render logic works.
-        """
-        # Arrange
-        src = _FIXTURES_DIR / "sample_item_entries.yaml"
-        dest = tmp_path / "entries.yaml"
-        dest.write_bytes(src.read_bytes())
-
-        # Act
-        result = load_item(dest)
-        sec = result.sections.get("fact_check")
-
-        # Assert
-        assert isinstance(sec, Section)
-        struck_entries = [e for e in sec.entries if e.struck]
-        assert len(struck_entries) == 1
-
-    def test_load_item_struck_entry_struck_reason(self, tmp_path: Path) -> None:
-        """load_item populates struck_reason for struck entries.
-
-        struck_reason is required for _render_entry to produce a valid details block.
-        """
-        # Arrange
-        src = _FIXTURES_DIR / "sample_item_entries.yaml"
-        dest = tmp_path / "entries.yaml"
-        dest.write_bytes(src.read_bytes())
-
-        # Act
-        result = load_item(dest)
-        sec = result.sections.get("fact_check")
-
-        # Assert
-        assert isinstance(sec, Section)
-        struck = next(e for e in sec.entries if e.struck)
-        assert struck.struck_reason == "superseded by deeper investigation"
-
-    def test_load_item_struck_entry_struck_at(self, tmp_path: Path) -> None:
-        """load_item populates struck_at for struck entries.
-
-        struck_at timestamp is required for the Entry model validator.
-        """
-        # Arrange
-        src = _FIXTURES_DIR / "sample_item_entries.yaml"
-        dest = tmp_path / "entries.yaml"
-        dest.write_bytes(src.read_bytes())
-
-        # Act
-        result = load_item(dest)
-        sec = result.sections.get("fact_check")
-
-        # Assert
-        assert isinstance(sec, Section)
-        struck = next(e for e in sec.entries if e.struck)
-        assert struck.struck_at == "2026-02-02T14:00:00Z"
-
-    def test_load_item_folds_legacy_unknown_key_into_now_canonical_key(self, tmp_path: Path) -> None:
-        """load_item folds a legacy ``unknown__story`` key into ``story``.
-
-        Regression guard for #2956 follow-up: a cache file written before
-        "Story" was registered in SECTION_HEADING stored it as
-        ``unknown__story``. Loading it must expose the canonical ``story``
-        key so a subsequent merge against a freshly-parsed GitHub body (which
-        always produces ``story``) collides on one key instead of rendering
-        the section twice.
-        """
-        # Arrange
-        item = BacklogItem(sections={"unknown__story": Section(entries=[])})
-        dest = tmp_path / "item.yaml"
-        save_item(item, dest)
-
-        # Act
-        result = load_item(dest)
-
-        # Assert
-        assert "story" in result.sections
-        assert "unknown__story" not in result.sections
-
-    def test_load_item_leaves_genuinely_unknown_key_unchanged(self, tmp_path: Path) -> None:
-        """load_item does not rename an ``unknown__`` key that is still uncanonical.
-
-        Only keys that have since been registered in SECTION_HEADING are
-        folded — a custom section name with no canonical entry must survive
-        unchanged.
-        """
-        # Arrange
-        item = BacklogItem(sections={"unknown__custom_analysis": Section(entries=[])})
-        dest = tmp_path / "item.yaml"
-        save_item(item, dest)
-
-        # Act
-        result = load_item(dest)
-
-        # Assert
-        assert "unknown__custom_analysis" in result.sections
-
-    def test_load_item_merges_entries_when_both_legacy_and_canonical_keys_present(self, tmp_path: Path) -> None:
-        """load_item merges entries when both ``unknown__story`` and ``story`` exist.
-
-        A manually edited or partially migrated cache file could contain both
-        keys for the same section; folding must not silently drop entries
-        from either side.
-        """
-        # Arrange
-        item = BacklogItem(
-            sections={
-                "unknown__story": Section(entries=[Entry(id="2026-01-01T00:00:00", content="legacy entry")]),
-                "story": Section(entries=[Entry(id="2026-01-02T00:00:00", content="canonical entry")]),
-            }
-        )
-        dest = tmp_path / "item.yaml"
-        save_item(item, dest)
-
-        # Act
-        result = load_item(dest)
-
-        # Assert
-        sec = result.sections["story"]
-        assert isinstance(sec, Section)
-        assert {e.content for e in sec.entries} == {"legacy entry", "canonical entry"}
-
-
-class TestLoadItemFoldingCoversRealBacklogViewConsumers:
-    """load_item's fold-on-read is what ``view_item``'s real consumers actually observe.
-
-    Regression guard for the round-2 #2964 review retraction: `groom-drift.md`
-    (Mode B, line ~81-83) and `feasibility-gate.md` (line ~23) both call
-    ``backlog view --selector "{title}"`` — a title selector, which makes
-    ``parse_issue_selector`` return ``None`` so GitHub-body enrichment never
-    runs (confirmed by tracing ``operations.view_item``). For that code path,
-    ``ViewItemResult.sections`` is built by
-    ``operations._build_sections_from_yaml_item``, which echoes the raw
-    in-memory ``BacklogItem.sections`` keys verbatim — the same snake_case/
-    ``unknown__`` keys ``load_item`` produces, never a Title-Case display
-    string. These tests chain the two real functions (``load_item`` then
-    ``_build_sections_from_yaml_item``) to prove the property that matters:
-    a stale ``unknown__impact_radius``/``unknown__files``/``unknown__priority``
-    cache entry (from before these names were registered) resolves to the
-    clean ``impact_radius``/``files``/``priority`` key after this PR — the
-    same key a freshly-groomed item produces — rather than staying invisible
-    under the pre-registration ``unknown__`` key.
-    """
-
-    def test_stale_impact_radius_and_files_keys_resolve_after_load(self, tmp_path: Path) -> None:
-        """A stale unknown__impact_radius/unknown__files cache resolves to canonical keys.
-
-        This is the exact scenario groom-drift.md's Mode B depends on: it
-        reads ``sections["Impact Radius"]``/``sections["Files"]`` from a
-        title-selector ``backlog view`` call against a locally-groomed item.
-        """
-        # Arrange
-        item = BacklogItem(
-            title="Groom Drift Consumer Check",
-            sections={
-                "unknown__impact_radius": Section(entries=[Entry(id="2026-01-01T00:00:00", content="plugins/foo.py")]),
-                "unknown__files": Section(entries=[Entry(id="2026-01-01T00:00:01", content="plugins/bar.py")]),
-            },
-        )
-        dest = tmp_path / "item.yaml"
-        save_item(item, dest)
-
-        # Act
-        loaded = load_item(dest)
-        result_sections = ops._build_sections_from_yaml_item(loaded)
-
-        # Assert — view_item keys its output by display title (#2971), not raw storage key.
-        assert "Impact Radius" in result_sections
-        assert "Files" in result_sections
-        assert "unknown__impact_radius" not in result_sections
-        assert "impact_radius" not in result_sections
-        assert "unknown__files" not in result_sections
-
-    def test_stale_priority_key_resolves_after_load(self, tmp_path: Path) -> None:
-        """A stale unknown__priority cache resolves to the canonical ``priority`` key.
-
-        This is the exact scenario feasibility-gate.md line ~23 depends on: a
-        BLOCKED effort/priority-mismatch check reads ``sections['Priority']``
-        from a title-selector ``backlog view`` call.
-        """
-        # Arrange
-        item = BacklogItem(
-            title="Feasibility Gate Consumer Check",
-            sections={"unknown__priority": Section(entries=[Entry(id="2026-01-01T00:00:00", content="P1")])},
-        )
-        dest = tmp_path / "item.yaml"
-        save_item(item, dest)
-
-        # Act
-        loaded = load_item(dest)
-        result_sections = ops._build_sections_from_yaml_item(loaded)
-
-        # Assert — view_item keys its output by display title (#2971), not raw storage key.
-        assert "Priority" in result_sections
-        assert "unknown__priority" not in result_sections
-        assert "priority" not in result_sections
-
-
-# ---------------------------------------------------------------------------
-# save_item
-# ---------------------------------------------------------------------------
-
-
-class TestSaveItem:
-    """save_item: writes BacklogItem to a .yaml file."""
-
-    def test_save_item_produces_readable_yaml(self, tmp_path: Path) -> None:
-        """save_item writes YAML that ruamel.yaml can load without errors.
-
-        The output must be valid YAML so load_item can read it back.
-        """
-        # Arrange
-        from ruamel.yaml import YAML
-
-        item = BacklogItem(
-            title="Test save item",
-            description="Checking save produces valid YAML.",
-            priority="P2",
-            item_type="Chore",
-            status="open",
-            added="2026-03-01",
-        )
-        dest = tmp_path / "saved.yaml"
-
-        # Act
-        save_item(item, dest)
-        yaml = YAML(typ="safe")
-        with dest.open(encoding="utf-8") as fh:
-            data = yaml.load(fh)
-
-        # Assert
-        assert data is not None
-        assert data["title"] == "Test save item"
-
-    def test_save_item_writes_metadata_block(self, tmp_path: Path) -> None:
-        """save_item writes the metadata sub-object into the YAML file.
-
-        metadata.priority must be present in the serialised output.
-        """
-        # Arrange
-        item = BacklogItem(title="Metadata test", priority="P0", item_type="Bug", status="open", added="2026-03-01")
-        dest = tmp_path / "metadata.yaml"
-
-        # Act
-        save_item(item, dest)
-        content = dest.read_text(encoding="utf-8")
-
-        # Assert
-        assert "priority: P0" in content
-
-    def test_save_item_excludes_file_path(self, tmp_path: Path) -> None:
-        """save_item does not write file_path to the YAML output.
-
-        file_path is a runtime field and must not be persisted to disk.
-        """
-        # Arrange
-        item = BacklogItem(title="Exclude test", file_path="/some/path/item.yaml")
-        dest = tmp_path / "exclude.yaml"
-
-        # Act
-        save_item(item, dest)
-        content = dest.read_text(encoding="utf-8")
-
-        # Assert
-        assert "file_path" not in content
-
-    def test_save_item_excludes_skip(self, tmp_path: Path) -> None:
-        """save_item does not write skip to the YAML output.
-
-        skip is a runtime field derived from status and must not be persisted.
-        """
-        # Arrange
-        item = BacklogItem(title="Skip exclude test", skip=False)
-        dest = tmp_path / "skip_exclude.yaml"
-
-        # Act
-        save_item(item, dest)
-        content = dest.read_text(encoding="utf-8")
-
-        # Assert
-        assert "skip:" not in content
-
-    def test_save_item_with_md_file_path_auto_migrates_to_yaml(self, tmp_path: Path) -> None:
-        """save_item auto-migrates when item.file_path ends with .md.
-
-        When path is omitted and item.file_path is an .md path, save_item must
-        write the .yaml file, rename the original .md to .md.bak, and update
-        item.file_path to the .yaml path.
-        """
-        # Arrange
-        md_path = tmp_path / "item.md"
-        md_path.write_text("# placeholder", encoding="utf-8")
-        item = BacklogItem(
-            title="Auto-migrate test",
-            description="Testing .md to .yaml auto-migration.",
-            priority="P2",
-            item_type="Chore",
-            status="open",
-            added="2026-03-31",
-            file_path=str(md_path),
-        )
-
-        # Act
-        save_item(item)
-
-        # Assert — .yaml written
-        yaml_path = tmp_path / "item.yaml"
-        assert yaml_path.exists(), f"Expected {yaml_path} to exist after auto-migration"
-        # Assert — .md.bak created
-        bak_path = tmp_path / "item.md.bak"
-        assert bak_path.exists(), f"Expected {bak_path} to exist after auto-migration"
-        # Assert — item.file_path updated to .yaml
-        assert item.file_path == str(yaml_path.resolve())
-
-    def test_save_item_with_yaml_file_path_writes_to_same_path(self, tmp_path: Path) -> None:
-        """save_item writes to item.file_path when it ends with .yaml and path is None.
-
-        No renaming should occur; item.file_path is updated to the resolved path.
-        """
-        # Arrange
-        yaml_path = tmp_path / "item.yaml"
-        item = BacklogItem(
-            title="Yaml path test",
-            description="Direct .yaml path.",
-            priority="P1",
-            item_type="Feature",
-            status="open",
-            added="2026-03-31",
-            file_path=str(yaml_path),
-        )
-
-        # Act
-        save_item(item)
-
-        # Assert — file written
-        assert yaml_path.exists(), f"Expected {yaml_path} to exist"
-        # Assert — item.file_path updated to resolved path
-        assert item.file_path == str(yaml_path.resolve())
-        # Assert — no stray .bak file
-        assert not (tmp_path / "item.yaml.bak").exists()
-
-    def test_save_item_with_no_path_and_no_file_path_raises(self) -> None:
-        """save_item raises ValueError when path is None and item.file_path is empty.
-
-        Fail-fast: the caller must supply a write destination.
-        """
-        # Arrange
-        item = BacklogItem(
-            title="No path test",
-            description="Item with no file_path.",
-            priority="P3",
-            item_type="Chore",
-            status="open",
-            added="2026-03-31",
-            file_path="",
-        )
-
-        # Act / Assert
-        with pytest.raises(ValueError, match="file_path is empty"):
-            save_item(item)
-
-
-# ---------------------------------------------------------------------------
-# Round-trip: load → save → load
-# ---------------------------------------------------------------------------
-
-
-class TestRoundTrip:
-    """Round-trip: load_item → save_item → load_item preserves field equality."""
-
-    def test_round_trip_title(self, tmp_path: Path) -> None:
-        """Round-trip preserves the item title.
-
-        Title must be equal before save and after reload for correct display.
-        """
-        # Arrange
-        src = _FIXTURES_DIR / "sample_item_groomed.yaml"
-        path1 = tmp_path / "original.yaml"
-        path2 = tmp_path / "roundtrip.yaml"
-        path1.write_bytes(src.read_bytes())
-        original = load_item(path1)
-
-        # Act
-        save_item(original, path2)
-        reloaded = load_item(path2)
-
-        # Assert
-        assert reloaded.title == original.title
-
-    def test_round_trip_priority(self, tmp_path: Path) -> None:
-        """Round-trip preserves the metadata priority.
-
-        Priority drives issue labelling and must survive save/load.
-        """
-        # Arrange
-        src = _FIXTURES_DIR / "sample_item_groomed.yaml"
-        path1 = tmp_path / "original.yaml"
-        path2 = tmp_path / "roundtrip.yaml"
-        path1.write_bytes(src.read_bytes())
-        original = load_item(path1)
-
-        # Act
-        save_item(original, path2)
-        reloaded = load_item(path2)
-
-        # Assert
-        assert reloaded.priority == original.priority
-
-    def test_round_trip_section_keys(self, tmp_path: Path) -> None:
-        """Round-trip preserves the set of section keys.
-
-        All four section types (fact_check, rt_ica, issue_classification, groomed)
-        must be present after the round-trip.
-        """
-        # Arrange
-        src = _FIXTURES_DIR / "sample_item_groomed.yaml"
-        path1 = tmp_path / "original.yaml"
-        path2 = tmp_path / "roundtrip.yaml"
-        path1.write_bytes(src.read_bytes())
-        original = load_item(path1)
-
-        # Act
-        save_item(original, path2)
-        reloaded = load_item(path2)
-
-        # Assert
-        assert set(reloaded.sections.keys()) == set(original.sections.keys())
-
-    def test_round_trip_groomed_date(self, tmp_path: Path) -> None:
-        """Round-trip preserves the GroomedData date.
-
-        Groomed date is displayed in the GitHub issue body and must not change.
-        """
-        # Arrange
-        src = _FIXTURES_DIR / "sample_item_groomed.yaml"
-        path1 = tmp_path / "original.yaml"
-        path2 = tmp_path / "roundtrip.yaml"
-        path1.write_bytes(src.read_bytes())
-        original = load_item(path1)
-        original_groomed = original.sections["groomed"]
-
-        # Act
-        save_item(original, path2)
-        reloaded = load_item(path2)
-        reloaded_groomed = reloaded.sections["groomed"]
-
-        # Assert
-        assert isinstance(original_groomed, GroomedData)
-        assert isinstance(reloaded_groomed, GroomedData)
-        assert reloaded_groomed.date == original_groomed.date
-
-    def test_round_trip_struck_entry_state(self, tmp_path: Path) -> None:
-        """Round-trip preserves struck entry state.
-
-        A struck entry must still be struck and have the same struck_reason after reload.
-        """
-        # Arrange
-        src = _FIXTURES_DIR / "sample_item_entries.yaml"
-        path1 = tmp_path / "original.yaml"
-        path2 = tmp_path / "roundtrip.yaml"
-        path1.write_bytes(src.read_bytes())
-        original = load_item(path1)
-
-        # Act
-        save_item(original, path2)
-        reloaded = load_item(path2)
-
-        # Assert
-        original_sec = original.sections["fact_check"]
-        reloaded_sec = reloaded.sections["fact_check"]
-        assert isinstance(original_sec, Section)
-        assert isinstance(reloaded_sec, Section)
-        orig_struck = next(e for e in original_sec.entries if e.struck)
-        reload_struck = next(e for e in reloaded_sec.entries if e.struck)
-        assert reload_struck.struck is True
-        assert reload_struck.struck_reason == orig_struck.struck_reason
-        assert reload_struck.struck_at == orig_struck.struck_at
-
-
-# ---------------------------------------------------------------------------
-# load_item — legacy .md files
-# ---------------------------------------------------------------------------
-
 _LEGACY_MD_TEXT = """\
 ---
 name: Legacy Test Item
@@ -758,201 +24,236 @@ metadata:
 ---
 Body content from legacy format.
 """
-
-
-class TestLoadItemLegacyMd:
-    """load_item: legacy .md files delegate to parse_item_file with DeprecationWarning."""
-
-    def test_load_item_md_returns_backlog_item(self, tmp_path: Path) -> None:
-        """load_item returns a BacklogItem when loading a .md file.
-
-        Legacy files must still produce a usable BacklogItem for migration.
-        """
-        # Arrange
-        path = tmp_path / "item.md"
-        path.write_text(_LEGACY_MD_TEXT, encoding="utf-8")
-
-        # Act
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
-            result = load_item(path)
-
-        # Assert
-        assert isinstance(result, BacklogItem)
-
-    def test_load_item_md_emits_deprecation_warning(self, tmp_path: Path) -> None:
-        """load_item emits DeprecationWarning when loading a legacy .md file.
-
-        The warning is the migration signal — consumers must see it to know
-        the item needs conversion.
-        """
-        # Arrange
-        path = tmp_path / "item.md"
-        path.write_text(_LEGACY_MD_TEXT, encoding="utf-8")
-
-        # Act / Assert
-        with pytest.warns(DeprecationWarning, match="legacy .md format"):
-            load_item(path)
-
-    def test_load_item_md_title_from_parse_item_file(self, tmp_path: Path) -> None:
-        """load_item .md path returns BacklogItem with title from parse_item_file.
-
-        parse_item_file is the real legacy parser — title must come from it.
-        """
-        # Arrange
-        path = tmp_path / "item.md"
-        path.write_text(_LEGACY_MD_TEXT, encoding="utf-8")
-
-        # Act
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
-            result = load_item(path)
-
-        # Assert
-        assert result.title == "Legacy Test Item"
-
-    def test_load_item_md_file_path_set(self, tmp_path: Path) -> None:
-        """load_item .md path sets file_path on the returned item.
-
-        file_path must be set regardless of file format for downstream use.
-        """
-        # Arrange
-        path = tmp_path / "item.md"
-        path.write_text(_LEGACY_MD_TEXT, encoding="utf-8")
-
-        # Act
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
-            result = load_item(path)
-
-        # Assert
-        assert result.file_path == str(path.resolve())
-
-
-# ---------------------------------------------------------------------------
-# load_item_text
-# ---------------------------------------------------------------------------
-
 _YAML_TEXT = """\
 title: In-memory item
 description: Loaded from text without disk I/O.
-type_: ''
-section: ''
 metadata:
   source: test
   added: '2026-03-10'
   priority: P2
   item_type: Docs
   status: open
-  issue: ''
-  last_synced: ''
-  groomed: ''
-  plan: ''
-  topic: ''
-  research_first: ''
-  files: ''
-  suggested_location: ''
 sections: {}
 """
 
 
-class TestLoadItemText:
-    """load_item_text: parses BacklogItem from in-memory string."""
+@pytest.mark.parametrize(("suffix", "expected"), [(".yaml", "yaml"), (".md", "legacy_md")])
+def test_detect_format_routes_supported_readers(suffix: str, expected: str) -> None:
+    assert detect_format(Path(f"/items/item{suffix}")) == expected
 
-    def test_load_item_text_yaml_returns_backlog_item(self) -> None:
-        """load_item_text with .yaml suffix returns a BacklogItem.
 
-        The path suffix drives format detection; no disk read occurs.
-        """
-        # Arrange
-        path = Path("/fake/item.yaml")
+@pytest.mark.parametrize("suffix", [".json", ".txt"])
+def test_detect_format_rejects_unsupported_readers(suffix: str) -> None:
+    with pytest.raises(ValueError, match="Unsupported file extension"):
+        detect_format(Path(f"/items/item{suffix}"))
 
-        # Act
-        result = load_item_text(_YAML_TEXT, path)
 
-        # Assert
-        assert isinstance(result, BacklogItem)
+def test_load_item_reads_the_complete_basic_persisted_contract(tmp_path: Path) -> None:
+    path = tmp_path / "item.yaml"
+    path.write_bytes((_FIXTURES_DIR / "sample_item.yaml").read_bytes())
 
-    def test_load_item_text_yaml_title_field(self) -> None:
-        """load_item_text populates the title from the YAML content string.
+    item = load_item(path)
 
-        Correct field mapping through model_validate must work without file I/O.
-        """
-        # Arrange
-        path = Path("/fake/item.yaml")
+    assert item.title == "Add YAML-based backlog item storage"
+    assert item.description == "Implement pure-YAML file I/O for backlog items to replace legacy markdown format."
+    assert item.priority == "P1"
+    assert item.file_path == str(path.resolve())
+    assert item.sections == {}
 
-        # Act
-        result = load_item_text(_YAML_TEXT, path)
 
-        # Assert
-        assert result.title == "In-memory item"
+def test_load_item_reads_typed_grooming_sections(tmp_path: Path) -> None:
+    path = tmp_path / "groomed.yaml"
+    path.write_bytes((_FIXTURES_DIR / "sample_item_groomed.yaml").read_bytes())
 
-    def test_load_item_text_yaml_priority_field(self) -> None:
-        """load_item_text populates priority from the YAML content string.
+    item = load_item(path)
 
-        Priority must be read from the metadata block in the YAML text.
-        """
-        # Arrange
-        path = Path("/fake/item.yaml")
+    assert set(item.sections) == {"fact_check", "rt_ica", "issue_classification", "groomed"}
+    assert isinstance(item.sections["fact_check"], Section)
+    groomed = item.sections["groomed"]
+    assert isinstance(groomed, GroomedData)
+    assert groomed.date == "2026-01-15"
+    assert groomed.subsections["Priority"] == "High — needed for milestone 2 backlog migration."
+    assert groomed.subsections["Impact"] == "All backlog operations will use pure YAML after this lands."
 
-        # Act
-        result = load_item_text(_YAML_TEXT, path)
 
-        # Assert
-        assert result.priority == "P2"
+def test_load_item_reads_struck_entry_fields(tmp_path: Path) -> None:
+    path = tmp_path / "entries.yaml"
+    path.write_bytes((_FIXTURES_DIR / "sample_item_entries.yaml").read_bytes())
 
-    def test_load_item_text_yaml_sets_file_path_to_path_str(self) -> None:
-        """load_item_text sets file_path to str(path), not a resolved path.
+    section = load_item(path).sections["fact_check"]
 
-        load_item_text uses str(path) directly (no disk access), while
-        load_item uses str(path.resolve()). Both are valid for their context.
-        """
-        # Arrange
-        path = Path("/fake/item.yaml")
+    assert isinstance(section, Section)
+    struck = next(entry for entry in section.entries if entry.struck)
+    assert (struck.content, struck.struck_reason, struck.struck_at) == (
+        "Original analysis before new findings.",
+        "superseded by deeper investigation",
+        "2026-02-02T14:00:00Z",
+    )
 
-        # Act
-        result = load_item_text(_YAML_TEXT, path)
 
-        # Assert
-        assert result.file_path == str(path)
+def test_load_item_preserves_legacy_unknown_section_migration_rules(tmp_path: Path) -> None:
+    path = tmp_path / "item.yaml"
+    save_item(
+        BacklogItem(
+            sections={
+                "unknown__story": Section(entries=[Entry(id="old", content="legacy")]),
+                "story": Section(entries=[Entry(id="new", content="canonical")]),
+                "unknown__custom_analysis": Section(entries=[]),
+            }
+        ),
+        path,
+    )
 
-    def test_load_item_text_md_delegates_to_parse_item_file(self) -> None:
-        """load_item_text with .md suffix delegates to parse_item_file.
+    sections = load_item(path).sections
 
-        The path suffix must select legacy parsing without any disk read.
-        """
-        # Arrange
-        path = Path("/fake/item.md")
+    story = sections["story"]
+    assert isinstance(story, Section)
+    assert {entry.content for entry in story.entries} == {"legacy", "canonical"}
+    assert "unknown__story" not in sections
+    assert "unknown__custom_analysis" in sections
 
-        # Act — parse_item_file is NOT mocked (integration fidelity requirement)
-        result = load_item_text(_LEGACY_MD_TEXT, path)
 
-        # Assert
-        assert isinstance(result, BacklogItem)
-        assert result.title == "Legacy Test Item"
+def test_load_item_migration_reaches_title_selector_view_consumers(tmp_path: Path) -> None:
+    path = tmp_path / "item.yaml"
+    save_item(
+        BacklogItem(
+            sections={
+                "unknown__impact_radius": Section(entries=[Entry(content="plugins/foo.py")]),
+                "unknown__files": Section(entries=[Entry(content="plugins/bar.py")]),
+                "unknown__priority": Section(entries=[Entry(content="P1")]),
+            }
+        ),
+        path,
+    )
 
-    def test_load_item_text_md_sets_file_path_to_path_str(self) -> None:
-        """load_item_text .md path sets file_path to str(path).
+    sections = ops._build_sections_from_yaml_item(load_item(path))
 
-        file_path must be set for legacy format items loaded in-memory.
-        """
-        # Arrange
-        path = Path("/fake/legacy.md")
+    assert {"Impact Radius", "Files", "Priority"}.issubset(sections)
+    assert not {"unknown__impact_radius", "unknown__files", "unknown__priority"}.intersection(sections)
 
-        # Act
-        result = load_item_text(_LEGACY_MD_TEXT, path)
 
-        # Assert
-        assert result.file_path == str(path)
+def test_save_and_load_preserve_explicit_persisted_values_and_runtime_omissions(tmp_path: Path) -> None:
+    path = tmp_path / "persisted.yaml"
+    save_item(
+        BacklogItem(
+            title="Persisted title",
+            description="first line\nsecond line",
+            priority="P0",
+            item_type="Bug",
+            status="open",
+            added="2026-03-01",
+            file_path="/runtime/only.yaml",
+            skip=True,
+            sections={
+                "fact_check": Section(
+                    entries=[
+                        Entry(
+                            id="entry-1",
+                            content="A struck durable entry",
+                            struck=True,
+                            struck_reason="replaced",
+                            struck_at="2026-03-02T03:04:05Z",
+                        )
+                    ]
+                )
+            },
+        ),
+        path,
+    )
 
-    def test_load_item_text_unsupported_suffix_raises(self) -> None:
-        """load_item_text raises ValueError for unsupported file suffix.
+    persisted = YAML(typ="safe").load(path)
+    reloaded = load_item(path)
 
-        detect_format is called internally; .txt must propagate as ValueError.
-        """
-        # Arrange
-        path = Path("/fake/item.txt")
+    assert persisted["title"] == "Persisted title"
+    assert persisted["description"] == "first line\nsecond line"
+    assert persisted["metadata"]["priority"] == "P0"
+    assert "file_path" not in persisted
+    assert "skip" not in persisted
+    assert reloaded.title == "Persisted title"
+    assert reloaded.description == "first line\nsecond line"
+    assert reloaded.priority == "P0"
+    section = reloaded.sections["fact_check"]
+    assert isinstance(section, Section)
+    assert [
+        (entry.id, entry.content, entry.struck, entry.struck_reason, entry.struck_at) for entry in section.entries
+    ] == [("entry-1", "A struck durable entry", True, "replaced", "2026-03-02T03:04:05Z")]
 
-        # Act / Assert
-        with pytest.raises(ValueError, match="Unsupported file extension"):
-            load_item_text(_YAML_TEXT, path)
+
+def test_save_item_preserves_file_migration_and_destination_guards(tmp_path: Path) -> None:
+    legacy = tmp_path / "item.md"
+    legacy.write_text("# placeholder", encoding="utf-8")
+    item = BacklogItem(title="Migrated", file_path=str(legacy))
+
+    save_item(item)
+
+    assert (tmp_path / "item.yaml").exists()
+    assert (tmp_path / "item.md.bak").exists()
+    assert item.file_path == str((tmp_path / "item.yaml").resolve())
+    with pytest.raises(ValueError, match="file_path is empty"):
+        save_item(BacklogItem())
+
+
+def test_save_item_uses_a_yaml_destination_without_a_backup(tmp_path: Path) -> None:
+    path = tmp_path / "item.yaml"
+    item = BacklogItem(title="Direct YAML", file_path=str(path))
+
+    save_item(item)
+
+    assert item.file_path == str(path.resolve())
+    assert not (tmp_path / "item.yaml.bak").exists()
+
+
+def test_load_item_reads_legacy_file_with_its_migration_signal(tmp_path: Path) -> None:
+    path = tmp_path / "item.md"
+    path.write_text(_LEGACY_MD_TEXT, encoding="utf-8")
+
+    with pytest.warns(DeprecationWarning, match="legacy .md format"):
+        item = load_item(path)
+
+    assert (item.title, item.file_path) == ("Legacy Test Item", str(path.resolve()))
+
+
+def test_load_item_text_reads_yaml_without_resolving_its_caller_path() -> None:
+    path = Path("/fake/item.yaml")
+
+    item = load_item_text(_YAML_TEXT, path)
+
+    assert (item.title, item.priority, item.file_path) == ("In-memory item", "P2", str(path))
+
+
+@pytest.mark.parametrize(
+    ("priority", "item_type", "status", "expected"),
+    [
+        ("IDEA", "Documentation", "resolved", ("Ideas", "Docs", "resolved")),
+        ("critical", "Legacy Type", "legacy-status", ("critical", "Legacy Type", "legacy-status")),
+    ],
+)
+def test_load_item_text_preserves_metadata_compatibility(
+    priority: str, item_type: str, status: str, expected: tuple[str, str, str]
+) -> None:
+    text = f"""\
+title: Compatibility item
+metadata:
+  added: '2026-03-10'
+  priority: {priority}
+  type: {item_type}
+  status: {status}
+  unknown_future_key: ignored
+sections: {{}}
+"""
+
+    item = load_item_text(text, Path("/fake/compatibility.yaml"))
+
+    assert (item.priority, item.item_type, item.status) == expected
+    assert item.added == "2026-03-10"
+    assert not hasattr(item.metadata, "unknown_future_key")
+
+
+def test_load_item_text_reads_legacy_md_and_rejects_unknown_suffix() -> None:
+    path = Path("/fake/item.md")
+
+    item = load_item_text(_LEGACY_MD_TEXT, path)
+
+    assert (item.title, item.file_path) == ("Legacy Test Item", str(path))
+    with pytest.raises(ValueError, match="Unsupported file extension"):
+        load_item_text(_YAML_TEXT, Path("/fake/item.txt"))
