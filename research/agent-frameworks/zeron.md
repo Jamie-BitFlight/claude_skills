@@ -18,7 +18,7 @@ freshness_tracking:
 
 ## Overview
 
-Zeron is a native Rust application that provides local-first control of multiple coding agents with optional multi-device synchronization. The README (line 3) names Claude Code, Codex, Cursor, Devin, Grok, Hermes, Pi and Antigravity as the controlled agents; only the Claude Code and Codex harnesses are verified in this entry, and ARCHITECTURE.md lists the Cursor harness as deferred (see Limitations and Caveats, Deferred Product Work item 4), so the README list is the project's claim, not a verified per-agent support matrix. Every device runs a small engine that stores sessions locally, with installations starting in local-only mode without requiring an account or network connection. The application is available as a single binary that can run in headed (desktop UI) or headless (daemon) modes, with optional multi-device workspace sync via Cloudflare Durable Objects and CRDTs when enabled.
+Zeron is a native Rust application that provides local-first control of multiple coding agents with optional multi-device synchronization. The README (line 3, v0.2.102, read 2026-10-06) names Claude Code, Codex, Cursor, Devin, Grok, Hermes, Pi and Antigravity as the controlled agents; only the Claude Code and Codex harnesses are verified in this entry, and ARCHITECTURE.md lists the Cursor harness as deferred (see Limitations and Caveats, Deferred Product Work item 4), so the README list is the project's claim, not a verified per-agent support matrix. Every device runs a small engine that stores sessions locally, with installations starting in local-only mode without requiring an account or network connection. The application is available as a single binary that can run in headed (desktop UI) or headless (daemon) modes, with optional multi-device workspace sync via Cloudflare Durable Objects and CRDTs when enabled.
 
 ---
 
@@ -38,7 +38,7 @@ Zeron is a native Rust application that provides local-first control of multiple
 
 ### Multi-Agent Harness Support
 
-Zeron abstracts the control interface across multiple coding agents through a pluggable harness system. Each harness is a trait implementation that handles agent-specific communication protocols—Claude Code via stream-json subprocess protocol, Codex via app-server JSON-RPC, with a mock harness. The README names Cursor, Devin, Grok, Hermes, Pi and Antigravity as controlled agents (README.md line 3), but the per-harness implementation status for those is not verified beyond directory names: `crates/harness/src/` at v0.2.102 contains `claude/`, `codex/`, `cursor/`, `acp/`, `opencode/`, `pi/` and `mock.rs`, and their contents were not read.
+Zeron abstracts the control interface across multiple coding agents through a pluggable harness system. Each harness is a trait implementation that handles agent-specific communication protocols—Claude Code via stream-json subprocess protocol, Codex via app-server JSON-RPC, with a mock harness. The README names Cursor, Devin, Grok, Hermes, Pi and Antigravity as controlled agents (README.md line 3, v0.2.102, read 2026-10-06), but the per-harness implementation status for those is not verified beyond directory names: `crates/harness/src/` at v0.2.102 contains `claude/`, `codex/`, `cursor/`, `acp/`, `opencode/`, `pi/` and `mock.rs`, and their contents were not read.
 
 ### Local-First Session Persistence
 
@@ -52,9 +52,9 @@ Authentication and workspace management are deliberately decoupled: signing in v
 
 The interface is built in gpui, pinned to one Zed revision (ARCHITECTURE.md line 174, v0.2.102, read 2026-10-06). The UI organizes around a searchable spaces sidebar with session tabs as a device-local viewport (opening/closing tabs is local-only; archiving is explicit). Key UI components include (figures below are as stated in ARCHITECTURE.md and `crates/ui/src/composer.rs` at v0.2.102, read 2026-10-06):
 
-- **Transcript**: Virtualized list with spring-based stick-to-bottom tracking (interrupted by user input, re-engages within 70px per ARCHITECTURE.md line 179), block-granular rows with incremental streaming markdown re-parse, and scroll-anchor absorption.
-- **Composer**: Hand-rolled text input with auto-grow (76–260px), IME support, question panel (1-9 keys, 220ms auto-advance per ARCHITECTURE.md line 198; `pub const AUTO_ADVANCE_MS: u64 = 220` in `crates/ui/src/composer.rs` at v0.2.102) for multi-choice scenarios, and attachment/image drag-drop.
-- **Terminal**: Alacritty VTE terminal emulation with portable-pty backend, tab drag-reorder, 150ms sliding animations, 12ms input coalescing, and 1MB replay (ARCHITECTURE.md line 203).
+- **Transcript**: Virtualized list with spring-based stick-to-bottom tracking (interrupted by user input, re-engages within 70px per ARCHITECTURE.md line 179, v0.2.102, read 2026-10-06), block-granular rows with incremental streaming markdown re-parse, and scroll-anchor absorption.
+- **Composer**: Hand-rolled text input with auto-grow (76–260px), IME support, question panel (1-9 keys, 220ms auto-advance per ARCHITECTURE.md line 198, v0.2.102, read 2026-10-06; `pub const AUTO_ADVANCE_MS: u64 = 220` in `crates/ui/src/composer.rs` at v0.2.102) for multi-choice scenarios, and attachment/image drag-drop.
+- **Terminal**: Alacritty VTE terminal emulation with portable-pty backend, tab drag-reorder, 150ms sliding animations, 12ms input coalescing, and 1MB replay (ARCHITECTURE.md line 203, v0.2.102, read 2026-10-06).
 - **Diff Pane**: Unified-patch virtualized viewer with per-file collapse animation (180ms), time-sliced syntax highlighting, and 200ms width transitions.
 - **Theme System**: Device-local independent light/dark variants with optional VS Code file/package import and custom family support, accent overrides for interaction roles only.
 
@@ -73,16 +73,16 @@ In the v0.2.102 snapshot (commit 64ad6f6, read 2026-10-06), the root `Cargo.toml
 - **zeron-engine**: Sessions engine (pub/sub broadcast, run journal with resumable seq replay), doc host + command executor, repos/worktrees, checkout-diff sync, terminals, uploads, agent credential swap, WorkOS auth, device-room host/peers, identity.
 - **zeron-rpc**: Typed request/response/stream RPC over WS (tokio-tungstenite) + in-memory transport, device-room virtual sockets (s/k/to/from frames).
 - **zeron-ui**: gpui app shell, sidebar, conversation, composer, terminal, diff, settings, animation kit.
-- **zeron-preview**: "Project-scoped HTTP discovery, stable local routing, and authenticated peers" (`crates/preview/src/lib.rs` line 1).
-- **zeron-update**: "release checking and self-update, shared by the engine (the background checker + `ApplyUpdate`), the CLI (`zeron update`), and the UI" (`crates/update/src/lib.rs` lines 1-3).
-- **zeron-theme**: "Zeron's source-neutral theme domain model" (`crates/theme/src/lib.rs` line 1).
-- **zeron-voice**: "Desktop-local Parakeet v3. No engine, document, RPC or audio persistence." (`crates/voice/src/lib.rs` line 1).
-- **zeron-markdown**: "Block-level markdown over pulldown-cmark, shared by every frontend." (`crates/markdown/src/lib.rs` line 1).
-- **zeron-syntax**: "Syntax-highlighting contracts shared by Zeron's desktop surfaces." (`crates/syntax/src/lib.rs` line 1).
+- **zeron-preview**: "Project-scoped HTTP discovery, stable local routing, and authenticated peers" (`crates/preview/src/lib.rs` line 1, v0.2.102, read 2026-10-06).
+- **zeron-update**: "release checking and self-update, shared by the engine (the background checker + `ApplyUpdate`), the CLI (`zeron update`), and the UI" (`crates/update/src/lib.rs` lines 1-3, v0.2.102, read 2026-10-06).
+- **zeron-theme**: "Zeron's source-neutral theme domain model" (`crates/theme/src/lib.rs` line 1, v0.2.102, read 2026-10-06).
+- **zeron-voice**: "Desktop-local Parakeet v3. No engine, document, RPC or audio persistence." (`crates/voice/src/lib.rs` line 1, v0.2.102, read 2026-10-06).
+- **zeron-markdown**: "Block-level markdown over pulldown-cmark, shared by every frontend." (`crates/markdown/src/lib.rs` line 1, v0.2.102, read 2026-10-06).
+- **zeron-syntax**: "Syntax-highlighting contracts shared by Zeron's desktop surfaces." (`crates/syntax/src/lib.rs` line 1, v0.2.102, read 2026-10-06).
 - **zeron-text**: "Analytic text measurement and line layout (pretext-style prepare/layout split) for virtualized transcripts" (`crates/text/Cargo.toml` description).
-- **zeron-mcp**: "a Model Context Protocol server over the running engine" (`crates/mcp/src/lib.rs` line 1).
-- **zeron-mobile**: "the UniFFI surface shared by the iOS and Android apps" (`crates/mobile/src/lib.rs` line 1).
-- **zeron-client**: "the engine-free thin client ("viewer device")" (`crates/client/src/lib.rs` line 1).
+- **zeron-mcp**: "a Model Context Protocol server over the running engine" (`crates/mcp/src/lib.rs` line 1, v0.2.102, read 2026-10-06).
+- **zeron-mobile**: "the UniFFI surface shared by the iOS and Android apps" (`crates/mobile/src/lib.rs` line 1, v0.2.102, read 2026-10-06).
+- **zeron-client**: "the engine-free thin client ("viewer device")" (`crates/client/src/lib.rs` line 1, v0.2.102, read 2026-10-06).
 
 Async runtime: tokio throughout; in-process UI bridges via `gpui_tokio` (futures surfaced as gpui Tasks).
 
@@ -97,7 +97,7 @@ Source: ARCHITECTURE.md — Edge (TypeScript); `edge/src/index.ts` — Worker ro
 - **DeviceRoom DO**: Per-device byte relay, nudges, and sidecar slots for diff/tail data.
 - **WorkspaceRegistry**: Private per-user room (`reg1/{orgId}/{userId}`) with authenticated row sync and ephemeral presence.
 - **Auth Routes**: `/auth/exchange` and `/auth/refresh` for WorkOS integration, orgs onboarding.
-- **R2 Attachments**: listed among the edge components (ARCHITECTURE.md line 30); no further detail was read.
+- **R2 Attachments**: listed among the edge components (ARCHITECTURE.md line 30, v0.2.102, read 2026-10-06); no further detail was read.
 
 ---
 
@@ -203,7 +203,7 @@ Per the README (line 60, v0.2.102, read 2026-10-06), the desktop app checks for 
 
 Statements in this section are from ARCHITECTURE.md at v0.2.102, read 2026-10-06.
 
-Token-usage display (profile heatmap, lifetime stats, per-message token columns, `WatchUsage`) is excluded. ARCHITECTURE.md (line 10) lists the goal as "Feature parity with zeron **except token-usage display** (poor fit for CRDTs; excluded)." and line 257 repeats the exclusion.
+Token-usage display (profile heatmap, lifetime stats, per-message token columns, `WatchUsage`) is excluded. ARCHITECTURE.md (line 10, v0.2.102, read 2026-10-06) lists the goal as "Feature parity with zeron **except token-usage display** (poor fit for CRDTs; excluded)." and line 257 (v0.2.102, read 2026-10-06) repeats the exclusion.
 
 ### Privacy Boundary
 
@@ -217,7 +217,7 @@ Items 1-4 are deferred product work; item 5 is recorded separately as a mileston
 2. Browsing both scopes simultaneously or switching visible scope without engine restart.
 3. Supported self-hosted backend contract (current endpoint and bearer overrides remain development seams).
 4. Cursor harness implementation, per ARCHITECTURE.md (its M5 gaps line and Open question 3, "parity item, scheduled after Codex"). The file carries no date of its own; it is from the v0.2.102 clone, whose commit is dated 2026-10-02. This conflicts with the README listing Cursor as a controlled agent and with `crates/harness/src/cursor/` existing (file names `catalog.rs`, `mod.rs`, `shim.mjs`, `state.rs` from the directory listing at v0.2.102), so the statement may be stale. Whether Cursor, ACP, OpenCode or Pi harnesses are functional is not verified beyond directory names.
-5. Prefers-reduced-motion support and engine hardening (instance lock, watchdogs) are listed as gaps of the M6 Polish milestone in ARCHITECTURE.md (lines 288-290, v0.2.102, read 2026-10-06). The same file says at line 194 that `prefers-reduced-motion` is honored, so the source contradicts itself on this point; it is not described as intentionally deferred.
+5. Prefers-reduced-motion support and engine hardening (instance lock, watchdogs) are listed as gaps of the M6 Polish milestone in ARCHITECTURE.md (lines 288-290, v0.2.102, read 2026-10-06). The same file says at line 194 (v0.2.102, read 2026-10-06) that `prefers-reduced-motion` is honored, so the source contradicts itself on this point; it is not described as intentionally deferred.
 
 ### Workspace File Trust
 
