@@ -1,25 +1,14 @@
-"""Tests for create_task_backend and create_context_backend factory routing.
-
-Verifies that:
-- TASKBACKEND=beads env var routes to BeadsTaskProvider
-- CONTEXTBACKEND=beads env var routes to BeadsContextBackend
-- .dh/config.yaml with task.backend = "beads" is respected (via DHConfig)
-- .dh/config.yaml with context.backend = "beads" is respected (via DHConfig)
-- Invalid backend names raise SamError
-"""
+"""Tests for the live context-backend factory route."""
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
-from tests.helpers import make_dh_paths_mock
 
-from sam_schema.core.backends.beads import BeadsContextBackend, BeadsTaskProvider
+from sam_schema.core.backends.beads import BeadsContextBackend
 from sam_schema.core.context_config import create_context_backend, reset_context_config
 from sam_schema.core.exceptions import SamError
-from sam_schema.core.task_config import create_task_backend, reset_task_config
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -29,64 +18,7 @@ if TYPE_CHECKING:
 def _reset_configs() -> Generator[None, None, None]:
     """Ensure singleton configs are cleared after each test."""
     yield
-    reset_task_config()
     reset_context_config()
-
-
-# ---------------------------------------------------------------------------
-# create_task_backend — env var routing
-# ---------------------------------------------------------------------------
-
-
-class TestCreateTaskBackendEnvVar:
-    def test_env_var_beads_returns_beads_provider(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """TASKBACKEND=beads must return a BeadsTaskProvider instance."""
-        monkeypatch.setenv("TASKBACKEND", "beads")
-        backend = create_task_backend()
-        assert isinstance(backend, BeadsTaskProvider)
-
-    def test_env_var_invalid_raises_sam_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """TASKBACKEND=nonexistent must raise SamError."""
-        monkeypatch.setenv("TASKBACKEND", "nonexistent")
-        with pytest.raises(SamError, match="Unknown backend"):
-            create_task_backend()
-
-    def test_explicit_name_beads_returns_beads_provider(self) -> None:
-        """create_task_backend('beads') must return a BeadsTaskProvider."""
-        backend = create_task_backend("beads")
-        assert isinstance(backend, BeadsTaskProvider)
-
-    def test_explicit_name_github_raises_not_implemented(self) -> None:
-        """create_task_backend('github') must raise NotImplementedError."""
-        with pytest.raises(NotImplementedError):
-            create_task_backend("github")
-
-
-# ---------------------------------------------------------------------------
-# create_task_backend — TOML file routing
-# ---------------------------------------------------------------------------
-
-
-class TestCreateTaskBackendConfig:
-    def test_config_yaml_task_backend_beads_returns_beads_provider(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """.dh/config.yaml with task.backend = 'beads' must route to BeadsTaskProvider."""
-        import dh_config as dh_config_mod
-
-        dh_dir = tmp_path / ".dh"
-        dh_dir.mkdir()
-        (dh_dir / "config.yaml").write_text("task:\n  backend: beads\n", encoding="utf-8")
-
-        # Clear TASKBACKEND env var so config file path is used.
-        monkeypatch.delenv("TASKBACKEND", raising=False)
-
-        monkeypatch.setattr(
-            dh_config_mod, "dh_paths", make_dh_paths_mock(tmp_path / "empty-project", user_dh_root=dh_dir)
-        )
-
-        backend = create_task_backend()
-        assert isinstance(backend, BeadsTaskProvider)
 
 
 # ---------------------------------------------------------------------------
