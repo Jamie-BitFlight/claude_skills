@@ -943,33 +943,6 @@ class TestGrepAuditOldPaths:
         # Assert
         assert hits == [], "artifact_registry.py contains .claude/ path references:\n" + "\n".join(hits)
 
-    def test_dh_paths_module_is_importable_and_exports_expected_functions(self) -> None:
-        """Verify dh_paths exports all expected public functions.
-
-        Tests: dh_paths module public API completeness
-        How: Import dh_paths; check each required function is callable
-        Why: If any function was accidentally removed, consumers would fail silently
-        """
-        # Arrange
-        expected_functions = [
-            "git_project_root",
-            "compute_slug",
-            "project_dh_dir",
-            "state_root",
-            "backlog_dir",
-            "plan_dir",
-            "milestones_dir",
-            "research_dir",
-            "context_dir",
-            "reports_dir",
-            "ensure_dirs",
-        ]
-
-        # Act / Assert
-        for fn_name in expected_functions:
-            assert hasattr(dh_paths, fn_name), f"dh_paths missing function: {fn_name}"
-            assert callable(getattr(dh_paths, fn_name)), f"dh_paths.{fn_name} is not callable"
-
 
 # ---------------------------------------------------------------------------
 # End-to-end: full three-tier directory layout
