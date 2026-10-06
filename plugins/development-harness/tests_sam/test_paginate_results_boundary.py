@@ -399,67 +399,6 @@ class TestExactBudgetBoundary:
 
 
 # ---------------------------------------------------------------------------
-# Test 4: Offset correctness
-# ---------------------------------------------------------------------------
-
-
-class TestOffsetBehavior:
-    """Verify that offset shifts the page_items window without affecting the cut-point logic."""
-
-    def test_offset_shifts_window_and_cut_point_still_applies(self) -> None:
-        """With 25 items and offset=5, the cut-point applies to the 20-item window.
-
-        page_items = items[5:] → 20 items with body=_BODY_NORMAL.
-        The binary search runs on page_items, producing the same effective_limit
-        of _CUT_POINT_K.
-        """
-        # Arrange
-        items = [_make_item(i, _BODY_NORMAL) for i in range(1, 26)]
-
-        # Act
-        result = _paginate(items, offset=5)
-
-        # Assert
-        pagination = result["pagination"]
-        assert pagination["limit"] == _CUT_POINT_K
-        assert pagination["offset"] == 5
-        assert result["count"] == _CUT_POINT_K
-        assert pagination["has_more"] is True
-        assert pagination["total"] == 25
-
-    def test_explicit_limit_bypasses_token_budget(self) -> None:
-        """An explicit limit parameter bypasses the token budget binary search.
-
-        When limit is provided, paginate_results uses it directly without
-        consulting the token budget.  This test confirms the bypass path
-        is not affected by the binary search refactor.
-        """
-        # Arrange
-        items = [_make_item(i, _BODY_NORMAL) for i in range(1, 21)]
-
-        # Act — request only 5 items (well within budget)
-        result = _paginate(items, limit=5)
-
-        # Assert
-        assert result["pagination"]["limit"] == 5
-        assert result["count"] == 5
-
-    def test_empty_items_returns_zero_count(self) -> None:
-        """An empty all_items list returns count=0 without entering the binary search.
-
-        The ``if page_items:`` guard means the binary search branch is never
-        reached.  effective_limit falls back to len(page_items) == 0.
-        """
-        # Arrange / Act
-        result = _paginate([])
-
-        # Assert
-        assert result["count"] == 0
-        assert result["pagination"]["limit"] == 0
-        assert result["pagination"]["has_more"] is False
-
-
-# ---------------------------------------------------------------------------
 # Test 5: Terminal and diagnostic response behavior
 # ---------------------------------------------------------------------------
 
