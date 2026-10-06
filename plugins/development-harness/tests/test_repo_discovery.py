@@ -302,6 +302,17 @@ class TestDiscoverViaGit:
     not depend on the actual git repository state.
     """
 
+    @pytest.fixture(autouse=True)
+    def configured_repo_root(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Keep helper tests out of lazy root resolution before their Git mock."""
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+        monkeypatch.setattr(
+            bc_models,
+            "_config",
+            BacklogConfig(repo_root=project_root, backlog_dir=project_root / "backlog", default_repo=""),
+        )
+
     def test_discover_via_git_returns_none_when_not_a_git_repo(self, mocker: MockerFixture) -> None:
         """Returns None when git.Repo raises InvalidGitRepositoryError.
 
