@@ -8,17 +8,17 @@ github_repository: https://github.com/magnitudedev/magnitude
 version_at_research: 0.2.4 (@magnitudedev/cli, latest release tag from magnitudedev/magnitude)
 license: Apache 2.0
 freshness_tracking:
-  last_verified: 2026-10-03
+  last_verified: 2026-10-06
   version_at_verification: 0.2.4
-  next_review: 2027-01-02
-  confidence_map: "Overview: high | Problem Addressed: high | Key Features: medium | Technical Architecture: medium | Installation & Usage: high | Limitations: medium"
+  next_review: 2027-01-06
+  confidence_map: "Overview: high | Problem Addressed: high | Key Features: medium | Technical Architecture: medium (doc + code-read) | Installation & Usage: high | Limitations and Caveats: medium"
 ---
 
 # Magnitude
 
 ## Overview
 
-Magnitude is an open source inference engine for agents that optimizes itself for your exact hardware. It compiles and tunes its kernels on your device, so open models run up to 2x faster than llama.cpp [vendor-reported; measurement method not mentioned in documentation]. One click connects the agent you already use (Pi, OpenCode, Hermes, Codex, and more). Works on Apple Silicon, NVIDIA, AMD, or nothing but a CPU.
+Magnitude is an open source inference engine for agents that optimizes itself for your exact hardware. It compiles and tunes its kernels on your device, so open models run faster than llama.cpp on the README's benchmark (conditions under Key Features; README read 2026-10-06). One click connects the agent you already use (Pi, OpenCode, Hermes, Codex, and more). Works on Apple Silicon, NVIDIA, AMD, or nothing but a CPU.
 
 ---
 
@@ -27,8 +27,8 @@ Magnitude is an open source inference engine for agents that optimizes itself fo
 | Problem | Solution |
 |---------|----------|
 | Running open models at speed without cloud API costs | Hardware-optimized compilation and tuning of inference kernels on the user's device, not precompiled for broad hardware classes |
-| Agent integration complexity with local models | One-click connection to 8+ agents (Pi, OpenCode, Hermes, OpenClaw, Codex, Claude Code, Oh My Pi, Cline), with OpenAI-compatible API for others |
-| Memory waste and slowdown from concurrent inference sessions | Prefix cache sharing between concurrent sessions; the Magnitude README states "27% less memory per agent" (vendor-reported; measurement method: Not mentioned in documentation) |
+| Agent integration complexity with local models | One-click connection to the eight agents the docs name (Pi, OpenCode, Hermes, OpenClaw, Codex, Claude Code, Oh My Pi, Cline), with OpenAI-compatible API for others |
+| Memory waste and slowdown from concurrent inference sessions | Prefix cache sharing between concurrent sessions; memory release when agents stop is stated in the README; the README's per-agent memory percentage is not reproduced (baseline and method: Not mentioned in documentation; README read 2026-10-06) |
 | Unpredictable performance on different hardware | Assessment tool in Discover recommends models matched to hardware capabilities |
 
 ---
@@ -37,33 +37,33 @@ Magnitude is an open source inference engine for agents that optimizes itself fo
 
 ### Performance Optimization
 
-- **Up to 2x faster than llama.cpp** (vendor-reported): the Magnitude README states "Up to 2x faster than llama.cpp: 92% faster decode on Metal, 19% on CUDA". The "up to 2x" figure has no measurement method in the README or docs (Measurement method: Not mentioned in documentation). The 92% and 19% decode figures come from the README benchmark graphic (`assets/benchmarks/llama-cpp-light.svg`), whose text gives the conditions: Metal on "Mac M4 Pro 48 GB" and CUDA on "DGX Spark", with "Qwen 3.6 35B A3B, 4-bit, 64k context, no speculative decoding." The graphic also lists 9% faster prefill on Metal and 23% faster prefill on CUDA. Run count, llama.cpp version and build flags: Not mentioned in documentation
-- **Kernel tuning on device**: Kernels are compiled and tuned on hardware before a model runs, fitting exact chip characteristics
-- **Hand-optimized kernels**: Built specifically for popular open-weight model families, not a generalist engine
-- **Fast concurrent sessions**: Sessions share prefix caches to prevent slowdown when running multiple models or agents
+- **Faster than llama.cpp (vendor-reported)**: the README benchmark graphic (`assets/benchmarks/llama-cpp-light.svg`, read 2026-10-06 from main at commit 54a83cc) reports 92% faster decode and 9% faster prefill on Metal ("Mac M4 Pro 48 GB"), and 19% faster decode and 23% faster prefill on CUDA ("DGX Spark"), under the stated conditions "Qwen 3.6 35B A3B, 4-bit, 64k context, no speculative decoding." These figures hold only for that model, quantization, context size and hardware. The README headline "up to 2x" and the run count, llama.cpp version and build flags: Not mentioned in documentation, so those are not reproduced as figures here
+- **Kernel tuning on device**: Kernels are compiled and tuned on hardware before a model runs, fitting exact chip characteristics. Mechanism (`inference/docs/seismic/overview.md`, read 2026-10-06): a `CandidateEvaluator` estimates or measures candidate implementations of an authored computation, and a `SelectionPolicy` selects among them to form a `PreparedKernel`; tuning results are keyed on the implementation, precision policy and search objective (`inference/docs/precision.md`)
+- **Hand-optimized kernels**: The README FAQ states "We write optimized kernels for the most popular open-weight families, which is how we beat generalist engines." Seismic's standard library supplies "reusable computations and authored alternatives" that model programs compose (`inference/docs/seismic/overview.md`); which families have hand-written kernels beyond the README's statement: Not mentioned in documentation
+- **Fast concurrent sessions**: The README states "sessions share prefix caches to prevent slowdown". Mechanism (`inference/docs/engine/state.md`): checkpoints and forks retain shared ownership claims on backing history extents and a fork copies ownership descriptions rather than history tensor bytes; one packed execution may serve multiple independent requests (`inference/docs/engine/overview.md`)
 
 ### Memory and Resource Management
 
-- **Memory efficiency** (vendor-reported): the Magnitude README states "Memory that flexes: 27% less memory per agent, freed when agents stop". Baseline, hardware, model and workload for the 27%: Not mentioned in documentation
+- **Memory efficiency** (vendor-reported): the README states "Memory that flexes: ... freed when agents stop" (README read 2026-10-06); the percentage figure attached to it is omitted (baseline, hardware, model and workload: Not mentioned in documentation). Model loading and unloading, below, is the documented mechanism for freeing memory
 - **Flexible context handling**: Configurable soft caps on context size (`contextLimits.softCapRatio`, `contextLimits.softCapMaxTokens`)
 - **Intelligent model loading**: Models load on demand and unload when idle or memory is tight
 
 ### Agent Integration
 
-- **Direct connections**: One-click setup for Pi, OpenCode, Hermes, OpenClaw, Codex, Claude Code, Oh My Pi, and Cline
+- **Direct connections**: One-click setup for Pi, OpenCode, Hermes, OpenClaw, Codex, Claude Code, Oh My Pi, and Cline. Mechanism (`docs/integrations/overview.mdx`): clicking Connect in Connections writes Magnitude configuration into the agent's own configuration files, which the connected card lists; it configures the agent without launching it, and the copied command starts the agent with the selected model
 - **OpenAI-compatible API**: HTTP endpoints at `http://127.0.0.1:10100/inference/v1` (OpenAI format) and `http://127.0.0.1:10100/inference/anthropic` (Anthropic format)
 - **Model discovery and recommendations**: Discover tool assesses hardware and recommends models by speed/intelligence trade-off (Balanced, Fastest, Faster, Smarter, Smartest)
 
 ### Features for Model Selection and Management
 
 - **Speculative decoding**: Automatic setup for supported models (MTP, DFlash, or DSpark)
-- **Prompt caching**: Automatic prompt cache reuse
-- **Vision and tool support**: Capability indicators for vision and tool use features per model
-- **Quantization variants**: Support for multiple fidelity levels to balance speed and quality
+- **Prompt caching**: Automatic for supported models (`docs/models.mdx`); the Usage view reports "Cached input" as tokens reused from cache, a subset of input tokens, and the FAQ says later turns reuse cached context. The cache data structure beyond the shared-history mechanism under Fast concurrent sessions: Not mentioned in documentation
+- **Vision and tool support**: The model details view lists "Capabilities" such as vision or tool use per model (`docs/models.mdx`); how the flags are derived: Not mentioned in documentation
+- **Quantization variants**: The model details view shows a "Fidelity / quantization" field; per `docs/models.mdx`, "Lower-bit variants generally use less memory and disk space; higher fidelity preserves more of the original model." Catalog entries carry the variants; the benchmark above used a 4-bit model
 
 ### Privacy and Deployment
 
-- **Local-only execution**: No tokens costs, prompts and files stay on machine, no internet required after model download
+- **Local-only execution**: The README states prompts, files and models stay on the machine and no internet is needed once a model is downloaded. Inference runs in a local service bound to `127.0.0.1:10100` by default, with remote access only when configured (`docs/api/network-access.mdx`)
 - **Network access configuration**: Optional remote server mode with API key authentication and network binding controls
 - **Custom provider endpoints**: Support for OpenAI-compatible endpoints configured in `config.json`
 
@@ -71,7 +71,7 @@ Magnitude is an open source inference engine for agents that optimizes itself fo
 
 ## Technical Architecture
 
-Magnitude's inference stack is divided into three primary components:
+Magnitude's inference stack is divided into three primary components, laid out as directories of the `inference/` workspace (`inference/README.md`, read 2026-10-06):
 
 **Engine** (`engine/`): Owns model interpretation, generation, scheduling, and state management. Handles model loading, prompt processing, and response generation.
 
@@ -79,7 +79,23 @@ Magnitude's inference stack is divided into three primary components:
 
 **Service** (`service/`): Owns the public HTTP API, model inventory management, hardware assessment, model residency (download/load/unload lifecycle), and worker supervision.
 
-The system uses a model catalog system that stores model metadata, compatibility information, and configuration. Models can be downloaded to `~/.magnitude/models` or a custom configured directory.
+The system uses a model catalog system (`catalog/`) that stores model metadata, compatibility information, and configuration. Models can be downloaded to `~/.magnitude/models` or a custom configured directory.
+
+### Data flow
+
+`inference/docs/overview.md` gives the flow as: HTTP/SSE requests pass through chat preparation and streaming to the Engine; an embedded application calls the Engine directly. The Engine runs model programs, which use the Seismic standard library and the Seismic compiler and runtime, which execute on CPU, Metal, CUDA or Vulkan. `inference/docs/engine/overview.md` gives the request lifecycle: artifact and model library produce a loaded executor; input preparation produces model input and request admission; a legal work proposal leads to capacity preparation and packed submission, physical completion, per-request validation and state acceptance, then queued output and publication. In Seismic, authored computation is checked, lowered to a `LogicalEntry`, expanded to a `CandidateDomain`, evaluated by a `CandidateEvaluator`, selected under a `SelectionPolicy`, and prepared as a `PreparedKernel` that is bound and executed with the actual invocation arguments (`inference/docs/seismic/overview.md`).
+
+### Extension and integration points
+
+- **Library embedding**: library callers can request state-only advancement, raw logits, selected vocabulary readout, or generation without HTTP, and "Local library use shares the production execution path without implicitly starting a server or scheduler" (`inference/docs/overview.md`, `inference/docs/engine/overview.md`)
+- **HTTP APIs**: OpenAI-compatible and Anthropic-compatible endpoints (see API Design) and the `magnitude connections` agent configuration
+- **Seismic**: kernel authors supply mathematical structure and alternative algorithms; the standard library supplies reusable computations (`inference/docs/seismic/overview.md`)
+
+### Documented design rationale
+
+`inference/docs/overview.md` lists governing principles, including "Separate policy from mechanism" ("The engine decides residency, admission, and acceptance; Seismic executes explicit work and retains resources safely") and "Keep hardware below the model" ("Model programs express dataflow and precision; backend implementations own hardware mechanisms"). The same document states that these files "describe intended architecture", so they record design intent and are not a verified description of the shipped code.
+
+Source: `inference/README.md` — Layout table, `inference/docs/overview.md` — System structure and Governing principles, `inference/docs/engine/overview.md` — Request lifecycle, `inference/docs/seismic/overview.md` — The system
 
 ### API Design
 
