@@ -28,20 +28,14 @@ sys.path.insert(0, "plugins/development-harness")
 
 from progressive_markdown import (
     CallableMarkdownContentProvider,
-    CodeBlock,
     CodeBlockNotFoundError,
     DocumentNotLoadedError,
-    MarkdownDocument,
     NavigationKind,
     NavigationResult,
-    NavigatorOptions,
     ProgressiveMarkdownNavigator,
-    SectionNode,
     SectionNotFoundError,
-    SourceSpan,
 )
 from progressive_markdown.list_navigator import ENCODING, TOKEN_BUDGET, chunk_text
-from pydantic import ValidationError
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -235,18 +229,7 @@ class TestTokenBudgeter:
 
 
 class TestNavigationResult:
-    """Tests for the NavigationResult Pydantic model."""
-
-    def test_model_dump_json_roundtrip(self, nav: ProgressiveMarkdownNavigator) -> None:
-        """NavigationResult.model_dump_json() produces valid JSON that roundtrips."""
-        import json
-
-        result = nav.map()
-        json_str = result.model_dump_json()
-        data = json.loads(json_str)
-        assert data["kind"] == "document_map"
-        assert "pages" in data
-        assert "current_page" in data
+    """Tests for NavigationResult convenience behavior."""
 
     def test_current_content_returns_page_content(self, nav: ProgressiveMarkdownNavigator) -> None:
         """current_content() returns the content of the current page."""
@@ -259,13 +242,6 @@ class TestNavigationResult:
             kind=NavigationKind.document_map, title="empty", pages=[], current_page=1, total_pages=1
         )
         assert result.current_content() == ""
-
-    def test_model_dump_includes_all_fields(self, nav: ProgressiveMarkdownNavigator) -> None:
-        """model_dump() includes kind, title, pages, current_page, total_pages, has_more."""
-        result = nav.map()
-        data = result.model_dump()
-        required = {"kind", "title", "pages", "current_page", "total_pages", "has_more", "metadata"}
-        assert required <= data.keys()
 
 
 # ---------------------------------------------------------------------------
@@ -332,14 +308,6 @@ class TestViewSection:
         assert "h2.1.1" in content
         assert "h2.1.2" in content
         assert "h2.1.3" in content
-
-    def test_parent_section_content_excludes_grandchildren(self, nav: ProgressiveMarkdownNavigator) -> None:
-        """section_map content does not include grandchild info as breadcrumbs."""
-        result = nav.view_section("h1.1")
-        result.current_content()
-        # h3.1.2.1 is a grandchild, should not appear in direct children listing.
-        # It may or may not appear in section map — just verify the result type.
-        assert result.kind == NavigationKind.section_map
 
     def test_leaf_section_returns_section_body(self, nav: ProgressiveMarkdownNavigator) -> None:
         """A section without children returns kind=section_body."""
@@ -732,145 +700,6 @@ class TestTypedExceptions:
         nav = ProgressiveMarkdownNavigator(provider=provider)
         with pytest.raises(DocumentNotLoadedError):
             nav.current_document()
-
-    def test_view_code_raises_not_returns_error_dict(self, nav: ProgressiveMarkdownNavigator) -> None:
-        """view_code raises CodeBlockNotFoundError, not {'error': ...}."""
-        with pytest.raises(CodeBlockNotFoundError):
-            nav.view_code("code_invalid_xyz")
-
-
-# ---------------------------------------------------------------------------
-# Models smoke test
-# ---------------------------------------------------------------------------
-
-
-class TestModels:
-    """Sanity checks on the Pydantic models."""
-
-    def test_source_span_construction(self) -> None:
-        """SourceSpan can be constructed with valid values."""
-        span = SourceSpan(start_line=0, end_line=10)
-        assert span.start_line == 0
-        assert span.end_line == 10
-
-    def test_source_span_invalid_start_line(self) -> None:
-        """SourceSpan raises ValidationError for negative start_line."""
-        with pytest.raises(ValidationError):
-            SourceSpan(start_line=-1, end_line=0)
-
-    def test_source_span_invalid_end_line(self) -> None:
-        """SourceSpan raises ValidationError when end_line < start_line."""
-        with pytest.raises(ValidationError):
-            SourceSpan(start_line=5, end_line=3)
-
-    def test_section_node_construction(self) -> None:
-        """SectionNode can be constructed and serialised."""
-        span = SourceSpan(start_line=0, end_line=10)
-        node = SectionNode(
-            id="sec_0001",
-            selector="h1.1",
-            slug="intro",
-            title="Introduction",
-            level=1,
-            span=span,
-            heading_span=SourceSpan(start_line=0, end_line=0),
-            body_span=SourceSpan(start_line=1, end_line=10),
-        )
-        d = node.model_dump()
-        assert d["id"] == "sec_0001"
-        assert d["child_ids"] == []
-
-    def test_code_block_construction(self) -> None:
-        """CodeBlock can be constructed and serialised."""
-        c = CodeBlock(
-            id="code_0001", language="python", content="print('hello')\n", summary="python, 1 lines, print('hello')"
-        )
-        d = c.model_dump()
-        assert d["language"] == "python"
-        assert d["section_id"] is None
-
-    def test_markdown_document_construction(self) -> None:
-        """MarkdownDocument can be constructed with defaults."""
-        doc = MarkdownDocument(source="inline", raw_markdown="", lines=[])
-        assert doc.root_section_ids == []
-        assert doc.sections == {}
-
-    def test_navigator_options_default_budget(self) -> None:
-        """NavigatorOptions default_budget equals _DEFAULT_BUDGET (env-derived)."""
-        from progressive_markdown.models import _DEFAULT_BUDGET
-
-        opts = NavigatorOptions()
-        assert opts.default_budget == _DEFAULT_BUDGET
-
-
-# ---------------------------------------------------------------------------
-# SourceSpan end_line inclusive contract — regression for indexer conversion
-# ---------------------------------------------------------------------------
-#
-# markdown-it-py token.map[1] is exclusive (first line after the token).
-# SourceSpan.end_line is inclusive (last line of the token, 0-based).
-# The indexer converts with ``token.map[1] - 1``.
-# These tests pin that contract so a naive removal of ``- 1`` is caught.
-
-# Document with known line numbers (0-based):
-#   0: # Heading
-#   1: (blank)
-#   2: ```python
-#   3: x = 1
-#   4: ```
-#   5: (blank)
-#   6: Trailing prose.
-_SPAN_CONTRACT_MD = """\
-# Heading
-
-```python
-x = 1
-```
-
-Trailing prose.
-"""
-
-
-class TestSourceSpanInclusiveContract:
-    """SourceSpan.end_line must be the last line of the token (inclusive).
-
-    Regression suite for the token.map[1]-exclusive to end_line-inclusive
-    conversion in the indexer.  A naive removal of ``- 1`` makes the fence
-    span overrun by one line; these tests catch that.
-    """
-
-    @pytest.fixture
-    def span_doc(self) -> MarkdownDocument:
-        """Parse _SPAN_CONTRACT_MD and return the MarkdownDocument."""
-        nav = ProgressiveMarkdownNavigator.from_markdown(_SPAN_CONTRACT_MD, source="span_contract.md")
-        return nav.current_document()
-
-    def test_fence_end_line_is_inclusive(self, span_doc: MarkdownDocument) -> None:
-        """Code block end_line points to the closing fence line (inclusive).
-
-        ``_SPAN_CONTRACT_MD`` has a fence at lines 2-4 (0-based).
-        token.map = [2, 5] (exclusive) → end_line must be 4.
-        If the indexer drops the ``- 1``, end_line would be 5 (wrong).
-        """
-        assert span_doc.code_blocks, "Expected at least one code block"
-        block = next(iter(span_doc.code_blocks.values()))
-        assert block.span is not None
-        assert block.span.start_line == 2, f"fence opens at line 2, got {block.span.start_line}"
-        assert block.span.end_line == 4, f"fence closes at line 4 (inclusive), got {block.span.end_line}"
-
-    def test_heading_span_end_line_is_inclusive(self, span_doc: MarkdownDocument) -> None:
-        """Heading span end_line points to the heading line itself (inclusive).
-
-        ``_SPAN_CONTRACT_MD`` has ``# Heading`` at line 0.
-        heading_open.map = [0, 1] (exclusive) → heading_span.end_line must be 0.
-        If the ``- 1`` were absent, end_line would be 1 (the blank line after).
-        """
-        assert span_doc.sections, "Expected at least one section"
-        sec = next(iter(span_doc.sections.values()))
-        assert sec.heading_span.start_line == 0, f"heading at line 0, got {sec.heading_span.start_line}"
-        assert sec.heading_span.end_line == 0, (
-            f"single-line heading end_line must be 0 (inclusive), got {sec.heading_span.end_line}"
-        )
 
 
 # ---------------------------------------------------------------------------

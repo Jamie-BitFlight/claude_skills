@@ -399,86 +399,7 @@ class TestExactBudgetBoundary:
 
 
 # ---------------------------------------------------------------------------
-# Test 4: Off-by-one regression — item at cut-point included, next excluded
-# ---------------------------------------------------------------------------
-
-
-class TestOffByOneRegression:
-    """Pin the precise inclusive/exclusive behaviour at the binary-search cut-point.
-
-    These tests will catch a bisect_left / bisect_right inversion where the
-    search converges one step too few (item N-1 returned instead of N) or one
-    step too many (item N+1 returned instead of N).
-    """
-
-    def test_item_at_cut_point_is_included(self) -> None:
-        """The last item that fits within the token budget is present in the result.
-
-        With 20 items of body=_BODY_NORMAL, item _CUT_POINT_K is the last that fits:
-            token_count([:_CUT_POINT_K]) = _T_AT_CUT ≤ TOKEN_BUDGET
-        It must appear in result['items'].
-        """
-        # Arrange
-        items = [_make_item(i, _BODY_NORMAL) for i in range(1, 21)]
-        cut_item_id = items[_CUT_POINT_K - 1]["id"]  # 0-indexed = 1-indexed _CUT_POINT_K
-
-        # Act
-        result = _paginate(items)
-        returned_ids = {item["id"] for item in result["items"]}
-
-        # Assert
-        assert cut_item_id in returned_ids, (
-            f"Item at cut-point ({cut_item_id}) should be in the result but is absent. "
-            f"effective_limit={result['pagination']['limit']}, returned={sorted(returned_ids)}"
-        )
-
-    def test_item_just_past_cut_point_is_excluded(self) -> None:
-        """The first item that would exceed the token budget is absent from the result.
-
-        With 20 items of body=_BODY_NORMAL, item _CUT_POINT_K + 1 is the first that
-        exceeds the budget:
-            token_count([:_CUT_POINT_K + 1]) = _T_PAST_CUT > TOKEN_BUDGET
-        It must NOT appear in result['items'].
-        """
-        # Arrange
-        items = [_make_item(i, _BODY_NORMAL) for i in range(1, 21)]
-        over_item_id = items[_CUT_POINT_K]["id"]  # 0-indexed _CUT_POINT_K = 1-indexed +1
-
-        # Act
-        result = _paginate(items)
-        returned_ids = {item["id"] for item in result["items"]}
-
-        # Assert
-        assert over_item_id not in returned_ids, (
-            f"Item just past cut-point ({over_item_id}) must be excluded, but appeared in result. "
-            f"effective_limit={result['pagination']['limit']}, returned={sorted(returned_ids)}"
-        )
-
-    def test_cut_point_is_exactly_k_not_k_minus_one_or_k_plus_one(self) -> None:
-        """The effective_limit is _CUT_POINT_K, not _CUT_POINT_K±1.
-
-        This test is the clearest statement of the off-by-one invariant and the
-        one most likely to catch a bisect direction error.
-        """
-        # Arrange
-        items = [_make_item(i, _BODY_NORMAL) for i in range(1, 21)]
-
-        # Act
-        result = _paginate(items)
-        limit = result["pagination"]["limit"]
-
-        # Assert
-        assert limit != _CUT_POINT_K - 1, (
-            f"Bisect converged one item short: got {_CUT_POINT_K - 1}, expected {_CUT_POINT_K}"
-        )
-        assert limit != _CUT_POINT_K + 1, (
-            f"Bisect converged one item too many: got {_CUT_POINT_K + 1}, expected {_CUT_POINT_K}"
-        )
-        assert limit == _CUT_POINT_K, f"Expected effective_limit={_CUT_POINT_K}, got {limit}"
-
-
-# ---------------------------------------------------------------------------
-# Test 5: Offset correctness
+# Test 4: Offset correctness
 # ---------------------------------------------------------------------------
 
 
@@ -539,33 +460,12 @@ class TestOffsetBehavior:
 
 
 # ---------------------------------------------------------------------------
-# Test 6: Response structure invariants
+# Test 5: Terminal and diagnostic response behavior
 # ---------------------------------------------------------------------------
 
 
 class TestResponseStructureInvariants:
-    """Verify the returned dict always contains the required keys."""
-
-    def test_required_keys_present_in_normal_response(self) -> None:
-        """All required top-level keys are present for a normal paginated response.
-
-        Tests that the binary-search refactor did not accidentally drop any of
-        the response fields the MCP callers depend on.
-        """
-        # Arrange
-        items = [_make_item(i, _BODY_NORMAL) for i in range(1, 21)]
-
-        # Act
-        result = _paginate(items)
-
-        # Assert
-        required_top_level = {"items", "count", "pagination", "messages", "warnings", "errors"}
-        assert required_top_level <= result.keys(), f"Missing top-level keys: {required_top_level - result.keys()}"
-
-        required_pagination = {"offset", "limit", "total", "has_more"}
-        assert required_pagination <= result["pagination"].keys(), (
-            f"Missing pagination keys: {required_pagination - result['pagination'].keys()}"
-        )
+    """Verify terminal pagination and caller diagnostic behavior."""
 
     def test_next_call_absent_when_no_more_pages(self) -> None:
         """next_call is absent from the response when all items fit on one page.

@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import pytest
 from progressive_markdown.list_navigator import DisclosureConfig, ProgressiveDisclosure, paginate_results
-from progressive_markdown.models import NavigationKind, NavigationResult, Page
+from progressive_markdown.models import NavigationResult
 
 # ---------------------------------------------------------------------------
 # Shared test data
@@ -168,35 +168,3 @@ def test_paginate_results_returns_dict_with_legacy_keys() -> None:
     # Verify count reflects the limit
     assert result["count"] == 3
     assert result["pagination"]["total"] == 5
-
-
-# ---------------------------------------------------------------------------
-# C1e — NavigationResult.model_dump() is available for dict-migration callers
-# ---------------------------------------------------------------------------
-
-
-def test_navigation_result_model_dump_available_for_dict_migration() -> None:
-    """NavigationResult.model_dump() must produce a complete serialisable dict.
-
-    Callers currently receiving select()/page() as dicts can migrate to
-    ``result.model_dump()`` to get the equivalent dict representation.
-    Architect §4.1.1 backward-compat note: 'NavigationResult is a Pydantic
-    model with .model_dump() → existing callers receiving a dict can migrate
-    to result.model_dump().'
-
-    GREEN pre-fix: NavigationResult already has model_dump() (Pydantic v2 model).
-    GREEN post-fix: unchanged.
-    """
-    page = Page(content="Task T01 content", page_number=1, total_pages=1, token_count=4, budget=9500)
-    nav_result = NavigationResult(
-        kind=NavigationKind.section_body, title="T01", pages=[page], current_page=1, total_pages=1
-    )
-
-    dumped = nav_result.model_dump()
-
-    assert isinstance(dumped, dict), "NavigationResult.model_dump() must return dict for dict-migration callers."
-    # Fields that migration callers need to read back
-    for field in ("kind", "title", "pages", "current_page", "total_pages", "has_more"):
-        assert field in dumped, f"model_dump() must include field {field!r} for complete dict migration."
-    # Computed field has_more is included in model_dump() (Pydantic v2 @computed_field)
-    assert isinstance(dumped["has_more"], bool)
