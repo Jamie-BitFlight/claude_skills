@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 # ---------------------------------------------------------------------------
-# Autouse fixture: always reset lru_cache between tests
+# Fixtures: reset cached discovery and control the cold configuration case
 # ---------------------------------------------------------------------------
 
 
@@ -45,6 +45,20 @@ def clear_discover_repo_cache() -> Generator[None, None, None]:
     Why: lru_cache persists for the process lifetime; without clearing it
          the first test result poisons all subsequent tests.
     """
+    discover_repo.cache_clear()
+    yield
+    discover_repo.cache_clear()
+
+
+@pytest.fixture
+def cold_discovery_configuration(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+    """Start a cache test before lazy configuration has resolved the project.
+
+    ``_config`` is private, but there is no public configuration-reset seam.
+    Keep that coupling local to the one test that must distinguish its initial
+    lazy resolution from subsequent cache hits.
+    """
+    monkeypatch.setattr(bc_models, "_config", None)
     discover_repo.cache_clear()
     yield
     discover_repo.cache_clear()
@@ -556,37 +570,26 @@ class TestDiscoverRepoCache:
     wrong repo slug.
     """
 
-    def test_discover_repo_called_twice_returns_same_result(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Two calls to discover_repo() return identical values.
+    def test_discover_repo_reuses_resolved_result_without_rediscovery(
+        self, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture, cold_discovery_configuration: None
+    ) -> None:
+        """A resolved discovery result is reused without running discovery again.
 
-        Tests: lru_cache result reuse
-        How: Set GITHUB_REPO; call twice; assert both return equal values.
-        Why: The cache must not produce different results between calls.
+        The first cold call may initialise configuration and perform its own
+        discovery.  After it returns, a repeated lookup must return that value
+        without entering the discovery path again.
         """
         monkeypatch.setenv("GITHUB_REPO", "cached-owner/cached-repo")
         first = discover_repo()
+        blocked_rediscovery = mocker.patch(
+            "backlog_core.models._discover_repo_with_root",
+            side_effect=AssertionError("cached lookup rediscovered the repository"),
+        )
+
         second = discover_repo()
-        assert first == second
 
-    def test_discover_repo_git_called_once_for_multiple_calls(
-        self, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
-    ) -> None:
-        """GitPython is called at most once regardless of how many times
-        discover_repo() is invoked.
-
-        Tests: lru_cache git I/O deduplication
-        How: Remove GITHUB_REPO; mock _discover_via_git to return a slug;
-             call discover_repo() twice; assert _discover_via_git called once.
-        Why: The performance contract of lru_cache(maxsize=1) — one git call
-             per process lifetime.
-        """
-        monkeypatch.delenv("GITHUB_REPO", raising=False)
-        mock_git = mocker.patch("backlog_core.models._discover_via_git", return_value="once/called")
-
-        discover_repo()
-        discover_repo()
-
-        mock_git.assert_called_once()
+        assert second == first
+        blocked_rediscovery.assert_not_called()
 
     def test_cache_clear_allows_re_discovery_with_new_env_var(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """After cache_clear(), a new GITHUB_REPO value is picked up.
