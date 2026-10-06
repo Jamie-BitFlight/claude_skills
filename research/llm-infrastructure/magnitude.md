@@ -2,7 +2,7 @@
 name: magnitude
 title: Magnitude
 subtitle: Hardware-optimized local inference engine for AI agents
-research_date: 2026-10-02
+research_date: 2026-10-06
 source_url: https://github.com/magnitudedev/magnitude
 github_repository: https://github.com/magnitudedev/magnitude
 version_at_research: 0.2.4 (@magnitudedev/cli, latest release tag from magnitudedev/magnitude)
@@ -45,18 +45,18 @@ Magnitude is an open source inference engine for agents that optimizes itself fo
 ### Memory and Resource Management
 
 - **Memory efficiency** (vendor-reported): the README states "Memory that flexes: ... freed when agents stop" (README read 2026-10-06); the percentage figure attached to it is omitted (baseline, hardware, model and workload: Not mentioned in documentation). Model loading and unloading, below, is the documented mechanism for freeing memory
-- **Flexible context handling**: Configurable soft caps on context size (`contextLimits.softCapRatio`, `contextLimits.softCapMaxTokens`)
-- **Intelligent model loading**: Models load on demand and unload when idle or memory is tight
+- **Flexible context handling**: `docs/reference/configuration-file.mdx` defines `contextLimits.softCapRatio` as the "Fraction of a model's context window used before compaction" (default `0.9`) and `contextLimits.softCapMaxTokens` as the "Absolute cap on context tokens, or `null`"; both apply on the next model load. How compaction is performed: Not mentioned in documentation
+- **Intelligent model loading**: `docs/models.mdx` states that "Magnitude loads a model on demand when an agent requests it and unloads it when idle or memory is tight"; **Load model** and **Stop model** in My Models do the same manually. The idle threshold and the memory-pressure rule: Not mentioned in documentation
 
 ### Agent Integration
 
 - **Direct connections**: One-click setup for Pi, OpenCode, Hermes, OpenClaw, Codex, Claude Code, Oh My Pi, and Cline. Mechanism (`docs/integrations/overview.mdx`): clicking Connect in Connections writes Magnitude configuration into the agent's own configuration files, which the connected card lists; it configures the agent without launching it, and the copied command starts the agent with the selected model
 - **OpenAI-compatible API**: HTTP endpoints at `http://127.0.0.1:10100/inference/v1` (OpenAI format) and `http://127.0.0.1:10100/inference/anthropic` (Anthropic format)
-- **Model discovery and recommendations**: Discover tool assesses hardware and recommends models by speed/intelligence trade-off (Balanced, Fastest, Faster, Smarter, Smartest)
+- **Model discovery and recommendations**: per `docs/models.mdx`, Discover "assesses your hardware and shows up to five recommendations", with Balanced as the starting point and Fastest, Faster, Smarter or Smartest shifting the speed-intelligence trade-off. The CLI exposes `hardware`, `catalog status`, and `catalog recommendations` (`docs/reference.mdx`), and assessment runs in the background. The assessment algorithm: Not mentioned in documentation
 
 ### Features for Model Selection and Management
 
-- **Speculative decoding**: Automatic setup for supported models (MTP, DFlash, or DSpark)
+- **Speculative decoding**: `docs/models.mdx` states that supported models use speculative decoding (MTP, DFlash, or DSpark) automatically, and the model details view's Speculation row shows "the speculative-decoding method prepared for the model" with setup handled by Magnitude. What MTP, DFlash and DSpark are, and how the method is selected per model: Not mentioned in documentation
 - **Prompt caching**: Automatic for supported models (`docs/models.mdx`); the Usage view reports "Cached input" as tokens reused from cache, a subset of input tokens, and the FAQ says later turns reuse cached context. The cache data structure beyond the shared-history mechanism under Fast concurrent sessions: Not mentioned in documentation
 - **Vision and tool support**: The model details view lists "Capabilities" such as vision or tool use per model (`docs/models.mdx`); how the flags are derived: Not mentioned in documentation
 - **Quantization variants**: The model details view shows a "Fidelity / quantization" field; per `docs/models.mdx`, "Lower-bit variants generally use less memory and disk space; higher fidelity preserves more of the original model." Catalog entries carry the variants; the benchmark above used a 4-bit model
@@ -64,8 +64,8 @@ Magnitude is an open source inference engine for agents that optimizes itself fo
 ### Privacy and Deployment
 
 - **Local-only execution**: The README states prompts, files and models stay on the machine and no internet is needed once a model is downloaded. Inference runs in a local service bound to `127.0.0.1:10100` by default, with remote access only when configured (`docs/api/network-access.mdx`)
-- **Network access configuration**: Optional remote server mode with API key authentication and network binding controls
-- **Custom provider endpoints**: Support for OpenAI-compatible endpoints configured in `config.json`
+- **Network access configuration**: `docs/reference/configuration-file.mdx` defines a `network` object in `config.json` with `enabled` (absent or `false` means this computer only), `bind` (one IP address; absent means all interfaces), `apiKey`, `requireApiKey` (default `true`) and `allowedHosts` (extra hostnames accepted); all apply on next start. Other devices send the key as `Authorization: Bearer KEY` or `x-api-key: KEY` (`docs/api/overview.mdx`), and `/rpc` returns `403` from other devices (`docs/api/network-access.mdx`)
+- **Custom provider endpoints**: the `providers` key of `config.json` holds "OpenAI-compatible endpoints to expose alongside local models" and applies immediately (`docs/reference/configuration-file.mdx`). The schema is printed by `magnitude docs custom-endpoints`; the topic file (`cli/src/agent-docs/topics/custom-endpoints.md`) shows each provider with a `displayName`, a `connection` (`baseUrl`, `authentication` of type `none`, `bearer` or `header` with an environment-variable credential) and a `models` map
 
 ---
 
@@ -111,7 +111,7 @@ Both families support JSON and server-sent event (SSE) streaming responses. Defa
 | Platform | Acceleration | Notes |
 |----------|--------------|-------|
 | Apple Silicon Mac | Metal (native, no separate toolkit) | Unified memory shared with GPU; app memory constraints apply |
-| Intel Mac | CPU | Intel Macs use CPU inference (docs/installation/macos.mdx); CUDA/Metal support on Intel Mac: Not mentioned in documentation |
+| Intel Mac | CPU | Intel Macs use CPU inference (`docs/installation/macos.mdx`); CUDA/Metal support on Intel Mac: Not mentioned in documentation |
 | Windows x64 | CPU, NVIDIA CUDA, Vulkan-compatible GPUs | CUDA targets Ampere-class (RTX 30/40 series) and newer |
 | Linux x64/ARM64 | CPU, NVIDIA CUDA, Vulkan-compatible GPUs | Same CUDA generation requirements as Windows |
 
@@ -125,7 +125,7 @@ Both families support JSON and server-sent event (SSE) streaming responses. Defa
 2. Install and open the app
 3. Use **Discover** to assess hardware and select a recommended model
 4. Download the model
-5. Open **Connections** to connect your agent (Pi, OpenCode, Hermes, Codex, Claude Code, etc.)
+5. Open **Connections** to connect your agent (Pi, OpenCode, Hermes, Codex, Claude Code, or another listed agent)
 6. Copy and run the displayed command to start the agent with your selected model
 
 The desktop app includes the `magnitude` CLI. No separate installation needed.
@@ -185,7 +185,7 @@ curl http://127.0.0.1:10100/inference/anthropic/v1/messages \
 ## Limitations and Caveats
 
 - **First-response latency**: Magnitude loads models on demand, so the first response after idle time takes longer than subsequent responses
-- **API scope**: The HTTP API provides inference only (listing models and generating text). Model downloading, management, and the Magnitude app itself are not available over the API
+- **API scope**: The HTTP API provides inference only (listing models and generating text). Per `docs/api/overview.mdx` (Scope): "Downloading models, managing them, and the Magnitude app itself are not available over the API"
 - **GPU memory sharing**: On dedicated-GPU systems (non-unified-memory), GPU memory and system RAM are not interchangeable; a machine with 64 GB system RAM and 8 GB GPU does not have 72 GB available for models
 - **Context size trade-offs**: Longer context windows increase memory demand and can slow response generation. Soft caps (`contextLimits.softCapRatio`, `contextLimits.softCapMaxTokens`) allow user-configured context limits
 - **Unified memory constraints**: On Apple Silicon, macOS and other applications use the same memory pool as the GPU, so available memory for models may be less than total unified memory
@@ -194,10 +194,27 @@ curl http://127.0.0.1:10100/inference/anthropic/v1/messages \
 
 ## References
 
-- [Magnitude GitHub Repository](https://github.com/magnitudedev/magnitude) (accessed 2026-10-02)
-- [Magnitude Documentation](https://docs.magnitude.dev) (accessed 2026-10-02)
-- [Magnitude Download Page](https://magnitude.dev/download) (accessed 2026-10-02)
-- [Magnitude Models](https://magnitude.dev/models) (accessed 2026-10-02)
+All paths below are files in the shallow clone of magnitudedev/magnitude at commit `54a83ccec57fee944ea2b550364f1a666ddc06a2` (54a83cc), read 2026-10-06; the `docs/` files are the source of the docs site, which was also read on 2026-10-06. The Magnitude download page and models page were not fetched; the entry cites the download link only as given in `docs/get-started.mdx`.
+
+- [Magnitude GitHub Repository](https://github.com/magnitudedev/magnitude), commit 54a83cc (accessed 2026-10-06)
+- [Magnitude Documentation](https://docs.magnitude.dev) (accessed 2026-10-06)
+- `README.md` (accessed 2026-10-06, commit 54a83cc)
+- `assets/benchmarks/llama-cpp-light.svg` (accessed 2026-10-06, commit 54a83cc)
+- `inference/README.md` (accessed 2026-10-06, commit 54a83cc)
+- `inference/docs/overview.md` (accessed 2026-10-06, commit 54a83cc)
+- `inference/docs/precision.md` (accessed 2026-10-06, commit 54a83cc)
+- `inference/docs/engine/overview.md` (accessed 2026-10-06, commit 54a83cc)
+- `inference/docs/engine/state.md` (accessed 2026-10-06, commit 54a83cc)
+- `inference/docs/seismic/overview.md` (accessed 2026-10-06, commit 54a83cc)
+- `docs/get-started.mdx` (accessed 2026-10-06, commit 54a83cc)
+- `docs/integrations/overview.mdx` (accessed 2026-10-06, commit 54a83cc)
+- `docs/models.mdx` (accessed 2026-10-06, commit 54a83cc)
+- `docs/reference.mdx` (accessed 2026-10-06, commit 54a83cc)
+- `docs/reference/configuration-file.mdx` (accessed 2026-10-06, commit 54a83cc)
+- `docs/api/overview.mdx` (accessed 2026-10-06, commit 54a83cc)
+- `docs/api/network-access.mdx` (accessed 2026-10-06, commit 54a83cc)
+- `docs/installation/macos.mdx` (accessed 2026-10-06, commit 54a83cc)
+- `cli/src/agent-docs/topics/custom-endpoints.md` (accessed 2026-10-06, commit 54a83cc)
 
 ---
 
