@@ -18,7 +18,7 @@ freshness_tracking:
 
 ## Overview
 
-Vector is an observability data pipeline written in Rust. The README describes it as "a high-performance, end-to-end (agent & aggregator) observability data pipeline that puts you in control of your observability data," used to collect, transform, and route logs and metrics to any vendor. The README also makes a speed comparison against alternatives; the entry does not reproduce the figure because the README sentence gives no benchmark method (Source: `README.md`, tag v0.58.0). It is maintained by Datadog's Community Open Source Engineering team (Source: `README.md`, tag v0.58.0).
+Vector is an observability data pipeline written in Rust. The README describes it as "a high-performance, end-to-end (agent & aggregator) observability data pipeline that puts you in control of your observability data," used to collect, transform, and route logs and metrics to any vendor. The README also states, as a vendor claim, that Vector is "up to 10x faster than every alternative in the space"; the sentence gives no benchmark method (Source: `README.md`, tag v0.58.0, accessed 2026-10-06). It is maintained by Datadog's Community Open Source Engineering team (Source: `README.md`, tag v0.58.0).
 
 ---
 
@@ -29,7 +29,7 @@ Vector is an observability data pipeline written in Rust. The README describes i
 | High observability costs and vendor lock-in | The README states "Vector enables dramatic cost reduction, novel data enrichment, and data security where you need it, not where it is most convenient for your vendors" (vendor claim, no figure given). Its listed use cases include "Reduce total observability costs" and "Transition vendors without disrupting workflows" |
 | Multiple monitoring tools and agent fatigue | One tool deployed as an agent or an aggregator; listed use case "Consolidate agents and eliminate agent fatigue". README: "Logs, metrics (beta), and traces (coming soon). One tool for all of your data." |
 | Data quality and visibility gaps | Listed use case "Enhance data quality and improve insights"; transforms (filter, remap, route, enrichment) run inside the pipeline |
-| Performance and reliability of existing pipelines | README principle: "Built in Rust, Vector's primary design goal is reliability." The README community section carries a vendor-reported scale statement about its largest user; the entry omits the figure because no measurement method is given |
+| Performance and reliability of existing pipelines | README principle: "Built in Rust, Vector's primary design goal is reliability." The README community section states, as a vendor claim, "Vector's largest user **processes over 500TB daily**" (Source: `README.md`, tag v0.58.0, accessed 2026-10-06); no measurement method is given |
 
 ---
 
@@ -38,7 +38,7 @@ Vector is an observability data pipeline written in Rust. The README describes i
 ### Core Capabilities
 
 - **Reliable**: README: "Built in Rust, Vector's primary design goal is reliability." The README states the goal and names no mechanism in that sentence. Mechanisms documented elsewhere are the configurable buffers with backpressure (see Backpressure and buffering below) and end-to-end acknowledgements (see Delivery guarantees below)
-- **End-to-end**: README: "Deploys as an agent or aggregator. Vector is a complete platform."
+- **Deployment roles**: "Vector is an end-to-end data pipeline designed to collect, process, and route data ... You can deploy it as an agent, sidecar, or aggregator" (Source: `website/content/en/docs/setup/deployment/roles.md`, tag v0.58.0). The per-role descriptions are rendered from a `roles` shortcode that was not read for this entry
 - **Unified data model**: Source type `Event` has three variants, `Log`, `Metric` and `Trace` (Source: `lib/vector-core/src/event/mod.rs:53` — enum Event). The README rates metrics "beta" and traces "coming soon".
 - **Open source**: Mozilla Public License 2.0 (Source: `LICENSE`, `Cargo.toml` — `license = "MPL-2.0"`).
 
@@ -90,7 +90,7 @@ The installation script command is quoted from `website/content/en/docs/setup/qu
 
 ### Basic Configuration Example
 
-Field names below were checked against the v0.58.0 config structs (`include` in `src/sources/file.rs:67`, tagged `mode` in `src/sources/syslog.rs:77`, `endpoints` in `src/sinks/elasticsearch/config.rs:102`, `bucket` and `key_prefix` in `src/sinks/aws_s3/config.rs`). The example has not been executed, and required options not shown (for example sink `encoding`, S3 `region`) were not checked. YAML, TOML and JSON config formats: Not mentioned in the sources reviewed for this entry.
+Field names below were checked against the v0.58.0 config structs (`include` in `src/sources/file.rs:67`, tagged `mode` and the `address` field of its `tcp` variant in `src/sources/syslog.rs:77-84`, `condition` in `src/transforms/filter.rs:28` with the value form taken from the test at `src/transforms/filter.rs:39`, `endpoints` in `src/sinks/elasticsearch/config.rs:102`, `bucket` and `key_prefix` in `src/sinks/aws_s3/config.rs`). The example has not been executed, and required options not shown (for example sink `encoding`, S3 `region`) were not checked. YAML, TOML and JSON config formats: Not mentioned in the sources reviewed for this entry.
 
 ```yaml
 sources:
@@ -110,8 +110,7 @@ transforms:
     inputs:
       - syslog_input
       - file_input
-    condition: |
-      .severity == "error" || .level == "ERROR"
+    condition: '.message == "value"'
 
 sinks:
   elasticsearch:
@@ -120,7 +119,6 @@ sinks:
       - filter_errors
     endpoints:
       - "https://elasticsearch.example.com"
-    mode: bulk
 
   s3_archive:
     type: aws_s3
@@ -132,7 +130,7 @@ sinks:
 
 ### Running Vector
 
-`src/cli.rs` defines `Validate(validate::Opts)` and `Test(unit_test::Opts)` subcommands.
+`src/cli.rs` defines `Validate(validate::Opts)` and `Test(unit_test::Opts)` subcommands, and a `--config` option (`short, long, env = "VECTOR_CONFIG"`, comma-delimited) whose doc comment says "`/etc/vector/vector.yaml` is targeted" by default (Source: `src/cli.rs:74-82`, tag v0.58.0, accessed 2026-10-06).
 
 ```bash
 vector validate /etc/vector/vector.yaml
@@ -147,7 +145,7 @@ vector test /etc/vector/vector.yaml
 - **Traces: README lists them as coming soon**: the README principle line reads "Logs, metrics (beta), and traces (coming soon)", and the README comparison table marks traces with a construction symbol for Vector (Source: `README.md`, tag v0.58.0).
 - **musl builds perform worse**: "Please note that musl, as of this writing, has a significantly worse performance profile than glibc when Vector is running in multiple threads (Vector defaults to the number of available cores). We recommend that you use glibc when available unless you're running Vector on a single CPU." (Source: `website/content/en/docs/setup/installation/_index.md`)
 - **Source builds need more than Rust**: see the prerequisites quoted under Installation (Source: `docs/DEVELOPING.md`).
-- **Performance and cost figures are vendor claims**: the README speed comparison and its "dramatic cost reduction" statement carry no methodology in the quoted sentences; no independent benchmark was reviewed.
+- **Performance and cost figures are vendor claims**: the README "up to 10x faster" statement, its "dramatic cost reduction" statement and the "500TB daily" statement carry no methodology in the quoted sentences; no independent benchmark was reviewed.
 - **Other limitations** (resource usage, scaling limits, unsupported platforms): Not mentioned in documentation reviewed for this entry. Confidence: low for completeness.
 
 ---
@@ -158,8 +156,8 @@ vector test /etc/vector/vector.yaml
 - [Vector Documentation Home](https://vector.dev/docs/) (accessed 2026-10-02)
 - [Vector Installation Guide](https://vector.dev/docs/setup/installation/) (accessed 2026-10-02)
 - [Vector Architecture Documentation](https://vector.dev/docs/architecture/) (accessed 2026-10-02)
-- Vector source code at tag v0.58.0: `src/topology/mod.rs`, `src/topology/running.rs`, `src/topology/builder.rs`, `src/config/diff.rs`, `src/sources/`, `src/sinks/`, `src/transforms/`, `docs/ARCHITECTURE.md`, `src/cli.rs`, `src/sources/file.rs`, `src/sources/syslog.rs`, `src/sources/http_server.rs`, `src/sinks/*/config.rs`, `src/transforms/filter.rs`, `src/transforms/remap.rs`, `src/transforms/route.rs`, `lib/vector-core/src/event/`, `lib/vector-buffers/src/topology/channel/` (accessed 2026-10-03)
-- Vector documentation files at tag v0.58.0: `website/content/en/docs/architecture/guarantees.md`, `website/content/en/docs/architecture/end-to-end-acknowledgements.md`, `website/content/en/docs/setup/installation/_index.md`, `website/content/en/docs/setup/quickstart.md`, `docs/DEVELOPING.md`, `README.md`, `LICENSE` (accessed 2026-10-03)
+- Vector source code at tag v0.58.0: `src/topology/mod.rs`, `src/topology/running.rs`, `src/topology/builder.rs`, `src/config/diff.rs`, `src/sources/`, `src/sinks/`, `src/transforms/`, `docs/ARCHITECTURE.md`, `src/cli.rs`, `rust-toolchain.toml`, `src/sources/file.rs`, `src/sources/syslog.rs`, `src/sources/http_server.rs`, `src/sinks/*/config.rs`, `src/transforms/filter.rs`, `src/transforms/remap.rs`, `src/transforms/route.rs`, `lib/vector-core/src/event/`, `lib/vector-buffers/src/topology/channel/` (accessed 2026-10-03; clone of tag v0.58.0 at commit 2bcad9bbb84e201dcfd58c22b1f779290101b728, re-read 2026-10-06)
+- Vector documentation files at tag v0.58.0: `website/content/en/docs/architecture/guarantees.md`, `website/content/en/docs/architecture/end-to-end-acknowledgements.md`, `website/content/en/docs/setup/installation/_index.md`, `website/content/en/docs/setup/quickstart.md`, `website/content/en/docs/setup/deployment/roles.md`, `docs/DEVELOPING.md`, `README.md`, `LICENSE` (accessed 2026-10-03)
 - Vector Cargo.toml at tag v0.58.0: version 0.58.0, license MPL-2.0 (accessed 2026-10-03). The default branch `Cargo.toml` shows 0.59.0-dev, which is the next development version on master; this entry's `version_at_research` is the v0.58.0 release tag, so the two differ by design.
 
 ---
