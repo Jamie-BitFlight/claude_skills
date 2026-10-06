@@ -11,14 +11,14 @@ freshness_tracking:
   last_verified: 2026-10-02
   version_at_verification: 0.6.0
   next_review: 2027-01-02
-  confidence_map: "Identity/Metadata: high | Features: high | Architecture: high | Usage Examples: high | Limitations: medium"
+  confidence_map: "Overview: high | Problem Addressed: medium | Key Features: high | Technical Architecture: high | Installation & Usage: high | Limitations and Caveats: medium"
 ---
 
 # coop
 
 ## Overview
 
-coop is a Rust CLI that manages disposable virtual machines where Claude Code, Codex, and Grok Build have full tool access — Docker, git, compilers, package managers — all without risk to the host machine. Each VM is isolated, reproducible, and inexpensive to create and destroy. The tool orchestrates the complete VM lifecycle: setup, start, shell, stop, destroy, status, and logs.
+coop is a Rust CLI that manages disposable virtual machines where Claude Code, Codex, and Grok Build have full tool access — Docker, git, compilers, package managers — all without risk to the host machine. Each VM is isolated and is created from a reusable golden image. The tool orchestrates the complete VM lifecycle: setup, start, shell, stop, destroy, status, and logs.
 
 ---
 
@@ -43,7 +43,7 @@ coop is a Rust CLI that manages disposable virtual machines where Claude Code, C
 
 ### Agent Integration
 
-- Pre-installed support for Claude Code, Codex, and Grok Build
+- Pre-installed support for Claude Code, Codex, and Grok Build: `coop setup` builds a golden image whose provision script installs Docker, GitHub CLI, Claude Code, Codex, Grok Build, and any profile packages (docs/backends.md); instances clone from that image
 - Managed `~/.claude/settings.json` injection with agent-specific configuration
 - Guest runs in bypass mode (`bypassPermissions` for Claude, `--dangerously-bypass-approvals-and-sandbox` for Codex, `--always-approve` for Grok Build) to grant agents full autonomy within the VM
 - Bootstrap logic injects agent config and marketplaces on first boot
@@ -53,14 +53,13 @@ coop is a Rust CLI that manages disposable virtual machines where Claude Code, C
 - **Workspace sync**: Copies host project directories into the VM (rsync on Firecracker, live virtiofs mounts on Lima)
 - **Secret forwarding**: GitHub PAT, API keys (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `XAI_API_KEY`), and arbitrary `env_forward` entries cross the host→guest boundary securely via SSH env channel or stdin
 - **Port forwarding**: SSH `-L` local port forwards with collision detection
-- **Multi-instance**: Multiple independent VMs per configuration; automatic instance name resolution
+- **Multi-instance**: Multiple independent VMs per configuration; with one instance the name argument is optional and coop selects it automatically, with several it is required (docs/commands.md)
 
 ### Configuration and Customization
 
 - Type-safe TOML config model with newtype constructors enforcing bounds (e.g., `VmMemory` has 128-MiB minimum, `InstanceIndex` is `0..=252`)
 - Secret indirection via `cmd:` retrieval commands evaluated at VM start
-- devcontainer.json support: parse, merge, and apply per-project environment specs
-- Per-instance JSON sidecars track runtime state (config, workspace, forwards, guest env, model routing, proxy state, devcontainer state)
+- Per-instance JSON sidecars track runtime state (config, workspace, forwards, guest env, model routing, proxy state)
 
 ### Lifecycle Automation
 
@@ -68,7 +67,7 @@ coop is a Rust CLI that manages disposable virtual machines where Claude Code, C
 - **`coop setup`**: Build golden images and prepare Firecracker/Lima infrastructure
 - **`coop claude|codex|grok`**: Launch agent CLI inside the VM
 - **`coop shell`**: Interactive shell access
-- **`coop resize`, `coop commit`, `coop restore`**: Disk and instance management
+- **`coop resize`, `coop commit`, `coop restore`**: `resize` changes a stopped instance's disk size, memory, or vCPU count and writes the change to the backend config; `commit` saves a stopped instance's filesystem as a reusable image listed by `coop images`; `restore --image <name>` resets the same instance to an image (docs/commands.md)
 - **`coop update`**: Self-update with SHA-256 and Sigstore attestation verification
 
 ### Credential Management
@@ -96,9 +95,9 @@ coop's core architecture consists of:
    - `RunningInstance` / `StoppedInstance` (`backend.rs`) — point-in-time observations with private fields, minted by `as_running` / `as_stopped`
    - `FirecrackerVm<Configured>` / `FirecrackerVm<Running>` (`vm.rs`) — gate lifecycle transitions at compile time
 
-4. **Backend-shared operations**: Configuration, secrets, workspace, SSH, agent bootstrap, devcontainer handling — all implementations live above the trait and must hold for both backends.
+4. **Backend-shared operations**: Configuration, secrets, workspace, SSH, agent bootstrap — all implementations live above the trait and must hold for both backends.
 
-5. **Per-instance state**: JSON sidecars in instance directory track `instance.json`, `vm_config.json`, `workspace.json`, `forwards.json`, `guest_env.json`, `model.json`, `proxy.json`, `devcontainer_state.json`, plus Firecracker `.pid`/`.socket`/`.log` files.
+5. **Per-instance state**: JSON sidecars in instance directory track `instance.json`, `vm_config.json`, `workspace.json`, `forwards.json`, `guest_env.json`, `model.json`, `proxy.json`, plus Firecracker `.pid`/`.socket`/`.log` files.
 
 ### Data Flow: Host → Guest
 
@@ -268,7 +267,7 @@ coop pull [INSTANCE]         # Sync guest workspace to local (rsync)
 - **One-time workspace sync on Firecracker**: Unlike Lima's live virtiofs mounts, Firecracker syncs are one-time (rsync or tar-pipe); use `coop push`/`coop pull` to re-sync
 - **Docker inside agent VMs**: docs/getting-started.md:3 states "Each VM gets its own filesystem, network stack, and Docker daemon." Behaviour when Docker fails inside the VM: Not mentioned in documentation
 - **Nested virtualization**: Not mentioned in documentation (the only `nested` match in docs/ and README.md is "nested skill references" in docs/claude-integration.md:115, about skill directory copying)
-- **Nix builds identify as development**: Nix-installed coop reports as a development build and disables `coop update` and background release notifications; upgrade via `nix profile upgrade coop` instead
+- **v0.5.4 Linux ARM64 binary**: docs/getting-started.md states the published v0.5.4 Linux ARM64 binary reports `coop 0.5.4-dev (8e24729+dirty)` and refuses `coop update` because it identifies itself as a development build; rerunning the installer bypasses that old updater
 
 ---
 
@@ -278,8 +277,10 @@ coop pull [INSTANCE]         # Sync guest workspace to local (rsync)
 - [README.md — Installation, setup, and basic usage](https://github.com/trailofbits/coop/blob/main/README.md) (accessed 2026-10-02)
 - [docs/ARCHITECTURE.md — Module map, two-backend design, data flow, invariants](https://github.com/trailofbits/coop/blob/main/docs/ARCHITECTURE.md) (accessed 2026-10-02)
 - [docs/getting-started.md — Prerequisites and installation details](https://github.com/trailofbits/coop/blob/main/docs/getting-started.md) (accessed 2026-10-02)
-- [docs/backends.md — Firecracker and Lima backend specifics](https://github.com/trailofbits/coop/blob/main/docs/backends.md) (accessed 2026-10-02)
-- [docs/commands.md — `claude` and `shell` flags, ARGS passthrough](https://github.com/trailofbits/coop/blob/main/docs/commands.md) (accessed 2026-10-03)
+- [docs/backends.md — Firecracker and Lima backend specifics, provision script](https://github.com/trailofbits/coop/blob/main/docs/backends.md) (accessed 2026-10-06)
+- [docs/commands.md — `claude` and `shell` flags, ARGS passthrough, resize/commit/restore, instance resolution](https://github.com/trailofbits/coop/blob/main/docs/commands.md) (accessed 2026-10-06)
+- [docs/claude-integration.md — Skill directory copying](https://github.com/trailofbits/coop/blob/main/docs/claude-integration.md) (accessed 2026-10-06)
+- [docs/images-and-profiles.md — Golden images and profiles](https://github.com/trailofbits/coop/blob/main/docs/images-and-profiles.md) (accessed 2026-10-06)
 - [docs/trust-model.md — Security boundaries, taint sources, invariants](https://github.com/trailofbits/coop/blob/main/docs/trust-model.md) (accessed 2026-10-02)
 - [Cargo.toml — Version 0.6.0, Apache-2.0 license, Rust dependencies](https://github.com/trailofbits/coop/blob/main/Cargo.toml) (accessed 2026-10-02)
 
