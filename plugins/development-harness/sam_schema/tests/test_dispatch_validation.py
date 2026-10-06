@@ -160,6 +160,7 @@ class TestDependencyValidation:
         )
 
         assert result.exit_code == 0, result.stderr
+        operation.assert_called_once()
 
     def test_missing_dep_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         operation = Mock(return_value={"created": True})
@@ -171,6 +172,7 @@ class TestDependencyValidation:
 
         assert result.exit_code == 1
         assert "does not appear in any wave" in result.stderr
+        operation.assert_not_called()
 
     def test_same_wave_dep_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         operation = Mock(return_value={"created": True})
@@ -189,6 +191,7 @@ class TestDependencyValidation:
 
         assert result.exit_code == 1
         assert "same wave" in result.stderr
+        operation.assert_not_called()
 
     def test_later_wave_dep_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         operation = Mock(return_value={"created": True})
@@ -207,3 +210,4 @@ class TestDependencyValidation:
 
         assert result.exit_code == 1
         assert "later wave" in result.stderr
+        operation.assert_not_called()
