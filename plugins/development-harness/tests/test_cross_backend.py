@@ -140,6 +140,11 @@ def _make_item_with_issue(issue_num: int, title: str = "Tracked Feature") -> Bac
 class TestBackendStatus:
     """probe_backend_status returns a valid BackendStatus with REACHABLE for local backends."""
 
+    @pytest.mark.parametrize(
+        "backend",
+        [pytest.param("memory", id="InMemoryBackend"), pytest.param("sqlite", id="SQLiteBackend")],
+        indirect=True,
+    )
     def test_probe_returns_reachable_for_local_backends(self, backend: WorkItemBackend) -> None:
         """probe_backend_status returns REACHABLE for memory and SQLite backends.
 
@@ -157,6 +162,11 @@ class TestBackendStatus:
 
             assert status.availability == BackendAvailability.REACHABLE
 
+    @pytest.mark.parametrize(
+        "backend",
+        [pytest.param("memory", id="InMemoryBackend"), pytest.param("sqlite", id="SQLiteBackend")],
+        indirect=True,
+    )
     def test_probe_returns_named_status(self, backend: WorkItemBackend) -> None:
         """probe_backend_status result has a non-empty name field.
 
@@ -171,6 +181,11 @@ class TestBackendStatus:
         if not os.environ.get("BACKLOG_CROSS_BACKEND_GITHUB"):
             assert status.name != ""
 
+    @pytest.mark.parametrize(
+        "backend",
+        [pytest.param("memory", id="InMemoryBackend"), pytest.param("sqlite", id="SQLiteBackend")],
+        indirect=True,
+    )
     def test_try_get_github_returns_none_for_local_backends(self, backend: WorkItemBackend) -> None:
         """try_get_github returns None for local (non-GitHub) backends.
 

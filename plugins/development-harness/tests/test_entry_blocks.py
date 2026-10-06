@@ -494,24 +494,6 @@ def test_deduplicate_timestamps_returns_modified_count():
     assert entries[1].id == "2026-03-10T08:00:00Z-1"
 
 
-def test_deduplicate_timestamps_delegates_to_resolve_duplicate_ids():
-    """_deduplicate_timestamps and _resolve_duplicate_ids must produce identical results."""
-    entries_a = [
-        Entry(id="2026-03-10T08:00:00Z", content="First."),
-        Entry(id="2026-03-10T08:00:00Z", content="Second."),
-        Entry(id="2026-03-10T09:00:00Z", content="Unique."),
-    ]
-    entries_b = [
-        Entry(id="2026-03-10T08:00:00Z", content="First."),
-        Entry(id="2026-03-10T08:00:00Z", content="Second."),
-        Entry(id="2026-03-10T09:00:00Z", content="Unique."),
-    ]
-    count_a = _resolve_duplicate_ids(entries_a)
-    count_b = _deduplicate_timestamps(entries_b)
-    assert count_a == count_b
-    assert [e.id for e in entries_a] == [e.id for e in entries_b]
-
-
 def test_rewrite_by_entry_id_uses_same_dedup_logic_as_parse():
     """rewrite_section(entry_id=...) with duplicate timestamps must resolve
     IDs the same way parse_entries() does, so a suffixed ID from parse

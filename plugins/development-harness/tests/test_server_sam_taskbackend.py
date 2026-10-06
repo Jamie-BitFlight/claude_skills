@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import inspect
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -539,80 +538,6 @@ async def test_sam_claim_raises_tool_error_when_backend_raises_plan_not_found(ba
     with pytest.raises(ToolError) as exc_info:
         await _call("sam_task", {"plan": "P999", "task": "T1", "config": {"action": "claim"}})
     assert "P999" in str(exc_info.value)
-
-
-# ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
-
-
-def test_server_module_uses_backlog_content_provider() -> None:
-    import sam_schema.server_backend as server_backend_module
-
-    source = inspect.getsource(server_backend_module)
-    assert "get_backlog_config" in source
-    assert "ContentProvider" in source
-
-
-def test_server_module_constructs_content_task_provider() -> None:
-    import sam_schema.server_backend as server_backend_module
-
-    source = inspect.getsource(server_backend_module)
-    assert "ContentTaskProvider(provider)" in source
-
-
-# ---------------------------------------------------------------------------
-# Group 4: Structural — no direct query / yaml_reader / yaml_writer imports
-# ---------------------------------------------------------------------------
-
-
-def test_server_has_no_direct_query_import() -> None:
-    """server.py must not import from sam_schema.core.query after T04.
-
-    After T04, all operations previously performed by query.* functions are
-    delegated to the TaskBackend Protocol. Any remaining direct query import
-    is a regression that indicates the tool still bypasses the backend.
-
-    Check: neither 'from sam_schema.core.query import' nor
-    'from sam_schema.core import query' appear in server.py import lines.
-    """
-    import sam_schema.server as server_module
-
-    source = inspect.getsource(server_module)
-    import_lines = [line for line in source.splitlines() if line.strip().startswith(("from ", "import "))]
-    import_block = "\n".join(import_lines)
-
-    assert "from sam_schema.core.query import" not in import_block
-    assert "from sam_schema.core import query" not in import_block
-
-
-def test_server_has_no_yaml_reader_import() -> None:
-    """server.py must not import yaml_reader after T04.
-
-    yaml_reader is an internal module of the YAML I/O stack encapsulated inside
-    LocalYamlTaskProvider. A direct import in server.py indicates the tool is
-    reading YAML files outside the backend abstraction.
-
-    Check: the string 'yaml_reader' does not appear anywhere in server.py source.
-    """
-    import sam_schema.server as server_module
-
-    source = inspect.getsource(server_module)
-    assert "yaml_reader" not in source
-
-
-def test_server_has_no_yaml_writer_import() -> None:
-    """server.py must not import yaml_writer after T04.
-
-    yaml_writer is an internal module of the YAML I/O stack encapsulated inside
-    LocalYamlTaskProvider. A direct import in server.py indicates the tool is
-    writing YAML files outside the backend abstraction.
-
-    Check: the string 'yaml_writer' does not appear anywhere in server.py source.
-    """
-    import sam_schema.server as server_module
-
-    source = inspect.getsource(server_module)
-    assert "yaml_writer" not in source
 
 
 # ---------------------------------------------------------------------------

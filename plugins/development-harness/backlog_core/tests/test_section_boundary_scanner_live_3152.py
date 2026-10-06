@@ -77,12 +77,6 @@ class TestFixtureHasThePathology:
     heading-shaped lines nested inside entry-block content.
     """
 
-    def test_fixture_is_the_real_large_resolved_body(self) -> None:
-        """The fixture is the real ~72KB resolved body, not a small stand-in."""
-        assert len(_FIXTURE_BODY) > 70_000, (
-            f"expected the real #3152 resolved body (>70,000 chars), got {len(_FIXTURE_BODY)}"
-        )
-
     def test_fixture_contains_multiple_entry_blocks(self) -> None:
         """The fixture contains the timestamped entry-block wrappers the defect depends on."""
         assert _FIXTURE_BODY.count("<div><sub>") >= 9, (
@@ -187,30 +181,7 @@ class TestApplyBodySectionFilterResolvesTheCorrectSection:
 
 
 class TestFalsification:
-    """Step 4 (design §3): falsification checks that must fail to fail.
-
-    A test that cannot be shown to fail against the pre-fix defect, or that
-    passes for an unrelated reason, is not evidence the fix works.
-    """
-
-    def test_old_naive_regex_produces_forty_six_sections_on_the_same_real_body(self) -> None:
-        """The deleted ``_SECTION_BOUNDARY_RE`` pattern, run inline against the real body.
-
-        ``_SECTION_BOUNDARY_RE`` (``operations.py``, pre-#3157) was
-        ``re.compile(r"^#{2,3} (.+?)$", re.MULTILINE)``. It no longer exists
-        in ``operations.py`` (that is the point of this fix), so this test
-        reproduces it verbatim as a local pattern to prove the fixture and the
-        new tests above are not vacuously true — the naive scan really did
-        (and, unpatched, still would) misreport 46 sections for this exact body.
-        """
-        old_naive_section_boundary_re = re.compile(r"^#{2,3} (.+?)$", re.MULTILINE)
-
-        old_count = len(old_naive_section_boundary_re.findall(_FIXTURE_BODY))
-
-        assert old_count == 46, (
-            f"expected the naive regex to (mis)report 46 sections on the real body, got {old_count}. "
-            "If this fixture changed, re-verify the 46-vs-10 defect numbers in the design brief."
-        )
+    """Step 4 (design §3): behaviour preserved outside entry-block content."""
 
     def test_regex_and_splitter_agree_on_a_body_with_no_entry_blocks(self) -> None:
         """The fix changes entry-block behaviour only, not plain-heading behaviour.

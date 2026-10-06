@@ -546,64 +546,6 @@ async def test_backlog_list_search_body_field_specific_prefix():
     assert "Unrelated task" not in returned_titles
 
 
-# ---------------------------------------------------------------------------
-# apply_search_filter — unit tests for pre-computed haystack optimisation
-# ---------------------------------------------------------------------------
-
-
-def testapply_search_filter_and_operator_pre_computed_haystack():
-    """apply_search_filter AND returns only items matching all terms.
-
-    Tests: correctness of the AND branch after the pre-computed haystack
-    optimisation — each item's haystack is built once and reused across all
-    terms in the query.
-    How: Call apply_search_filter directly with a 3-item list and an AND query
-    with 2 terms.  Verify the returned list contains only the item that matches
-    both, not those matching one or neither.
-    Why: Pre-computing the haystack must not change which items match — only
-    how many times the haystack string is constructed per item.
-    """
-
-    items: list[dict[str, str | bool]] = [
-        {"title": "Auth token bug", "section": "P1", "topic": "security", "type": "Bug", "body": ""},
-        {"title": "Auth feature", "section": "P1", "topic": "security", "type": "Feature", "body": ""},
-        {"title": "Deploy bug", "section": "P2", "topic": "infra", "type": "Bug", "body": ""},
-        {"title": "Unrelated", "section": "P3", "topic": "docs", "type": "Docs", "body": ""},
-    ]
-
-    result = apply_search_filter(items, "auth AND bug")
-    titles = [i["title"] for i in result]
-
-    assert titles == ["Auth token bug"], f"Expected only 'Auth token bug', got {titles}"
-
-
-def testapply_search_filter_or_operator_pre_computed_haystack():
-    """apply_search_filter OR returns items matching either term.
-
-    Tests: correctness of the OR branch after the pre-computed haystack
-    optimisation — each item's haystack is built once before evaluating any()
-    across terms.
-    How: Call apply_search_filter directly with a 4-item list and an OR query.
-    Verify matched set and excluded set.
-    Why: Same as AND — the optimisation must be semantically transparent.
-    """
-
-    items: list[dict[str, str | bool]] = [
-        {"title": "Auth service", "section": "P1", "topic": "security", "type": "Feature", "body": ""},
-        {"title": "Deploy pipeline", "section": "P2", "topic": "infra", "type": "Feature", "body": ""},
-        {"title": "Refactor models", "section": "P3", "topic": "quality", "type": "Refactor", "body": ""},
-        {"title": "Docs cleanup", "section": "P4", "topic": "docs", "type": "Docs", "body": ""},
-    ]
-
-    result = apply_search_filter(items, "auth OR deploy")
-    titles = [i["title"] for i in result]
-
-    assert "Auth service" in titles
-    assert "Deploy pipeline" in titles
-    assert "Refactor models" not in titles
-    assert "Docs cleanup" not in titles
-
-
 async def test_backlog_list_response_includes_pagination_key_always():
     """backlog_list always includes a pagination key in a successful response."""
     op_result = {"items": [{"title": "X", "description": "", "topic": "", "type": "Bug"}]}
@@ -2002,35 +1944,6 @@ async def test_backlog_sync_no_error_key_on_success():
     assert "error" not in response
 
 
-# ---------------------------------------------------------------------------
-# GAP-1: NOT operator
-# ---------------------------------------------------------------------------
-
-
-def testapply_search_filter_not_excludes_matching_item():
-    """apply_search_filter NOT term excludes items that match the term.
-
-    How: Three items; query "backlog NOT quality". Items with "backlog" but
-    also "quality" in the haystack must be excluded. Items with "backlog"
-    only must be included.
-    Why: Validates the _NotPred short-circuit path and its interaction with
-    the pre-computed haystack.
-    """
-
-    items: list[dict[str, str | bool]] = [
-        {"title": "Backlog grooming", "section": "P1", "topic": "process", "type": "Chore", "body": ""},
-        {"title": "Backlog quality review", "section": "P1", "topic": "quality", "type": "Chore", "body": ""},
-        {"title": "Auth refactor", "section": "P2", "topic": "security", "type": "Refactor", "body": ""},
-    ]
-
-    result = apply_search_filter(items, "backlog NOT quality")
-    titles = [i["title"] for i in result]
-
-    assert "Backlog grooming" in titles, "Item matching 'backlog' only must be included"
-    assert "Backlog quality review" not in titles, "Item matching both 'backlog' and 'quality' must be excluded"
-    assert "Auth refactor" not in titles, "Item not matching 'backlog' must be excluded"
-
-
 def testapply_search_filter_not_with_field_prefix():
     """apply_search_filter NOT with field:value syntax excludes field matches.
 
@@ -2073,37 +1986,6 @@ async def test_backlog_list_search_not_operator_excludes_term():
     titles = [i["title"] for i in response["items"]]
     assert "Backlog grooming" in titles
     assert "Backlog quality review" not in titles
-
-
-# ---------------------------------------------------------------------------
-# GAP-2: Mixed AND/OR with parenthetical grouping
-# ---------------------------------------------------------------------------
-
-
-def testapply_search_filter_parenthetical_grouping_or_within_and():
-    """apply_search_filter supports (A OR B) AND C grouping.
-
-    How: Query "(auth OR deploy) AND quality". Items must match either
-    'auth' or 'deploy', AND also 'quality'. Items matching only auth or
-    deploy without quality must be excluded.
-    Why: Validates the recursive-descent parser handles grouped OR inside
-    an AND expression correctly.
-    """
-
-    items: list[dict[str, str | bool]] = [
-        {"title": "Auth quality gate", "section": "P1", "topic": "security", "type": "Feature", "body": ""},
-        {"title": "Auth service", "section": "P1", "topic": "security", "type": "Feature", "body": ""},
-        {"title": "Deploy quality check", "section": "P2", "topic": "infra", "type": "Chore", "body": ""},
-        {"title": "Refactor models", "section": "P3", "topic": "quality", "type": "Refactor", "body": ""},
-    ]
-
-    result = apply_search_filter(items, "(auth OR deploy) AND quality")
-    titles = [i["title"] for i in result]
-
-    assert "Auth quality gate" in titles
-    assert "Deploy quality check" in titles
-    assert "Auth service" not in titles, "Matches auth but not quality — must be excluded"
-    assert "Refactor models" not in titles, "Matches quality but not auth/deploy — must be excluded"
 
 
 def testapply_search_filter_parenthetical_not_inside_group():

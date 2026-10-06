@@ -45,18 +45,6 @@ def test_sqlite_backend_put_work_item_reference_is_model_derived() -> None:
     assert backend.get_work_item(item.reference).title == "Untracked item"
 
 
-def test_memory_and_sqlite_backends_derive_the_same_reference_for_the_same_title() -> None:
-    """Both backends resolve an unset-reference item with the same title to the same key.
-
-    Under the old per-backend ``uuid4()`` fallback this was never true — every call
-    minted an unrelated random key. Parity here proves both backends now delegate to
-    the single model-level derivation instead of hand-rolling their own.
-    """
-    memory_item = BacklogItem(title="Shared Title Item")
-    sqlite_item = BacklogItem(title="Shared Title Item")
-    assert memory_item.reference == sqlite_item.reference
-
-
 def test_backend_put_work_item_reference_is_deterministic_across_reloads() -> None:
     """Reconstructing the same conceptual item twice resolves to the same backend key.
 

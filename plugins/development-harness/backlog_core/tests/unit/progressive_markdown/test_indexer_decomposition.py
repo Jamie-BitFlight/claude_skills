@@ -2,13 +2,7 @@
 
 These tests serve two purposes:
 
-1. **PLR lint-gate** (``TestPLRLintGate``): Asserts that ``indexer.py`` passes
-   ``ruff check --select PLR0915,PLR0914``.  This test is deliberately RED
-   before T07 (the C3 refactoring task) because the monolithic ``build()``
-   currently has 74 statements (PLR0915 limit: 50) and 40 local variables
-   (PLR0914 limit: 15).  It becomes GREEN after T07 decomposes ``build()``.
-
-2. **Behavioral equivalence** (remaining test classes): Characterise the
+Behavioral equivalence: characterise the
    current observable output of ``MarkdownIndexer.build()`` on a
    representative multi-section, multi-heading, multi-code-block document.
    These tests are GREEN before and after T07 — they pin the behavioral
@@ -22,31 +16,15 @@ Coverage required by T06 acceptance criteria:
 - Slug and selector generation
 - ``body_span`` and ``heading_span`` boundary arithmetic
 
-Running this file before T07 should produce:
-  FAILED test_indexer_build_passes_plr_complexity_gates (the lint-gate, RED)
-  PASSED everything else (behavioral characterisation, GREEN)
+The configured Ruff hook validates linting; this file covers behavioral
+characterisation only.
 """
 
 from __future__ import annotations
 
-import subprocess
-from pathlib import Path
-
 import pytest
 from progressive_markdown.indexer import MarkdownIndexer
 from progressive_markdown.parser import MarkdownItParser
-
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-
-# Absolute path to the file under test.
-# parents[0] = progressive_markdown/   (this test's directory)
-# parents[1] = unit/
-# parents[2] = tests/
-# parents[3] = backlog_core/
-# parents[4] = plugins/development-harness/
-_INDEXER_PATH = Path(__file__).parents[4] / "progressive_markdown" / "indexer.py"
 
 # ---------------------------------------------------------------------------
 # Characterisation markdown fixture
@@ -115,37 +93,6 @@ def document():
     parser = MarkdownItParser()
     result = parser.parse("char.md", _CHARACTERIZATION_MD)
     return MarkdownIndexer().build(result)
-
-
-# ---------------------------------------------------------------------------
-# PLR lint-gate — RED pre-fix, GREEN post-fix
-# ---------------------------------------------------------------------------
-
-
-class TestPLRLintGate:
-    """ruff PLR0915/PLR0914 gate on indexer.py.
-
-    This class is deliberately RED before T07 runs.  The monolithic
-    ``build()`` currently violates both rules (74 statements, 40 locals).
-    After T07 decomposes it, this test becomes GREEN, proving the refactoring
-    resolved the complexity violations.
-    """
-
-    def test_indexer_build_passes_plr_complexity_gates(self) -> None:
-        """ruff --select PLR0915,PLR0914 must exit 0 on indexer.py after decomposition.
-
-        Failing pre-fix proves the gate is wired and detects the violation.
-        Passing post-fix proves decomposition succeeded.
-        """
-        result = subprocess.run(
-            ["ruff", "check", "--select", "PLR0915,PLR0914", str(_INDEXER_PATH)],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        assert result.returncode == 0, (
-            f"PLR violations remain in indexer.py — T07 refactoring incomplete:\n{result.stdout}"
-        )
 
 
 # ---------------------------------------------------------------------------
