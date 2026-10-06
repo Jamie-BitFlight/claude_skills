@@ -155,7 +155,8 @@ def test_save_and_load_preserve_explicit_persisted_values_and_runtime_omissions(
                             struck_at="2026-03-02T03:04:05Z",
                         )
                     ]
-                )
+                ),
+                "groomed": GroomedData(date="2026-03-03", subsections={"Impact": "high"}),
             },
         ),
         path,
@@ -167,11 +168,19 @@ def test_save_and_load_preserve_explicit_persisted_values_and_runtime_omissions(
     assert persisted["title"] == "Persisted title"
     assert persisted["description"] == "first line\nsecond line"
     assert persisted["metadata"]["priority"] == "P0"
+    assert persisted["metadata"]["added"] == "2026-03-01"
+    assert persisted["metadata"]["item_type"] == "Bug"
+    assert persisted["metadata"]["status"] == "open"
+    assert persisted["sections"]["groomed"] == {"date": "2026-03-03", "subsections": {"Impact": "high"}}
     assert "file_path" not in persisted
     assert "skip" not in persisted
     assert reloaded.title == "Persisted title"
     assert reloaded.description == "first line\nsecond line"
     assert reloaded.priority == "P0"
+    assert (reloaded.added, reloaded.item_type, reloaded.status) == ("2026-03-01", "Bug", "open")
+    groomed = reloaded.sections["groomed"]
+    assert isinstance(groomed, GroomedData)
+    assert (groomed.date, groomed.subsections) == ("2026-03-03", {"Impact": "high"})
     section = reloaded.sections["fact_check"]
     assert isinstance(section, Section)
     assert [
