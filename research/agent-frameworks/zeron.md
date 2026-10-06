@@ -50,7 +50,7 @@ Authentication and workspace management are deliberately decoupled: signing in v
 
 ### Native UI with gpui
 
-The interface is built in gpui, pinned to one Zed revision (ARCHITECTURE.md line 174). The UI organizes around a searchable spaces sidebar with session tabs as a device-local viewport (opening/closing tabs is local-only; archiving is explicit). Key UI components include (figures below are as stated in ARCHITECTURE.md and `crates/ui/src/composer.rs` at v0.2.102, read 2026-10-06):
+The interface is built in gpui, pinned to one Zed revision (ARCHITECTURE.md line 174, v0.2.102, read 2026-10-06). The UI organizes around a searchable spaces sidebar with session tabs as a device-local viewport (opening/closing tabs is local-only; archiving is explicit). Key UI components include (figures below are as stated in ARCHITECTURE.md and `crates/ui/src/composer.rs` at v0.2.102, read 2026-10-06):
 
 - **Transcript**: Virtualized list with spring-based stick-to-bottom tracking (interrupted by user input, re-engages within 70px per ARCHITECTURE.md line 179), block-granular rows with incremental streaming markdown re-parse, and scroll-anchor absorption.
 - **Composer**: Hand-rolled text input with auto-grow (76–260px), IME support, question panel (1-9 keys, 220ms auto-advance per ARCHITECTURE.md line 198; `pub const AUTO_ADVANCE_MS: u64 = 220` in `crates/ui/src/composer.rs` at v0.2.102) for multi-choice scenarios, and attachment/image drag-drop.
@@ -60,7 +60,7 @@ The interface is built in gpui, pinned to one Zed revision (ARCHITECTURE.md line
 
 ### Headless and Headed Modes
 
-One binary, two modes: headed mode launches a gpui window and optionally hosts a local engine over IPC if no daemon is running; `zeron headless` runs the engine as a daemon only. In-process mode uses an in-memory RPC transport (same protocol as external daemons, no serialization shortcuts), which ARCHITECTURE.md (line 38) describes as "so the boundary stays honest". Headless mode serves the local profile over localhost IPC and, when authenticated and synced, also hosts its DeviceRoom for remote peers.
+One binary, two modes: headed mode launches a gpui window and optionally hosts a local engine over IPC if no daemon is running; `zeron headless` runs the engine as a daemon only. In-process mode uses an in-memory RPC transport (same protocol as external daemons, no serialization shortcuts), which ARCHITECTURE.md (line 38, v0.2.102, read 2026-10-06) describes as "so the boundary stays honest". Headless mode serves the local profile over localhost IPC and, when authenticated and synced, also hosts its DeviceRoom for remote peers.
 
 ### Cargo Workspace Architecture
 
@@ -207,7 +207,7 @@ Token-usage display (profile heatmap, lifetime stats, per-message token columns,
 
 ### Privacy Boundary
 
-Devices authenticated to the same synced account are **trusted peers** for remote workspace access—a remote peer can request workspace file contents and write changes. Ignored-file visibility is **not** an authorization boundary; when `includeIgnored` is enabled, remote peers can read and write files like `.env`. `.git` remains unavailable. ARCHITECTURE.md (line 84) states: "Zeron intentionally does not maintain a filename denylist because it would be incomplete and could imply a security guarantee it cannot provide." If authenticated devices must no longer trust one another, that policy must be enforced by the owning engine for remote requests; UI-only hiding is not a security control.
+Devices authenticated to the same synced account are **trusted peers** for remote workspace access—a remote peer can request workspace file contents and write changes. Ignored-file visibility is **not** an authorization boundary; when `includeIgnored` is enabled, remote peers can read and write files like `.env`. `.git` remains unavailable. ARCHITECTURE.md (line 84, v0.2.102, read 2026-10-06) states: "Zeron intentionally does not maintain a filename denylist because it would be incomplete and could imply a security guarantee it cannot provide." If authenticated devices must no longer trust one another, that policy must be enforced by the owning engine for remote requests; UI-only hiding is not a security control.
 
 ### Deferred Product Work
 
@@ -217,11 +217,11 @@ Items 1-4 are deferred product work; item 5 is recorded separately as a mileston
 2. Browsing both scopes simultaneously or switching visible scope without engine restart.
 3. Supported self-hosted backend contract (current endpoint and bearer overrides remain development seams).
 4. Cursor harness implementation, per ARCHITECTURE.md (its M5 gaps line and Open question 3, "parity item, scheduled after Codex"). The file carries no date of its own; it is from the v0.2.102 clone, whose commit is dated 2026-10-02. This conflicts with the README listing Cursor as a controlled agent and with `crates/harness/src/cursor/` existing (file names `catalog.rs`, `mod.rs`, `shim.mjs`, `state.rs` from the directory listing at v0.2.102), so the statement may be stale. Whether Cursor, ACP, OpenCode or Pi harnesses are functional is not verified beyond directory names.
-5. Prefers-reduced-motion support and engine hardening (instance lock, watchdogs) are listed as gaps of the M6 Polish milestone in ARCHITECTURE.md (lines 288-290). The same file says at line 194 that `prefers-reduced-motion` is honored, so the source contradicts itself on this point; it is not described as intentionally deferred.
+5. Prefers-reduced-motion support and engine hardening (instance lock, watchdogs) are listed as gaps of the M6 Polish milestone in ARCHITECTURE.md (lines 288-290, v0.2.102, read 2026-10-06). The same file says at line 194 that `prefers-reduced-motion` is honored, so the source contradicts itself on this point; it is not described as intentionally deferred.
 
 ### Workspace File Trust
 
-Remote workspace file requests are subject to workspace-relative path containment, symlink, and write-conflict checks. Ignored-file visibility setting does not restrict what remote peers may access.
+Remote workspace file requests are subject to workspace-relative path containment, symlink, and write-conflict checks (ARCHITECTURE.md line 82, v0.2.102, read 2026-10-06). Ignored-file visibility setting does not restrict what remote peers may access.
 
 ---
 
