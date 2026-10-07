@@ -61,6 +61,7 @@ from backlog_core.models import (
     StatusFetchResult,
     ViewEnrichmentResult,
     ViewItemResult,
+    parse_issue_number,
     reference_is_title_derived,
 )
 
@@ -390,8 +391,19 @@ class InMemoryBackend:
         """Create an issue from a BacklogItem and return its number."""
         if dry_run:
             return None
-        number = self._next_issue_number
-        self._next_issue_number += 1
+        number = max(
+            self._next_issue_number,
+            max(self._issues, default=0) + 1,
+            max(
+                (
+                    parsed_number + 1
+                    for reference in self._work_items
+                    if (parsed_number := parse_issue_number(reference)) is not None and reference == f"#{parsed_number}"
+                ),
+                default=1,
+            ),
+        )
+        self._next_issue_number = number + 1
         issue = _make_issue_node(number=number, title=item.title, body=item.description)
         self._issues[number] = issue
         return number

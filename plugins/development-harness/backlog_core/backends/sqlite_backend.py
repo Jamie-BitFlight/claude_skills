@@ -75,6 +75,7 @@ from backlog_core.models import (
     StatusFetchResult,
     ViewEnrichmentResult,
     ViewItemResult,
+    parse_issue_number,
     reference_is_title_derived,
 )
 
@@ -395,8 +396,16 @@ class SQLiteBackend:
 
     def _next_issue_number(self) -> int:
         """Return the next auto-increment issue number."""
-        row = self._conn.execute("SELECT COALESCE(MAX(issue_number), 0) + 1 FROM items").fetchone()
-        return int(row[0])
+        row = self._conn.execute("SELECT COALESCE(MAX(issue_number), 0) FROM items").fetchone()
+        work_item_next = max(
+            (
+                parsed_number + 1
+                for row in self._conn.execute("SELECT reference FROM work_item_records")
+                if (parsed_number := parse_issue_number(str(row[0]))) is not None and str(row[0]) == f"#{parsed_number}"
+            ),
+            default=1,
+        )
+        return max(int(row[0]) + 1, work_item_next)
 
     def _next_milestone_number(self) -> int:
         """Return the next auto-increment milestone number."""

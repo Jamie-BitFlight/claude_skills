@@ -16,6 +16,7 @@ import backlog_core.operations as ops
 import pytest
 from backlog_core.backend_types import SyncProvider
 from backlog_core.backends.memory_backend import InMemoryBackend
+from backlog_core.backends.sqlite_backend import SQLiteBackend
 from backlog_core.github_sync import render_issue_body
 from backlog_core.models import (
     BackendUnavailableError,
@@ -628,6 +629,34 @@ class TestAddItemCreatesLocalFile:
 
         viewed = view_item(selector)
         assert viewed.issue == selector
+
+    @pytest.mark.parametrize("backend_type", [InMemoryBackend, SQLiteBackend], ids=["memory", "sqlite"])
+    def test_add_item_existing_work_item_reference_is_not_overwritten(self, backend_type: Callable[[], Any]) -> None:
+        """Native creation must not replace an existing work record with the same reference."""
+        from backlog_core.backend_protocol import reset_config, set_config
+        from backlog_core.backend_types import BacklogConfig as BackendBacklogConfig
+
+        backend = backend_type()
+        set_config(BackendBacklogConfig(backend=backend))
+        try:
+            existing = BacklogItem(
+                title="Existing native record",
+                description="This record must survive a colliding create.",
+                priority="P1",
+                reference="#1",
+                issue="#1",
+            )
+            backend.put_work_item(existing)
+
+            created = add_item(title="New native record", description="A distinct item.", priority="P2", force=True)
+
+            assert created["item_ref"] == "#2"
+            assert backend.get_work_item("#1").title == "Existing native record"
+            assert backend.get_work_item("#2").title == "New native record"
+        finally:
+            reset_config()
+            if isinstance(backend, SQLiteBackend):
+                backend._conn.close()
 
 
 class TestAddItemValidatesPriorityAndType:
