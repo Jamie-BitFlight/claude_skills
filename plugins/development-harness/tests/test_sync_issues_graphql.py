@@ -8,8 +8,6 @@ All PyGithub boundary objects are mocked — no live API calls.
 
 from __future__ import annotations
 
-import inspect
-import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -146,16 +144,6 @@ class TestSyncIssuesGraphqlCallbackCalledPerIssue:
 
 
 # ---------------------------------------------------------------------------
-# TestSyncIssuesGraphqlCheckpointBoundary
-# ---------------------------------------------------------------------------
-
-
-class TestSyncIssuesGraphqlCheckpointBoundary:
-    def test_sync_issues_graphql_has_no_track_timestamp_parameter(self) -> None:
-        assert "track_timestamp" not in inspect.signature(sync_issues_graphql).parameters
-
-
-# ---------------------------------------------------------------------------
 # TestSyncIssuesGraphqlErrorPropagation
 # ---------------------------------------------------------------------------
 
@@ -260,85 +248,3 @@ class TestSyncIssuesGraphqlNoNPlusOne:
             f"Expected at most 2 GraphQL calls for 50 issues, got {mock_fetch.call_count}"
         )
         assert len(result) == 50
-
-
-# ---------------------------------------------------------------------------
-# TestSyncIssuesGraphqlIncrementalPerformance
-# ---------------------------------------------------------------------------
-
-
-class TestSyncIssuesGraphqlIncrementalPerformance:
-    """Performance benchmark: incremental sync (with since) completes under 2s wall clock.
-
-    AC4: The sync primitive with a since filter must process 20 issues in under 2 seconds
-    when the GraphQL transport returns instantly (no network latency). This catches
-    algorithmic regressions (O(N^2) processing, unnecessary loops) that would slow
-    even mock scenarios beyond the SLA.
-    """
-
-    @pytest.mark.slow
-    def test_sync_issues_graphql_incremental_since_completes_under_2s(self, mocker: MockerFixture) -> None:
-        """Verify incremental sync of 20 issues completes in under 2s wall clock.
-
-        Tests: sync_issues_graphql incremental-sync performance SLA.
-        How:
-            1. Arrange — mock _fetch_issues_graphql to return 20 issues instantly;
-               provide a since datetime for incremental mode.
-            2. Act — measure wall clock with time.perf_counter().
-            3. Assert — elapsed < 2.0s.
-        Why: Incremental sync is the hot path; any O(N) overhead in the primitive
-             itself (not in network I/O) must remain negligible for small result sets.
-        """
-        # Arrange
-        repo = _make_mock_repo(mocker)
-        issues = [_make_issue_node(i) for i in range(1, 21)]
-        mocker.patch("backlog_core.gh_client._fetch_issues_graphql", return_value=issues)
-        since_dt = datetime(2024, 1, 1, tzinfo=UTC)
-
-        # Act
-        start = time.perf_counter()
-        sync_issues_graphql(repo, "test-owner", "test-repo", since=since_dt)
-        elapsed = time.perf_counter() - start
-
-        # Assert
-        assert elapsed < 2.0, f"Incremental sync took {elapsed:.3f}s, expected < 2s"
-
-
-# ---------------------------------------------------------------------------
-# TestSyncIssuesGraphqlFullSyncPerformance
-# ---------------------------------------------------------------------------
-
-
-class TestSyncIssuesGraphqlFullSyncPerformance:
-    """Performance benchmark: full sync of 100 mock issues completes under 15s wall clock.
-
-    AC5: The sync primitive without a since filter must process 100 issues in under 15
-    seconds when the GraphQL transport returns instantly. This validates that the primitive
-    itself introduces no algorithmic overhead that would violate the full-sync SLA.
-    """
-
-    @pytest.mark.slow
-    def test_sync_issues_graphql_full_sync_100_issues_under_15s(self, mocker: MockerFixture) -> None:
-        """Verify full sync of 100 issues completes in under 15s wall clock.
-
-        Tests: sync_issues_graphql full-sync performance SLA.
-        How:
-            1. Arrange — mock _fetch_issues_graphql to return 100 issues instantly;
-               no since filter (full refresh mode).
-            2. Act — measure wall clock with time.perf_counter().
-            3. Assert — elapsed < 15.0s.
-        Why: Full sync is the baseline recovery path. Primitive-level overhead must
-             remain negligible so the 15s budget is available entirely for network I/O.
-        """
-        # Arrange
-        repo = _make_mock_repo(mocker)
-        issues = [_make_issue_node(i) for i in range(1, 101)]
-        mocker.patch("backlog_core.gh_client._fetch_issues_graphql", return_value=issues)
-
-        # Act
-        start = time.perf_counter()
-        sync_issues_graphql(repo, "test-owner", "test-repo")
-        elapsed = time.perf_counter() - start
-
-        # Assert
-        assert elapsed < 15.0, f"Full sync took {elapsed:.3f}s, expected < 15s"

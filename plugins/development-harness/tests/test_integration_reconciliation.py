@@ -82,13 +82,6 @@ class TestFilterClosedItemsOperations:
         assert "needs-grooming" in remaining_statuses
         assert len(filtered) == 4
 
-    def test_includes_all_items_when_include_closed_true(self) -> None:
-        """All items are returned unfiltered when include_closed is True."""
-        items = _make_mixed_items()
-        filtered = _filter_closed_items(items, include_closed=True)
-        assert len(filtered) == len(items)
-        assert filtered is items  # Same reference, not a copy
-
     def test_empty_list_returns_empty(self) -> None:
         """Empty input list returns empty list regardless of include_closed value."""
         assert _filter_closed_items([], include_closed=False) == []

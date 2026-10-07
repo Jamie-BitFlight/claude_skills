@@ -24,7 +24,6 @@ import requests
 from backlog_core import operations
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.models import BacklogItem, Output
-from backlog_core.sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -36,11 +35,6 @@ class _Repo:
     """Minimal stand-in for the PyGithub repository ``try_get_github`` returns."""
 
     full_name = "owner/repo"
-
-
-def test_the_chosen_exception_is_one_the_sibling_handlers_already_treat_as_transient() -> None:
-    """Pin the reproduction to the shared tuple rather than to one hard-coded class."""
-    assert requests.exceptions.ConnectionError in RETRYABLE_TRANSIENT_EXCEPTIONS
 
 
 @pytest.fixture

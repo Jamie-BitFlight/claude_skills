@@ -74,103 +74,19 @@ class TestCreatePlanFile:
     Why: create_plan_file is called by ``sam create`` -- output must be loadable.
     """
 
-    def test_create_plan_file_writes_valid_yaml(self, tmp_path: Path) -> None:
-        """Created file is valid YAML readable by load_plan.
-
-        Tests: YAML validity.
-        How: Write plan, load back, check no exceptions.
-        Why: Invalid YAML breaks all downstream operations.
-        """
-        # Arrange
-        plan = _make_plan()
+    def test_create_plan_file_round_trips_plan_fields(self, tmp_path: Path) -> None:
+        """The create-file entry point persists values that the plan reader can recover."""
         output = tmp_path / "P001-test.yaml"
-        # Act
-        create_plan_file(output, plan)
-        # Assert
-        result = load_plan(output)
-        assert result.plan.feature == "writer-new-test"
+        create_plan_file(output, _make_plan(num_tasks=3))
 
-    def test_create_plan_file_preserves_task_count(self, tmp_path: Path) -> None:
-        """Written plan has the same number of tasks as the input.
-
-        Tests: Task count fidelity.
-        How: Write plan with 2 tasks, load back, count.
-        Why: Lost tasks during serialization is silent data loss.
-        """
-        # Arrange
-        plan = _make_plan(num_tasks=3)
-        output = tmp_path / "P001-test.yaml"
-        # Act
-        create_plan_file(output, plan)
-        # Assert
-        result = load_plan(output)
-        assert len(result.plan.tasks) == 3
-
-    def test_create_plan_file_preserves_goal(self, tmp_path: Path) -> None:
-        """Written plan preserves the goal field.
-
-        Tests: Goal field round-trip.
-        How: Write plan with goal, load back, compare.
-        Why: Goal drives agent behavior during execution.
-        """
-        # Arrange
-        plan = _make_plan()
-        output = tmp_path / "P001-test.yaml"
-        # Act
-        create_plan_file(output, plan)
-        # Assert
-        result = load_plan(output)
-        assert result.plan.goal == "Test new writer functions"
-
-    def test_create_plan_file_preserves_context(self, tmp_path: Path) -> None:
-        """Written plan preserves the context field.
-
-        Tests: Context field round-trip.
-        How: Write plan with context, load back, compare.
-        Why: Context is shared across all tasks.
-        """
-        # Arrange
-        plan = _make_plan()
-        output = tmp_path / "P001-test.yaml"
-        # Act
-        create_plan_file(output, plan)
-        # Assert
-        result = load_plan(output)
-        assert result.plan.context == "Test context for writer tests"
-
-    def test_create_plan_file_preserves_task_ids(self, tmp_path: Path) -> None:
-        """Written tasks have correct IDs matching the input.
-
-        Tests: Task ID fidelity.
-        How: Write plan, load back, check each task ID.
-        Why: Wrong task IDs break addressing and dependency resolution.
-        """
-        # Arrange
-        plan = _make_plan(num_tasks=3)
-        output = tmp_path / "P001-test.yaml"
-        # Act
-        create_plan_file(output, plan)
-        # Assert
-        result = load_plan(output)
-        ids = [t.id for t in result.plan.tasks]
-        assert ids == ["T1", "T2", "T3"]
-
-    def test_create_plan_file_preserves_dependencies(self, tmp_path: Path) -> None:
-        """Written tasks preserve dependency lists.
-
-        Tests: Dependency field round-trip.
-        How: Write plan with deps, load back, compare T2 deps.
-        Why: Lost dependencies break task ordering.
-        """
-        # Arrange
-        plan = _make_plan(num_tasks=3)
-        output = tmp_path / "P001-test.yaml"
-        # Act
-        create_plan_file(output, plan)
-        # Assert
-        result = load_plan(output)
-        t2 = next(t for t in result.plan.tasks if t.id == "T2")
-        assert t2.dependencies == ["T1"]
+        loaded = load_plan(output).plan
+        assert (loaded.feature, loaded.goal, loaded.context) == (
+            "writer-new-test",
+            "Test new writer functions",
+            "Test context for writer tests",
+        )
+        assert [task.id for task in loaded.tasks] == ["T1", "T2", "T3"]
+        assert loaded.tasks[1].dependencies == ["T1"]
 
     def test_create_plan_file_adds_yaml_extension(self, tmp_path: Path) -> None:
         """Path without extension gets .yaml added automatically.

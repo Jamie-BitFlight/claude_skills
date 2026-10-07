@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import pytest
 from backlog_core.models import BacklogItem, ViewItemResult
@@ -27,7 +27,6 @@ from backlog_core.parsing import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
     from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -881,134 +880,6 @@ class TestBuildIssueBodyFromFile:
 
         # Assert
         assert result is None
-
-
-# ---------------------------------------------------------------------------
-# _build_issue_body_from_file (dict-based, scripts/backlog.py)
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.skip(
-    reason=(
-        "scripts/backlog.py does not exist in this repository. The dict-based "
-        "_build_issue_body_from_file was planned but never implemented. "
-        "backlog_core.parsing.build_issue_body_from_file takes BacklogItem, not dict. "
-        "See plan/tasks-1-backlog-state-reconciliation.md"
-    )
-)
-class TestBuildIssueBodyFromFileDict:
-    """Tests for _build_issue_body_from_file(item: dict) -> str | None.
-
-    This is the dict-based version that was planned for scripts/backlog.py. It
-    uses '_raw_body' key instead of BacklogItem.raw_body attribute.
-    NOTE: scripts/backlog.py was never created; these tests are skipped until
-    the dict-based variant is implemented in backlog_core.
-    """
-
-    @staticmethod
-    def _call_build(build_fn: object, item: dict[str, str]) -> str | None:
-        """Narrow *build_fn* for ty; body never runs while the class is skipped."""
-        fn = cast("Callable[[dict[str, str]], str | None]", build_fn)
-        return fn(item)
-
-    @pytest.fixture
-    def build_fn(self) -> object:
-        """Skip — scripts/backlog.py was intentionally deleted; class is skipped.
-
-        The dict-based _build_issue_body_from_file was planned for
-        scripts/backlog.py which no longer exists. All functionality moved to
-        backlog_core/. This fixture skips rather than raising FileNotFoundError
-        so that pytest's fixture collection does not fail even if the class-level
-        skip marker is bypassed.
-
-        Returns:
-            Never returns; always skips.
-        """
-        raise pytest.skip.Exception("scripts/backlog.py does not exist. Functionality moved to backlog_core/.")
-
-    def test_returns_none_when_no_groomed_section(self, build_fn: object) -> None:
-        """Dict item without '## Groomed' in _raw_body returns None.
-
-        Tests: Gate logic for dict-based version
-        How: Pass dict with _raw_body lacking groomed heading
-        Why: Consistency with BacklogItem-based version
-        """
-        # Arrange
-        item = {"_raw_body": _UNGROOMED_RAW_BODY, "_title": "Test"}
-
-        # Act
-        result = self._call_build(build_fn, item)
-
-        # Assert
-        assert result is None
-
-    def test_returns_body_when_groomed_present(self, build_fn: object) -> None:
-        """Dict item with '## Groomed' in _raw_body returns stripped body + newline.
-
-        Tests: Passthrough behavior for dict-based version
-        How: Pass dict with groomed _raw_body, verify output
-        Why: Must match BacklogItem-based version behavior
-        """
-        # Arrange
-        item = {"_raw_body": _GROOMED_RAW_BODY, "_title": "Test"}
-
-        # Act
-        result = self._call_build(build_fn, item)
-
-        # Assert
-        assert result is not None
-        assert result == _GROOMED_RAW_BODY.strip() + "\n"
-
-    def test_preserves_all_sections(self, build_fn: object) -> None:
-        """All sections from _raw_body appear exactly once — no duplication.
-
-        Tests: Content integrity for dict-based version
-        How: Count section headers in output
-        Why: Regression guard matching BacklogItem-based tests
-        """
-        # Arrange
-        item = {"_raw_body": _GROOMED_RAW_BODY}
-
-        # Act
-        result = self._call_build(build_fn, item)
-
-        # Assert
-        assert result is not None
-        assert result.count("## Story") == 1
-        assert result.count("## Groomed") == 1
-
-    def test_missing_raw_body_key_returns_none(self, build_fn: object) -> None:
-        """Dict without _raw_body key returns None (empty string default).
-
-        Tests: Missing key handling
-        How: Pass dict without _raw_body key
-        Why: Function uses .get() with default; must not raise
-        """
-        # Arrange
-        item: dict[str, str] = {"_title": "No body"}
-
-        # Act
-        result = self._call_build(build_fn, item)
-
-        # Assert
-        assert result is None
-
-    def test_does_not_generate_synthetic_story(self, build_fn: object) -> None:
-        """Dict-based version must not generate synthetic story text.
-
-        Tests: Regression guard for old bug
-        How: Verify output contains only the raw_body content
-        Why: The function was refactored to passthrough; synthetic generation is gone
-        """
-        # Arrange
-        item = {"_raw_body": _GROOMED_RAW_BODY, "_title": "Detect Duplicates"}
-
-        # Act
-        result = self._call_build(build_fn, item)
-
-        # Assert
-        assert result is not None
-        assert "I want to **detect duplicates" not in result.lower()
 
 
 # ---------------------------------------------------------------------------

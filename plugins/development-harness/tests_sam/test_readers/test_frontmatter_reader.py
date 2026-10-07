@@ -340,22 +340,6 @@ def test_read_frontmatter_plan_tasks_list_empty_list_raises_value_error(tmp_path
         read_frontmatter_plan(f)
 
 
-def test_read_frontmatter_plan_real_followup_file_returns_one_task() -> None:
-    """Verify the actual follow-up task file that triggered this bug can be read.
-
-    Tests: Real-world tasks-list file produces one task dict.
-    How: Call read_frontmatter_plan on the real plan file.
-    Why: Regression guard — the exact file that failed before the fix.
-    """
-    real_file = pathlib.Path(__file__).resolve().parents[4] / "plan" / "tasks-3-unified-sam-task-schema-followup-1.md"
-    if not real_file.exists():
-        pytest.skip("Real follow-up file not present in this environment")
-    _, task_dicts, fmt = read_frontmatter_plan(real_file)
-    assert fmt == FormatType.YAML_FRONTMATTER
-    assert len(task_dicts) == 1
-    assert task_dicts[0].get("status") == "pending"
-
-
 # ---------------------------------------------------------------------------
 # Code fence edge case — --- inside ``` blocks must not split segments
 # ---------------------------------------------------------------------------

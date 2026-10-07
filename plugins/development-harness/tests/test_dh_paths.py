@@ -8,7 +8,6 @@ Tests cover:
 - ensure_dirs(): idempotent directory creation
 - DH_STATE_HOME override: env var changes base directory
 - Cache behaviour: repeated calls with same cwd return cached results
-- LEGACY_PATH_MAP: expected keys present
 - _get_dh_user_root(): module-level alias re-reads env on each call
 """
 
@@ -24,7 +23,6 @@ import dh_paths
 import git
 import pytest
 from dh_paths import (
-    LEGACY_PATH_MAP,
     _get_dh_user_root,
     backlog_dir,
     compute_slug,
@@ -1065,99 +1063,3 @@ class TestEnsureDirs:
         # Assert — sentinel file untouched
         assert sentinel.exists()
         assert sentinel.read_text() == "keep me"
-
-
-# ---------------------------------------------------------------------------
-# LEGACY_PATH_MAP
-# ---------------------------------------------------------------------------
-
-
-class TestLegacyPathMap:
-    """Tests for LEGACY_PATH_MAP constant: presence, mapping correctness, callability.
-
-    Strategy: Assert dictionary contents directly — no subprocess or filesystem
-    operations needed. All assertions are pure dict/attribute checks.
-    """
-
-    def test_legacy_path_map_contains_backlog_key(self) -> None:
-        """Verify .claude/backlog key is present in LEGACY_PATH_MAP.
-
-        Tests: LEGACY_PATH_MAP key presence for backlog directory
-        How: Assert key in dict
-        Why: Migration tool uses this map to discover all old-path consumers
-        """
-        assert ".claude/backlog" in LEGACY_PATH_MAP
-
-    def test_legacy_path_map_contains_plan_key(self) -> None:
-        """Verify plan key is present in LEGACY_PATH_MAP.
-
-        Tests: LEGACY_PATH_MAP key presence for plan directory
-        How: Assert key in dict
-        Why: Migration tool must recognise the plan/ prefix
-        """
-        assert "plan" in LEGACY_PATH_MAP
-
-    def test_legacy_path_map_contains_context_key(self) -> None:
-        """Verify .claude/context key is present in LEGACY_PATH_MAP.
-
-        Tests: LEGACY_PATH_MAP key presence for context directory
-        How: Assert key in dict
-        Why: Migration tool must recognise the .claude/context/ prefix
-        """
-        assert ".claude/context" in LEGACY_PATH_MAP
-
-    def test_legacy_path_map_contains_reports_key(self) -> None:
-        """Verify .claude/reports key is present in LEGACY_PATH_MAP.
-
-        Tests: LEGACY_PATH_MAP key presence for reports directory
-        How: Assert key in dict
-        Why: Migration tool must recognise the .claude/reports/ prefix
-        """
-        assert ".claude/reports" in LEGACY_PATH_MAP
-
-    def test_legacy_path_map_backlog_maps_to_backlog_dir(self) -> None:
-        """Verify .claude/backlog maps to the string 'backlog_dir'.
-
-        Tests: LEGACY_PATH_MAP maps backlog prefix to correct function name
-        How: Assert dict value equals expected string
-        Why: Automated reference updates use this value to generate import calls
-        """
-        assert LEGACY_PATH_MAP[".claude/backlog"] == "backlog_dir"
-
-    def test_legacy_path_map_plan_maps_to_plan_dir(self) -> None:
-        """Verify plan maps to the string 'plan_dir'.
-
-        Tests: LEGACY_PATH_MAP maps plan prefix to correct function name
-        How: Assert dict value equals expected string
-        Why: Automated reference updates must produce the correct function name
-        """
-        assert LEGACY_PATH_MAP["plan"] == "plan_dir"
-
-    def test_legacy_path_map_context_maps_to_context_dir(self) -> None:
-        """Verify .claude/context maps to the string 'context_dir'.
-
-        Tests: LEGACY_PATH_MAP maps context prefix to correct function name
-        How: Assert dict value equals expected string
-        Why: Hook scripts need to find and update their context path references
-        """
-        assert LEGACY_PATH_MAP[".claude/context"] == "context_dir"
-
-    def test_legacy_path_map_reports_maps_to_reports_dir(self) -> None:
-        """Verify .claude/reports maps to the string 'reports_dir'.
-
-        Tests: LEGACY_PATH_MAP maps reports prefix to correct function name
-        How: Assert dict value equals expected string
-        Why: Reports dir consumers need correct function reference in migration
-        """
-        assert LEGACY_PATH_MAP[".claude/reports"] == "reports_dir"
-
-    def test_legacy_path_map_all_values_are_callable_function_names(self) -> None:
-        """Verify every value in LEGACY_PATH_MAP names a callable on dh_paths.
-
-        Tests: LEGACY_PATH_MAP values are resolvable and callable attributes
-        How: Use hasattr + callable check on dh_paths module for each value
-        Why: Map is only useful if every value resolves to an actual function
-        """
-        for value in LEGACY_PATH_MAP.values():
-            assert hasattr(dh_paths, value), f"dh_paths has no attribute '{value}'"
-            assert callable(getattr(dh_paths, value)), f"dh_paths.{value} is not callable"

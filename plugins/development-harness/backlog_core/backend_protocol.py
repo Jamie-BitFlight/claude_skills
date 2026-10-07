@@ -161,30 +161,6 @@ def reset_config() -> None:
 _VALID_BACKENDS: tuple[str, ...] = ("github", "memory", "sqlite", "beads")
 
 
-def _auto_detect_beads() -> str | None:
-    """Return ``"beads"`` when the explicit opt-in marker ``.beads/dh-backend`` exists.
-
-    Requires an explicit opt-in marker file at ``<project_root>/.beads/dh-backend``.
-    The ``.beads/`` directory alone is not sufficient — a project may have a
-    ``.beads/`` directory for other purposes without intending to use the beads
-    backlog backend.
-
-    Uses dh_paths to resolve the project root.  Falls through silently
-    (returns ``None``) when dh_paths is absent, the project root cannot
-    be determined, or the marker file does not exist.
-
-    Returns:
-        ``"beads"`` when the opt-in marker file is present, otherwise ``None``.
-    """
-    if dh_paths is None:
-        return None
-    try:
-        project_root = dh_paths.git_project_root()
-    except (FileNotFoundError, RuntimeError):
-        return None
-    return "beads" if (project_root / BEADS_DIR / BEADS_OPT_IN_MARKER).is_file() else None
-
-
 def create_backend(name: str | None = None) -> WorkItemBackend:
     """Instantiate and return a backend by name.
 

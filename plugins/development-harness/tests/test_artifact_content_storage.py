@@ -1,8 +1,6 @@
 """Tests for artifact content storage and retrieval via configured providers.
 
 Covers:
-- _build_artifact_content_comment: structure, truncation
-- _extract_content_from_comment: happy path, malformed input
 - GitHubArtifactProvider.store_artifact_content: create new, update existing
 - GitHubArtifactProvider.read_artifact_content_from_remote: found, not found
 - artifact_register MCP tool: manifest-only and explicit logical-content writes
@@ -30,12 +28,7 @@ if str(_tests_dir) not in sys.path:
     sys.path.insert(0, str(_tests_dir))
 
 from backlog_core.artifact_manifest_store import artifact_content_reference
-from backlog_core.artifact_provider import (
-    _GITHUB_COMMENT_MAX_CHARS,
-    GitHubArtifactProvider,
-    _build_artifact_content_comment,
-    _extract_content_from_comment,
-)
+from backlog_core.artifact_provider import GitHubArtifactProvider
 from backlog_core.backend_types import ContentProvider
 from backlog_core.models import (
     ArtifactEntry,
@@ -104,184 +97,6 @@ def _artifact_record(item_id: int, artifact_type: str, artifact_id: str, content
         ),
         content=content,
     )
-
-
-# ---------------------------------------------------------------------------
-# _build_artifact_content_comment
-# ---------------------------------------------------------------------------
-
-
-def test_build_artifact_content_comment_contains_opening_tag() -> None:
-    """Verify the opening artifact-content HTML comment tag is present.
-
-    Tests: _build_artifact_content_comment structure.
-    How: Build a comment and check for the opening marker string.
-    Why: The tag is used by the search logic to identify matching comments.
-    """
-    # Arrange
-    artifact_type = "research"
-    path = "plan/research-foo.md"
-    content = "Some content"
-
-    # Act
-    result = _build_artifact_content_comment(artifact_type, path, content)
-
-    # Assert
-    assert "<!-- artifact-content:type=research:path=plan/research-foo.md -->" in result
-
-
-def test_build_artifact_content_comment_contains_closing_tag() -> None:
-    """Verify the closing artifact-content HTML comment tag is present.
-
-    Tests: _build_artifact_content_comment structure.
-    How: Build a comment and check for the closing delimiter.
-    Why: The closing tag bounds the extractable content block.
-    """
-    # Arrange / Act
-    result = _build_artifact_content_comment("research", "plan/foo.md", "content")
-
-    # Assert
-    assert "<!-- /artifact-content -->" in result
-
-
-def test_build_artifact_content_comment_contains_details_block() -> None:
-    """Verify the comment wraps content in an HTML details/summary block.
-
-    Tests: _build_artifact_content_comment structure.
-    How: Check for <details> and <summary> HTML elements.
-    Why: Keeps GitHub issues visually uncluttered while storing machine-parseable content.
-    """
-    # Arrange / Act
-    result = _build_artifact_content_comment("architect", "plan/arch.md", "# Architecture")
-
-    # Assert
-    assert "<details>" in result
-    assert "</details>" in result
-    assert "<summary>" in result
-
-
-def test_build_artifact_content_comment_embeds_content() -> None:
-    """Verify the artifact content is embedded verbatim in the comment.
-
-    Tests: _build_artifact_content_comment content embedding.
-    How: Build comment and assert content string appears in result.
-    Why: The stored content must be retrievable by _extract_content_from_comment.
-    """
-    # Arrange
-    content = "This is the artifact body text."
-
-    # Act
-    result = _build_artifact_content_comment("feature-context", "plan/fc.md", content)
-
-    # Assert
-    assert content in result
-
-
-def test_build_artifact_content_comment_truncates_oversized_content() -> None:
-    """Verify oversized content is truncated to stay within GitHub's limit.
-
-    Tests: _build_artifact_content_comment truncation.
-    How: Pass content larger than _GITHUB_COMMENT_MAX_CHARS and verify result fits.
-    Why: GitHub rejects comments exceeding 65536 characters.
-    """
-    # Arrange — content large enough to exceed the GitHub limit
-    oversized = "x" * (_GITHUB_COMMENT_MAX_CHARS + 1000)
-
-    # Act
-    result = _build_artifact_content_comment("research", "plan/big.md", oversized)
-
-    # Assert — result must be within the limit
-    assert len(result) <= _GITHUB_COMMENT_MAX_CHARS
-    assert "WARNING: content truncated" in result
-
-
-def test_build_artifact_content_comment_does_not_truncate_within_limit() -> None:
-    """Verify content within the size limit is stored unmodified.
-
-    Tests: _build_artifact_content_comment no-truncation path.
-    How: Pass small content and verify no WARNING marker appears.
-    Why: Normal-sized artifacts should round-trip without modification.
-    """
-    # Arrange — content well within limit
-    content = "Small content"
-
-    # Act
-    result = _build_artifact_content_comment("research", "plan/small.md", content)
-
-    # Assert — no truncation warning
-    assert "WARNING" not in result
-    assert content in result
-
-
-# ---------------------------------------------------------------------------
-# _extract_content_from_comment
-# ---------------------------------------------------------------------------
-
-
-def test_extract_content_from_comment_returns_inner_content() -> None:
-    """Verify inner content is extracted from a well-formed comment body.
-
-    Tests: _extract_content_from_comment happy path.
-    How: Build a comment body with standard structure, extract, verify content present.
-    Why: Round-trip correctness — stored content must be recoverable.
-    """
-    # Arrange
-    comment_body = (
-        "<!-- artifact-content:type=research:path=plan/foo.md -->\n"
-        "<details>\n"
-        "<summary>Artifact: research — plan/foo.md</summary>\n\n"
-        "# Research findings\n\nSome text here.\n\n"
-        "</details>\n"
-        "<!-- /artifact-content -->"
-    )
-
-    # Act
-    result = _extract_content_from_comment(comment_body)
-
-    # Assert
-    assert "# Research findings" in result
-    assert "Some text here." in result
-
-
-def test_extract_content_from_comment_strips_surrounding_whitespace() -> None:
-    """Verify extracted content has surrounding whitespace stripped.
-
-    Tests: _extract_content_from_comment whitespace handling.
-    How: Embed content with leading/trailing spaces, check result is stripped.
-    Why: Whitespace normalisation prevents spurious diffs in callers.
-    """
-    # Arrange
-    comment_body = (
-        "<!-- artifact-content:type=research:path=plan/foo.md -->\n"
-        "<details>\n"
-        "<summary>summary</summary>\n\n"
-        "  actual content  \n\n"
-        "</details>\n"
-        "<!-- /artifact-content -->"
-    )
-
-    # Act
-    result = _extract_content_from_comment(comment_body)
-
-    # Assert
-    assert result == "actual content"
-
-
-def test_extract_content_from_comment_returns_full_body_when_malformed() -> None:
-    """Verify malformed comments return the full body rather than raising.
-
-    Tests: _extract_content_from_comment fallback on missing </summary> or </details>.
-    How: Pass a body without the expected HTML structure, verify identity return.
-    Why: Graceful degradation — callers can inspect the raw body instead of crashing.
-    """
-    # Arrange — no </summary> or </details> tags
-    malformed = "<!-- artifact-content:type=x:path=y -->\nsome raw text\n<!-- /artifact-content -->"
-
-    # Act
-    result = _extract_content_from_comment(malformed)
-
-    # Assert — returns the full body rather than raising
-    assert result == malformed
 
 
 # ---------------------------------------------------------------------------
@@ -489,7 +304,14 @@ def test_read_artifact_content_from_remote_ignores_wrong_type(tmp_path: Path) ->
     Why: Type filtering is required — different artifacts may share paths.
     """
     # Arrange — comment exists but for a different type
-    comment_body = _build_artifact_content_comment("architect", "plan/foo.md", "some content")
+    comment_body = """<!-- artifact-content:type=architect:path=plan/foo.md -->
+<details>
+<summary>Artifact: architect — plan/foo.md</summary>
+
+some content
+
+</details>
+<!-- /artifact-content -->"""
     wrong_type_comment = make_issue_comment_node(body=comment_body)
     responses = [
         make_issue_comments_response([wrong_type_comment])  # _fetch_issue_comments_graphql
@@ -631,29 +453,6 @@ async def test_artifact_read_returns_configured_provider_content() -> None:
     assert mock_provider.get_content.call_args_list[1].args[0] == ContentRef(
         kind=ContentKind.ARTIFACT_CONTENT, namespace="42", artifact_type="research", name="plan/r.md"
     )
-
-
-async def test_artifact_read_requires_no_filesystem_fallback() -> None:
-    # Arrange
-    entry = ArtifactEntry(artifact_type=ArtifactType.RESEARCH, artifact_id="plan/r.md", status=ArtifactStatus.CURRENT)
-    mock_manifest = ArtifactManifest(issue_number=42, artifacts=[entry])
-    mock_provider = MagicMock(spec=ContentProvider)
-    mock_provider.get_content.side_effect = [
-        _manifest_record(mock_manifest),
-        _artifact_record(42, "research", "plan/r.md", "# Provider-only content"),
-    ]
-
-    with (
-        patch("backlog_core.server._get_artifact_provider", return_value=mock_provider),
-        patch("backlog_core.server._artifact_registry") as mock_registry,
-    ):
-        mock_registry.get_by_type.return_value = [entry]
-        # Act
-        result = await _call("artifact_read", {"item_id": 42, "artifact_type": "research"})
-
-    # Assert
-    assert result.get("error") is None
-    assert result["content"] == "# Provider-only content"
 
 
 async def test_artifact_read_returns_error_when_type_not_found() -> None:

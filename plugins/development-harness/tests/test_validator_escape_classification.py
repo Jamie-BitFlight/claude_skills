@@ -19,17 +19,8 @@ from backlog_core.backend_types import BacklogConfig
 from backlog_core.backends._github_work_item_versions import WorkItemHead, parse_work_item_head
 from backlog_core.backends.github_backend import GitHubBackend
 from backlog_core.file_cache import FileCache
-from backlog_core.models import (
-    BacklogItem,
-    ContentKind,
-    ContentRef,
-    ContentUnavailableError,
-    ContentWrite,
-    ProviderItem,
-    ProviderSnapshot,
-    ValidationError,
-)
-from backlog_core.server import _manifest_reference, mcp
+from backlog_core.models import BacklogItem, ContentUnavailableError, ProviderItem, ProviderSnapshot, ValidationError
+from backlog_core.server import mcp
 from sam_schema.core.addressing import parse_address
 
 from tests.helpers import call_mcp_tool
@@ -120,27 +111,6 @@ def test_an_empty_plan_address_is_refused_before_any_content_reference_is_built(
         parse_address("")
 
 
-@pytest.mark.parametrize("revision", ["rev-1", ""])
-def test_no_content_write_builder_can_pair_create_only_with_an_expected_revision(revision: str) -> None:
-    """``ContentWrite``'s two refusals are fenced by how every builder constructs one.
-
-    Each builder derives the pair from one value -- ``create_only=not revision`` beside
-    ``expected_revision=revision`` -- so whichever way that value falls, only one of the two is
-    ever set. This reproduces that derivation for both values rather than trusting it by reading.
-    ``owner_reference`` is fenced separately: no artifact-kind write passes one at all: only the
-    plan-kind writes in ``sam_schema.core.backends.content`` and ``dh_core.ledger.port`` do, and
-    the validator's plan arm ignores it.
-    """
-    write = ContentWrite(
-        reference=ContentRef(kind=ContentKind.PLAN, name="P1"),
-        content="c",
-        expected_revision=revision,
-        create_only=not revision,
-    )
-
-    assert not (write.create_only and write.expected_revision)
-
-
 def test_a_tampered_work_item_head_fails_closed_as_a_content_error() -> None:
     """``WorkItemHead``'s digest refusal never escapes: ``parse_work_item_head`` is the only
     path that builds one from stored bytes and it converts, while ``WorkItemHead.create``
@@ -150,32 +120,3 @@ def test_a_tampered_work_item_head_fails_closed_as_a_content_error() -> None:
 
     with pytest.raises(ContentUnavailableError, match="work-item head is invalid"):
         parse_work_item_head(tampered)
-
-
-def test_the_entry_block_strike_refusal_has_no_caller_that_can_reach_it() -> None:
-    """``entry_blocks.strike_entry``'s ``ValueError`` is fenced by its two call sites.
-
-    ``_rewrite_replace`` is its only caller: it passes either a block it just built with
-    ``wrap_entry_with_timestamp`` or a span ``find_entry_spans`` just located, so the argument is
-    always a valid entry block. The ``backlog_strike_entry`` tool does not route here at all --
-    ``operations.strike_entry`` mutates the parsed ``Entry`` model instead.
-    """
-    legacy = entry_blocks.rewrite_section(
-        "plain legacy text", new_content="new", replace=True, reason="r", added_date="2026-01-01"
-    )
-    spanned = entry_blocks.rewrite_section(
-        "<div><sub>2026-01-01T00:00:00Z</sub>\n\nx\n</div>", new_content="new", replace=True, reason="r"
-    )
-
-    assert "struck:" in legacy
-    assert "struck:" in spanned
-
-
-def test_the_manifest_reference_boundary_still_converts() -> None:
-    """The one already-fixed site, kept under test beside the rest of the classification.
-
-    A bare ``ContentRef`` construction still raises ``pydantic.ValidationError``: the conversion
-    lives at the boundary that builds the model from caller input, not in the validator.
-    """
-    with pytest.raises(ValidationError, match="namespace must not be empty"):
-        _ = _manifest_reference("")

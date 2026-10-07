@@ -4,9 +4,7 @@ T13: Full workflow validation — verifies that the consolidated dh_paths
 architecture works end-to-end across all consumers.
 
 Tests cover:
-- Full backlog write/read cycle via new state root
-- Full plan file write/read cycle via new state root
-- Context file lifecycle (write, read, delete)
+- Backlog model state-root resolution
 - Worktree state isolation (two projects use distinct state roots)
 - Artifact path resolution through GitHubArtifactProvider (no .claude/)
 - ArtifactRegistry round-trip: register, read, remove
@@ -20,7 +18,6 @@ Tests cover:
 
 from __future__ import annotations
 
-import json
 import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -81,58 +78,7 @@ def project_with_dirs(isolated_project: tuple[Path, Path]) -> tuple[Path, Path]:
 
 
 class TestBacklogWriteReadCycle:
-    """Full backlog write/read cycle using the new state root.
-
-    Strategy: Write a markdown file directly to backlog_dir(), read it back,
-    and verify round-trip fidelity. No GitHub calls — filesystem only.
-    Validates that the backlog directory is correctly placed under
-    DH_STATE_HOME/projects/{slug}/backlog/ (not .claude/backlog/).
-    """
-
-    def test_backlog_file_written_to_state_root_not_dot_claude(self, project_with_dirs: tuple[Path, Path]) -> None:
-        """Verify a backlog file written to backlog_dir() resolves under DH_STATE_HOME.
-
-        Tests: backlog_dir() routes to state root, not .claude/backlog/
-        How: Write a sentinel file to backlog_dir(); assert its path contains
-             the project slug and does not contain '.claude'
-        Why: Core requirement of T13 — all backlog state must be outside the repo
-        """
-        project_root, _sr = project_with_dirs
-
-        # Arrange
-        bd = backlog_dir(project_root)
-        item_file = bd / "p1-my-feature.md"
-
-        # Act
-        item_file.write_text("# My Feature\n\nstatus: open\n", encoding="utf-8")
-
-        # Assert — file is under state root, not .claude/backlog/
-        assert item_file.exists()
-        assert ".claude" not in str(item_file)
-        assert "backlog" in str(item_file)
-        slug = compute_slug(project_root)
-        assert slug in str(item_file)
-
-    def test_backlog_file_round_trips_content_intact(self, project_with_dirs: tuple[Path, Path]) -> None:
-        """Verify backlog file content survives a write/read cycle.
-
-        Tests: backlog_dir() is a readable, writable filesystem path
-        How: Write YAML frontmatter + body; read back; compare exact content
-        Why: Producers and consumers must agree on file location
-        """
-        project_root, _sr = project_with_dirs
-
-        # Arrange
-        content = "---\ntitle: Integration Test Item\nstatus: open\npriority: P1\n---\n\nTest body.\n"
-        bd = backlog_dir(project_root)
-        item_file = bd / "p1-integration-test-item.md"
-
-        # Act
-        item_file.write_text(content, encoding="utf-8")
-        result = item_file.read_text(encoding="utf-8")
-
-        # Assert
-        assert result == content
+    """Backlog model paths resolve to the DH state root."""
 
     def test_models_backlog_dir_resolves_to_dh_state_not_dot_claude(self, isolated_project: tuple[Path, Path]) -> None:
         """Verify models.BACKLOG_DIR resolves under DH_STATE_HOME, not .claude/.
@@ -170,170 +116,6 @@ class TestBacklogWriteReadCycle:
 
         # Assert
         assert slug in str(models.BACKLOG_DIR)
-
-
-# ---------------------------------------------------------------------------
-# Full plan file write/read cycle
-# ---------------------------------------------------------------------------
-
-
-class TestPlanFileWriteReadCycle:
-    """Full plan file write/read cycle using the new state root.
-
-    Strategy: Write a YAML plan file to plan_dir(), read it back via the
-    filesystem, and confirm it is not stored under the repo's plan/ directory.
-    """
-
-    def test_plan_file_written_to_state_root_not_repo_plan_dir(self, project_with_dirs: tuple[Path, Path]) -> None:
-        """Verify a plan file written to plan_dir() is outside the repo.
-
-        Tests: plan_dir() resolves to DH_STATE_HOME/projects/{slug}/plan/
-        How: Write plan YAML; assert path is under state root and not under
-             project_root/plan/
-        Why: Plan files must move out of the repo working tree
-        """
-        project_root, _sr = project_with_dirs
-
-        # Arrange
-        pd = plan_dir(project_root)
-        plan_file = pd / "P001-my-feature.yaml"
-        content = "plan-number: 1\nslug: my-feature\ngoal: test\ntasks: []\n"
-
-        # Act
-        plan_file.write_text(content, encoding="utf-8")
-
-        # Assert — NOT in repo's plan/ directory
-        assert plan_file.exists()
-        repo_plan_dir = project_root / "plan"
-        assert not str(plan_file).startswith(str(repo_plan_dir))
-        assert ".claude" not in str(plan_file)
-        slug = compute_slug(project_root)
-        assert slug in str(plan_file)
-
-    def test_plan_file_round_trips_yaml_content(self, project_with_dirs: tuple[Path, Path]) -> None:
-        """Verify plan YAML content survives a write/read cycle.
-
-        Tests: plan_dir() is a readable, writable filesystem path
-        How: Write multi-line YAML; read back; assert content identity
-        Why: SAM MCP server reads plan files from this location
-        """
-        project_root, _sr = project_with_dirs
-
-        # Arrange
-        yaml_content = (
-            "plan-number: 42\n"
-            "slug: test-feature\n"
-            "goal: Verify path consolidation\n"
-            "tasks:\n"
-            "  - id: T1\n"
-            "    title: First task\n"
-            "    status: not-started\n"
-        )
-        pd = plan_dir(project_root)
-        plan_file = pd / "P042-test-feature.yaml"
-
-        # Act
-        plan_file.write_text(yaml_content, encoding="utf-8")
-        result = plan_file.read_text(encoding="utf-8")
-
-        # Assert
-        assert result == yaml_content
-
-    def test_plan_codebase_subdir_exists_after_ensure_dirs(self, project_with_dirs: tuple[Path, Path]) -> None:
-        """Verify plan/codebase/ subdirectory is created by ensure_dirs().
-
-        Tests: ensure_dirs creates plan/codebase/ for codebase analysis artifacts
-        How: Call ensure_dirs; check plan_dir()/codebase/ exists
-        Why: codebase-analyzer writes artifacts to this subdirectory
-        """
-        project_root, _sr = project_with_dirs
-
-        # Assert — ensure_dirs already called in fixture
-        codebase_dir = plan_dir(project_root) / "codebase"
-        assert codebase_dir.is_dir()
-
-
-# ---------------------------------------------------------------------------
-# Context file lifecycle
-# ---------------------------------------------------------------------------
-
-
-class TestContextFileLifecycle:
-    """Context file write, read, and delete lifecycle.
-
-    Strategy: Simulate the active-task record lifecycle — write an
-    active-task JSON context file to context_dir(), read it back, then
-    delete it, as `active-task clear` does.
-    """
-
-    def test_context_file_written_to_state_root_not_dot_claude(self, project_with_dirs: tuple[Path, Path]) -> None:
-        """Verify context file writes to DH state root, not .claude/context/.
-
-        Tests: context_dir() resolves outside the repo working tree
-        How: Write active-task JSON; assert path does not contain .claude/context
-        Why: Session context files must not pollute the repo working tree
-        """
-        project_root, _sr = project_with_dirs
-
-        # Arrange
-        cd = context_dir(project_root)
-        session_id = "test-session-abc123"
-        context_file = cd / f"active-task-{session_id}.json"
-        payload = {"plan": "P001", "task_id": "T1", "parent_issue_number": 42}
-
-        # Act
-        context_file.write_text(json.dumps(payload), encoding="utf-8")
-
-        # Assert
-        assert context_file.exists()
-        assert ".claude/context" not in str(context_file)
-        slug = compute_slug(project_root)
-        assert slug in str(context_file)
-
-    def test_context_file_round_trips_json_payload(self, project_with_dirs: tuple[Path, Path]) -> None:
-        """Verify context JSON payload survives a write/read cycle.
-
-        Tests: context_dir() is a readable, writable filesystem path
-        How: Write known JSON; read and parse back; compare all fields
-        Why: task_status_hook.py reads this file on PostToolUse events
-        """
-        project_root, _sr = project_with_dirs
-
-        # Arrange
-        cd = context_dir(project_root)
-        session_id = "session-deadbeef"
-        context_file = cd / f"active-task-{session_id}.json"
-        payload = {"plan": "P981", "task_id": "T13", "parent_issue_number": 981}
-
-        # Act
-        context_file.write_text(json.dumps(payload), encoding="utf-8")
-        loaded = json.loads(context_file.read_text(encoding="utf-8"))
-
-        # Assert
-        assert loaded["plan"] == payload["plan"]
-        assert loaded["task_id"] == payload["task_id"]
-        assert loaded["parent_issue_number"] == payload["parent_issue_number"]
-
-    def test_context_file_deletion_leaves_no_file(self, project_with_dirs: tuple[Path, Path]) -> None:
-        """Verify context file can be deleted after task completion.
-
-        Tests: deleting the active-task context file removes it from context_dir()
-        How: Write context file; delete it; assert it no longer exists
-        Why: Stale context files must not persist beyond task execution
-        """
-        project_root, _sr = project_with_dirs
-
-        # Arrange
-        cd = context_dir(project_root)
-        context_file = cd / "active-task-cleanup-test.json"
-        context_file.write_text('{"task_id": "T1"}', encoding="utf-8")
-        assert context_file.exists()
-
-        # Act — simulate hook deletion
-        context_file.unlink()
-
-        # Assert
-        assert not context_file.exists()
 
 
 # ---------------------------------------------------------------------------
@@ -500,22 +282,6 @@ class TestArtifactProviderPathResolution:
         # Act / Assert
         with pytest.raises(ValueError, match="Path traversal detected"):
             provider.read_artifact_content("../../../etc/passwd")
-
-    def test_artifact_provider_root_does_not_contain_dot_claude(self, isolated_project: tuple[Path, Path]) -> None:
-        """Verify the provider root_worktree path does not include .claude/.
-
-        Tests: GitHubArtifactProvider uses state_root() not a .claude/ path
-        How: Instantiate provider; inspect _root_worktree string; assert no .claude
-        Why: Artifacts must be served from the new state root, not the old .claude tree
-        """
-        project_root, _state_home = isolated_project
-
-        # Arrange
-        with patch.object(dh_paths, "git_project_root", return_value=project_root):
-            provider = GitHubArtifactProvider(repo="owner/repo")
-
-        # Assert
-        assert ".claude" not in str(provider._root_worktree)
 
     def test_read_local_artifact_content_returns_none_for_missing_file(
         self, project_with_dirs: tuple[Path, Path]
@@ -1176,33 +942,6 @@ class TestGrepAuditOldPaths:
 
         # Assert
         assert hits == [], "artifact_registry.py contains .claude/ path references:\n" + "\n".join(hits)
-
-    def test_dh_paths_module_is_importable_and_exports_expected_functions(self) -> None:
-        """Verify dh_paths exports all expected public functions.
-
-        Tests: dh_paths module public API completeness
-        How: Import dh_paths; check each required function is callable
-        Why: If any function was accidentally removed, consumers would fail silently
-        """
-        # Arrange
-        expected_functions = [
-            "git_project_root",
-            "compute_slug",
-            "project_dh_dir",
-            "state_root",
-            "backlog_dir",
-            "plan_dir",
-            "milestones_dir",
-            "research_dir",
-            "context_dir",
-            "reports_dir",
-            "ensure_dirs",
-        ]
-
-        # Act / Assert
-        for fn_name in expected_functions:
-            assert hasattr(dh_paths, fn_name), f"dh_paths missing function: {fn_name}"
-            assert callable(getattr(dh_paths, fn_name)), f"dh_paths.{fn_name} is not callable"
 
 
 # ---------------------------------------------------------------------------

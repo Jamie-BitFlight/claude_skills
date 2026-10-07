@@ -10,11 +10,13 @@ asyncio_mode = "auto" is set in pyproject.toml — no @pytest.mark.asyncio neede
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 import pytest
 from dh_core import ledger
 from fastmcp.client import Client
 from fastmcp.exceptions import ToolError
+from sam_schema import server_plan_ops
 from sam_schema.core.backends.memory import InMemoryTaskProvider
 from sam_schema.core.backends.memory_context_backend import InMemoryContextBackend
 from sam_schema.core.context_config import ContextConfig, reset_context_config, set_context_config
@@ -62,6 +64,15 @@ _SINGLE_TASK_LIST = [
         "priority": 1,
         "complexity": "low",
     }
+]
+
+_INVALID_TASK_INPUTS = [
+    pytest.param({"title": "Missing ID"}, id="missing-id"),
+    pytest.param({"id": "T1"}, id="missing-title"),
+    pytest.param({"id": "not-an-id", "title": "Bad ID"}, id="invalid-id"),
+    pytest.param({"id": "T1", "title": "Bad dependency", "dependencies": ["not-an-id"]}, id="invalid-dependency"),
+    pytest.param({"id": "T1", "title": ""}, id="empty-title"),
+    pytest.param({"id": "T1", "title": "x" * 201}, id="long-title"),
 ]
 
 
@@ -431,6 +442,9 @@ async def test_sam_task_update_append_section_stores_content(
     assert result.data.updated is True
     assert result.data.address == f"{plan_id}/T01"
 
+    read_result = await client.call_tool("sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}})
+    assert read_result.data.task.context_notes == "## Progress Notes\n\nWork in progress."
+
 
 async def test_sam_task_update_invalid_json_raises_tool_error(
     client: Client, task_backend: InMemoryTaskProvider
@@ -525,6 +539,53 @@ async def test_sam_plan_create_invalid_task_missing_id_raises_tool_error(client:
                 }
             },
         )
+
+
+@pytest.mark.parametrize("action", ["create", "append_task"])
+@pytest.mark.parametrize("task", _INVALID_TASK_INPUTS)
+async def test_sam_plan_rejects_invalid_task_without_persisting_it(
+    client: Client, action: str, task: dict[str, object]
+) -> None:
+    """Invalid public task input is refused before it mutates a plan."""
+    plan_id = ""
+    if action == "create":
+        before = (await client.call_tool("sam_plan", {"config": {"action": "list", "limit": 100}})).data.items
+        payload = {"config": {"action": "create", "slug": "invalid", "goal": "Invalid input", "tasks": [task]}}
+    else:
+        created = await client.call_tool(
+            "sam_plan", {"config": {"action": "create", "slug": "draft", "goal": "Draft", "tasks": []}}
+        )
+        plan_id = created.data.plan_id
+        before = (await client.call_tool("sam_plan", {"plan": plan_id, "config": {"action": "read"}})).data.plan.tasks
+        payload = {"plan": plan_id, "config": {"action": "append_task", "task": task}}
+
+    with pytest.raises(ToolError):
+        await client.call_tool("sam_plan", payload)
+
+    if action == "create":
+        after = (await client.call_tool("sam_plan", {"config": {"action": "list", "limit": 100}})).data.items
+    else:
+        after = (await client.call_tool("sam_plan", {"plan": plan_id, "config": {"action": "read"}})).data.plan.tasks
+    assert after == before
+
+
+async def test_sam_plan_task_authoring_defaults_an_omitted_status(client: Client) -> None:
+    """The public task-definition boundary accepts an omitted status as not-started."""
+    created = await client.call_tool(
+        "sam_plan",
+        {
+            "config": {
+                "action": "create",
+                "slug": "default-status",
+                "goal": "Default status",
+                "tasks": [{"id": "T1", "title": "Task"}],
+            }
+        },
+    )
+
+    read = await client.call_tool("sam_plan", {"plan": created.data.plan_id, "config": {"action": "read"}})
+
+    assert read.data.plan.tasks[0].status == "not-started"
 
 
 # ===========================================================================
@@ -752,25 +813,27 @@ async def test_sam_plan_ready_full_returns_complete_task_fields(
     """sam_plan action=ready with full=True returns the complete Task model dump.
 
     Tests: sam_plan ready full=True path.
-    How: Create plan with one ready task; call ready with full=True.
+    How: Create plan with a description; call ready with full=True and verify the real operation receives that flag.
     Why: full=True is needed when agents require all task fields, not just the 7-field manifest.
     """
     # Arrange
-    plan_data = task_backend.create_plan("full-plan", "Full goal", [task_def("T01")])
+    task = task_def("T01").model_copy(update={"description": "Task context that the full response must retain."})
+    plan_data = task_backend.create_plan("full-plan", "Full goal", [task])
     plan_id = plan_data["plan_id"]
 
     # Act
-    result = await client.call_tool("sam_plan", {"config": {"action": "ready", "full": True}, "plan": plan_id})
+    with patch.object(
+        server_plan_ops.operations, "get_ready_tasks", wraps=server_plan_ops.operations.get_ready_tasks
+    ) as ready:
+        result = await client.call_tool("sam_plan", {"config": {"action": "ready", "full": True}, "plan": plan_id})
 
     # Assert
+    assert ready.call_count == 1
+    assert ready.call_args.kwargs["full"] is True
     data = result.data
     assert data.count == 1
     task = data.ready_tasks[0]
-    # Full model contains more than the compact 7-field manifest
-    assert task.id
-    assert task.title
-    assert task.status
-    assert task.dependencies is not None
+    assert task.description == "Task context that the full response must retain."
 
 
 async def test_sam_plan_ready_missing_plan_raises_tool_error(client: Client) -> None:
@@ -794,7 +857,7 @@ async def test_sam_plan_update_sets_context_field(client: Client, task_backend: 
     """sam_plan action=update sets the plan-level context field.
 
     Tests: sam_plan update context path.
-    How: Create plan; set context via update; verify updated=true.
+    How: Create plan; set context via update; read it through sam_plan.
     Why: Context is set by the context-gathering agent after discovery.
     """
     # Arrange
@@ -809,6 +872,9 @@ async def test_sam_plan_update_sets_context_field(client: Client, task_backend: 
     # Assert
     assert result.data.updated is True
     assert result.data.address == plan_id
+
+    read_result = await client.call_tool("sam_plan", {"config": {"action": "read"}, "plan": plan_id})
+    assert read_result.data.plan.context == "New context text"
 
 
 async def test_sam_plan_update_missing_plan_raises_tool_error(client: Client) -> None:
@@ -849,29 +915,11 @@ async def test_sam_active_task_get_returns_null_when_not_set(client: Client) -> 
 # ===========================================================================
 
 
-async def test_sam_active_task_set_stores_plan_and_task(client: Client) -> None:
-    """sam_active_task action=set stores the plan/task address and returns the context.
-
-    Tests: sam_active_task set happy path.
-    How: Set plan=P1, task=T01; verify the returned context contains task_id.
-    Why: set is the primary write operation for session-to-task binding.
-    """
-    # Act
-    result = await client.call_tool(
-        "sam_active_task", {"config": {"action": "set", "plan": "P1", "task": "T01"}, "session_id": "test-session-set"}
-    )
-
-    # Assert
-    data = result.data
-    assert data.active_task is not None
-    assert data.active_task.task_id == "T01"
-
-
 async def test_sam_active_task_set_with_explicit_session_id(client: Client) -> None:
     """sam_active_task action=set with explicit session_id stores to the named session.
 
     Tests: sam_active_task set with session_id parameter.
-    How: Set with session_id='test-session'; verify session_id in returned context.
+    How: Set with session_id='test-session'; read back the same persisted context.
     Why: Explicit session IDs enable multi-agent isolation in worktree deployments.
     """
     # Act
@@ -884,6 +932,14 @@ async def test_sam_active_task_set_with_explicit_session_id(client: Client) -> N
     assert ctx is not None
     assert ctx.session_id == "test-session-xyz"
     assert ctx.task_id == "T05"
+
+    read_result = await client.call_tool(
+        "sam_active_task", {"config": {"action": "get"}, "session_id": "test-session-xyz"}
+    )
+    stored = read_result.data.active_task
+    assert stored is not None
+    assert stored.plan == "P10"
+    assert stored.task_id == "T05"
 
 
 async def test_sam_active_task_get_after_set_returns_stored_context(client: Client) -> None:

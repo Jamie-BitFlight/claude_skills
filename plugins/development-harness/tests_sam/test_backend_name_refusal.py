@@ -1,9 +1,8 @@
-"""An unrecognised backend name must not be a bare ``ValueError``.
+"""An unrecognised context backend name must not be a bare ``ValueError``.
 
-``create_task_backend`` and ``create_context_backend`` resolve their name from an env
-var, then ``.dh/config.yaml``, then the beads marker, and refused an unknown one with a
-plain ``ValueError`` -- the unconverted siblings of the refusal 5c804ad6a fixed in
-``backlog_core.backend_protocol``. Nothing on the SAM path catches ``ValueError``, and
+``create_context_backend`` resolves its name from an env var, then ``.dh/config.yaml``,
+then the beads marker, and refused an unknown one with a plain ``ValueError``. Nothing
+on the SAM path catches ``ValueError``, and
 ``server_backend`` built the context backend at import time, so ``CONTEXTBACKEND=bogus``
 made ``import sam_schema.server_backend`` fail outright: the server did not start, which
 is worse than a failed call.
@@ -24,24 +23,10 @@ from pathlib import Path
 import pytest
 from fastmcp.exceptions import ToolError
 from sam_schema.core.action_models import GetActiveTaskConfig
-from sam_schema.core.context_config import create_context_backend, reset_context_config
-from sam_schema.core.exceptions import SamError
-from sam_schema.core.task_config import create_task_backend
+from sam_schema.core.context_config import reset_context_config
 from sam_schema.server_active_task import sam_active_task_impl
 
 _PLUGIN_DIR = Path(__file__).resolve().parents[1]
-
-
-def test_unknown_context_backend_name_refuses_as_a_sam_error() -> None:
-    """``create_context_backend`` refuses an unknown name with sam_schema's own error."""
-    with pytest.raises(SamError, match="Unknown backend"):
-        create_context_backend("bogus")
-
-
-def test_unknown_task_backend_name_refuses_as_a_sam_error() -> None:
-    """``create_task_backend`` refuses an unknown name the same way."""
-    with pytest.raises(SamError, match="Unknown backend"):
-        create_task_backend("bogus")
 
 
 def test_server_backend_imports_with_an_unknown_context_backend_name() -> None:

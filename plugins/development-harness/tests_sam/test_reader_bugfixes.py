@@ -87,6 +87,7 @@ class TestBug1ProseParallelizeWithDroppedTasks:
             f"Expected 1 task but got {len(result.plan.tasks)}. Gaps: {[g.actual for g in result.gaps]}"
         )
         assert result.plan.tasks[0].id == "T1"
+        assert result.plan.tasks[0].title == "Decision gate task"
         assert result.plan.tasks[0].parallelize_with == []
 
 
@@ -153,7 +154,8 @@ class TestBug2StringFormatTaskEntriesDropped:
         assert len(result.plan.tasks) == 3, (
             f"Expected 3 tasks but got {len(result.plan.tasks)}. Gaps: {[g.actual for g in result.gaps]}"
         )
-        task_ids = [t.id for t in result.plan.tasks]
-        assert "1.1" in task_ids
-        assert "1.2" in task_ids
-        assert "1.3" in task_ids
+        assert [(task.id, task.title) for task in result.plan.tasks] == [
+            ("1.1", "Update entry-template.md — Freshness Tracking note"),
+            ("1.2", "Update research-curator SKILL.md — Batch Mode"),
+            ("1.3", "Integration verification — 6 acceptance criteria"),
+        ]

@@ -1,23 +1,14 @@
-"""Assert frontend files contain no business logic.
+"""Assert frontend import roots stay within their declared allowlists.
 
-Frontends are thin adapters: parse args, call operations, format output.
-This test uses AST-based import analysis to enforce that frontend files
-only import from an allowlist of permitted modules.
+This AST check guards the frontend dependency architecture: an unapproved
+import root cannot enter a declared frontend. It does not establish that the
+file has no inline business logic or that broad permitted roots contain none.
 
-The allowlist approach is stronger than a regex denylist because it catches
-the general case (any import not on the list) rather than specific known
-bad patterns. As logic is extracted to dh_core.operations, the allowlist
-is tightened — eventually the only permitted import for business logic
-will be dh_core.operations.
-
-Additionally, a denylist of specific forbidden patterns (regexes) is
-maintained as a regression guard for known-leaked logic.
 """
 
 from __future__ import annotations
 
 import ast
-import re
 from pathlib import Path
 
 import pytest
@@ -25,7 +16,7 @@ import pytest
 # Ensure plugin root resolves relative paths.
 _plugin_root = Path(__file__).resolve().parent.parent
 
-#: Frontend files that must remain logic-free.
+#: Frontend files whose import roots are bounded by ``ALLOWED_IMPORTS``.
 FRONTEND_FILES: list[str] = [
     "sam_schema/cli.py",
     "sam_schema/server.py",
@@ -39,8 +30,6 @@ FRONTEND_FILES: list[str] = [
 
 #: Allowed import roots for each frontend file.
 #: During the transition, frontends still import from legacy modules.
-#: As operations are extracted, entries are removed from the allowlist
-#: and the forbidden_patterns list grows.
 ALLOWED_IMPORTS: dict[str, set[str]] = {
     "sam_schema/cli.py": {
         "__future__",
@@ -122,17 +111,9 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     },
 }
 
+
 #: Specific forbidden regex patterns per file (regression guard).
 #: Grows as logic is extracted. Each entry is (filepath, pattern, description).
-FORBIDDEN_PATTERNS: list[tuple[str, str, str]] = [
-    # Phase 1 will add entries like:
-    # ("sam_schema/cli.py", r"from sam_schema\.core\.query import",
-    #  "CLI must import from dh_core.operations, not legacy query.py"),
-    # ("sam_schema/server.py", r"from sam_schema\.core\.gist_task_layer import",
-    #  "MCP server must use dh_core.operations, not GistTaskLayer directly"),
-]
-
-
 def _extract_import_roots(filepath: Path) -> set[str]:
     """Parse a Python file and extract all import root module names.
 
@@ -168,12 +149,12 @@ def _extract_import_roots(filepath: Path) -> set[str]:
     return roots
 
 
-class TestFrontendLogicFree:
-    """Frontend files must not contain business logic."""
+class TestFrontendImportRoots:
+    """Frontend import roots remain within the declared architecture boundary."""
 
     @pytest.mark.parametrize("filepath", FRONTEND_FILES)
-    def test_imports_are_allowlisted(self, filepath: str) -> None:
-        """Every import in a frontend file must be on the allowlist."""
+    def test_import_roots_are_allowlisted(self, filepath: str) -> None:
+        """Every absolute import root in a frontend file is declared."""
         full_path = _plugin_root / filepath
         if not full_path.exists():
             pytest.skip(f"{filepath} does not exist")
@@ -190,22 +171,5 @@ class TestFrontendLogicFree:
         assert not violations, (
             f"{filepath} imports non-allowlisted modules: {sorted(violations)}.\n"
             f"Allowed: {sorted(allowed)}.\n"
-            f"Business logic imports must go through dh_core.operations."
-        )
-
-    @pytest.mark.parametrize(
-        ("filepath", "pattern", "description"),
-        FORBIDDEN_PATTERNS or [("__none__", "__never_match__", "no patterns registered yet")],
-    )
-    def test_no_forbidden_patterns(self, filepath: str, pattern: str, description: str) -> None:
-        if filepath == "__none__":
-            pytest.skip("No forbidden patterns registered yet")
-        full_path = _plugin_root / filepath
-        if not full_path.exists():
-            pytest.skip(f"{filepath} does not exist yet")
-        content = full_path.read_text()
-        assert not re.search(pattern, content), (
-            f"{filepath} matches forbidden pattern: {pattern}\n"
-            f"Description: {description}\n"
-            f"This indicates business logic has leaked back into the frontend."
+            "Frontend import roots must be declared in ALLOWED_IMPORTS."
         )

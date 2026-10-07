@@ -6,12 +6,10 @@ generic surface.  GitHubBackend is included in the parametrization but
 skipped by default (require network access and a valid GITHUB_TOKEN); set
 ``BACKLOG_CROSS_BACKEND_GITHUB=1`` to run it.
 
-GitHub-specific methods (``_fetch_issue_graphql``, ``_fetch_issues_graphql``,
-``_update_issue_graphql``, ``_add_comment_graphql``, ``_fetch_milestones_graphql``,
-``try_get_github``) live in ``test_github_extras.py`` and parametrize over
-``GitHubBackend`` only.  Branch-operation tests live in
-``test_branch_backend.py`` and parametrize over backends where
-``supports_branches`` is True.
+GitHub-specific GraphQL request/parsing behavior is covered by request-shaped
+fake-transport tests; remote durability belongs to the sandboxed live-E2E lane.
+Branch-operation tests live in ``test_branch_backend.py`` and parametrize over
+backends where ``supports_branches`` is True.
 
 Integer-id assertions (``isinstance(number, int)``, ``num_b > num_a``,
 ``title_map[...] == number``) are gated on ``backend.issue_id_type == "integer"``
@@ -36,8 +34,8 @@ Test layout:
     TestViewEnrich            — view_enrich_from_github populates ViewItemResult
     TestBeadsBackendConformance — beads-specific protocol surface
 
-GitHub-specific surface (IssueNode fetch/update, comments, milestones,
-try_get_github) is covered in test_github_extras.py.  Branch CRUD
+GitHub-specific request/parsing behavior uses request-shaped fake transports;
+the sandboxed live-E2E lane covers remote durability. Branch CRUD
 (create/get/list/delete) is covered in test_branch_backend.py.
 """
 
@@ -140,6 +138,11 @@ def _make_item_with_issue(issue_num: int, title: str = "Tracked Feature") -> Bac
 class TestBackendStatus:
     """probe_backend_status returns a valid BackendStatus with REACHABLE for local backends."""
 
+    @pytest.mark.parametrize(
+        "backend",
+        [pytest.param("memory", id="InMemoryBackend"), pytest.param("sqlite", id="SQLiteBackend")],
+        indirect=True,
+    )
     def test_probe_returns_reachable_for_local_backends(self, backend: WorkItemBackend) -> None:
         """probe_backend_status returns REACHABLE for memory and SQLite backends.
 
@@ -157,6 +160,11 @@ class TestBackendStatus:
 
             assert status.availability == BackendAvailability.REACHABLE
 
+    @pytest.mark.parametrize(
+        "backend",
+        [pytest.param("memory", id="InMemoryBackend"), pytest.param("sqlite", id="SQLiteBackend")],
+        indirect=True,
+    )
     def test_probe_returns_named_status(self, backend: WorkItemBackend) -> None:
         """probe_backend_status result has a non-empty name field.
 
@@ -171,6 +179,11 @@ class TestBackendStatus:
         if not os.environ.get("BACKLOG_CROSS_BACKEND_GITHUB"):
             assert status.name != ""
 
+    @pytest.mark.parametrize(
+        "backend",
+        [pytest.param("memory", id="InMemoryBackend"), pytest.param("sqlite", id="SQLiteBackend")],
+        indirect=True,
+    )
     def test_try_get_github_returns_none_for_local_backends(self, backend: WorkItemBackend) -> None:
         """try_get_github returns None for local (non-GitHub) backends.
 
@@ -180,7 +193,7 @@ class TestBackendStatus:
         # Arrange — nothing extra
 
         # Act / Assert — only for local (non-GitHub) backends.  GitHubBackend
-        # returns a real Repository, covered in test_github_extras.py.
+        # returns a real Repository; remote behavior belongs to sandboxed live-E2E.
         if not os.environ.get("BACKLOG_CROSS_BACKEND_GITHUB"):
             assert backend.try_get_github() is None
 
@@ -230,8 +243,8 @@ class TestCreateItem:
 
         # Assert — generic backends round-trip via view_enrich_from_github,
         # which works for both integer and string issue IDs.  GitHubExtras
-        # backends additionally expose _fetch_issue_graphql; that path is
-        # covered in test_github_extras.py.
+        # backends additionally expose _fetch_issue_graphql; deterministic
+        # request/parsing coverage uses request-shaped fake transports.
         result = ViewItemResult(title="Fetchable Feature")
         enrichment = backend.view_enrich_from_github(result, str(number))
         assert enrichment.enriched is True

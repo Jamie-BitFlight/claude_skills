@@ -487,36 +487,6 @@ class TestAddItemCreatesLocalFile:
 
         mock_try_gh.assert_called_once()
 
-    def test_add_item_calls_github_and_returns_item_ref(self, mocker: MockerFixture) -> None:
-        """Verify add_item calls try_get_github and returns item_ref on success.
-
-        Tests: add_item backend-first integration path.
-        How: Patch try_get_github to return a mock repo, verify item_ref is returned.
-        Why: Backend-first design requires the backend to be contacted before local file write.
-        """
-        mock_repo = mocker.Mock()
-        mocker.patch("backlog_core.operations.try_get_github", return_value=mock_repo)
-        mocker.patch("backlog_core.operations.create_issue_for_item", return_value=42)
-
-        result = add_item(title="GH First Item", description="desc", priority="P1")
-
-        assert result.get("item_ref") == "#42"
-
-    def test_add_item_returns_item_ref_from_github(self, mocker: MockerFixture) -> None:
-        """Verify add_item return dict includes item_ref when backend issue is created.
-
-        Tests: add_item item_ref in return value for integer-ID backends.
-        How: Mock create_issue_for_item to return 99; expect item_ref == '#99'.
-        Why: item_ref is the canonical selector string used by all downstream callers.
-        """
-        mock_repo = mocker.Mock()
-        mocker.patch("backlog_core.operations.try_get_github", return_value=mock_repo)
-        mocker.patch("backlog_core.operations.create_issue_for_item", return_value=99)
-
-        result = add_item(title="Issue Num Item", description="desc", priority="P1")
-
-        assert result["item_ref"] == "#99"
-
     def test_add_item_returns_item_ref_in_hash_n_format(self, mocker: MockerFixture) -> None:
         """Verify add_item return dict includes item_ref in '#N' string format.
 

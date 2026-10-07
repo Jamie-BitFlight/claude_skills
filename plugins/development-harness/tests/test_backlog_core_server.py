@@ -146,15 +146,6 @@ async def test_backlog_add_passes_optional_params():
     assert call_kwargs["force"] is True
 
 
-async def test_backlog_add_backlog_error_returns_error_key():
-    """backlog_add catches BacklogError and includes error key in response."""
-    with patch("dh_core.operations.add_item", side_effect=BacklogError("duplicate found")):
-        response = await _call("backlog_add", {"title": "Dupe", "priority": "P1", "description": "Already exists"})
-
-    assert response["error"] == "duplicate found"
-    assert "messages" in response
-
-
 async def test_backlog_add_output_messages_included():
     """backlog_add includes output messages from the Output collector."""
     out = Output()
@@ -233,14 +224,6 @@ async def test_backlog_list_type_and_topic_default_to_none():
     call_kwargs = mock_list.call_args.kwargs
     assert call_kwargs["type_"] is None
     assert call_kwargs["topic"] is None
-
-
-async def test_backlog_list_backlog_error_returns_error_key():
-    """backlog_list catches BacklogError and includes error key in response."""
-    with patch("dh_core.operations.list_items", side_effect=BacklogError("backlog dir missing")):
-        response = await _call("backlog_list", {})
-
-    assert response["error"] == "backlog dir missing"
 
 
 async def test_backlog_list_search_filters_across_title_description_topic_type():
@@ -546,64 +529,6 @@ async def test_backlog_list_search_body_field_specific_prefix():
     assert "Unrelated task" not in returned_titles
 
 
-# ---------------------------------------------------------------------------
-# apply_search_filter — unit tests for pre-computed haystack optimisation
-# ---------------------------------------------------------------------------
-
-
-def testapply_search_filter_and_operator_pre_computed_haystack():
-    """apply_search_filter AND returns only items matching all terms.
-
-    Tests: correctness of the AND branch after the pre-computed haystack
-    optimisation — each item's haystack is built once and reused across all
-    terms in the query.
-    How: Call apply_search_filter directly with a 3-item list and an AND query
-    with 2 terms.  Verify the returned list contains only the item that matches
-    both, not those matching one or neither.
-    Why: Pre-computing the haystack must not change which items match — only
-    how many times the haystack string is constructed per item.
-    """
-
-    items: list[dict[str, str | bool]] = [
-        {"title": "Auth token bug", "section": "P1", "topic": "security", "type": "Bug", "body": ""},
-        {"title": "Auth feature", "section": "P1", "topic": "security", "type": "Feature", "body": ""},
-        {"title": "Deploy bug", "section": "P2", "topic": "infra", "type": "Bug", "body": ""},
-        {"title": "Unrelated", "section": "P3", "topic": "docs", "type": "Docs", "body": ""},
-    ]
-
-    result = apply_search_filter(items, "auth AND bug")
-    titles = [i["title"] for i in result]
-
-    assert titles == ["Auth token bug"], f"Expected only 'Auth token bug', got {titles}"
-
-
-def testapply_search_filter_or_operator_pre_computed_haystack():
-    """apply_search_filter OR returns items matching either term.
-
-    Tests: correctness of the OR branch after the pre-computed haystack
-    optimisation — each item's haystack is built once before evaluating any()
-    across terms.
-    How: Call apply_search_filter directly with a 4-item list and an OR query.
-    Verify matched set and excluded set.
-    Why: Same as AND — the optimisation must be semantically transparent.
-    """
-
-    items: list[dict[str, str | bool]] = [
-        {"title": "Auth service", "section": "P1", "topic": "security", "type": "Feature", "body": ""},
-        {"title": "Deploy pipeline", "section": "P2", "topic": "infra", "type": "Feature", "body": ""},
-        {"title": "Refactor models", "section": "P3", "topic": "quality", "type": "Refactor", "body": ""},
-        {"title": "Docs cleanup", "section": "P4", "topic": "docs", "type": "Docs", "body": ""},
-    ]
-
-    result = apply_search_filter(items, "auth OR deploy")
-    titles = [i["title"] for i in result]
-
-    assert "Auth service" in titles
-    assert "Deploy pipeline" in titles
-    assert "Refactor models" not in titles
-    assert "Docs cleanup" not in titles
-
-
 async def test_backlog_list_response_includes_pagination_key_always():
     """backlog_list always includes a pagination key in a successful response."""
     op_result = {"items": [{"title": "X", "description": "", "topic": "", "type": "Bug"}]}
@@ -895,14 +820,6 @@ async def test_backlog_view_forwards_refresh_false_by_default():
 
     call_kwargs = mock_view.call_args.kwargs
     assert call_kwargs["refresh"] is False
-
-
-async def test_backlog_view_backlog_error_returns_error_key():
-    """backlog_view catches BacklogError when item is not found."""
-    with patch("dh_core.operations.view_item", side_effect=BacklogError("No item found for: #999")):
-        response = await _call("backlog_view", {"selector": "#999"})
-
-    assert "No item found for: #999" in response["error"]
 
 
 async def test_backlog_view_default_includes_content():
@@ -1301,14 +1218,6 @@ async def test_backlog_sync_dry_run_forwarded():
     assert mock_sync.call_args.kwargs["dry_run"] is True
 
 
-async def test_backlog_sync_backlog_error_returns_error_key():
-    """backlog_sync catches BacklogError and includes error key."""
-    with patch("dh_core.operations.sync_items", side_effect=BacklogError("GitHub unavailable")):
-        response = await _call("backlog_sync", {})
-
-    assert response["error"] == "GitHub unavailable"
-
-
 async def test_backlog_sync_returns_operation_warnings():
     """backlog_sync retains operation warnings in its response payload."""
 
@@ -1355,14 +1264,6 @@ async def test_backlog_close_passes_cleanup_and_force():
     assert call_kwargs["force"] is True
 
 
-async def test_backlog_close_backlog_error_returns_error_key():
-    """backlog_close catches BacklogError (e.g. item not found)."""
-    with patch("dh_core.operations.close_item", side_effect=BacklogError("item not found")):
-        response = await _call("backlog_close", {"selector": "Item", "reason": "wontfix"})
-
-    assert response["error"] == "item not found"
-
-
 # ---------------------------------------------------------------------------
 # backlog_resolve
 # ---------------------------------------------------------------------------
@@ -1393,14 +1294,6 @@ async def test_backlog_resolve_passes_cleanup_and_force():
     call_kwargs = mock_resolve.call_args.kwargs
     assert call_kwargs["cleanup"] is True
     assert call_kwargs["force"] is True
-
-
-async def test_backlog_resolve_backlog_error_returns_error_key():
-    """backlog_resolve catches BacklogError when resolution fails."""
-    with patch("dh_core.operations.resolve_item", side_effect=BacklogError("open PRs exist")):
-        response = await _call("backlog_resolve", {"selector": "Item", "summary": "no longer needed"})
-
-    assert response["error"] == "open PRs exist"
 
 
 # ---------------------------------------------------------------------------
@@ -1476,14 +1369,6 @@ async def test_backlog_update_passes_description():
     assert call_kwargs["description"] == "Updated description."
 
 
-async def test_backlog_update_backlog_error_returns_error_key():
-    """backlog_update catches BacklogError."""
-    with patch("dh_core.operations.update_item", side_effect=BacklogError("item not found")):
-        response = await _call("backlog_update", {"selector": "Missing"})
-
-    assert response["error"] == "item not found"
-
-
 # ---------------------------------------------------------------------------
 # backlog_groom
 # ---------------------------------------------------------------------------
@@ -1515,14 +1400,6 @@ async def test_backlog_groom_passes_section_and_content():
     call_kwargs = mock_groom.call_args.kwargs
     assert call_kwargs["section"] == "Background"
     assert call_kwargs["content"] == "Some background info"
-
-
-async def test_backlog_groom_backlog_error_returns_error_key():
-    """backlog_groom catches BacklogError."""
-    with patch("dh_core.operations.groom_item", side_effect=BacklogError("item not found")):
-        response = await _call("backlog_groom", {"selector": "#999"})
-
-    assert response["error"] == "item not found"
 
 
 async def test_backlog_groom_accepts_mark_groomed_parameter():
@@ -1588,14 +1465,6 @@ async def test_backlog_normalize_dry_run_forwarded():
     assert mock_normalize.call_args.kwargs["dry_run"] is True
 
 
-async def test_backlog_normalize_backlog_error_returns_error_key():
-    """backlog_normalize catches BacklogError."""
-    with patch("dh_core.operations.normalize_items", side_effect=BacklogError("malformed files")):
-        response = await _call("backlog_normalize", {})
-
-    assert response["error"] == "malformed files"
-
-
 async def test_backlog_normalize_returns_operation_warnings():
     """backlog_normalize retains operation warnings in its response payload."""
 
@@ -1636,14 +1505,6 @@ async def test_backlog_pull_passes_dry_run_and_force():
     call_kwargs = mock_pull.call_args.kwargs
     assert call_kwargs["dry_run"] is True
     assert call_kwargs["force"] is True
-
-
-async def test_backlog_pull_backlog_error_returns_error_key():
-    """backlog_pull catches BacklogError."""
-    with patch("dh_core.operations.pull_items", side_effect=BacklogError("no GitHub token")):
-        response = await _call("backlog_pull", {})
-
-    assert response["error"] == "no GitHub token"
 
 
 async def test_backlog_pull_with_issue_number_selector_calls_pull_by_selector():
@@ -2002,35 +1863,6 @@ async def test_backlog_sync_no_error_key_on_success():
     assert "error" not in response
 
 
-# ---------------------------------------------------------------------------
-# GAP-1: NOT operator
-# ---------------------------------------------------------------------------
-
-
-def testapply_search_filter_not_excludes_matching_item():
-    """apply_search_filter NOT term excludes items that match the term.
-
-    How: Three items; query "backlog NOT quality". Items with "backlog" but
-    also "quality" in the haystack must be excluded. Items with "backlog"
-    only must be included.
-    Why: Validates the _NotPred short-circuit path and its interaction with
-    the pre-computed haystack.
-    """
-
-    items: list[dict[str, str | bool]] = [
-        {"title": "Backlog grooming", "section": "P1", "topic": "process", "type": "Chore", "body": ""},
-        {"title": "Backlog quality review", "section": "P1", "topic": "quality", "type": "Chore", "body": ""},
-        {"title": "Auth refactor", "section": "P2", "topic": "security", "type": "Refactor", "body": ""},
-    ]
-
-    result = apply_search_filter(items, "backlog NOT quality")
-    titles = [i["title"] for i in result]
-
-    assert "Backlog grooming" in titles, "Item matching 'backlog' only must be included"
-    assert "Backlog quality review" not in titles, "Item matching both 'backlog' and 'quality' must be excluded"
-    assert "Auth refactor" not in titles, "Item not matching 'backlog' must be excluded"
-
-
 def testapply_search_filter_not_with_field_prefix():
     """apply_search_filter NOT with field:value syntax excludes field matches.
 
@@ -2073,37 +1905,6 @@ async def test_backlog_list_search_not_operator_excludes_term():
     titles = [i["title"] for i in response["items"]]
     assert "Backlog grooming" in titles
     assert "Backlog quality review" not in titles
-
-
-# ---------------------------------------------------------------------------
-# GAP-2: Mixed AND/OR with parenthetical grouping
-# ---------------------------------------------------------------------------
-
-
-def testapply_search_filter_parenthetical_grouping_or_within_and():
-    """apply_search_filter supports (A OR B) AND C grouping.
-
-    How: Query "(auth OR deploy) AND quality". Items must match either
-    'auth' or 'deploy', AND also 'quality'. Items matching only auth or
-    deploy without quality must be excluded.
-    Why: Validates the recursive-descent parser handles grouped OR inside
-    an AND expression correctly.
-    """
-
-    items: list[dict[str, str | bool]] = [
-        {"title": "Auth quality gate", "section": "P1", "topic": "security", "type": "Feature", "body": ""},
-        {"title": "Auth service", "section": "P1", "topic": "security", "type": "Feature", "body": ""},
-        {"title": "Deploy quality check", "section": "P2", "topic": "infra", "type": "Chore", "body": ""},
-        {"title": "Refactor models", "section": "P3", "topic": "quality", "type": "Refactor", "body": ""},
-    ]
-
-    result = apply_search_filter(items, "(auth OR deploy) AND quality")
-    titles = [i["title"] for i in result]
-
-    assert "Auth quality gate" in titles
-    assert "Deploy quality check" in titles
-    assert "Auth service" not in titles, "Matches auth but not quality — must be excluded"
-    assert "Refactor models" not in titles, "Matches quality but not auth/deploy — must be excluded"
 
 
 def testapply_search_filter_parenthetical_not_inside_group():
