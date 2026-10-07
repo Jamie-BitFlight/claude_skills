@@ -14,10 +14,12 @@ sections needed for the decisions below rather than restating that policy here.
 
 ## Procedure
 
-1. **Resolve the claim.** Identify the authoritative behavior, realistic failure, consequence, and
-   unresolved intent. Inspect callers, existing protection, configuration, and implementation only
-   far enough to locate the real boundary. Complete when each material claim has an authority or an
-   explicit unresolved gap.
+1. **Resolve the claim.** Identify the required behavior, realistic failure, consequence, and
+   evidence authority. Label material intent as authoritative, observed, derived, assumed, or proposed;
+   implementation locates seams but does not define expected behavior. Inspect callers, existing
+   protection, configuration, and implementation only far enough to locate the real boundary. Resolve
+   only ambiguity that can change the design and carry the rest as explicit gaps. Complete when every
+   material claim has an authoritative basis or a consequential unresolved decision.
 2. **Design close evidence.** Choose the direct observation that would distinguish the claimed change,
    preferably the same observation before and after a fix. Complete when the change has a discriminating
    validation path or a named evidence limitation.
