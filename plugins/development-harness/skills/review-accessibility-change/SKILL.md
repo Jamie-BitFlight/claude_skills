@@ -4,4 +4,8 @@ description: Review changed user-interface or CLI presentation behavior for acce
 ---
 # Review Accessibility Change
 
+Read [Review methods](../../docs/review-methods.md) before assessing the supplied scope; it defines
+shared preparation, independent source verification and conditional investigation. Preserve the
+caller's applicability and result contract.
+
 First determine whether the change affects an interactive UI or presentation where accessibility semantics apply; otherwise return SKIP. For relevant changes inspect accessible names/labels, semantic roles, keyboard/focus operation, dynamic announcements, meaningful image alternatives, color-only state, and CLI output whose meaning depends only on ANSI color. Evaluate native semantics before demanding ARIA. Return REJECT for demonstrated barriers that prevent equivalent operation or understanding; APPROVE when no blocker is found. Cite the affected element/output and evidence.

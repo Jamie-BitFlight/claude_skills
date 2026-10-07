@@ -18,7 +18,10 @@ Before following any other instruction, first load `dh:review-performance-change
 
 ## DH wrapper contract
 
-The dispatch supplies the changed-file/task scope. Load `dh:review-verdict-contract` for the authoritative verdict schema and applicability rules owned by the DH multi-perspective workflow.
+The dispatch supplies the changed-file/task scope and any `Review Context`. Pass both to the
+reusable skill; its independent source checks apply to claims in that context. Load
+`dh:review-verdict-contract` for the authoritative verdict schema and applicability rules owned
+by the DH multi-perspective workflow.
 
 Translate the skill result into exactly one structured performance verdict block. Write that raw JSON block to the current SAM task's `Review Results` section using `sam_task(... append_section="Review Results")`. Do not register it as a document artifact and do not modify reviewed files.
 

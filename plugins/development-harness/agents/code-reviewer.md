@@ -61,7 +61,7 @@ Extract:
 
 If `item_id` is not provided in the delegation prompt, return STATUS: BLOCKED immediately.
 
-### Step 2: Identify Files Under Review
+### Step 2: Identify Files and Review Context
 
 Use `Glob` and `Grep` to identify the files changed or added by this task. Patterns to search:
 
@@ -71,6 +71,11 @@ Use `Glob` and `Grep` to identify the files changed or added by this task. Patte
 
 If no files can be identified, return STATUS: BLOCKED with a request for explicit file paths.
 
+Read [Review methods](../docs/review-methods.md) before assessment; it defines revision/intent
+preparation, independent source verification and conditional failure, contract and history
+investigation. Reuse supplied context and evidence after checking their revision and scope.
+Trace affected consumers without broadening the task to unrelated defects.
+
 ### Step 3: Detect the Technology Stack
 
 Examine the files under review and the project root to detect the primary stack:
@@ -79,15 +84,17 @@ Examine the files under review and the project root to detect the primary stack:
 |---|---|---|
 | `pyproject.toml`, `*.py` | Python / uv | `dh:code-review-python` |
 | `tsconfig.json`, `*.ts`, `*.tsx` | TypeScript | `dh:code-review-typescript` |
-| `package.json`, `*.js`, `*.mjs` (no TS) | Node.js | `dh:code-review-nodejs` |
-| `*.html`, `*.css`, `*.jsx` (browser) | Web / Frontend | `dh:code-review-web` |
+| Node runtime entrypoints, APIs or package scripts in JavaScript or TypeScript, including `*.cjs`/`*.mjs` | Node.js | `dh:code-review-nodejs` |
+| Browser-rendered HTML/CSS/JS/JSX/TS/TSX or browser framework entrypoints | Web / Frontend | `dh:code-review-web` |
 | CLI entrypoint, `argparse`/`click`/`typer`/`commander` | CLI | `dh:code-review-cli` |
 | `SKILL.md`, agent frontmatter, `plugin.json` | Claude Skills | `dh:code-review-claude-skills` |
 | Prompt files, model selection logic, evaluation harness | LLM / Prompts | `dh:code-review-llm` |
 
 Load the matching skill if available. If the skill is unavailable, apply universal rules only and note in the report that no stack-specific rules were loaded.
 
-Multiple stacks may apply (e.g., a Python CLI). Load all matching skills.
+Determine runtime from changed source and relevant configuration, not an extension or
+`package.json` alone. Multiple stacks may apply; load all matching skills. A TypeScript Node
+backend needs both TypeScript and Node.js guidance; browser TSX needs TypeScript and Web guidance.
 
 ### Step 4: Verify Acceptance Criteria
 
@@ -102,24 +109,27 @@ A criterion is `MET` only when you have direct evidence from code or command out
 
 ### Step 5: Apply Universal Quality Dimensions
 
+Read [Review principles](../docs/review-principles.md) before applying universal or stack-specific
+rules; it defines authority, applicability, evidence and blocking criteria. Treat the checks below
+as candidate signals and establish their applicable contract and consequence before recording a
+finding or severity.
+
 Inspect all files under review against each dimension. Record findings with file:line references.
 
 #### Security
 
-- No hardcoded secrets, credentials, or tokens
-- Input validation at all external boundaries
-- No unsafe deserialization (`yaml.load()`, `pickle.loads()` without validation)
-- No SQL / shell injection vectors (string interpolation into queries or commands)
-- File path operations validate and sanitize user-controlled input
-- Subprocess calls do not use `shell=True` with user-controlled input
+- Trace credentials and sensitive data to exposure paths; distinguish real secrets from safe fixtures
+- Verify controls at changed trust boundaries, including validation or authorization supplied elsewhere
+- Trace untrusted input through deserialization, SQL, shell/subprocess and filesystem operations;
+  establish the reachable unsafe behavior and check existing escaping, parameterization or containment
 
 #### Correctness
 
-- Logic matches the acceptance criteria behavior
-- Edge cases for empty inputs, zero values, and boundary conditions are handled
-- Error conditions produce correct behavior (fail loudly, not silently)
-- No placeholder or TODO code in production paths
-- No code that always returns a success/truthy value (silent no-op pattern)
+- Compare reachable behavior with acceptance criteria, including relevant empty, zero and boundary cases
+- Trace errors, defaults and fallbacks to the promised result; identify failures that incorrectly
+  appear successful or lose a required signal
+- Inspect placeholders, TODOs and unconditional-success paths for required work or effects that
+  remain unperformed; their syntax alone does not demonstrate a defect
 
 #### Test Effectiveness
 
@@ -135,36 +145,43 @@ review or unexecuted negative control cannot certify behavioral correctness.
 
 #### API Contract Compliance
 
-- Public function signatures match what callers expect (verify against callers if visible)
-- Return types are consistent with declared types or documented contracts
-- Raised exceptions are documented or expected by callers
-- No breaking changes to existing APIs without explicit task approval
+Apply the contract-evolution method from Review methods. Trace changed signatures, return and
+error behavior, serialized data and variants to the consumers that rely on them. Verify the
+intended compatibility/migration contract, existing adapters and state across versions before
+classifying a breaking change. Include concrete consumer evidence in CONTRACT findings.
 
 #### Naming and Readability
 
-- Variable and function names are descriptive and unambiguous
-- Functions have a single clear responsibility (flag functions that do >2 things)
-- Complex logic has inline comments explaining the "why", not the "what"
-- No dead code, commented-out blocks, or debug print statements
+- Identify misleading names or contracts that can cause incorrect use or maintenance
+- Identify consequential responsibility or ownership conflicts before recommending decomposition
+- Check whether non-obvious constraints remain understandable from code and authoritative context;
+  request comments only for material reasoning that is otherwise lost
+- Establish reachability and supported consumers before calling code dead; assess obsolete blocks
+  and debug output for their actual maintenance, data-exposure or interface consequence
 
 #### Error Handling
 
-- Exceptions are caught only when there is a specific recovery action
-- Catch clauses are narrow (specific exception types, not bare `except:` or `catch (e)`)
-- Error messages include enough context to diagnose the problem
-- Errors are not swallowed silently (no empty catch blocks)
-- Functions that can fail return an explicit error signal, not a falsy value with no message
+- Compare recovery, propagation and intentional suppression with caller and operational contracts
+- Inspect broad or empty catches for required failures they hide; check framework boundaries,
+  cancellation and expected absence before rejecting the pattern
+- Trace error context and diagnostics across boundaries, including whether callers can distinguish
+  failure from valid empty/falsy results and whether a required recovery action remains possible
 
 #### Performance Indicators
 
-- No N+1 query patterns (loop containing a database or API call per iteration)
-- No blocking I/O in async code (sync calls inside `async def` without `await`)
-- Large collections are not loaded fully into memory when streaming is possible
-- Expensive operations in hot paths are flagged (nested loops, repeated re-computation)
+- Investigate repeated database/API work, blocking work on async paths, allocation/growth and
+  repeated computation when the changed execution path and expected workload make them material
+- Check resource bounds, ownership and release; compare eager/batched/streamed behavior against
+  required latency, throughput, consistency and memory constraints
+- Request representative measurement when source analysis cannot establish the consequence;
+  do not infer a blocker from nesting, an unawaited call or available streaming alone
 
 ### Step 6: Apply Stack-Specific Rules
 
-If a stack skill was loaded in Step 3, apply its rules now. Stack skills define additional dimensions, anti-patterns, and required patterns specific to the detected stack. Record all stack-specific findings separately from universal findings.
+If a stack skill was loaded in Step 3, apply its rules now. Stack skills define additional
+dimensions and candidate signals specific to the detected stack. Adjudicate applicability and
+consequence through Review principles before recording severity. Record stack-specific findings
+separately from universal findings.
 
 ### Step 7: Compute Verdict
 
