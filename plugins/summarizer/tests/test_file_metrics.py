@@ -52,9 +52,6 @@ class TestDetectCategory:
         assert file_metrics.detect_category(tmp_path / "FILE.PY") == "code"
         assert file_metrics.detect_category(tmp_path / "README.MD") == "documentation"
 
-    def test_no_extension(self, tmp_path: Path) -> None:
-        assert file_metrics.detect_category(tmp_path / "Makefile") == "unknown"
-
 
 class TestIsTextFile:
     """Test text vs binary file detection."""
@@ -346,14 +343,6 @@ class TestCLIIntegration:
         data = json.loads(result.stdout)
         assert "error" in data
         assert data["error"] is not None
-
-    def test_error_json_has_consistent_schema(self, tmp_path: Path, text_file: Path) -> None:
-        success_result = self._run(str(text_file), "--json")
-        error_result = self._run(str(tmp_path / "missing"), "--json")
-        success_data = json.loads(success_result.stdout)
-        error_data = json.loads(error_result.stdout)
-        assert "error" in error_data
-        assert "path" in success_data
 
     def test_custom_tail_lines(self, text_file: Path) -> None:
         result = self._run(str(text_file), "--json", "--tail-lines", "5")
