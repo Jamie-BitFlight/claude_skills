@@ -9,6 +9,7 @@
 #   "marko>=2.2.3",
 #   "pygithub>=2.9.1",
 #   "pydantic>=2.13.4",
+#   "regex>=2026.4.4",
 #   "ruamel.yaml>=0.19.1",
 #   "tiktoken>=0.13.0",
 #   "tomlkit>=0.15.1",
