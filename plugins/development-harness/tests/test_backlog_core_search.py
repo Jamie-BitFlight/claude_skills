@@ -24,8 +24,12 @@ threshold and was never detected.
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
-from backlog_core.search import ContentDuplicateMatch, build_concept_query, find_content_duplicates
+import regex
+from backlog_core.models import SearchTimeoutError
+from backlog_core.search import ContentDuplicateMatch, apply_search_filter, build_concept_query, find_content_duplicates
 
 
 def _candidate(
@@ -37,6 +41,66 @@ def _candidate(
     if file_path:
         entry["file_path"] = file_path
     return entry
+
+
+class TestApplySearchFilter:
+    """Tests for the public search filter contract."""
+
+    def test_regex_and_literal_fallback_preserve_search_results(self) -> None:
+        items = [_candidate("Authentication retry", "literal /[/ query"), _candidate("Unrelated", "nothing useful")]
+
+        assert apply_search_filter(items, "/auth.*retry/") == [items[0]]
+        assert apply_search_filter(items, "/[/") == [items[0]]
+
+    def test_field_plain_and_logical_terms_keep_existing_semantics(self) -> None:
+        items = [
+            _candidate("Authentication login", "ready"),
+            _candidate("Authentication logout", "archived"),
+            _candidate("Authentication token", "ready"),
+        ]
+
+        assert apply_search_filter(items, "title:authentication AND (login OR logout) AND NOT archived") == [items[0]]
+
+    def test_compiles_each_regex_term_once_per_query(self) -> None:
+        items = [_candidate("alpha", ""), _candidate("beta", ""), _candidate("unrelated", "")]
+
+        with patch("backlog_core.search.regex.compile", wraps=regex.compile) as compile_pattern:
+            result = apply_search_filter(items, "/alpha/ OR regex:beta")
+
+        assert result == items[:2]
+        assert compile_pattern.call_count == 2
+
+    def test_timeout_raises_non_retryable_search_error(self) -> None:
+        class TimeoutPattern:
+            def search(self, value: str, *, timeout: float) -> None:
+                del value, timeout
+                raise TimeoutError
+
+        with (
+            patch("backlog_core.search.regex.compile", return_value=TimeoutPattern()),
+            pytest.raises(SearchTimeoutError) as caught,
+        ):
+            apply_search_filter([_candidate("slow", "")], "/slow/")
+
+        assert str(caught.value) == "Search regex evaluation exceeded 100 ms"
+        assert caught.value.retryable is False
+
+    def test_timeout_budget_is_shared_across_candidates(self) -> None:
+        timeouts: list[float] = []
+
+        class NoMatchPattern:
+            def search(self, value: str, *, timeout: float) -> None:
+                del value
+                timeouts.append(timeout)
+                return
+
+        with (
+            patch("backlog_core.search.regex.compile", return_value=NoMatchPattern()),
+            patch("backlog_core.search.time.monotonic", side_effect=[100.0, 100.02, 100.06]),
+        ):
+            assert apply_search_filter([_candidate("one", ""), _candidate("two", "")], "/miss/") == []
+
+        assert timeouts == pytest.approx([0.08, 0.04])
 
 
 # ---------------------------------------------------------------------------

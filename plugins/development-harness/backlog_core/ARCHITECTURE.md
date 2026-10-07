@@ -412,7 +412,9 @@ from markdown parsing, so it must not be folded into `parsing.py`.
   `_OrPred`, `_NotPred`, `_TruePred`).
 - Term matching: `_item_matches_term()` — supports `/regex/` or `regex:pattern`, `field:value`
   (`title`, `section`, `topic`, `type`, `body`), and plain substring terms against the
-  `_SEARCH_FIELDS` haystack built by `_build_haystack()`.
+  `_SEARCH_FIELDS` haystack built by `_build_haystack()`. Accepted regex terms compile once before
+  candidate evaluation; matching shares a 100 ms request-wide deadline. Compilation is outside
+  that deadline because `regex.compile()` has no timeout.
 - Public entry point: `apply_search_filter(items, search)` — used by both `operations.list_items()`
   (MCP and CLI `backlog list --search`) and `find_content_duplicates()` below.
 - Snippet helpers: `_make_snippet()`, `_make_snippet_parts()`, `_format_match_text()`,

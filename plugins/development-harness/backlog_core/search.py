@@ -12,9 +12,14 @@ import dataclasses
 import itertools
 import operator
 import re
+import time
 from enum import StrEnum
+from typing import Protocol
 
+import regex
 from pydantic import BaseModel, ConfigDict
+
+from .models import SearchTimeoutError
 
 # Fields searched by default when no field-specific prefix is given.
 # ``body`` contains the full item content (description + all section entries)
@@ -24,6 +29,38 @@ _SEARCH_FIELDS: tuple[str, ...] = ("title", "section", "topic", "type", "body")
 
 # Minimum length for a valid /pattern/ regex term (e.g. "/x/" has length 3).
 _REGEX_SLASH_MIN_LEN = 2
+_REGEX_MATCH_TIMEOUT_SECONDS = 0.1
+
+
+class _TimedRegexPattern(Protocol):
+    """The timeout-aware subset of a compiled ``regex`` pattern."""
+
+    def search(self, string: str, *, timeout: float) -> object: ...
+
+
+def _regex_pattern_from_term(term: str) -> str | None:
+    """Return the regex text for a regex-form term, if present."""
+    if term.startswith("/") and term.endswith("/") and len(term) > _REGEX_SLASH_MIN_LEN:
+        return term[1:-1]
+    if term.startswith("regex:"):
+        return term[len("regex:") :]
+    return None
+
+
+def _compile_regex_term(term: str) -> _TimedRegexPattern | None:
+    """Compile accepted regex syntax once before evaluating candidates.
+
+    Returns:
+        A timeout-aware pattern, or ``None`` for a non-regex or invalid term.
+    """
+    pattern_text = _regex_pattern_from_term(term)
+    if pattern_text is None:
+        return None
+    try:
+        re.compile(pattern_text, re.IGNORECASE)
+    except re.error:
+        return None
+    return regex.compile(pattern_text, regex.IGNORECASE | regex.VERSION0)
 
 
 def _item_field_text(item: dict[str, str | bool], field: str) -> str:
@@ -40,7 +77,14 @@ def _build_haystack(item: dict[str, str | bool]) -> str:
     return " ".join(_item_field_text(item, f) for f in _SEARCH_FIELDS)
 
 
-def _item_matches_term(item: dict[str, str | bool], term: str, haystack: str | None = None) -> bool:
+def _item_matches_term(
+    item: dict[str, str | bool],
+    term: str,
+    haystack: str | None = None,
+    *,
+    regex_pattern: _TimedRegexPattern | None = None,
+    deadline: float,
+) -> bool:
     """Return True if a single search term matches the item.
 
     Supported term forms (evaluated in order):
@@ -59,22 +103,22 @@ def _item_matches_term(item: dict[str, str | bool], term: str, haystack: str | N
         haystack: Pre-computed full-text string from ``_build_haystack``.
             When provided, avoids rebuilding the haystack inside this call.
             Pass ``None`` (default) to let this function build it on demand.
+        regex_pattern: Accepted regex compiled before candidate evaluation.
+        deadline: Monotonic deadline shared by every matching call in a query.
     """
     term = term.strip()
     if not term:
         return True
 
-    # Regex form: /pattern/ or regex:pattern
-    if (term.startswith("/") and term.endswith("/") and len(term) > _REGEX_SLASH_MIN_LEN) or term.startswith("regex:"):
-        pattern_str = term[1:-1] if term.startswith("/") else term[len("regex:") :]
+    if regex_pattern is not None:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise SearchTimeoutError
+        hs = haystack if haystack is not None else _build_haystack(item)
         try:
-            pattern = re.compile(pattern_str, re.IGNORECASE)
-        except re.error:
-            # Invalid regex — fall through to plain substring match on the raw term.
-            pass
-        else:
-            hs = haystack if haystack is not None else _build_haystack(item)
-            return bool(pattern.search(hs))
+            return bool(regex_pattern.search(hs, timeout=remaining))
+        except TimeoutError:
+            raise SearchTimeoutError from None
 
     # Field-specific form: field:value
     if ":" in term:
@@ -100,15 +144,16 @@ def _item_matches_term(item: dict[str, str | bool], term: str, haystack: str | N
 class _Predicate:
     """Base class for search predicates.
 
-    Subclasses implement ``__call__(item, haystack) -> bool``.
+    Subclasses implement ``__call__(item, haystack, deadline) -> bool``.
     """
 
-    def __call__(self, item: dict[str, str | bool], haystack: str) -> bool:
+    def __call__(self, item: dict[str, str | bool], haystack: str, deadline: float) -> bool:
         """Evaluate the predicate against a single backlog item.
 
         Args:
             item: Backlog item dict.
             haystack: Pre-computed full-text string from ``_build_haystack``.
+            deadline: Monotonic deadline shared by every matching call in a query.
 
         Returns:
             True if the item matches the predicate.
@@ -121,9 +166,13 @@ class _TermPred(_Predicate):
     """Match a single leaf term against an item."""
 
     term: str
+    regex_pattern: _TimedRegexPattern | None = dataclasses.field(init=False)
 
-    def __call__(self, item: dict[str, str | bool], haystack: str) -> bool:
-        return _item_matches_term(item, self.term, haystack)
+    def __post_init__(self) -> None:
+        self.regex_pattern = _compile_regex_term(self.term)
+
+    def __call__(self, item: dict[str, str | bool], haystack: str, deadline: float) -> bool:
+        return _item_matches_term(item, self.term, haystack, regex_pattern=self.regex_pattern, deadline=deadline)
 
 
 @dataclasses.dataclass
@@ -133,8 +182,8 @@ class _AndPred(_Predicate):
     left: _Predicate
     right: _Predicate
 
-    def __call__(self, item: dict[str, str | bool], haystack: str) -> bool:
-        return self.left(item, haystack) and self.right(item, haystack)
+    def __call__(self, item: dict[str, str | bool], haystack: str, deadline: float) -> bool:
+        return self.left(item, haystack, deadline) and self.right(item, haystack, deadline)
 
 
 @dataclasses.dataclass
@@ -144,8 +193,8 @@ class _OrPred(_Predicate):
     left: _Predicate
     right: _Predicate
 
-    def __call__(self, item: dict[str, str | bool], haystack: str) -> bool:
-        return self.left(item, haystack) or self.right(item, haystack)
+    def __call__(self, item: dict[str, str | bool], haystack: str, deadline: float) -> bool:
+        return self.left(item, haystack, deadline) or self.right(item, haystack, deadline)
 
 
 @dataclasses.dataclass
@@ -154,14 +203,14 @@ class _NotPred(_Predicate):
 
     operand: _Predicate
 
-    def __call__(self, item: dict[str, str | bool], haystack: str) -> bool:
-        return not self.operand(item, haystack)
+    def __call__(self, item: dict[str, str | bool], haystack: str, deadline: float) -> bool:
+        return not self.operand(item, haystack, deadline)
 
 
 class _TruePred(_Predicate):
     """Always-true predicate used as a safe no-op fallback."""
 
-    def __call__(self, item: dict[str, str | bool], haystack: str) -> bool:
+    def __call__(self, item: dict[str, str | bool], haystack: str, deadline: float) -> bool:
         return True
 
 
@@ -318,6 +367,9 @@ def apply_search_filter(items: list[dict[str, str | bool]], search: str) -> list
         items: Backlog item dicts to filter.
         search: Query string.
 
+    Regex compilation happens before matching starts. The 100 ms request-wide
+    deadline applies only to matching because ``regex.compile()`` has no timeout.
+
     Returns:
         Filtered list of items that match the search query.
     """
@@ -329,10 +381,11 @@ def apply_search_filter(items: list[dict[str, str | bool]], search: str) -> list
     parser = _SearchParser(tokens)
     predicate = parser.parse()
 
+    deadline = time.monotonic() + _REGEX_MATCH_TIMEOUT_SECONDS
     result = []
     for item in items:
         hs = _build_haystack(item)
-        if predicate(item, hs):
+        if predicate(item, hs, deadline):
             result.append(item)
     return result
 

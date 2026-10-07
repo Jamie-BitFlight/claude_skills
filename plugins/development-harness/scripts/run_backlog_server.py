@@ -13,6 +13,7 @@
 #   "ruamel.yaml>=0.18.0",
 #   "tiktoken>=0.12.0",
 #   "python-dotenv>=1.0.0",
+#   "regex>=2026.4.4",
 # ]
 #
 # [tool.ty.environment]

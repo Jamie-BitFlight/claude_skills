@@ -18,7 +18,14 @@ import json
 from unittest.mock import patch
 
 import pytest
-from backlog_core.models import BackendAvailability, BackendStatus, BacklogError, Output, ViewItemResult
+from backlog_core.models import (
+    BackendAvailability,
+    BackendStatus,
+    BacklogError,
+    Output,
+    SearchTimeoutError,
+    ViewItemResult,
+)
 from backlog_core.search import apply_search_filter
 from backlog_core.server import mcp
 from fastmcp.client import Client
@@ -180,6 +187,14 @@ async def test_backlog_list_success_returns_items():
     assert call_kwargs["refresh"] is False
     assert call_kwargs["label"] is None
     assert response["items"][0]["title"] == "Item A"
+
+
+async def test_backlog_list_timeout_returns_non_retryable_error():
+    with patch("dh_core.operations.list_items", side_effect=SearchTimeoutError()):
+        response = await _call("backlog_list", {"search": "/slow/"})
+
+    assert response["error"] == "Search regex evaluation exceeded 100 ms"
+    assert response["retryable"] is False
 
 
 async def test_backlog_list_passes_filter_params():
