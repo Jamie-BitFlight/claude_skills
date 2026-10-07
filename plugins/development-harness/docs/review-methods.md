@@ -113,8 +113,9 @@ Semantic equivalence across different anchors is an investigation note, not perm
 merge those entries: retain each original anchor and cross-reference the related findings
 in narrative until the owning schema and all consumers support multiple anchors. At the
 same location, keep distinct failures distinguishable in the original reviewer verdicts;
-do not claim the current synthesis schema can independently represent them. Preserve all constituent source reports and original severity claims. A single
-worker reporting twice counts as one worker, and two workers repeating the same assumption
+do not claim the current synthesis schema can independently represent them.
+Preserve all constituent source reports and original severity claims. A single worker
+reporting twice counts as one worker, and two workers repeating the same assumption
 are not independent verification of that assumption.
 
 Verification is separate from candidate grouping. Classify an investigated candidate as
@@ -135,9 +136,10 @@ this is not a persisted or enforceable DH coverage gate yet. Existing worker ver
 punch-list schemas do not carry per-path coverage; do not add fields to their JSON blocks
 or claim that approval proves every path was read. Report known omissions in the caller's
 existing summary/limitations channel. A future persisted coverage manifest requires an
-explicit owner, schema and reconciliation gate (tracked in #4098). A bounded review budget
-may prioritize investigation but must not turn unread paths into an implicit approval. Validate comment anchors against the pinned
-comparison, using unchanged consumer lines as supporting evidence when necessary.
+explicit owner, schema and reconciliation gate (tracked in #4098).
+A bounded review budget may prioritize investigation but must not turn unread paths
+into an implicit approval. Validate comment anchors against the pinned comparison,
+using unchanged consumer lines as supporting evidence when necessary.
 Source-position confidence must not be confused with defect confidence.
 
 Prefer deterministic extraction, path normalization, source matching, schema validation,
