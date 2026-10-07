@@ -8,9 +8,10 @@ description: Design validation and maintained regression protection before test 
 Design the smallest evidence set that can distinguish the consequential failure while remaining stable
 through valid redesign. Plan only; return the design to the caller.
 
-Use [Testing principles](../../docs/testing-principles.md) as the authority for admission, contract
-altitude, oracle independence, test economics, execution safety, and evidence status. Read the
-sections needed for the decisions below rather than restating that policy here.
+Use [Testing principles](../../docs/testing-principles.md) as shared reference. For retention, read
+**Test admission gate** and **Test economics**. For boundary/oracle decisions, read **Contract
+altitude** and principles 2-5. For TDD, read **TDD contract**. Before execution planning, read
+**Evidence execution boundary**.
 
 ## Procedure
 
