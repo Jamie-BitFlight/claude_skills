@@ -1,0 +1,101 @@
+{
+  "skill_name": "hypothetical-walkthrough",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "$hypothetical-walkthrough Target: the current repository's real `/dh:work-backlog-item create` route. Scenario: the user's report is \"a small typo 'teh' instead of 'the' in an error message from the scientific-thinking plugin CLI tool.\"",
+      "expected_output": "Separates the unverified typo report from source evidence and traces the real create route through its interactive, duplicate, response-selector, and create-only terminal branches using symbolic values.",
+      "files": [
+        "../work-backlog-item/SKILL.md",
+        "../work-backlog-item/scripts/parser/parse.schema.json",
+        "../work-backlog-item/scripts/parser/command-routes.json",
+        "../work-backlog-item/references/workflows/create/scope.md",
+        "../work-backlog-item/references/workflows/create/start.md",
+        "../dh-cli-usage/SKILL.md",
+        "../dh-cli-usage/references/command-reference.md",
+        "../../sam_schema/cli.py",
+        "../../backlog_core/server.py",
+        "../../backlog_core/operations.py",
+        "../../backlog_core/tool_responses.py",
+        "../../dh_core/operations.py",
+        "../../sam_schema/backlog.py"
+      ],
+      "expectations": [
+        "Derives the create route and keeps it terminal after creation rather than inventing automatic grooming.",
+        "Preserves interactive required-field and duplicate branches without claiming a live write or duplicate outcome.",
+        "Carries the declared response selector symbolically, including the empty `item_ref` plus non-empty `reference` fallback.",
+        "Does not invent a scientific-thinking CLI, error message, typo location, or reproduction result when source evidence does not establish one."
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "$hypothetical-walkthrough Target: the current repository's real `/dh:work-backlog-item groom` route. Scenario: the user's report is \"a small typo 'teh' instead of 'the' in an error message from the scientific-thinking plugin CLI tool.\"",
+      "expected_output": "Separates the unverified typo report from source evidence and traces freeform groom through the source-defined create-then-groom handoff with symbolic selectors and explicit conditional branches.",
+      "files": [
+        "../work-backlog-item/SKILL.md",
+        "../work-backlog-item/scripts/parser/parse.schema.json",
+        "../work-backlog-item/scripts/parser/command-routes.json",
+        "../work-backlog-item/references/workflows/create/scope.md",
+        "../work-backlog-item/references/workflows/create/start.md",
+        "../work-backlog-item/references/workflows/groom/start.md",
+        "../work-backlog-item/references/workflows/groom/scope.md",
+        "../work-backlog-item/references/workflows/groom/intake.md",
+        "../work-backlog-item/references/workflows/groom/analyze.md",
+        "../work-backlog-item/references/workflows/groom/swarm.md",
+        "../work-backlog-item/references/workflows/groom/finalize.md",
+        "../work-backlog-item/references/workflows/groom/groom-drift.md",
+        "../work-backlog-item/references/workflows/groom/error.md",
+        "../work-backlog-item/references/workflows/groom/finally.md",
+        "../work-backlog-item/references/workflows/groom/impact-radius-result.md",
+        "../work-backlog-item/references/workflows/groom/fact-check-result.md",
+        "../analyze-change-impact/SKILL.md",
+        "../verify-factual-claim/SKILL.md",
+        "../backend-resolution/SKILL.md",
+        "../dh-cli-usage/SKILL.md",
+        "../dh-cli-usage/references/command-reference.md",
+        "../planner-rt-ica/SKILL.md",
+        "../subagent-contract/SKILL.md",
+        "../dispatch-contract/SKILL.md",
+        "../../agents/impact-analyst.md",
+        "../../agents/fact-checker.md",
+        "../../agents/classifier.md",
+        "../../agents/rtica-assessor.md",
+        "../../agents/alignment-analyst.md",
+        "../../agents/task-worker.md",
+        "../../agents/backlog-item-groomer.md",
+        "../../sam_schema/cli.py",
+        "../../backlog_core/server.py",
+        "../../backlog_core/operations.py",
+        "../../backlog_core/tool_responses.py",
+        "../../dh_core/operations.py",
+        "../../sam_schema/backlog.py"
+      ],
+      "expectations": [
+        "Derives freeform groom as the source-defined create-then-groom route, while retaining create-only as a terminal boundary rather than inventing automatic grooming.",
+        "Uses the declared response shape symbolically, including the empty `item_ref` plus non-empty `reference` fallback, and does not invent a runtime issue number.",
+        "Preserves interactive required-field and duplicate branches as simulated gates, binding every groom-consumer selector to the exact producer field and declared branch mapping without a live write.",
+        "Carries unresolved gates through nested-agent, persistence, and finalization handoffs; labels any continuation beyond an unmet condition as counterfactual and retains source-declared conflicts as conditional outcomes.",
+        "Does not invent a scientific-thinking CLI, error message, typo location, or reproduction result when source evidence does not establish one.",
+        "Marks the result as hypothetical and offers to address, backlog, or discuss/split the findings."
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "$hypothetical-walkthrough Target: the supplied job-event fixture. Scenario: job `release-42` at attempt `3`.",
+      "expected_output": "Reports the unavailable instructed path as a block without substituting stdout, identifies the direct consumer's key mismatch without repairing it, and distinguishes the compatible consumer path.",
+      "files": [
+        "evals/fixtures/transition-contracts/WORKFLOW.md",
+        "evals/fixtures/transition-contracts/publisher.py",
+        "evals/fixtures/transition-contracts/consumer.py",
+        "evals/fixtures/transition-contracts/consumer_compatible.py"
+      ],
+      "expectations": [
+        "Derives `job_id` as a string and `attempt` as an integer from the fixture CLI input and publisher output.",
+        "Marks the unavailable instructed fixture path as a blocked transition and does not silently substitute the publisher's stdout; any continuation is explicitly diagnostic or counterfactual.",
+        "Identifies the direct consumer's required `jobId` key as a missing mapping without changing either side.",
+        "Distinguishes the compatible consumer's `job_id` contract from the broken consumer without treating a code-declared mapping as an improvised recovery.",
+        "Marks the result as hypothetical and offers to address, backlog, or discuss/split the findings."
+      ]
+    }
+  ]
+}
