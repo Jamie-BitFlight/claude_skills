@@ -106,10 +106,14 @@ For every candidate, retain the original report and identify:
 - The failure mechanism, supporting anchors, and any counterevidence.
 - The reporting worker and perspective, rule/group assignment, and reviewed revision.
 
-Use location overlap only to nominate candidates for comparison. Merge when the evidence
-establishes the same violated guarantee and underlying failure, including when the anchors
-differ. Keep candidates separate if they concern distinct failures or equivalence cannot be
-established. Preserve all constituent source reports and original severity claims. A single
+Use location overlap to nominate candidates for comparison. In the current DH
+multi-perspective punch-list contract, merge only findings that satisfy the authoritative
+same-file-and-line rule in `skills/review-verdict-contract/references/verdict-schema.md`.
+Semantic equivalence across different anchors is an investigation note, not permission to
+merge those entries: retain each original anchor and cross-reference the related findings
+in narrative until the owning schema and all consumers support multiple anchors. At the
+same location, keep distinct failures distinguishable in the original reviewer verdicts;
+do not claim the current synthesis schema can independently represent them. Preserve all constituent source reports and original severity claims. A single
 worker reporting twice counts as one worker, and two workers repeating the same assumption
 are not independent verification of that assumption.
 
@@ -124,10 +128,15 @@ unless the owning schema explicitly supports them.
 
 ## Coverage and review execution boundary
 
-Record every changed path, including renamed/deleted files and agent-facing Markdown,
-configuration, schemas, scripts and tests. Mark each as reviewed, delegated, or uncovered
-with the reason. A bounded review budget may prioritize investigation but must not turn
-unread paths into an implicit approval. Validate comment anchors against the pinned
+In review preparation, inventory every changed path, including renamed/deleted files and
+agent-facing Markdown, configuration, schemas, scripts and tests. The orchestrator should
+track reviewed, delegated and uncovered paths and their reasons in its run context, but
+this is not a persisted or enforceable DH coverage gate yet. Existing worker verdict and
+punch-list schemas do not carry per-path coverage; do not add fields to their JSON blocks
+or claim that approval proves every path was read. Report known omissions in the caller's
+existing summary/limitations channel. A future persisted coverage manifest requires an
+explicit owner, schema and reconciliation gate (tracked in #4098). A bounded review budget
+may prioritize investigation but must not turn unread paths into an implicit approval. Validate comment anchors against the pinned
 comparison, using unchanged consumer lines as supporting evidence when necessary.
 Source-position confidence must not be confused with defect confidence.
 
