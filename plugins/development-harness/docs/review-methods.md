@@ -109,9 +109,12 @@ For every candidate, retain the original report and identify:
 Use location overlap to nominate candidates for comparison. In the current DH
 multi-perspective punch-list contract, merge only findings that satisfy the authoritative
 same-file-and-line rule in `skills/review-verdict-contract/references/verdict-schema.md`.
-Semantic equivalence across different anchors is an investigation note, not permission to
-merge those entries: retain each original anchor and cross-reference the related findings
-in narrative until the owning schema and all consumers support multiple anchors. At the
+Preserve its explicit exception: a `line: null` finding may merge with a concrete-line
+finding in the same file **only when both describe the same defect**. Two distinct
+failures at one line remain separate entries. Other cross-line or cross-file semantic
+equivalence is an investigation note, not permission to merge those entries: retain each
+original anchor and cross-reference the related findings in narrative until the owning
+schema and all consumers support multiple anchors. At the
 same location, keep distinct failures distinguishable in the original reviewer verdicts;
 do not claim the current synthesis schema can independently represent them.
 Preserve all constituent source reports and original severity claims. A single worker
