@@ -1,13 +1,18 @@
 ---
 name: code-review-architecture
-description: "Use when a task asks for architecture review, dependency graph visualization, module coupling analysis, or circular dependency detection. Auto-detects scope (git diff → PR diff → full project). Reads project config (pyproject.toml, tsconfig.json, go.mod, Cargo.toml) to establish the intra-project module namespace before parsing imports. Builds a module-dependency graph across Python, TypeScript, JavaScript, Go, Rust, and Java. Detects cycles via graphify output or an executable Python script. Checks Conway's Law alignment against CODEOWNERS and directory structure. For Claude plugin repos, also traces cross-language chains: hook configs → hook scripts, SKILL.md/agent docs → node/uv-run scripts, PEP 723 inline deps, and MCP tool calls. Emits Mermaid flowcharts with severity color-coding (red = circular dep, yellow = high-coupling, green = clean, blue = Conway violation). Applies recursive semantic partitioning for graphs > 40 nodes. Registers each diagram as a codebase-analysis artifact."
+description: "Use for architecture review, dependency graphs, coupling analysis, or circular dependency detection. Establishes project module namespaces and traces imports plus Claude plugin hook, skill, script, PEP 723, and MCP boundaries. Emits partitioned Mermaid graphs with cycle, coupling, and ownership signals; verifies contract and consequence before assigning severity. Registers diagrams as codebase-analysis artifacts."
 user-invocable: true
 ---
 
 Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
 # Architecture Audit — Module Dependency Graph
 
-Generates a Mermaid module-dependency graph with severity color-coding from import/include analysis of the project source. Registers the result as a `codebase-analysis` artifact.
+Generates a Mermaid module-dependency graph with topology signal colors from import/include
+analysis of the project source. Registers the result as a `codebase-analysis` artifact.
+
+Read [Review principles](../../docs/review-principles.md) before classifying findings; it defines
+authority, applicability, evidence, and blocking criteria. Graph shape is evidence for investigation;
+establish the affected contract and consequence before treating a signal as a defect.
 
 ## When to Invoke
 
@@ -74,7 +79,7 @@ Before falling back to Glob, check whether a richer indexing skill is available 
 1. Probe availability: `graphify --version`. If the command fails or is not found, skip this branch.
 
 2. Check whether `graphify-out/graph.json` already exists in the project root.
-   - If it **does**, use it directly (it may have been committed to the repo for team use). Treat it as fresh unless it is older than 24 hours or the working tree has uncommitted source file changes, in which case run step 3.
+   - If it **does**, verify that its source scope and inputs match the reviewed revision and working-tree changes. Rebuild when freshness cannot be established; a recent timestamp alone is not evidence of matching inputs.
    - If it **does not**, continue to step 3.
 
 3. Build the graph (AST extraction is local — no API calls required for code files):
@@ -263,7 +268,10 @@ In Markdown files (`skill-doc` nodes), scan for `mcp__<server>__<tool>` patterns
 
 **3a-i. Prefer graphify output (when available from Step 1a)**
 
-If `graphify` was run and produced `graphify-out/GRAPH_REPORT.md`, read that file. It explicitly lists circular imports and confidence-tagged (`EXTRACTED`, `INFERRED`, `AMBIGUOUS`) dependency relationships. Use it as the authoritative cycle list. Only fall back to 3a-ii if graphify output is absent or the report contains only `AMBIGUOUS` entries for the modules in question.
+If `graphify` was run and produced `graphify-out/GRAPH_REPORT.md`, read that file. Use its cycle
+and confidence-tagged (`EXTRACTED`, `INFERRED`, `AMBIGUOUS`) relationships as graph evidence within
+the verified extraction scope. Resolve uncertain relevant edges from source before assigning a
+defect. Fall back to 3a-ii when graphify output cannot establish the required cycle evidence.
 
 **3a-ii. Run a cycle-detection script**
 
@@ -306,18 +314,28 @@ for m in graph:
 print(json.dumps({"cycles": cycles, "count": len(cycles)}))
 ```
 
-To run: serialize the filtered adjacency map from Step 2 to JSON, pipe it into the script, and parse the output. Every module that appears in any cycle is classified **critical**.
+To run: serialize the filtered adjacency map from Step 2 to JSON, pipe it into the script, and
+parse the output. Mark detected participants as cycle signals. Trace the relevant import/call
+semantics and initialization or ownership contract before assigning severity; a detected cycle
+alone does not establish a build failure, runtime error, or unsafe refactor.
 
 **3a-iii. Coupling metrics**
 
 After cycle classification, compute in-degree + out-degree for each node from the filtered adjacency map built in Step 2:
 
-- Degree ≥ 10 → **high-coupling** (warning) unless already critical.
-- All others → **clean**.
+- Degree ≥ 10 is a screening heuristic for a **coupling signal**, unless already marked as a cycle signal; it is not a universal defect threshold.
+- Other nodes have **no detected topology signal** under this screen. That label does not establish overall architectural correctness.
 
-### Step 3b: Conway's Law Alignment Check
+For a candidate coupling finding, inspect responsibility, stable public dependencies, change
+propagation, and the target's architecture. Report the concrete maintenance or behavioral
+consequence before recommending a split, facade, or dependency inversion. Record source/graph
+exclusions and unresolved edges as coverage gaps; absence of a detected signal is bounded by them.
 
-Conway's Law states that a system's module structure mirrors the communication structure of the team that built it. Check whether module cluster boundaries align with the project's stated team/ownership structure.
+### Step 3b: Ownership Alignment Check
+
+Compare module clusters with the project's stated team/ownership structure. Use mismatches to
+investigate an intended boundary; graph clustering and CODEOWNERS alone do not prescribe how a
+team must organize its modules.
 
 **3b-i. Find team/ownership signals**
 
@@ -331,25 +349,28 @@ Look for the following, in order:
 
 For each cluster identified in Step 5b, check whether all modules in the cluster fall under the same CODEOWNERS pattern or top-level directory.
 
-A **Conway violation** occurs when:
+A candidate **ownership signal** occurs when:
 - A single cluster contains modules from two or more distinct CODEOWNERS paths (different teams own different parts of what the graph treats as one cohesive unit)
 - OR a single team's modules are split across two or more clusters (what belongs together architecturally is fragmented in the graph)
 
-**3b-iii. Record Conway findings**
+**3b-iii. Record ownership signals and findings**
 
-Each violation is a finding of class **Conway**. Add it to the Findings section (see Output Format). Conway findings do not affect the red/yellow/green node coloring (which is reserved for circular deps and coupling) but must appear in the Findings section separately.
+Record the mismatch, its ownership evidence, and the intended responsibility boundary. Determine
+whether it causes an actual coordination, cohesion, or contract problem before reporting a
+defect or recommending ownership changes. List unresolved ownership signals separately from
+confirmed findings; they do not affect the red/yellow/green topology coloring.
 
 **Example for this repository** (claude_skills):
 - Top-level domain boundaries: `plugins/development-harness/`, `plugins/plugin-creator/`, `scripts/`, `tests/`
-- Each `plugins/{name}/` directory is an intended domain. If the graph clusters `backlog_core` and `sam_schema` into separate clusters, that is a Conway violation because both live under `plugins/development-harness/` and are owned together.
+- If `backlog_core` and `sam_schema` appear in separate clusters under one plugin directory, inspect their declared responsibilities and contracts. Shared ownership alone does not establish that they should form one cluster.
 
 ### Step 4: Color-Code Nodes
 
 | Class | Condition | Fill | Stroke |
 |---|---|---|---|
-| Critical | Participates in a circular dependency | `#FF4444` | `#CC0000` |
-| Warning | Degree ≥ 10 (not critical) | `#FFD700` | `#B8860B` |
-| Clean | No circular dep, degree < 10 | `#44BB44` | `#228822` |
+| Cycle signal | Participates in a detected cycle | `#FF4444` | `#CC0000` |
+| Coupling signal | Degree ≥ 10 (no detected cycle) | `#FFD700` | `#B8860B` |
+| No detected topology signal | No detected cycle, degree < 10 | `#44BB44` | `#228822` |
 
 ### Step 5: Emit the Mermaid Flowchart(s)
 
@@ -519,29 +540,30 @@ flowchart TD
 
 ## Findings
 
-### 🔴 Circular Dependencies (Critical)
+### 🔴 Circular Dependency Signals
 
-| Cycle | Modules Involved |
-|---|---|
-| Cycle 1 | `ModuleA → ModuleB → ModuleA` |
+| Cycle | Modules Involved | Contract / consequence evidence | Finding or unresolved check |
+|---|---|---|---|
+| Cycle 1 | `ModuleA → ModuleB → ModuleA` | {verified semantics and affected contract} | {severity if supported, otherwise next check} |
 
-### 🟡 High-Coupling Modules (Warning)
+### 🟡 Coupling Signals
 
 | Module | In-Degree | Out-Degree | Total Degree |
 |---|---|---|---|
 | `ServiceFacade` | 8 | 5 | 13 |
 
-### 🔵 Conway's Law Violations
+### 🔵 Ownership Signals
 
-| Violation | Modules | Expected Owner | Actual Owners |
+| Signal | Modules | Intended boundary / evidence | Actual Owners |
 |---|---|---|---|
-| Cross-boundary coupling | `auth/users.py`, `billing/users.py` | Single team | `@team-auth`, `@team-billing` |
+| Cross-boundary coupling | `auth/users.py`, `billing/users.py` | {declared boundary and consequence or unresolved check} | `@team-auth`, `@team-billing` |
 
-> Omit this section entirely if no Conway violations were found (Step 3b).
+> Omit this section entirely if no ownership signals were found (Step 3b).
 
-### 🟢 Clean Modules
+### 🟢 Modules Without Detected Topology Signals
 
-{N} modules with no circular dependencies and total degree < 10.
+{N} analyzed modules with no detected cycle and total degree < 10. State extraction exclusions
+and unresolved edges; this count is not a general architecture pass.
 
 ---
 
@@ -549,12 +571,12 @@ flowchart TD
 
 **Detected scope:** {detected-scope}
 **Total modules analyzed:** {N}
-**Circular dependency participants:** {count} — Critical
-**High-coupling modules:** {count} — Warning
-**Conway violations:** {count} — (omit line if 0)
-**Clean modules:** {count}
+**Detected cycle participants:** {count}
+**Coupling signals:** {count}
+**Ownership signals:** {count} — (omit line if 0)
+**Modules without detected topology signals:** {count}
 
-{One paragraph describing overall architecture health and the most important findings.}
+{State confirmed consequences, unresolved signals, evidence boundaries, and the most important findings.}
 ````
 
 ### Partitioned Report — Parent Diagram (> 40 nodes)
@@ -591,7 +613,7 @@ flowchart TD
 
 ## Findings
 
-{Same Findings sections as single-diagram report — report findings across ALL nodes, not only those visible in the parent diagram. Include 🔴 Circular Dependencies, 🟡 High-Coupling Modules, 🔵 Conway's Law Violations (if any), and 🟢 Clean Modules.}
+{Use the single-diagram Findings sections across ALL analyzed nodes, not only those visible in the parent diagram. Keep cycle/coupling/ownership signals distinct from evidence-backed defects and carry exclusions or unresolved checks.}
 
 ---
 
@@ -600,12 +622,12 @@ flowchart TD
 **Detected scope:** {detected-scope}
 **Total modules analyzed:** {N}
 **Diagrams produced:** {1 parent + C children}
-**Circular dependency participants:** {count} — Critical
-**High-coupling modules:** {count} — Warning
-**Conway violations:** {count} — (omit line if 0)
-**Clean modules:** {count}
+**Detected cycle participants:** {count}
+**Coupling signals:** {count}
+**Ownership signals:** {count} — (omit line if 0)
+**Modules without detected topology signals:** {count}
 
-{One paragraph describing overall architecture health, partitioning rationale, and the most important findings.}
+{State evidence-backed findings, unresolved signals, partitioning rationale, and coverage limits.}
 ````
 
 ### Partitioned Report — Child Diagram
@@ -635,22 +657,22 @@ flowchart TD
 
 ## Findings
 
-{Findings scoped to this cluster only — 🔴 Circular Dependencies, 🟡 High-Coupling Modules, 🔵 Conway Violations (if any within or spanning this cluster's boundary), 🟢 Clean Modules.}
+{Findings scoped to this cluster, with cycle/coupling/ownership signals, confirmed consequences, unresolved checks, and coverage limits. Include concerns spanning this cluster's boundary.}
 
 ---
 
 ## Summary
 
-{One paragraph describing the health of this cluster and any cross-boundary concerns, including whether the cluster boundary aligns with team ownership (Step 3b).}
+{State what the evidence establishes about this cluster and its cross-boundary concerns, including any unresolved ownership interpretation from Step 3b.}
 ````
 
 ## Color Legend
 
 | Color | Meaning | Recommended Action |
 |---|---|---|
-| 🔴 Red (`#FF4444`) | Circular dependency — breaks build tooling, causes runtime errors, prevents safe refactoring | Break the cycle by extracting shared types to a common module or applying dependency inversion |
-| 🟡 Yellow (`#FFD700`) | High coupling (degree ≥ 10) — high change-propagation risk | Extract a façade or split responsibilities across smaller modules |
-| 🟢 Green (`#44BB44`) | Clean — no circular dependency, low coupling | No action required |
-| 🔵 Conway violation | Cluster boundary misaligns with team/ownership boundary | Align module groupings with team boundaries, or restructure CODEOWNERS to match the actual dependency clusters |
+| 🔴 Red (`#FF4444`) | Detected cycle signal | Verify import/call semantics and consequence; change the dependency only when the affected contract justifies it |
+| 🟡 Yellow (`#FFD700`) | Coupling signal (degree ≥ 10 screening heuristic) | Inspect responsibilities and change propagation before proposing a facade or split |
+| 🟢 Green (`#44BB44`) | No detected topology signal in the analyzed graph | Preserve coverage limits; other architecture properties remain unassessed |
+| 🔵 Ownership signal | Cluster and ownership boundaries differ | Verify intended responsibility and coordination consequences before changing modules or CODEOWNERS |
 | 🟤 Brown dashed edge | Cross-language invocation (`invokes`, `fires`, `spawns`) — e.g., SKILL.md → parse.mjs, hooks.json → session-start.cjs, hook → uv run script | Verify the target script exists; ensure input/output contract is documented |
 | ⬜ Light grey hexagon | External PEP 723 package dependency (`ext-pkg`) or MCP tool call (`mcp-call`) | No action unless the package has known vulnerabilities or the MCP tool is undocumented |

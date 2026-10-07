@@ -1,20 +1,25 @@
 ---
 name: code-review-web
-description: Use when reviewing web frontend code — HTML, CSS, JSX, or browser-targeted JavaScript. Enforces accessibility (WCAG AA, aria labels, focus management), XSS prevention (innerHTML, dangerouslySetInnerHTML), performance (layout thrash, CLS, lazy loading), CSS design tokens, form labeling, and event listener cleanup. Loaded by dh:code-reviewer on *.html, *.css, *.jsx detection.
+description: Reviews browser-rendered HTML, CSS, JSX, TSX, JavaScript, and TypeScript for accessibility, XSS, forms, focus, rendering performance, styles, and lifecycle cleanup. Loaded by dh:code-reviewer when source or framework entrypoints establish frontend execution; composes with TypeScript checks.
 user-invocable: false
 ---
 
 # Web Frontend Code Review Patterns
 
-Stack-specific rules loaded by `dh:code-reviewer` when `*.html`, `*.css`, or `*.jsx` (browser-targeted) files are detected.
+Load these checks for browser-targeted HTML, CSS, JavaScript, TypeScript, JSX, and TSX. Confirm the
+rendering/runtime path from source and relevant framework configuration; apply TypeScript checks
+alongside these checks when applicable.
+
+Read [Review principles](../../docs/review-principles.md) before applying these checks; it defines
+authority, applicability, evidence, and blocking criteria.
 
 ## Accessibility
 
 - Every interactive element (button, link, input, select) must have an accessible name — either visible text, `aria-label`, or `aria-labelledby`
-- Focus must be managed when modals, dialogs, or dynamic panels open — trap focus inside and restore it on close
-- Color contrast ratio must meet WCAG AA — 4.5:1 for normal text, 3:1 for large text (18px+ or 14px+ bold)
+- Verify focus behavior for the component's semantics: modal interaction needs appropriate containment and restoration; do not impose a modal focus trap on an ordinary nonmodal panel.
+- Check text contrast and large-text eligibility against the target's applicable accessibility standard; record the actual foreground/background and sizing evidence rather than guessing from visual appearance.
 - Icon-only buttons without visible text must have `aria-label` or a visually-hidden text span
-- Form inputs must be associated with their label via `for`/`id` pairing or `aria-labelledby` — proximity alone is not sufficient
+- Verify form controls have programmatically associated names/labels appropriate to their semantics; visual proximity alone does not establish that relationship.
 - Images conveying information must have descriptive `alt` text; decorative images use `alt=""`
 - Keyboard navigation must work — focus order must follow visual order, no focus traps outside intentional modal patterns
 
@@ -23,35 +28,35 @@ Stack-specific rules loaded by `dh:code-reviewer` when `*.html`, `*.css`, or `*.
 - `element.innerHTML = userValue` is a blocking finding — use `textContent` for plain text
 - `dangerouslySetInnerHTML` (React) or equivalent without sanitization is a blocking finding
 - User-controlled values used in `eval()`, `Function()`, or `setTimeout(string)` are a blocking finding
-- URL values from user input used in `href`, `src`, or `action` attributes must be validated against an allowlist of schemes (block `javascript:`, `data:`)
+- Validate user-controlled URL schemes for the actual attribute and content context; prevent executable or unauthorized navigation/content while preserving deliberately supported media sources.
 
 ## Performance
 
-- Layout thrash — reading layout properties (`offsetWidth`, `getBoundingClientRect`) inside a loop that also writes styles — is a blocking finding
-- Images must have explicit `width` and `height` attributes to prevent layout shift (CLS)
-- Images below the fold must use `loading="lazy"` — eager loading of off-screen images delays critical rendering
-- Large JavaScript bundles loaded synchronously in `<head>` without `defer` or `async` are a blocking finding
-- Expensive computations inside render functions (React `render`, Vue template expressions) without memoization are a blocking finding
+- Investigate interleaved layout reads (`offsetWidth`, `getBoundingClientRect`) and style writes for repeated layout work; establish the affected rendering path and cost before assigning severity.
+- Check that image layout reserves the required space through dimensions or an equivalent supported layout rule; report observed or source-established layout-shift risk.
+- Review off-screen image loading against the critical rendering path and intended preload behavior; recommend lazy loading where it addresses a demonstrated cost.
+- Check the actual script-loading semantics and critical rendering effect of large bundles; absence of a particular attribute alone does not establish a performance defect.
+- Trace expensive render work to its input size, frequency, and user-visible cost before recommending memoization or another optimization.
 
 ## CSS
 
-- `!important` without an explanatory comment is a blocking finding
-- Design tokens (colors, spacing, typography) must use CSS custom properties (`--color-primary`) — hardcoded hex values and px values are non-blocking but flagged
-- Magic `z-index` values without a documented z-index scale are a blocking finding — use named tokens (`z-index: var(--z-modal)`)
+- Inspect `!important` for an actual cascade conflict or project-policy violation; a justified third-party override is not defective solely because of the keyword.
+- Apply the project's design-token conventions where they exist; do not impose a new token system on unrelated styles.
+- Trace undocumented `z-index` values to stacking behavior and project policy before requiring named tokens or a new scale.
 - `position: fixed` or `position: sticky` without overflow and scroll container awareness is flagged
-- `*` selectors in component styles that may bleed into child components are a blocking finding
+- Verify whether broad component selectors affect unintended descendants; identify the affected component and style consequence.
 
 ## Forms
 
-- Every `<input>`, `<select>`, and `<textarea>` must have an associated `<label>` (either wrapping or via `for`/`id`)
-- `autocomplete` attributes must be set on inputs that collect personal data (name, email, address, payment) — required for WCAG 1.3.5
+- Verify user-operable fields have accessible names and any visible/programmatic labels required by their semantics and the target standard; preserve supported wrapping, association, or equivalent naming mechanisms.
+- Where the target accessibility standard requires identifying input purpose, verify the field's purpose and relevant `autocomplete` metadata.
 - Validation error messages must be associated with the field via `aria-describedby` — color alone is not sufficient to communicate errors
 - Form submission must not clear field values without user confirmation when validation fails
 
 ## Event Listener Cleanup
 
-- Event listeners added in component mount / setup must be removed in the corresponding unmount / cleanup
-- `document.addEventListener` without a corresponding `removeEventListener` in the cleanup lifecycle is a blocking finding
+- Verify listeners stop affecting the component when its lifetime ends, through explicit removal, supported abort/disposal behavior, or an equivalent lifetime guarantee.
+- For `document.addEventListener`, trace the long-lived emitter and actual cleanup mechanism; report retained listeners or stale effects rather than requiring one cleanup spelling.
 - `AbortController` is preferred for fetch-and-cleanup patterns — pass the signal and abort on cleanup
 
 ## Anti-Patterns
@@ -77,13 +82,13 @@ Stack-specific rules loaded by `dh:code-reviewer` when `*.html`, `*.css`, or `*.
 ```
 
 ```css
-/* WRONG: magic z-index */
+/* Investigate this value against the actual stacking contract. */
 .modal { z-index: 9999; }
 
 /* RIGHT: design token */
 .modal { z-index: var(--z-modal); }
 
-/* WRONG: unexplained !important */
+/* Investigate the override's scope and reason. */
 .button { color: red !important; }
 
 /* RIGHT: explained override */
