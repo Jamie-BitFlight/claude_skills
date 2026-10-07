@@ -220,7 +220,14 @@ Stateful testing explores sequences of actions, not only isolated inputs [6]. Fo
 operations observe the resulting state and the absence of forbidden effects, not just an exception.
 Include ownership races, duplicate requests, and partial completion when those are material risks.
 
-### 8. Control the experiment
+### 8. Select interactions systematically
+
+When several independent factors can jointly affect an admitted obligation, use the Test Designer's
+[interaction-coverage reference](../skills/test-designer/references/interaction-coverage.md).
+Treat combinatorial coverage as case-selection evidence only; the protected contract, oracle,
+execution reach, and temporal behavior require their own evidence.
+
+### 9. Control the experiment
 
 Control or record relevant time, randomness, versions, configuration, filesystem, shared state,
 scheduling, and external dependencies. Preserve failing inputs, seeds, logs, and traces. Timing,
@@ -230,14 +237,14 @@ report trials, failures, and uncertainty. Do not tighten tolerances or add retri
 A passing rerun does not explain a failure; unavailable, skipped, xfailed, or interrupted work is
 not passing behavioral evidence. Account for cleanup of processes, threads, resources, and state.
 
-### 9. Make failures interpretable
+### 10. Make failures interpretable
 
 Keep scenario, action, expected behavior, and observation legible. Use behavior-oriented names and
 helpers that expose rather than conceal the important input/state. Emit expected/actual differences
 and enough context to reproduce the failure. Avoid a fixture framework that reproduces production
 complexity or hides the oracle [2]. Follow the project's applicable typing and fixture conventions.
 
-### 10. Maintain protection, not test count
+### 11. Maintain protection, not test count
 
 Adjudicate failures as product, requirement, oracle, or harness/environment defects before editing
 expectations. Compare a material rewrite against its original protection and unacceptable regressions.
