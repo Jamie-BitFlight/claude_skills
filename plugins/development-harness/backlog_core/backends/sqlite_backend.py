@@ -1273,7 +1273,6 @@ class SQLiteBackend:
         Returns:
             ``IssueNode`` of the created issue.
         """
-        number = self._next_issue_number()
         task_type = getattr(task, "task_type", "") or ""
         task_desc = getattr(task, "description", "") or task.task_id
         title = (
@@ -1282,15 +1281,19 @@ class SQLiteBackend:
             else f"[{task.feature}/{task.task_id}] {task_desc}"
         )
         body = description or task_desc
-        ts = _now()
-        self._conn.execute(
-            "INSERT INTO items (issue_number, title, status, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (number, title, "open", body, ts, ts),
-        )
-        if labels:
-            for tag in labels:
-                self._conn.execute("INSERT OR IGNORE INTO item_tags (issue_number, tag) VALUES (?, ?)", (number, tag))
-        self._conn.commit()
+        with self._conn:
+            self._conn.execute("BEGIN IMMEDIATE")
+            number = self._next_issue_number()
+            ts = _now()
+            self._conn.execute(
+                "INSERT INTO items (issue_number, title, status, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (number, title, "open", body, ts, ts),
+            )
+            if labels:
+                for tag in labels:
+                    self._conn.execute(
+                        "INSERT OR IGNORE INTO item_tags (issue_number, tag) VALUES (?, ?)", (number, tag)
+                    )
         row = self._conn.execute("SELECT * FROM items WHERE issue_number = ?", (number,)).fetchone()
         return self._row_to_issue_node(row)
 

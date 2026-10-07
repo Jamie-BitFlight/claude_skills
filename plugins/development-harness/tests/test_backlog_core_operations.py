@@ -746,6 +746,61 @@ class TestAddItemCreatesLocalFile:
             first_backend._conn.close()
             second_backend._conn.close()
 
+    def test_concurrent_sqlite_task_native_creation_preserves_shared_counter(
+        self, tmp_path: Path, mocker: MockerFixture
+    ) -> None:
+        """Item and task creation must reserve distinct SQLite issue numbers."""
+        database_path = tmp_path / "backlog.sqlite3"
+        first_backend = SQLiteBackend(str(database_path))
+        second_backend = SQLiteBackend(str(database_path))
+        allocation_barrier = Barrier(2)
+
+        def coordinate_allocator(allocate: Callable[[], int]) -> Callable[[], int]:
+            def coordinated_allocate() -> int:
+                number = allocate()
+                with contextlib.suppress(BrokenBarrierError):
+                    allocation_barrier.wait(timeout=0.5)
+                return number
+
+            return coordinated_allocate
+
+        mocker.patch.object(
+            first_backend, "_next_issue_number", side_effect=coordinate_allocator(first_backend._next_issue_number)
+        )
+        mocker.patch.object(
+            second_backend, "_next_issue_number", side_effect=coordinate_allocator(second_backend._next_issue_number)
+        )
+        start_barrier = Barrier(2)
+
+        def create_item() -> str:
+            start_barrier.wait(timeout=5)
+            number = first_backend.create_issue_for_item(
+                None, BacklogItem(title="SQLite item", description="item", priority="P1")
+            )
+            assert number is not None
+            return f"#{number}"
+
+        def create_task() -> str:
+            start_barrier.wait(timeout=5)
+            issue = second_backend.create_task_issue(
+                MagicMock(),
+                1,
+                MagicMock(task_id="T1", feature="sqlite", task_type="implementation", description="task"),
+            )
+            assert issue is not None
+            return f"#{issue['number']}"
+
+        try:
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                references = [executor.submit(create_item), executor.submit(create_task)]
+                created_references = [future.result() for future in references]
+
+            assert set(created_references) == {"#1", "#2"}
+            assert {issue["number"] for issue in first_backend.get_task_issues(MagicMock(), 1)} == {1, 2}
+        finally:
+            first_backend._conn.close()
+            second_backend._conn.close()
+
 
 class TestAddItemValidatesPriorityAndType:
     """add_item() rejects invalid priority/type at the ingress boundary.
