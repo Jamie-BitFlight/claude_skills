@@ -6,7 +6,8 @@ description: Design validation and maintained regression protection before test 
 # Test Designer
 
 Design the smallest evidence set that can distinguish the consequential failure while remaining stable
-through valid redesign. Plan only; return the design to the caller.
+through valid redesign. Plan only; return the design to the caller. The method is standalone and
+language-independent; it does not depend on SAM or a specific test framework.
 
 Use [Testing principles](../../docs/testing-principles.md) as shared reference. For retention, read
 **Test admission gate** and **Test economics**. For boundary/oracle decisions, read **Contract
