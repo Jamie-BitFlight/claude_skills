@@ -222,34 +222,10 @@ Include ownership races, duplicate requests, and partial completion when those a
 
 ### 8. Select interactions systematically
 
-Use combinatorial selection only after the protected contract, consequence, boundary, and oracle are
-known. It is a case-selection technique, not a source of requirements or expected results.
-
-When several independent factors can jointly affect an admitted obligation, identify behaviorally
-distinct values with equivalence partitioning and justified boundaries. Model relevant input, state,
-configuration, environment, and capability factors; omit incidental implementation dimensions.
-Distinguish impossible configurations from reachable invalid requests: constrain away only states the
-test environment cannot meaningfully exercise. Rejections, authorization failures, forbidden effects,
-and other negative behavior remain test obligations when the interface can receive those requests.
-
-Choose interaction strength from the failure mechanism and consequence. Pairwise coverage is a useful
-default candidate for broad low-cost interaction sampling, not a completeness claim. Use higher-order
-coverage, explicit scenarios, stateful sequences, or exhaustive coverage where a consequential fault
-requires them. Always preserve known regression-inducing and high-consequence combinations explicitly;
-a covering-array generator may pack other combinations around those cases when supported.
-
-A generated matrix establishes only its verified combination-selection claim. It does not establish
-that execution reached the intended mechanism, that an oracle is correct, or that temporal behavior
-was exercised. Earlier rejection can mask later factors. For every generated family, verify feasible
-t-way coverage independently of merely producing a model or invoking a tool, and state exclusions and
-uncovered interactions. Record generator/version/options/seed when they affect reproducibility. If the
-generator is unavailable, report the model as proposed rather than generated evidence.
-
-Credit existing tests that already satisfy required interactions before adding cases. Apply the normal
-admission gate and test economics to the family as a whole and to uniquely valuable explicit cases.
-When rows are removed or consolidated, recompute any claimed covering property for the surviving
-suite. Combinatorial selection may be temporary close-validation evidence; it does not automatically
-justify permanent retention.
+When several independent factors can jointly affect an admitted obligation, use the Test Designer's
+[interaction-coverage reference](../skills/test-designer/references/interaction-coverage.md).
+Treat combinatorial coverage as case-selection evidence only; the protected contract, oracle,
+execution reach, and temporal behavior require their own evidence.
 
 ### 9. Control the experiment
 
