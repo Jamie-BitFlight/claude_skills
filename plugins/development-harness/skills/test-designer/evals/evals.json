@@ -120,6 +120,12 @@
       "prompt": "Design regression protection for a deployment resolver where region, storage backend, authentication mode, and retry mode can interact. A previous defect required EU + replica + workload identity + retry. Some combinations are impossible because workload identity is unsupported in one explicitly documented local-only region; unauthenticated requests are reachable and must be rejected without writes.",
       "expected_output": "Trigger interaction coverage. Model behaviorally relevant factors and distinguish the documented impossible environment combination from reachable rejection cases. Preserve the known four-factor regression explicitly, choose and justify surrounding interaction strength rather than defaulting blindly to pairwise, credit existing protection, and claim generated/verified coverage only if rows were actually generated and checked. Keep oracle, forbidden-write observation, and temporal retry behavior separate from combinatorial coverage.",
       "files": []
+    },
+    {
+      "id": 21,
+      "prompt": "A bug ticket says expired tokens must be rejected. Production currently lets refresh(expired_token) succeed, one existing test expects that success, and a security note says expired tokens cannot access protected resources but says nothing about refresh. Design the next test without changing files.",
+      "expected_output": "Keep the evidence provenance distinct: the ticket is authoritative only for the behavior it actually scopes, production and the existing test are observed/current behavior, and extending the security note from protected-resource access to refresh would be derived or assumed. Do not silently choose refresh policy and do not block unrelated separable design work. Name the consequential refresh-policy decision that needs authority before asserting it.",
+      "files": []
     }
   ]
 }
