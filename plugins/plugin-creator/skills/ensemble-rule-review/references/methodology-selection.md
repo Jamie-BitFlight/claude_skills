@@ -16,7 +16,7 @@ Each family's mechanics and trade-offs are grounded in the cited literature, not
 
 | Family | Workers do | Merge step | Best for | Anchor |
 |---|---|---|---|---|
-| Ensemble-denoising (this skill) | Apply overlapping rule slices to the SAME input | Count corroboration on `(group, location)`, drop tail | Review / checklist / rubric where recall + precision on findings matter | Self-consistency vote (Wang 2022); bagging (Breiman 1996) |
+| Ensemble-denoising (this skill) | Apply overlapping rule slices to the SAME input | Count corroboration on normalized location, drop tail | Review / checklist / rubric where recall + precision on findings matter | Self-consistency vote (Wang 2022); bagging (Breiman 1996) |
 | Work-partition / map-reduce | Each handles a DISJOINT item independently | Concatenate / collect, no agreement count | Generative breadth: implement N functions, write N tests, scan N docs | [./composing-in-workflows.md](./composing-in-workflows.md) |
 | Best-of-N / tournament | N attempts at the SAME goal | A judge selects ONE winner (selection, not vote) | Generation where you want the single best of several attempts | Best-of-N selection (verifier/reward family; e.g. Cobbe et al. verifiers) |
 | Multi-agent debate | Propose, then critique and revise across ROUNDS | Converge / majority after interaction | Open-ended reasoning, factuality, hard problems needing self-correction | Du et al. 2023 (arXiv:2305.14325); Liang et al. 2023 (arXiv:2305.19118) |

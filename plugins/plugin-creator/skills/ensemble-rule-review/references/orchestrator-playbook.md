@@ -113,13 +113,15 @@ def reduce(findings, keep_threshold=1):
     # 1. Keep only violations.
     violations = [f for f in findings if f.get("verdict", "VIOLATION") == "VIOLATION"]
 
-    # 2. Dedup + count corroboration. KEY ON (group, location) — NEVER the rule slug.
-    #    Workers author their own rule slugs, so keying on rule would never corroborate;
-    #    `group` is the orchestrator-assigned id, identical across workers, so it collides.
+    # 2. Dedup + count corroboration. KEY ON NORMALIZED LOCATION — NEVER the rule slug.
+    #    Workers author their own rule slugs, so keying on rule would never corroborate.
     merged = {}
     for f in violations:
-        key = (f["group"], normalize(f["location"]))  # group is the stable corroboration key
-        m = merged.setdefault(key, {"agents": set(), "evidence": [], "severity": "low"})
+        key = normalize(f["location"])
+        m = merged.setdefault(
+            key, {"group": f["group"], "groups_seen": set(), "agents": set(), "evidence": [], "severity": "low"}
+        )
+        m["groups_seen"].add(f["group"])
         m["agents"].add(f["worker_id"])  # weight = number of DISTINCT workers
         m["evidence"].append(f["evidence"])
         m["severity"] = max_sev(m["severity"], f.get("severity"))
@@ -134,10 +136,11 @@ def reduce(findings, keep_threshold=1):
 
 Two contract points the live test proved necessary:
 
-- **Key on `group`, not the rule slug.** In the worked review run, two agents flagged the same
-  line with different slugs (`any-without-justification` vs `any-not-in-boundary-module`). Keying
-  on the slug splits them into two weight-1 findings; keying on `group` corroborates them to
-  weight 2. Keying on the rule slug is the dominant cause of "the ensemble found nothing agreed".
+- **Key on normalized location, not the rule slug.** In the worked review run, two agents flagged
+  the same line with different slugs (`any-without-justification` vs
+  `any-not-in-boundary-module`). Keying on the slug splits them into two findings; location merges
+  them and retains every contributing group. Keying on the rule slug is the dominant cause of
+  "the ensemble found nothing agreed".
 - **Weight = count of DISTINCT workers**, not raw report count, so one worker emitting a finding
   twice cannot fake corroboration.
 
@@ -176,8 +179,8 @@ The orchestrator itself is the **reducer** — mid tier (sonnet), medium effort 
   signal, so single-worker hallucinations survive.
 - **Slices too broad.** Overloads the cheap worker back into the silent-criteria-dropping regime
   the pattern exists to avoid.
-- **Reducing before dedup.** Corroboration counting is meaningless until `(rule_id, location)` is
-  normalized — dedup first, then weight.
+- **Reducing before dedup.** Corroboration counting is meaningless until locations are normalized
+  and deduplicated — dedup first, then weight.
 - **Over-tiered workers when the job is mechanical matching.** Pays for inference that was
   engineered out of the worker's job; the cost adds nothing because the tier advantage has no work
   to do. Use the cheapest tier for mechanical slices. Exception — do NOT treat "non-cheapest worker"

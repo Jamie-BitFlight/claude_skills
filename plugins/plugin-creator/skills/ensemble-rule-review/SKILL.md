@@ -288,10 +288,10 @@ Two procedures and one reusable contract turn this pattern from concept into act
   redundancy, and prints the recommended `--keep-threshold` — removing the manual bookkeeping that
   caused this session's bugs (wrong paths, drifted group ids, ad-hoc overlap, per-worker tagging).
 - **Reducer script** — run `./scripts/reduce.py` (tested; `./scripts/test_reduce.py`) over the
-  worker output files to dedup, corroboration-weight on `(group, location)`, drop the tail, and
-  rank. Workers emit a stable `group` id (the corroboration key) plus a free-form `rule` slug
-  (descriptive only) — keying on the slug would never corroborate, since workers name rules
-  differently.
+  worker output files to dedup on normalized location, collect contributing `groups_seen`,
+  corroboration-weight by distinct worker, drop the tail, and rank. Workers emit a stable `group`
+  id as finding metadata plus a free-form `rule` slug (descriptive only) — keying on the slug
+  would never corroborate, since workers name rules differently.
 - **Measure whether it actually works** — follow
   [./references/measuring-success.md](./references/measuring-success.md): the free no-gold-set
   weight-distribution diagnostic, precision/recall/F1 against a labelled set, and the falsification

@@ -23,8 +23,8 @@ No creativity, no scope expansion, no extra analysis.
   group. Apply ONLY these rules. Ignore every rule outside your slice.
 - `group` (per finding) — emit the group id of the SPECIFIC rule each finding violates, not one
   fixed worker-level id. If your slice spans groups 1 and 2, a group-1 violation emits `group: 1`
-  and a group-2 violation emits `group: 2`. The group id is the corroboration key; your free-form
-  rule name is not, and may differ from the other worker's name for the same rule.
+  and a group-2 violation emits `group: 2`. The reducer merges different groups at one normalized
+  location; your free-form rule name is descriptive only and may differ between workers.
 - `OUTFILE` — an absolute path to write your report to.
 
 If any of these is missing, do not guess. Emit `STATUS: BLOCKED` naming what is absent, and stop.
@@ -54,9 +54,9 @@ The reducer parses this literally. Do not rename fields or change the leading `-
 ```
 
 `location` must be `path:line` — keep the directory, not just the filename, so two files sharing a
-basename do not collide. `group` is the corroboration key: emit the id of the specific rule this
-finding violates. The reducer keys on `(group, location)`, so two workers corroborate a shared
-line even when their `rule` slugs differ — provided both emit the same group id for that rule.
+basename do not collide. Emit `group` as the id of the specific rule this finding violates. The
+reducer keys on normalized location, so different groups at one location merge while retaining all
+contributing groups; differing `rule` slugs do not block that merge.
 
 ## Terminal output (always emit, even with zero findings)
 
