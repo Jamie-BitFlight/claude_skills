@@ -220,7 +220,7 @@ Stateful testing explores sequences of actions, not only isolated inputs [6]. Fo
 operations observe the resulting state and the absence of forbidden effects, not just an exception.
 Include ownership races, duplicate requests, and partial completion when those are material risks.
 
-## Interaction-aware case selection
+### 8. Select interactions systematically
 
 Use combinatorial selection only after the protected contract, consequence, boundary, and oracle are
 known. It is a case-selection technique, not a source of requirements or expected results.
@@ -251,7 +251,7 @@ When rows are removed or consolidated, recompute any claimed covering property f
 suite. Combinatorial selection may be temporary close-validation evidence; it does not automatically
 justify permanent retention.
 
-### 8. Control the experiment
+### 9. Control the experiment
 
 Control or record relevant time, randomness, versions, configuration, filesystem, shared state,
 scheduling, and external dependencies. Preserve failing inputs, seeds, logs, and traces. Timing,
@@ -261,14 +261,14 @@ report trials, failures, and uncertainty. Do not tighten tolerances or add retri
 A passing rerun does not explain a failure; unavailable, skipped, xfailed, or interrupted work is
 not passing behavioral evidence. Account for cleanup of processes, threads, resources, and state.
 
-### 9. Make failures interpretable
+### 10. Make failures interpretable
 
 Keep scenario, action, expected behavior, and observation legible. Use behavior-oriented names and
 helpers that expose rather than conceal the important input/state. Emit expected/actual differences
 and enough context to reproduce the failure. Avoid a fixture framework that reproduces production
 complexity or hides the oracle [2]. Follow the project's applicable typing and fixture conventions.
 
-### 10. Maintain protection, not test count
+### 11. Maintain protection, not test count
 
 Adjudicate failures as product, requirement, oracle, or harness/environment defects before editing
 expectations. Compare a material rewrite against its original protection and unacceptable regressions.
