@@ -52,11 +52,24 @@ Do not require a SAM plan, a specific framework, or another plugin for standalon
    stable contract or gives unique important fault discrimination more cheaply. For each material
    test/family, justify its oracle independently, state what doubles omit and what must be real, and
    include a behavior-preserving variation when implementation coupling is a risk.
-6. **Plan execution.** Discover the actual project command and CI lane. Record isolation,
+6. **Select combinations when interactions are a plausible failure mechanism.** When behavior depends
+   on several independent inputs, states, configurations, environments, or capabilities, model only
+   factors that can affect an admitted obligation. Partition values by behavior and include justified
+   boundaries. Distinguish impossible configurations from reachable requests that the product must
+   reject; constraints may remove only the former. Choose pairwise, higher-order, stateful, or explicit
+   combinations from consequence and evidence rather than using pairwise by default. Preserve known
+   regressions and consequential combinations explicitly even when a covering array would otherwise
+   omit them. Where useful, generate a covering array with an available combinatorial tool, but keep
+   the design tool-independent. Verify the generated rows satisfy the claimed feasible t-way coverage;
+   a model file or generator invocation alone is not coverage evidence. Credit adequate existing tests
+   before adding generated cases. Treat the resulting cases as a protection family: if retained rows
+   are removed or changed, recompute any interaction-coverage claim. Static combination coverage does
+   not replace transition, race, interruption, recovery, forbidden-effect, or oracle evidence.
+7. **Plan execution.** Discover the actual project command and CI lane. Record isolation,
    prerequisites, cleanup, diagnostics, and negative controls where justified. Follow the shared
    safety rules; propose rather than execute unavailable or unsafe checks. Keep product expectations
    separate from generated-artifact freshness and consumer/agent execution evidence.
-7. **Check the plan before authoring.** Confirm that every proposed test has a point, each important
+8. **Check the plan before authoring.** Confirm that every proposed test has a point, each important
    scoped obligation has protection or an explicit gap, and no oracle merely repeats production logic
    or mutable source. Ask: what undesirable behavior could occur if this assertion disappeared while
    all other tests remained green? If the answer is only that implementation/prose could change, the
@@ -73,6 +86,9 @@ Return a concise test plan in the current response or caller's existing authoriz
 - direct close validation for the claimed change, explicitly separate from retained regression protection;
 - test cards or a compact matrix, with each retained case's protection benefit, ownership cost, and unique purpose;
 - highest-consequence missing guarantees, justified boundary choices, and execution order;
+- when interaction selection is material: factors/value partitions, feasibility constraints with
+  rationale, selected interaction strength or explicit combinations, preserved regression seeds,
+  generated-versus-observed status, and verified coverage/gaps;
 - expected red for TDD and any risk-justified fault/negative control, positive behavior, and protected refactor behavior;
 - proposed versus executed checks, commands/results when observed, and evidence limitations.
 
