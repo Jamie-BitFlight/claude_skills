@@ -60,7 +60,11 @@ Against the gold set, for each configuration:
 The design makes specific predictions. Test the ones that would DISPROVE it:
 
 1. Ablate the corroboration weighting (reducer with vs without weighting). If F1 does not improve
-   with weighting on, the corroboration step adds nothing and the value is just dedup + parallelism.
+    with weighting on, the corroboration step adds nothing and the value is just dedup + parallelism.
+   Set `preserve_high_severity=False` in both reducer calls for this threshold-only experiment;
+   otherwise the production critical/high exemption changes what the ablation measures. Record
+   the retention policy with the results. Evaluate production output separately with preservation
+   enabled, including false positives among severe findings retained below threshold.
 2. Sweep N / window. Bagging predicts F1 plateaus at the correlated-error floor; Condorcet predicts
    F1 can DEGRADE as homogeneous correlated workers are added. A rising-then-falling F1 curve
    confirms correlated-error dominance.
@@ -83,7 +87,8 @@ The keep threshold decides whether 2-of-`window` agreement is signal or shared b
 value depends on the measured ρ and per-worker competence — it cannot be guessed. Sweep the
 threshold against the gold set and pick the value that maximizes F1 (or recall at a precision
 floor, if false negatives are costlier). Do not assume the script default denoises; the default
-`keep_threshold=1` drops nothing.
+`keep_threshold=1` drops nothing. Keep `preserve_high_severity` fixed across a threshold sweep;
+use the production default `True` when selecting a threshold for operational review.
 
 ## Success definition
 

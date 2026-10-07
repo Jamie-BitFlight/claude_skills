@@ -15,12 +15,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
+
 import reduce as r
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-    import pytest
 
 WORKER_A = """# Worker A
 - group: 2
@@ -112,10 +112,35 @@ def test_lone_finding_stays_weight_one() -> None:
 
 
 def test_keep_threshold_drops_tail() -> None:
+    """The threshold-only policy isolates corroboration for measured ablations."""
     reports = {"A": r.parse_report(WORKER_A), "C": r.parse_report(WORKER_C)}
-    survivors = r.reduce_findings(reports, keep_threshold=2)
+    survivors = r.reduce_findings(reports, keep_threshold=2, preserve_high_severity=False)
     assert all(m.weight >= 2 for m in survivors)
     assert all(m.location != "create_plugin.py:127" for m in survivors)
+
+
+@pytest.mark.parametrize(
+    ("severity", "retained"), [("critical", True), ("high", True), ("medium", False), ("low", False)]
+)
+def test_keep_threshold_preserves_severe_findings_without_extra_votes(severity: str, *, retained: bool) -> None:
+    """A serious singleton remains visible without fabricating corroboration."""
+    corroborated = "- group: quality\n  location: shared.py:20\n  severity: medium\n"
+    reports = {
+        "A": r.parse_report(f"- group: security\n  location: service.py:10\n  severity: {severity}\n" + corroborated),
+        "B": r.parse_report(corroborated),
+    }
+
+    survivors = r.reduce_findings(reports, keep_threshold=2)
+
+    ordinary = next(finding for finding in survivors if finding.location == "shared.py:20")
+    assert ordinary.severity == "medium"
+    assert ordinary.weight == 2
+    singleton = [finding for finding in survivors if finding.location == "service.py:10"]
+    assert bool(singleton) is retained
+    if retained:
+        assert singleton[0].severity == severity
+        assert singleton[0].weight == 1
+        assert singleton[0].agents == {"A"}
 
 
 def test_pass_verdict_excluded() -> None:
@@ -123,10 +148,10 @@ def test_pass_verdict_excluded() -> None:
   rule: typed
   location: x.py:10
   verdict: PASS
-  severity: low
+  severity: critical
 """
     reports = {"A": r.parse_report(report)}
-    assert r.reduce_findings(reports, keep_threshold=1) == []
+    assert r.reduce_findings(reports, keep_threshold=2) == []
 
 
 def test_verdict_defaults_to_violation_when_absent() -> None:
@@ -251,9 +276,10 @@ def test_severity_escalates_to_highest() -> None:
   location: x.py:10
   severity: critical
 """
-    merged = r.reduce_findings({"A": r.parse_report(report)}, keep_threshold=1)
+    merged = r.reduce_findings({"A": r.parse_report(report)}, keep_threshold=2)
     assert len(merged) == 1
     assert merged[0].severity == "critical"
+    assert merged[0].weight == 1
 
 
 def test_ranking_weight_then_severity() -> None:
@@ -270,14 +296,50 @@ def test_load_reports_derives_worker_id_from_stem(tmp_path: Path) -> None:
     assert set(reports) == {"A", "C"}
 
 
-def test_main_runs_end_to_end(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    (tmp_path / "review-A.md").write_text(WORKER_A, encoding="utf-8")
+@pytest.mark.parametrize(("threshold", "preserved_count", "shared_tag"), [(2, 2, "KEEP"), (3, 3, "PRESERVED")])
+def test_main_runs_end_to_end(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], threshold: int, preserved_count: int, shared_tag: str
+) -> None:
+    """Report retention separately from actual corroboration at the CLI boundary."""
+    additional_findings = """
+- group: security
+  rule: exposed-secret
+  location: service.py:10
+  severity: critical
+
+- group: quality
+  location: medium.py:10
+  severity: medium
+
+- group: quality
+  location: low.py:10
+  severity: low
+
+- group: security
+  location: passing.py:10
+  verdict: PASS
+  severity: critical
+"""
+    (tmp_path / "review-A.md").write_text(WORKER_A + additional_findings, encoding="utf-8")
     (tmp_path / "review-C.md").write_text(WORKER_C, encoding="utf-8")
-    code = r.main([str(tmp_path), "--glob", "review-*.md"])
+    code = r.main([str(tmp_path), "--glob", "review-*.md", "--keep-threshold", str(threshold)])
+
     assert code == 0
     out = capsys.readouterr().out
+    assert "raw findings: 7   retained findings: 3" in out
     assert "corroborated (weight>=2): 1" in out
-    assert "KEEP w=2" in out
+    assert "lone (weight=1): 2" in out
+    assert f"retained below threshold: {preserved_count}" in out
+    assert f"[{shared_tag} w=2] group=2 create_plugin.py:121" in out
+    assert "[PRESERVED w=1] group=2 create_plugin.py:127" in out
+    assert "[PRESERVED w=1] group=security service.py:10" in out
+    shared_line = next(line for line in out.splitlines() if "create_plugin.py:121" in line)
+    singleton_line = next(line for line in out.splitlines() if "service.py:10" in line)
+    assert "corroborated=True" in shared_line
+    assert "corroborated=False" in singleton_line
+    assert "medium.py:10" not in out
+    assert "low.py:10" not in out
+    assert "passing.py:10" not in out
 
 
 def test_main_errors_on_missing_dir(tmp_path: Path) -> None:
