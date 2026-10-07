@@ -661,6 +661,38 @@ class TestAddItemCreatesLocalFile:
             if isinstance(backend, SQLiteBackend):
                 backend._conn.close()
 
+    def test_concurrent_memory_native_creation_preserves_both_records(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Concurrent Memory creates must retain separate native records."""
+        import backlog_core.backends.memory_backend as memory_backend
+        from backlog_core.backend_protocol import reset_config, set_config
+        from backlog_core.backend_types import BacklogConfig as BackendBacklogConfig
+
+        allocation_barrier = Barrier(2)
+
+        def coordinated_max(*values: Any, **kwargs: Any) -> Any:
+            result = max(*values, **kwargs)
+            with contextlib.suppress(BrokenBarrierError):
+                allocation_barrier.wait(timeout=0.5)
+            return result
+
+        backend = InMemoryBackend()
+        monkeypatch.setattr(memory_backend, "max", coordinated_max, raising=False)
+        set_config(BackendBacklogConfig(backend=backend))
+        start_barrier = Barrier(2)
+
+        def create(title: str) -> str:
+            start_barrier.wait(timeout=5)
+            return str(add_item(title=title, description=title, priority="P1", force=True)["item_ref"])
+
+        try:
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                references = list(executor.map(create, ["Memory native one", "Memory native two"]))
+
+            assert set(references) == {"#1", "#2"}
+            assert {item.title for item in backend.list_work_items()} == {"Memory native one", "Memory native two"}
+        finally:
+            reset_config()
+
     def test_concurrent_native_creation_sqlite_instances_preserve_both_records(
         self, tmp_path: Path, mocker: MockerFixture
     ) -> None:
