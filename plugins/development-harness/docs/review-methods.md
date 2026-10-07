@@ -118,14 +118,17 @@ Preserve all constituent source reports and original severity claims. A single w
 reporting twice counts as one worker, and two workers repeating the same assumption
 are not independent verification of that assumption.
 
-Verification is separate from candidate grouping. Classify an investigated candidate as
+Verification is separate from candidate grouping. During investigation, distinguish
 VERIFIED (applicable contract and defect established), REFUTED (specific counterevidence
-disproves the claim), or UNRESOLVED (the discriminating evidence is unavailable). Include
-the reason, source references, and cheapest safe next check. Do not silently delete
-REFUTED or UNRESOLVED observations from the audit trail; do not promote UNRESOLVED to a
-confirmed blocking defect. Preserve the caller's existing verdict schema and raw-finding
-conservation contract: these dispositions are internal investigation notes or narrative
-unless the owning schema explicitly supports them.
+disproves the claim), and UNRESOLVED (discriminating evidence unavailable). These are
+reasoning categories, **not persisted statuses or new verdict fields**. Preserve every
+raw finding through the existing DH verdict/synthesis contract; do not turn an unresolved
+candidate into a confirmed blocker. When an existing authorized durable report section
+can hold a concise explanation, use it without changing its schema. Otherwise report
+only what the existing contract supports, and mark the missing adjudication audit trail
+as a limitation. A durable per-candidate reason/source/next-check record requires an
+explicit owner and schema migration tracked in #4098; never claim an ephemeral worker
+response is a durable audit trail.
 
 ## Coverage and review execution boundary
 
