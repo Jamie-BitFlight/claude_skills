@@ -207,7 +207,7 @@ def try_get_github(repo: str = "") -> Repository | None:
 
 
 def create_issue_for_item(
-    repository: Repository, item: BacklogItem, dry_run: bool = False, output: Output | None = None
+    repository: Repository | None, item: BacklogItem, dry_run: bool = False, output: Output | None = None
 ) -> int | None:
     """Create a backend issue from a BacklogItem.
 
@@ -1841,8 +1841,10 @@ def _try_create_backend_issue_ref(item_data: BacklogItem, repo: str, out: Output
 
     - String-ID backends (beads): calls ``create_beads_issue_for_item`` on the
       backend, returns the nanoid (e.g. ``"bd-a3f8"``).
-    - Integer-ID backends (GitHub, sqlite, memory): calls
-      ``_try_create_github_issue``, formats the returned number as ``"#N"``.
+    - Integer-ID GitHub backends: create through the authenticated GitHub
+      connection.
+    - Integer-ID local backends (sqlite, memory): create in their native
+      store, which does not require a GitHub connection.
 
     The return value is always a ``str``: non-empty on success, empty string
     when the backend is unavailable or creation fails.
@@ -1865,8 +1867,10 @@ def _try_create_backend_issue_ref(item_data: BacklogItem, repo: str, out: Output
         # Unknown string-ID backend — log and fall through to local-only.
         out.warn("  WARNING: String-ID backend does not support create_beads_issue_for_item — creating local-only item")
         return ""
-    # Integer-ID backend path (GitHub, sqlite, memory).
-    issue_num = _try_create_github_issue(item_data, repo, out)
+    if backend.supports_github_extras:
+        issue_num = _try_create_github_issue(item_data, repo, out)
+    else:
+        issue_num = create_issue_for_item(None, item_data, dry_run=False, output=out)
     return f"#{issue_num}" if issue_num else ""
 
 

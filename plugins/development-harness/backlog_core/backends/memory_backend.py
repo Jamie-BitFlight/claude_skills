@@ -61,6 +61,7 @@ from backlog_core.models import (
     StatusFetchResult,
     ViewEnrichmentResult,
     ViewItemResult,
+    parse_issue_number,
     reference_is_title_derived,
 )
 
@@ -142,6 +143,7 @@ class InMemoryBackend:
         # Issues: {number: IssueNode}
         self._issues: dict[int, IssueNode] = {}
         self._next_issue_number: int = 1
+        self._issue_lock = RLock()
 
         # Comments: {issue_number: list[IssueCommentNode]}
         self._comments: dict[int, list[IssueCommentNode]] = {}
@@ -385,15 +387,28 @@ class InMemoryBackend:
         return self._fetch_issue_graphql(repo, owner, repo_name, issue["number"])["body"]
 
     def create_issue_for_item(
-        self, repo: Repository, item: BacklogItem, dry_run: bool = False, output: Output | None = None
+        self, repo: Repository | None, item: BacklogItem, dry_run: bool = False, output: Output | None = None
     ) -> int | None:
         """Create an issue from a BacklogItem and return its number."""
         if dry_run:
             return None
-        number = self._next_issue_number
-        self._next_issue_number += 1
-        issue = _make_issue_node(number=number, title=item.title, body=item.description)
-        self._issues[number] = issue
+        with self._issue_lock:
+            number = max(
+                self._next_issue_number,
+                max(self._issues, default=0) + 1,
+                max(
+                    (
+                        parsed_number + 1
+                        for reference in self._work_items
+                        if (parsed_number := parse_issue_number(reference)) is not None
+                        and reference == f"#{parsed_number}"
+                    ),
+                    default=1,
+                ),
+            )
+            self._next_issue_number = number + 1
+            issue = _make_issue_node(number=number, title=item.title, body=item.description)
+            self._issues[number] = issue
         return number
 
     def close_github_issue(
@@ -702,8 +717,6 @@ class InMemoryBackend:
         output: Output | None = None,
     ) -> IssueNode | None:
         """Create a child task issue and return its IssueNode."""
-        number = self._next_issue_number
-        self._next_issue_number += 1
         task_type = getattr(task, "task_type", "") or ""
         task_desc = getattr(task, "description", "") or task.task_id
         title = (
@@ -711,8 +724,11 @@ class InMemoryBackend:
             if task_type
             else f"[{task.feature}/{task.task_id}] {task_desc}"
         )
-        issue = _make_issue_node(number=number, title=title, body=description or task_desc)
-        self._issues[number] = issue
+        with self._issue_lock:
+            number = self._next_issue_number
+            self._next_issue_number += 1
+            issue = _make_issue_node(number=number, title=title, body=description or task_desc)
+            self._issues[number] = issue
         return issue
 
     def get_task_issues(

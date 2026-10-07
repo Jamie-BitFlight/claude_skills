@@ -720,13 +720,15 @@ class GitHubBackend:
         return self._work_items.work_item_version(repo, owner, repo_name, issue)[0].body
 
     def create_issue_for_item(
-        self, repo: Repository, item: BacklogItem, dry_run: bool = False, output: Output | None = None
+        self, repo: Repository | None, item: BacklogItem, dry_run: bool = False, output: Output | None = None
     ) -> int | None:
         """Create a backend issue from a BacklogItem.
 
         Returns:
             Issue number on success, or None on failure / dry_run.
         """
+        if repo is None:
+            raise ValueError("GitHubBackend requires a repository to create an issue")
         return gh_client.create_issue_for_item(repo, item, dry_run, output)
 
     def close_github_issue(

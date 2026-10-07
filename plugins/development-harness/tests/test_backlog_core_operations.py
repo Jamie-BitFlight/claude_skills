@@ -7,7 +7,10 @@ by an autouse fixture that redirects BACKLOG_DIR to tmp_path.
 
 from __future__ import annotations
 
+import contextlib
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Barrier, BrokenBarrierError
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import ANY, MagicMock
 
@@ -16,6 +19,7 @@ import backlog_core.operations as ops
 import pytest
 from backlog_core.backend_types import SyncProvider
 from backlog_core.backends.memory_backend import InMemoryBackend
+from backlog_core.backends.sqlite_backend import SQLiteBackend
 from backlog_core.github_sync import render_issue_body
 from backlog_core.models import (
     BackendUnavailableError,
@@ -569,34 +573,203 @@ class TestAddItemCreatesLocalFile:
 
         mock_create.assert_not_called()
 
-    def test_add_item_local_only_pending_state_visible_via_list_and_view(
+    def test_add_item_native_memory_reference_visible_via_list_and_view(
         self, mocker: MockerFixture, plain_memory_backend: InMemoryBackend
     ) -> None:
-        """Verify a local-only create's pending state is visible on later reads, not just at creation.
+        """Verify native Memory creation remains visible through later reads.
 
-        Tests: item 2 of #2999's fix — a caller reading the item later (grooming,
-            RT-ICA, dispatch) via list_items/view_item, not the add_item() return
-            value itself, must still be able to tell the item has no backend issue.
-        How: Create a local-only item (GitHub unavailable), then read it back through
-             both list_items and view_item; assert the empty "issue" field is present
-             on both, exactly mirroring add_item's own item_ref=="" signal.
-        Why: _build_list_entry and view_result_from_local_item already emit "issue"
-             unconditionally (BacklogItem.issue defaults to ""), so this test locks in
-             that the read paths already carry the signal add_item now also returns —
-             no separate mechanism was needed for requirement 2.
+        Tests: a local integer-ID provider creates a selector without consulting
+            the unavailable GitHub capability, and list_items/view_item preserve it.
+        How: Create an item through Memory, then read it through list_items and
+            view_item using the returned native selector.
+        Why: Memory shares SQLite's local integer-ID dispatch branch. The direct
+            reads prove this provider remains addressable after creation.
         """
         assert plain_memory_backend.supports_github_extras is False
-        mocker.patch("backlog_core.operations.try_get_github", return_value=None)
+        mock_try_github = mocker.patch("backlog_core.operations.try_get_github", return_value=None)
         mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
-        add_item(title="Pending Local Only Item", description="desc", priority="P2")
+        created = add_item(title="Native Memory Item", description="desc", priority="P2")
+        selector = str(created["item_ref"])
+
+        assert selector == "#1"
+        assert created["warnings"] == []
+        mock_try_github.assert_not_called()
 
         listed = list_items(refresh=False)
         list_entries = cast("list[dict[str, str | bool]]", listed["items"])
-        entry = next(it for it in list_entries if it["title"] == "Pending Local Only Item")
-        assert entry["issue"] == ""
+        entry = next(it for it in list_entries if it["title"] == "Native Memory Item")
+        assert entry["issue"] == selector
 
-        viewed = view_item("Pending Local Only Item")
-        assert viewed.issue == ""
+        viewed = view_item(selector)
+        assert viewed.issue == selector
+
+    @pytest.mark.parametrize("backend_type", [InMemoryBackend, SQLiteBackend], ids=["memory", "sqlite"])
+    def test_add_item_existing_work_item_reference_is_not_overwritten(self, backend_type: Callable[[], Any]) -> None:
+        """Native creation must not replace an existing work record with the same reference."""
+        from backlog_core.backend_protocol import reset_config, set_config
+        from backlog_core.backend_types import BacklogConfig as BackendBacklogConfig
+
+        backend = backend_type()
+        set_config(BackendBacklogConfig(backend=backend))
+        try:
+            existing = BacklogItem(
+                title="Existing native record",
+                description="This record must survive a colliding create.",
+                priority="P1",
+                reference="#1",
+                issue="#1",
+            )
+            backend.put_work_item(existing)
+
+            created = add_item(title="New native record", description="A distinct item.", priority="P2", force=True)
+
+            assert created["item_ref"] == "#2"
+            assert backend.get_work_item("#1").title == "Existing native record"
+            assert backend.get_work_item("#2").title == "New native record"
+        finally:
+            reset_config()
+            if isinstance(backend, SQLiteBackend):
+                backend._conn.close()
+
+    def test_concurrent_memory_native_creation_preserves_both_records(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Concurrent Memory creates must retain separate native records."""
+        import backlog_core.backends.memory_backend as memory_backend
+        from backlog_core.backend_protocol import reset_config, set_config
+        from backlog_core.backend_types import BacklogConfig as BackendBacklogConfig
+
+        allocation_barrier = Barrier(2)
+
+        def coordinated_max(*values: Any, **kwargs: Any) -> Any:
+            result = max(*values, **kwargs)
+            with contextlib.suppress(BrokenBarrierError):
+                allocation_barrier.wait(timeout=0.5)
+            return result
+
+        backend = InMemoryBackend()
+        monkeypatch.setattr(memory_backend, "max", coordinated_max, raising=False)
+        set_config(BackendBacklogConfig(backend=backend))
+        start_barrier = Barrier(2)
+
+        def create(title: str) -> str:
+            start_barrier.wait(timeout=5)
+            return str(add_item(title=title, description=title, priority="P1", force=True)["item_ref"])
+
+        try:
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                references = list(executor.map(create, ["Memory native one", "Memory native two"]))
+
+            assert set(references) == {"#1", "#2"}
+            assert {item.title for item in backend.list_work_items()} == {"Memory native one", "Memory native two"}
+        finally:
+            reset_config()
+
+    def test_concurrent_native_creation_sqlite_instances_preserve_both_records(
+        self, tmp_path: Path, mocker: MockerFixture
+    ) -> None:
+        """Concurrent SQLite connections must allocate separate references."""
+        database_path = tmp_path / "backlog.sqlite3"
+        first_backend = SQLiteBackend(str(database_path))
+        second_backend = SQLiteBackend(str(database_path))
+        allocation_barrier = Barrier(2)
+
+        def coordinate_allocator(allocate: Callable[[], int]) -> Callable[[], int]:
+            def coordinated_allocate() -> int:
+                number = allocate()
+                with contextlib.suppress(BrokenBarrierError):
+                    allocation_barrier.wait(timeout=0.1)
+                return number
+
+            return coordinated_allocate
+
+        mocker.patch.object(
+            first_backend, "_next_issue_number", side_effect=coordinate_allocator(first_backend._next_issue_number)
+        )
+        mocker.patch.object(
+            second_backend, "_next_issue_number", side_effect=coordinate_allocator(second_backend._next_issue_number)
+        )
+        start_barrier = Barrier(2)
+
+        def create(backend: SQLiteBackend, title: str) -> str:
+            start_barrier.wait(timeout=5)
+            item = BacklogItem(title=title, description=title, priority="P1")
+            issue_number = backend.create_issue_for_item(None, item)
+            assert issue_number is not None
+            reference = f"#{issue_number}"
+            backend.put_work_item(item.model_copy(update={"reference": reference, "issue": reference}))
+            return reference
+
+        try:
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                references = list(
+                    executor.map(
+                        lambda args: create(*args),
+                        [(first_backend, "SQLite native one"), (second_backend, "SQLite native two")],
+                    )
+                )
+
+            assert set(references) == {"#1", "#2"}
+            assert {item.title for item in first_backend.list_work_items()} == {
+                "SQLite native one",
+                "SQLite native two",
+            }
+        finally:
+            first_backend._conn.close()
+            second_backend._conn.close()
+
+    def test_concurrent_sqlite_task_native_creation_preserves_shared_counter(
+        self, tmp_path: Path, mocker: MockerFixture
+    ) -> None:
+        """Item and task creation must reserve distinct SQLite issue numbers."""
+        database_path = tmp_path / "backlog.sqlite3"
+        first_backend = SQLiteBackend(str(database_path))
+        second_backend = SQLiteBackend(str(database_path))
+        allocation_barrier = Barrier(2)
+
+        def coordinate_allocator(allocate: Callable[[], int]) -> Callable[[], int]:
+            def coordinated_allocate() -> int:
+                number = allocate()
+                with contextlib.suppress(BrokenBarrierError):
+                    allocation_barrier.wait(timeout=0.5)
+                return number
+
+            return coordinated_allocate
+
+        mocker.patch.object(
+            first_backend, "_next_issue_number", side_effect=coordinate_allocator(first_backend._next_issue_number)
+        )
+        mocker.patch.object(
+            second_backend, "_next_issue_number", side_effect=coordinate_allocator(second_backend._next_issue_number)
+        )
+        start_barrier = Barrier(2)
+
+        def create_item() -> str:
+            start_barrier.wait(timeout=5)
+            number = first_backend.create_issue_for_item(
+                None, BacklogItem(title="SQLite item", description="item", priority="P1")
+            )
+            assert number is not None
+            return f"#{number}"
+
+        def create_task() -> str:
+            start_barrier.wait(timeout=5)
+            issue = second_backend.create_task_issue(
+                MagicMock(),
+                1,
+                MagicMock(task_id="T1", feature="sqlite", task_type="implementation", description="task"),
+            )
+            assert issue is not None
+            return f"#{issue['number']}"
+
+        try:
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                references = [executor.submit(create_item), executor.submit(create_task)]
+                created_references = [future.result() for future in references]
+
+            assert set(created_references) == {"#1", "#2"}
+            assert {issue["number"] for issue in first_backend.get_task_issues(MagicMock(), 1)} == {1, 2}
+        finally:
+            first_backend._conn.close()
+            second_backend._conn.close()
 
 
 class TestAddItemValidatesPriorityAndType:

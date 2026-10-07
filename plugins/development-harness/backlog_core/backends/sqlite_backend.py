@@ -75,6 +75,7 @@ from backlog_core.models import (
     StatusFetchResult,
     ViewEnrichmentResult,
     ViewItemResult,
+    parse_issue_number,
     reference_is_title_derived,
 )
 
@@ -395,8 +396,16 @@ class SQLiteBackend:
 
     def _next_issue_number(self) -> int:
         """Return the next auto-increment issue number."""
-        row = self._conn.execute("SELECT COALESCE(MAX(issue_number), 0) + 1 FROM items").fetchone()
-        return int(row[0])
+        row = self._conn.execute("SELECT COALESCE(MAX(issue_number), 0) FROM items").fetchone()
+        work_item_next = max(
+            (
+                parsed_number + 1
+                for row in self._conn.execute("SELECT reference FROM work_item_records")
+                if (parsed_number := parse_issue_number(str(row[0]))) is not None and str(row[0]) == f"#{parsed_number}"
+            ),
+            default=1,
+        )
+        return max(int(row[0]) + 1, work_item_next)
 
     def _next_milestone_number(self) -> int:
         """Return the next auto-increment milestone number."""
@@ -719,7 +728,7 @@ class SQLiteBackend:
 
     @_serialized_connection_operation
     def create_issue_for_item(
-        self, repo: Repository, item: BacklogItem, dry_run: bool = False, output: Output | None = None
+        self, repo: Repository | None, item: BacklogItem, dry_run: bool = False, output: Output | None = None
     ) -> int | None:
         """Create an issue from a BacklogItem and return its number.
 
@@ -734,14 +743,15 @@ class SQLiteBackend:
         """
         if dry_run:
             return None
-        number = self._next_issue_number()
-        body = json.dumps(item.sections if hasattr(item, "sections") else {})
-        ts = _now()
-        self._conn.execute(
-            "INSERT INTO items (issue_number, title, status, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (number, item.title, "open", body, ts, ts),
-        )
-        self._conn.commit()
+        with self._conn:
+            self._conn.execute("BEGIN IMMEDIATE")
+            number = self._next_issue_number()
+            body = json.dumps(item.sections if hasattr(item, "sections") else {})
+            ts = _now()
+            self._conn.execute(
+                "INSERT INTO items (issue_number, title, status, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (number, item.title, "open", body, ts, ts),
+            )
         return number
 
     @_serialized_connection_operation
@@ -1263,7 +1273,6 @@ class SQLiteBackend:
         Returns:
             ``IssueNode`` of the created issue.
         """
-        number = self._next_issue_number()
         task_type = getattr(task, "task_type", "") or ""
         task_desc = getattr(task, "description", "") or task.task_id
         title = (
@@ -1272,15 +1281,19 @@ class SQLiteBackend:
             else f"[{task.feature}/{task.task_id}] {task_desc}"
         )
         body = description or task_desc
-        ts = _now()
-        self._conn.execute(
-            "INSERT INTO items (issue_number, title, status, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (number, title, "open", body, ts, ts),
-        )
-        if labels:
-            for tag in labels:
-                self._conn.execute("INSERT OR IGNORE INTO item_tags (issue_number, tag) VALUES (?, ?)", (number, tag))
-        self._conn.commit()
+        with self._conn:
+            self._conn.execute("BEGIN IMMEDIATE")
+            number = self._next_issue_number()
+            ts = _now()
+            self._conn.execute(
+                "INSERT INTO items (issue_number, title, status, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (number, title, "open", body, ts, ts),
+            )
+            if labels:
+                for tag in labels:
+                    self._conn.execute(
+                        "INSERT OR IGNORE INTO item_tags (issue_number, tag) VALUES (?, ?)", (number, tag)
+                    )
         row = self._conn.execute("SELECT * FROM items WHERE issue_number = ?", (number,)).fetchone()
         return self._row_to_issue_node(row)
 
