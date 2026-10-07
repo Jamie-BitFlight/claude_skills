@@ -41,13 +41,17 @@
       "id": 7,
       "prompt": "Read the supplied queue requirement and plan the next TDD increment. Return the test design without writing code.",
       "expected_output": "Derive a bounded test from the supplied contract; choose an independently justified observation without prescribing a receipt format or storage technology. Do not require preexisting implementation. State intended red and unresolved test seams, and keep later duplicate/conflict obligations visible without exhaustive upfront planning.",
-      "files": ["fixtures/queue-contract.md"]
+      "files": [
+        "fixtures/queue-contract.md"
+      ]
     },
     {
       "id": 8,
       "prompt": "Use /dh:add-new-feature to plan the queue API described in the supplied requirement in this isolated evaluation workspace. Produce the normal plan and its verification cases; do not implement the feature.",
       "expected_output": "In a fixture-backed isolated DH environment, follow the normal architecture and swarm-planning dispatch. Reach test-designer through the planner loading clear-cove-task-design, not an evaluator-injected skill. Carry contract, oracle, boundary, failure case and gaps into existing acceptance/verification fields. Preserve stage altitude, authorized backend, and normal artifact/STATUS protocols. Missing harness/backend prerequisites mean an unvalidated route, never a passing activation claim.",
-      "files": ["fixtures/queue-contract.md"]
+      "files": [
+        "fixtures/queue-contract.md"
+      ]
     },
     {
       "id": 9,
@@ -83,6 +87,30 @@
       "id": 14,
       "prompt": "A login test submits invalid credentials and asserts stderr is exactly \"Authentication failed\". That message is the documented observable that distinguishes the authentication-failure path from parser, network, and internal-error paths. Review the proposed assertion before implementation.",
       "expected_output": "Accept text as a legitimate oracle when this exact observable discriminates the consequential authentication-failure behavior/path and its authority is established. Do not reject it merely because it is an exact string; the protected claim is the error-path behavior, not the continued existence of arbitrary prose.",
+      "files": []
+    },
+    {
+      "id": 15,
+      "prompt": "An API supports create/update/delete across authenticated and unauthenticated callers, JSON and form payloads, and primary/replica storage. The product contract requires every unauthenticated operation to be rejected without mutation. Design maintained test protection without writing code.",
+      "expected_output": "Recognize interacting factors and use systematic combination selection where economical. Do not constrain away reachable unauthenticated PUT/DELETE-style requests merely because they are invalid: preserve rejection and forbidden-mutation observations. Define factors/value partitions and a justified interaction strength, credit existing protection, independently justify the oracle, and distinguish generated combination coverage from executed behavioral evidence.",
+      "files": []
+    },
+    {
+      "id": 16,
+      "prompt": "A defect occurs only on Remote backend + Cold cache + Retry. The feature also has Local/Remote backend, Warm/Cold cache, and First/Retry attempt factors. Plan regression and broader interaction protection.",
+      "expected_output": "Preserve the known three-factor regression explicitly even if general interaction sampling is pairwise. Pairwise may be used for economical surrounding coverage only with its limitation stated; alternatively justify strength 3. Require an independently justified behavioral oracle and verify any claimed feasible interaction coverage rather than assuming generation proves it.",
+      "files": []
+    },
+    {
+      "id": 17,
+      "prompt": "A pure function maps two booleans to a documented result. Four direct contract examples already cover every possible input. Someone proposes adding a PICT/pairwise model because combinatorial testing is now available. Decide the test design.",
+      "expected_output": "Reuse the exhaustive existing protection and avoid combinatorial-tool ceremony or duplicate retained cases. Interaction modeling is conditional, not mandatory; NO NEW TEST JUSTIFIED is valid when existing protection already covers the admitted obligation more cheaply.",
+      "files": []
+    },
+    {
+      "id": 18,
+      "prompt": "A configuration has OS, database, authentication mode, and deployment tier. A covering-array generator is unavailable in this environment. Design interaction tests and report what evidence exists.",
+      "expected_output": "May propose a factor/value/constraint model and justified interaction strength, but must not claim generated or verified pairwise/t-way coverage without checking the resulting rows. Preserve explicit consequential/known-regression cases, identify feasibility constraints with rationale, and report generation/coverage as unvalidated while still providing useful independent oracle and boundary design.",
       "files": []
     }
   ]
