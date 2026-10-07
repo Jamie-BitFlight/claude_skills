@@ -13,3 +13,5 @@ The purpose and explicit goals of the skill multi-perspective-review:
    collision-resistant run stamp, so no run reads or is polluted by another run's state.
 5. Keep the verdict/punch-list schema and dispatch mechanics owned by companion skills
    (`dh:review-verdict-contract`, `dh:dispatch-contract`) rather than duplicated in this file.
+6. Give reviewers the same resolved comparison and source-linked intent/authority/impact context
+   while preserving independent source verification and the complete changed-file scope.

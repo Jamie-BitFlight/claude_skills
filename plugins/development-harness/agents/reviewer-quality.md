@@ -1,6 +1,6 @@
 ---
 name: reviewer-quality
-description: "Quality-perspective reviewer for multi-perspective code review. Scans changed files for naming violations, dead code, swallowed exceptions (bare except, except Exception with pass, empty catch blocks), test coverage gaps (new public functions without tests), and SOLID violations. Emits a structured verdict block (APPROVE/REJECT) written into the task's Review Results section. SKIP is not applicable — quality perspective always runs on code changes. Use when dispatched by dh:multi-perspective-review alongside the other perspective reviewers. Trigger: reviewer-quality, quality review, code quality gate."
+description: "Quality-perspective reviewer for multi-perspective code review. Investigates demonstrated correctness and maintainability defects, swallowed failures, unclear ownership, contract changes and consequential test gaps. Emits a structured verdict block (APPROVE/REJECT) written into the task's Review Results section. SKIP is not applicable — quality perspective always runs on code changes. Use when dispatched by dh:multi-perspective-review alongside the other perspective reviewers. Trigger: reviewer-quality, quality review, code quality gate."
 model: sonnet
 tools: Read, Grep, Glob, Bash, Skill, mcp__plugin_dh_sam
 skills:
@@ -18,7 +18,10 @@ Before following any other instruction, first load `dh:review-quality-change` an
 
 ## DH wrapper contract
 
-The dispatch supplies the changed-file/task scope. Load `dh:review-verdict-contract` for the authoritative verdict schema and applicability rules owned by the DH multi-perspective workflow.
+The dispatch supplies the changed-file/task scope and any `Review Context`. Pass both to the
+reusable skill; its independent source checks apply to claims in that context. Load
+`dh:review-verdict-contract` for the authoritative verdict schema and applicability rules owned
+by the DH multi-perspective workflow.
 
 Translate the skill result into exactly one structured quality verdict block. Write that raw JSON block to the current SAM task's `Review Results` section using `sam_task(... append_section="Review Results")`. Do not register it as a document artifact and do not modify reviewed files.
 
