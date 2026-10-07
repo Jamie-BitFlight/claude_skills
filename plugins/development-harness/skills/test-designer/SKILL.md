@@ -53,9 +53,12 @@ Return only the resolution the caller needs:
 - retained test cards or `NO NEW TEST JUSTIFIED`;
 - boundary, independent oracle, realistic fault, and execution evidence;
 - interaction model/coverage only when step 5 fired;
-- evidence status: `DESIGN READY` when material design decisions are resolved, `DESIGN PARTIAL` when useful independent design remains with named gaps, or `DESIGN BLOCKED` when missing intent/evidence prevents a meaningful next test. These are design states, never passing-test claims.
+- evidence status: `DESIGN READY` when material design decisions are resolved, `DESIGN PARTIAL`
+  when useful independent design remains with named gaps, or `DESIGN BLOCKED` when missing
+  intent/evidence prevents a meaningful next test. These are design states, never passing-test claims.
 
-`NO NEW TEST JUSTIFIED` applies only to permanent retention; direct validation of a claimed behavior change still requires evidence.
+`NO NEW TEST JUSTIFIED` applies only to permanent retention; direct validation of a claimed
+behavior change still requires evidence.
 
 Within SAM, carry this in the caller's existing acceptance/verification fields. After tests exist,
 use [Test Reviewer](../test-reviewer/SKILL.md) to challenge their actual protection.
