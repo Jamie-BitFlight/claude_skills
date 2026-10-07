@@ -353,9 +353,10 @@ def score_arm_b(
 ) -> tuple[ArmMetrics, ArmBExtras, list[str]]:
     """Score arm B (ensemble) against the gold set, with E1 ablation and decoy weights.
 
-    Runs reduce_findings at keep_threshold=1 (dedup only) and keep_threshold=2
-    (corroboration gate) to compute the E1 ablation.  Reports per-decoy corroboration
-    weight for the E0 diagnostic.
+    Projects raw reports by group before reducing at keep_threshold=1 (dedup only)
+    and keep_threshold=2 (corroboration gate), preserving group-keyed metrics while
+    computing the E1 ablation. Reports per-decoy corroboration weight for the E0
+    diagnostic.
 
     Args:
         report_dir: Directory containing one worker report file per Haiku agent.
@@ -383,9 +384,14 @@ def score_arm_b(
         msg = f"No worker reports matching {glob!r} in {report_dir}"
         raise ValueError(msg)
 
-    # E1 ablation: run reduce at both thresholds and compare F1
-    merged_t1 = reduce_findings(reports, 1)
-    merged_t2 = reduce_findings(reports, 2)
+    reports_by_group: dict[str, dict[str, list]] = {}
+    for worker_id, findings in reports.items():
+        for finding in findings:
+            reports_by_group.setdefault(finding.group, {}).setdefault(worker_id, []).append(finding)
+
+    # E1 ablation: preserve the existing group-keyed scoring facts at both thresholds.
+    merged_t1 = [merged for group_reports in reports_by_group.values() for merged in reduce_findings(group_reports, 1)]
+    merged_t2 = [merged for group_reports in reports_by_group.values() for merged in reduce_findings(group_reports, 2)]
 
     reported_t2 = {(m.group, m.location) for m in merged_t2}
     reported_t1 = {(m.group, m.location) for m in merged_t1}

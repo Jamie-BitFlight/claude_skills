@@ -71,7 +71,7 @@ A value written in two files will drift. Define it once; reference it everywhere
   passes — e.g. an agent that says "the single file under review" while the arm passes a file list is
   inconsistent.
 - Schema field names, ordering tolerance, and field semantics are identical across every file that
-  emits or parses them (the corroboration key especially — `group` and the `location` format).
+  emits or parses them (the normalized `location` merge key especially, plus `group` metadata).
 
 ## 5. Review the harness artifacts with the methodology itself
 

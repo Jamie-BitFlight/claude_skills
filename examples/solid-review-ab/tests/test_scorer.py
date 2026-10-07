@@ -393,6 +393,42 @@ def test_score_arm_b_decoy_weight_tracked(
     assert extras.per_decoy_weight[decoy_grp, decoy_loc] == 2
 
 
+def test_score_arm_b_preserves_group_local_metrics_for_different_groups_at_one_location(tmp_path: Path) -> None:
+    """Different groups at one location remain distinct scoring facts."""
+    from runner.scorer import score_arm_b
+
+    (tmp_path / "worker-A.md").write_text(_finding("1", "x.py:10"), encoding="utf-8")
+    (tmp_path / "worker-B.md").write_text(_finding("2", "/x.py:10"), encoding="utf-8")
+    gold_positives = {("1", "x.py:10"), ("2", "x.py:10")}
+
+    metrics, extras, _warnings = score_arm_b(tmp_path, gold_positives, set())
+
+    assert extras.f1_at_threshold_1 == pytest.approx(1.0)
+    assert extras.f1_at_threshold_2 == pytest.approx(0.0)
+    assert metrics.true_positives == 0
+    assert metrics.false_negatives == 2
+
+
+def test_score_arm_b_preserves_group_local_threshold_and_decoy_weight(tmp_path: Path) -> None:
+    """A group-2 singleton neither survives threshold two nor gains decoy weight."""
+    from runner.scorer import score_arm_b
+
+    (tmp_path / "worker-A.md").write_text(
+        _findings_text(_finding("1", "x.py:10"), _finding("2", "x.py:10"), _finding("2", "decoy.py:10")),
+        encoding="utf-8",
+    )
+    (tmp_path / "worker-B.md").write_text(_finding("1", "x.py:10"), encoding="utf-8")
+    gold_positives = {("1", "x.py:10"), ("2", "x.py:10")}
+    gold_decoys = {("2", "decoy.py:10")}
+
+    metrics, extras, _warnings = score_arm_b(tmp_path, gold_positives, gold_decoys)
+
+    assert metrics.true_positives == 1
+    assert metrics.false_negatives == 1
+    assert metrics.f1 == pytest.approx(2 / 3)
+    assert extras.per_decoy_weight == {("2", "decoy.py:10"): 1}
+
+
 def test_score_arm_b_no_reports_raises(
     tmp_path: Path, gold_positives: set[tuple[str, str]], gold_decoys: set[tuple[str, str]]
 ) -> None:

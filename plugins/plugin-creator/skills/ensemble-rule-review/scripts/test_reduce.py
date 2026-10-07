@@ -37,7 +37,7 @@ WORKER_A = """# Worker A
 """
 
 # Worker C flags the SAME line 121 with a DIFFERENT rule slug — corroboration must
-# still fire because keying is on (group, location), not the free-form rule slug.
+# still fire because normalized location, not the free-form rule slug, is the merge key.
 WORKER_C = """# Worker C
 - group: 2
   rule: any-not-in-boundary-module
@@ -54,8 +54,8 @@ def test_parse_allows_list_item_dash() -> None:
     assert findings[0].location == "create_plugin.py:121"
 
 
-def test_corroboration_keys_on_group_not_rule() -> None:
-    """Two workers, same (group, line), different rule slugs -> one weight-2 finding."""
+def test_corroboration_ignores_rule_slug() -> None:
+    """Two workers, same location, different rule slugs -> one weight-2 finding."""
     reports = {"A": r.parse_report(WORKER_A), "C": r.parse_report(WORKER_C)}
     survivors = r.reduce_findings(reports, keep_threshold=1)
     line121 = [m for m in survivors if m.location == "create_plugin.py:121"]
@@ -64,6 +64,33 @@ def test_corroboration_keys_on_group_not_rule() -> None:
     assert line121[0].agents == {"A", "C"}
     # Both distinct slugs are retained for display, but did not block the merge.
     assert line121[0].rules == {"any-without-justification", "any-not-in-boundary-module"}
+
+
+def test_different_groups_at_one_normalized_location_merge_cross_group() -> None:
+    reports = {
+        "A": r.parse_report("- group: 1\n  rule: a\n  location: x.py:10\n"),
+        "B": r.parse_report("- group: 2\n  rule: b\n  location: /x.py:10\n"),
+    }
+
+    survivors = r.reduce_findings(reports, keep_threshold=1)
+
+    assert len(survivors) == 1
+    assert survivors[0].groups_seen == {"1", "2"}
+    assert survivors[0].cross_group is True
+    assert survivors[0].weight == 2
+
+
+def test_one_group_at_one_normalized_location_is_not_cross_group() -> None:
+    reports = {
+        "A": r.parse_report("- group: 1\n  rule: a\n  location: x.py:10\n"),
+        "B": r.parse_report("- group: 1\n  rule: b\n  location: /x.py:10\n"),
+    }
+
+    survivors = r.reduce_findings(reports, keep_threshold=1)
+
+    assert len(survivors) == 1
+    assert survivors[0].groups_seen == {"1"}
+    assert survivors[0].cross_group is False
 
 
 def test_lone_finding_stays_weight_one() -> None:

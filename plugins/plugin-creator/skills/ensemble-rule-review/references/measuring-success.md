@@ -18,10 +18,10 @@ no gold set; it is unreproduced. Treat it as a speed observation only.
 
 ## Step 0 — The free diagnostic (no gold set, run first)
 
-Before building any labeled corpus, dump the corroboration-weight distribution per `(group,
-location)` from existing worker output logs (the reducer already computes weight = count of
-distinct workers; see [./orchestrator-playbook.md](./orchestrator-playbook.md) and `../scripts/
-reduce.py`).
+Before building any labeled corpus, dump the corroboration-weight distribution per normalized
+location from existing worker output logs, retaining contributing groups as metadata (the reducer
+already computes weight = count of distinct workers; see [./orchestrator-playbook.md](./orchestrator-playbook.md)
+and `../scripts/reduce.py`).
 
 Read the distribution:
 
