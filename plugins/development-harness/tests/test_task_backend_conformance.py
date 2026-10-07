@@ -413,6 +413,24 @@ class TestTaskBackendConformance:
         assert isinstance(status["completion_pct"], float)
         assert status["has_cycles"] is False
 
+    @pytest.mark.parametrize(
+        ("statuses", "expected_completion_pct"),
+        [(["complete", "deferred", "skipped"], 100.0), (["complete", "deferred", "skipped", "failed"], 75.0)],
+    )
+    def test_get_plan_status_successful_terminal_completion(
+        self, backend: TaskBackend, statuses: list[str], expected_completion_pct: float
+    ) -> None:
+        """Successful terminal statuses count as complete; failed does not."""
+        tasks = [_make_task_def(f"T{index:02d}", f"Task {index}") for index in range(1, len(statuses) + 1)]
+        plan_id = backend.create_plan("my-plan", "Goal", tasks)["plan_id"]
+
+        for index, task_status in enumerate(statuses, start=1):
+            backend.update_task_status(plan_id, f"T{index:02d}", task_status)
+
+        status = backend.get_plan_status(plan_id)
+
+        assert status["completion_pct"] == expected_completion_pct
+
     # ------------------------------------------------------------------
     # Documents
     # ------------------------------------------------------------------

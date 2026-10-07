@@ -21,7 +21,7 @@ import dh_paths
 
 from sam_schema.core.addressing import AddressingError, resolve_plan_address
 from sam_schema.core.backends._utils import validate_appended_task
-from sam_schema.core.dependencies import DependencyGraph
+from sam_schema.core.dependencies import SUCCESSFUL_STATUSES, DependencyGraph
 from sam_schema.core.exceptions import DocumentNotFoundError, PlanNotFoundError, TaskNotFoundError, TaskValidationError
 from sam_schema.core.models import AcceptanceCriterion, Plan, PlanState, PlanStatus, ReadResult, Task, TaskStatus
 from sam_schema.readers import detect
@@ -799,8 +799,8 @@ class LocalYamlTaskProvider:
         blocked_tasks = [{t.id: missing_deps} for t, missing_deps in graph.get_blocked_tasks()]
 
         total = len(plan.tasks)
-        complete_count = by_status.get(TaskStatus.COMPLETE, 0)
-        completion_pct = (complete_count / total * 100.0) if total > 0 else 0.0
+        successful_count = sum(by_status.get(status, 0) for status in SUCCESSFUL_STATUSES)
+        completion_pct = (successful_count / total * 100.0) if total > 0 else 0.0
 
         status = PlanStatus(
             feature=plan.feature,

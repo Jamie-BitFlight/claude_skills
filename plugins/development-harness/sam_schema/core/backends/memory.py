@@ -617,8 +617,8 @@ class InMemoryTaskProvider:
                 ready_task_ids.append(task["id"])
 
         total = len(tasks)
-        complete_count = by_status.get("complete", 0)
-        completion_pct = (complete_count / total * 100.0) if total > 0 else 0.0
+        successful_count = sum(by_status.get(status, 0) for status in SUCCESSFUL_STATUSES)
+        completion_pct = (successful_count / total * 100.0) if total > 0 else 0.0
 
         return {
             "feature": plan["feature"],

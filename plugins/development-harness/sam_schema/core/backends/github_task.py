@@ -498,8 +498,8 @@ class GitHubTaskProvider:
                 unmet = [d for d in t["dependencies"] if by_id.get(d, {}).get("status") not in SUCCESSFUL_STATUSES]  # type: ignore[union-attr]
                 if unmet:
                     blocked.append({t["id"]: unmet})
-        completed = by_status.get("complete", 0)
-        pct = (completed / len(tasks) * 100.0) if tasks else 0.0
+        successful_count = sum(by_status.get(status, 0) for status in SUCCESSFUL_STATUSES)
+        pct = (successful_count / len(tasks) * 100.0) if tasks else 0.0
         return {
             "feature": slug,
             "total_tasks": len(tasks),
