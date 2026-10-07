@@ -25,13 +25,14 @@ and `../scripts/reduce.py`).
 
 Read the distribution:
 
-- If weight is near-constant per group (≈`window` for everything the workers emit, ≈0 otherwise),
-  the denoising instrument is empirically degenerate — agreement carries no information and the
-  reducer is just a deduplicating pass. This happens when workers sharing a group produce
-  near-identical output (same model, same input, same prompt, low effort). Fix: inject within-group
-  diversity (see [./experiment-matrix.md](./experiment-matrix.md)) before investing in a full eval.
-- If weight varies meaningfully across findings (some at `window`, some lower), the instrument is
-  discriminating — proceed to the full evaluation to quantify how well.
+- If weight is near-constant across normalized locations, the denoising instrument is empirically
+  degenerate — agreement carries no information and the reducer is just a deduplicating pass. Do
+  not compare this public, all-group weight to a per-group `window`; it exposes no per-group worker
+  weight. Near-constant output can occur when workers produce near-identical output (same model,
+  same input, same prompt, low effort). Fix: inject diversity (see
+  [./experiment-matrix.md](./experiment-matrix.md)) before investing in a full eval.
+- If weight varies meaningfully across normalized locations, the instrument is discriminating —
+  proceed to the full evaluation to quantify how well.
 
 This is the fastest falsification of the central claim and costs nothing but reading logs you
 already have.
