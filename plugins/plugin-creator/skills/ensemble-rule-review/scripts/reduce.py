@@ -8,7 +8,8 @@ Reads one fixed-schema findings file per worker, deduplicates findings on a
 STABLE key (the worker's assigned group id plus the normalized location — never
 the free-form rule slug, which differs between workers), counts how many
 distinct workers independently reported each finding (the corroboration weight),
-drops PASS verdicts and the low-weight tail, and prints a ranked report.
+drops PASS verdicts and the low-weight tail except critical/high findings, and
+prints a ranked report that distinguishes preservation from corroboration.
 
 Fixed finding schema each worker emits (one block per finding, blocks separated
 by the block-start field reappearing):
@@ -181,21 +182,28 @@ def parse_report(text: str) -> list[Finding]:
 
 
 def reduce_findings(
-    reports: dict[str, list[Finding]], keep_threshold: int, *, slug_headings: bool = False
+    reports: dict[str, list[Finding]],
+    keep_threshold: int,
+    *,
+    slug_headings: bool = False,
+    preserve_high_severity: bool = True,
 ) -> list[Merged]:
-    """Dedup on (group, normalized-location), count corroboration, rank, cut tail.
+    """Dedup, count corroboration, and retain severe findings below the threshold.
 
     Args:
         reports: Mapping of worker id to that worker's parsed findings.
-        keep_threshold: Minimum corroboration weight a finding must reach to survive.
+        keep_threshold: Minimum corroboration weight for ordinary retention.
         slug_headings: Passed through to `normalize_location` — when True, heading-only
             locations are slug-normalized. Defaults to False (legacy behavior), so
             existing internal and external callers (e.g. the solid-review-ab scorer)
             keep the pre-change corroboration key space unless they opt in.
+        preserve_high_severity: Retain critical/high violations below keep_threshold
+            without changing their weight. False selects threshold-only reduction
+            for measured corroboration ablations.
 
     Returns:
-        The surviving `Merged` findings (weight >= keep_threshold), ranked by
-        corroboration weight then severity, highest first.
+        Retained `Merged` findings, ranked by corroboration weight then severity,
+        highest first. Preservation is not a verification verdict.
     """
     merged: dict[tuple[str, str], Merged] = {}
     for agent, findings in reports.items():
@@ -215,7 +223,11 @@ def reduce_findings(
             if SEVERITY_RANK.get(finding.severity, 1) > SEVERITY_RANK.get(entry.severity, 1):
                 entry.severity = finding.severity
 
-    survivors = [m for m in merged.values() if m.weight >= keep_threshold]
+    survivors = [
+        m
+        for m in merged.values()
+        if m.weight >= keep_threshold or (preserve_high_severity and m.severity in {"critical", "high"})
+    ]
     survivors.sort(key=lambda m: (m.weight, SEVERITY_RANK.get(m.severity, 1)), reverse=True)
     return survivors
 
@@ -245,18 +257,21 @@ def format_report(reports: dict[str, list[Finding]], survivors: list[Merged], ke
     total_raw = sum(counts.values())
     kept = [m for m in survivors if m.weight >= CORROBORATION_MIN]
     tail = [m for m in survivors if m.weight < CORROBORATION_MIN]
+    preserved = [m for m in survivors if m.weight < keep_threshold]
     lines.extend((
-        f"raw findings: {total_raw}   distinct after dedup: {len(survivors)}",
+        f"raw findings: {total_raw}   retained findings: {len(survivors)}",
         f"corroborated (weight>=2): {len(kept)}   lone (weight=1): {len(tail)}",
         f"keep_threshold: {keep_threshold}",
+        f"retained below threshold: {len(preserved)}",
         "",
         "=== RANKED (corroboration weight, then severity) ===",
     ))
     for m in survivors:
-        tag = "KEEP" if m.weight >= CORROBORATION_MIN else "tail"
+        tag = "KEEP" if m.weight >= keep_threshold else "PRESERVED"
         agents = "".join(sorted(m.agents))
         rules = "|".join(sorted(m.rules)) or "?"
         line = f"[{tag} w={m.weight}] group={m.group} {m.location}  sev={m.severity}  agents={agents}  rule={rules}"
+        line += f"  corroborated={m.weight >= CORROBORATION_MIN}"
         if m.cross_group:
             line += "  cross_group=True"
         lines.append(line)
@@ -276,7 +291,7 @@ def main(argv: list[str] | None = None) -> int:
         "--keep-threshold",
         type=int,
         default=1,
-        help="Minimum corroboration weight to retain (default 1 = keep all, rank only).",
+        help="Minimum weight for ordinary retention; critical/high findings are preserved (default 1 keeps all).",
     )
     parser.add_argument(
         "--slug-headings",
