@@ -91,3 +91,51 @@ architecture or implementation supersedes that rationale; age and change frequen
 implicit contracts and delayed effects; read its relevant guidance when those trigger the inquiry.
 If history cannot be retrieved or does not establish purpose, name the remaining uncertainty and
 the evidence needed. Do not invent historical incidents or treat repeated claims as corroboration.
+
+## Preserve finding identity and provenance
+
+A source location is an anchor for inspection, not a defect identity. Two reports at the
+same line can concern different violated guarantees; one failure may have evidence at several
+locations. Never infer semantic equivalence from normalized location, rule group, severity,
+or matching reviewer wording alone.
+
+For every candidate, retain the original report and identify:
+
+- The governing contract and its authoritative source (or mark it unresolved).
+- The triggering input/state and the observable incorrect behavior.
+- The failure mechanism, supporting anchors, and any counterevidence.
+- The reporting worker and perspective, rule/group assignment, and reviewed revision.
+
+Use location overlap only to nominate candidates for comparison. Merge when the evidence
+establishes the same violated guarantee and underlying failure, including when the anchors
+differ. Keep candidates separate if they concern distinct failures or equivalence cannot be
+established. Preserve all constituent source reports and original severity claims. A single
+worker reporting twice counts as one worker, and two workers repeating the same assumption
+are not independent verification of that assumption.
+
+Verification is separate from candidate grouping. Classify an investigated candidate as
+VERIFIED (applicable contract and defect established), REFUTED (specific counterevidence
+disproves the claim), or UNRESOLVED (the discriminating evidence is unavailable). Include
+the reason, source references, and cheapest safe next check. Do not silently delete
+REFUTED or UNRESOLVED observations from the audit trail; do not promote UNRESOLVED to a
+confirmed blocking defect. Preserve the caller's existing verdict schema and raw-finding
+conservation contract: these dispositions are internal investigation notes or narrative
+unless the owning schema explicitly supports them.
+
+## Coverage and review execution boundary
+
+Record every changed path, including renamed/deleted files and agent-facing Markdown,
+configuration, schemas, scripts and tests. Mark each as reviewed, delegated, or uncovered
+with the reason. A bounded review budget may prioritize investigation but must not turn
+unread paths into an implicit approval. Validate comment anchors against the pinned
+comparison, using unchanged consumer lines as supporting evidence when necessary.
+Source-position confidence must not be confused with defect confidence.
+
+Prefer deterministic extraction, path normalization, source matching, schema validation,
+and coverage accounting. Use agent judgment for intent, semantic equivalence, and causal
+interpretation. Run conditional deeper probes only when their expected information can
+change a review decision; record unavailable probes rather than claiming they ran.
+
+The plugin-creator ensemble reducer is a distinct consumer: its location-based merge
+and threshold experiment are not the DH verdict/synthesis contract. Do not route DH
+verdicts through that reducer or reinterpret a location merge as semantic agreement.
