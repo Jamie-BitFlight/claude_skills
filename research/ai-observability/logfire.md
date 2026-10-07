@@ -381,3 +381,4 @@ LIMIT 100
 | [pandera](../data-infrastructure/pandera.md) | data-infrastructure | referenced by pandera (data-infrastructure) |
 | [abtop](../developer-tools/abtop.md) | developer-tools | referenced by abtop (developer-tools) |
 | [msgspec](../serialization-libraries/msgspec.md) | serialization-libraries | referenced by msgspec (serialization-libraries) |
+| [vector](../data-infrastructure/vector.md) | data-infrastructure | referenced by vector (data-infrastructure) |

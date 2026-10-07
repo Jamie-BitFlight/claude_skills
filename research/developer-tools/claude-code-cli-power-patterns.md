@@ -450,6 +450,7 @@ These patterns are directly applicable to Claude Code skill development, AI agen
 | [Compound Engineering Plugin](../research-agent-patterns/compound-engineering-plugin.md) | research-agent-patterns | Every Inc's Plan/Work/Review/Compound workflow (80/20 planning-execution split); 14 parallel review agents in isolated worktrees — implements multi-agent composition using power patterns for scalable code review |
 | [Claw Loop v2.0](../research-agent-patterns/claw-loop.md) | research-agent-patterns | Autonomous development orchestration via tmux + cron with supervisor-worker pattern; uses session forking and worktree isolation for parallel task execution — applies power patterns to long-running autonomous pipelines |
 | [GitHub CLI](./github-cli.md) | developer-tools | Official GitHub CLI for PR/issue workflows; integrates with --from-pr pattern to resume feature branches with full context linkage |
+| [gh-aw](./gh-aw.md) | developer-tools | referenced by gh-aw (developer-tools) |
 
 ---
 

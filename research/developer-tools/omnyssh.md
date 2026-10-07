@@ -1,0 +1,303 @@
+---
+name: omnyssh
+title: OmnySSH
+subtitle: SSH server management dashboard with live metrics, terminals, SFTP, and snippets
+research_date: 2026-10-06
+source_url: https://github.com/timhartmann7/omnyssh
+github_repository: https://github.com/timhartmann7/omnyssh
+version_at_research: 1.1.4
+license: Apache-2.0
+freshness_tracking:
+  last_verified: 2026-10-06
+  version_at_verification: 1.1.4
+  next_review: 2027-01-06
+  confidence_map: "Overview: high | Problem Addressed: medium (doc + code-read) | Key Features: medium (doc + code-read) | Technical Architecture: medium (code-read) | Installation & Usage: medium (doc + code-read) | Limitations and Caveats: low"
+---
+
+# OmnySSH
+
+## Overview
+
+OmnySSH is an open-source SSH client and server management tool providing "Every server you manage, in one window." It combines a live dashboard with real-time metrics collection, multi-tab PTY terminals, two-panel SFTP file management, and command snippets with broadcast execution. Available as both a terminal user interface (TUI) and a Tauri 2-based desktop GUI, it reads existing `~/.ssh/config` without modification and requires no account and has no telemetry (README: "No account, no login screen, no telemetry."). The README compares it with Termius and "tmux + ssh" in a table and says of tmux that it "wins on weight and loses on everything visual". The README states "Around 130 MB of RAM with several sessions open, on a 20 MB download" (source: README at tag v1.1.4, accessed 2026-10-06).
+
+---
+
+## Problem Addressed
+
+| Problem | Solution |
+|---------|----------|
+| Managing multiple SSH connections scattered across terminal tabs and tmux sessions | Unified dashboard organizing all hosts as cards with live status and one-click connection switching |
+| Manual SSH key setup and secure credential management | Automated SSH key generation, `authorized_keys` configuration with rollback protection, and in-memory passphrase caching (source: `crates/omnyssh-core/src/ssh/identity.rs` module documentation at tag v1.1.4, accessed 2026-10-06) |
+| Lack of visibility into remote server health | Live dashboard displaying CPU, RAM, disk usage, uptime, OS version, and top processes per host; bars turn yellow/red as thresholds breach |
+| Inefficient file transfer workflows | Two-panel SFTP browser (local left, remote right) with progress bars and bulk operations; select files and move across panels |
+| Repetitive command execution across hosts | Snippets with parameter substitution; execute a single snippet across multiple selected hosts at once |
+| Terminal bloat from competing tools | Single application; the README states a 20 MB download and "Around 130 MB of RAM with several sessions open", and reports Termius at ~649 MB RAM across 9 processes, "measured on an M4 Mac with both apps open and idle" (source: README "Small" and "Comparison" sections at tag v1.1.4, accessed 2026-10-06) |
+
+---
+
+## Key Features
+
+### Live Dashboard
+
+- Cards for every host, fed by `PollManager`/`run_host_poller` (one poller task per host running remote commands through `SshSession::run_command`, parsed by `parse_*` into `Metrics`; see Technical Architecture), showing:
+  - CPU, RAM, and disk utilization bars (visual indicators: yellow at warning level, red at critical)
+  - Uptime and OS version
+  - Top processes eating CPU (up to 3 processes shown)
+  - Docker badge showing container count
+  - Live refresh from background metrics poller
+  - Streamer mode to replace real IPs with fake ones (safe for recordings/screen sharing); the GUI keeps its state in `crates/omnyssh-gui/ui/src/lib/stores/streamer.ts`
+
+### Real Terminals
+
+- Full PTY sessions in tabs (source: `crates/omnyssh-core/src/ssh/pty.rs` — `PtyManager`, `feed_parser`; vt100 screen model)
+- Multi-session terminal management: each session is its own `PtyManager` session task over a russh channel; A connection limit is Not mentioned in documentation
+- Switching between open sessions via a sidebar and sessions persisting while working in the dashboard are README claims; the mechanism: Not mentioned in documentation (the sidebar code was not read)
+- Terminal search and session navigation via fuzzy search (`⌘K` or `/`)
+
+### Two-Panel SFTP File Manager
+
+- Local filesystem panel (left) and remote filesystem panel (right)
+- Tick files and move across panels with progress indication — a frontend sends `SftpCommand` values to `SftpManager::send`, which runs them on an SFTP channel (`russh-sftp`) and reports `CoreEvent::FileTransferProgress`
+- Bulk operations: select multiple files at once
+
+### Snippets and Broadcast Execution
+
+- Save frequently-used commands as reusable snippets — persisted as a TOML file via `Snippet`/`SnippetsFile`, `load_snippets`, `save_snippets` (`crates/omnyssh-core/src/config/snippets.rs`)
+- Parameter substitution: `sudo systemctl restart {{service}}` prompts for `service` value at execution
+- Execute a single snippet across multiple selected hosts; the README states "it runs on all of them at once" (in the TUI, `spawn_snippet_tasks` in `crates/omnyssh/src/app/snippets.rs` substitutes `{{placeholder}}` values via `substitute_params`, opens a Results popup with pending entries, then spawns one tokio task per selected host; each task calls `run_command_on_host`, which opens a new connection per invocation, and sends `CoreEvent::SnippetResult`; source: that file at tag v1.1.4)
+
+### Fuzzy Search
+
+- `⌘K` or `/` to search all hosts and currently-open sessions — the GUI implements it as the `CommandPalette.svelte` component (`crates/omnyssh-gui/ui/src/lib/components/`)
+- Jumping to a terminal or resuming a session, and the global command palette, are README claims; the TUI mechanism: Not mentioned in documentation (not read)
+
+### Themes
+
+- Light and dark mode built into both TUI and GUI (source: README; the GUI mechanism: Not mentioned in documentation); the TUI themes are named in `UiConfig` (`crates/omnyssh-core/src/config/app_config.rs`, `available_themes`)
+- TUI supports four themes: `default`, `dracula`, `nord`, `gruvbox`
+- Remappable keybindings via `config.toml` (TUI only)
+
+### Cross-Platform Support
+
+- Platforms and package formats per the README at tag v1.1.4 (accessed 2026-10-06); build mechanism: Not mentioned in documentation
+- **macOS**: Apple Silicon (aarch64) and Intel (x86_64); installs to `/Applications`
+- **Linux**: x86_64 via AppImage, `.deb`, or `.rpm`; installs to app menu
+- **Windows**: x86_64 `.exe` installer
+- **TUI**: Prebuilt binaries for Linux, macOS, Windows, and Termux
+
+---
+
+## Technical Architecture
+
+OmnySSH is structured as a **Rust cargo workspace with frontend-agnostic architecture**, separating the SSH engine from UI implementations. All source citations below are against tag `v1.1.4` (accessed 2026-10-06).
+
+### Workspace Structure
+
+- **`omnyssh-core`** (library): SSH engine, configuration handling, domain events, self-updater — its crate documentation states that nothing in it "may depend on terminal-rendering, input, or CLI crates". Source: `crates/omnyssh-core/src/lib.rs` — `pub mod config`, `pub mod event`, `pub mod ssh`, `pub mod update`, `pub mod utils`; `Cargo.toml` — `members = ["crates/omnyssh-core", "crates/omnyssh", "crates/omnyssh-gui"]`
+  - Compiled as a library depended on by both TUI and GUI. Source: `crates/omnyssh/Cargo.toml` — `omnyssh-core = { path = "../omnyssh-core" }`, `crates/omnyssh-gui/Cargo.toml` — `omnyssh-core = { path = "../omnyssh-core" }`
+- **`omnyssh`** (TUI binary `omny`): terminal interface using Ratatui. Source: `crates/omnyssh/Cargo.toml` — `[[bin]] name = "omny"`, `ratatui = "0.29"`
+- **`omnyssh-gui`** (GUI binary): Tauri 2 + SvelteKit desktop application with a Rust bridge to the core. Source: `crates/omnyssh-gui/Cargo.toml` — `tauri = { version = "2", ... }`, `crates/omnyssh-gui/src/bridge.rs`, `crates/omnyssh-gui/ui/package.json` — `@sveltejs/kit`
+- The workspace excludes the GUI from bare `cargo build`. Source: `Cargo.toml` — `default-members = ["crates/omnyssh-core", "crates/omnyssh"]`
+
+### Core Components (Source: `crates/omnyssh-core/src/`)
+
+**SSH Engine (`ssh/` module)**: a native `russh` client (version 0.46, not OpenSSH) powers the items below. Source: `crates/omnyssh-core/Cargo.toml` — `russh = "0.46"`, `russh-sftp = "2.0"`, `crates/omnyssh-core/src/ssh/session.rs` — `SshSession::connect`, `SshSession::run_command`, `SshSession::open_sftp_channel`
+
+- Metrics collection via remote command execution: `PollManager` starts one poller task per host and each poll runs `CPU_CMD`, `MEM_CMD`, `DISK_CMD`, `UPTIME_CMD` and a process-listing command through `run_command`. Source: `crates/omnyssh-core/src/ssh/pool.rs` — `PollManager::start`, `run_host_poller`, `crates/omnyssh-core/src/ssh/metrics.rs` — `parse_cpu_top`, `parse_ram_free`, `parse_disk_df`, `parse_uptime`, `parse_top_processes`, `threshold_level`
+- SFTP file transfer via `russh-sftp`. Source: `crates/omnyssh-core/src/ssh/sftp.rs` — `SftpManager`, `SftpCommand`, `FileEntry`, `list_local_dir`
+- Multi-session PTY terminals: `PtyManager::open` requests a remote PTY on a russh channel; output is fed to a `vt100::Parser`. Source: `crates/omnyssh-core/src/ssh/pty.rs` — `PtyManager`, `feed_parser`
+- Local port forwarding. Source: `crates/omnyssh-core/src/ssh/tunnel.rs` — `TunnelManager`, `LocalForward`
+- `ProxyJump` chain resolution. Source: `crates/omnyssh-core/src/ssh/jump.rs` — `resolve_chain`
+- Host and connection-state types. Source: `crates/omnyssh-core/src/ssh/client.rs` — `Host`, `MonitorMode`, `ConnectionStatus`
+
+**SSH Identity & Authentication**:
+
+- Passphrase handling for encrypted keys; its module documentation states "Passphrases are cached in process memory only — never written to disk". Source: `crates/omnyssh-core/src/ssh/identity.rs` — `IdentityError`, `ask_passphrase`, `unlock`
+- Password authentication with retry flag: a `Prompter` sends `CoreEvent::PasswordRequired` (which carries a `retry` field) and waits for `answer`. Source: `crates/omnyssh-core/src/ssh/password.rs` — `Prompter`, `answer`, `PasswordError`
+- Known hosts verification against `~/.ssh/known_hosts`. Source: `crates/omnyssh-core/src/ssh/known_hosts.rs` — `check`, `learn` (both `pub(crate)`), `crates/omnyssh-core/src/ssh/session.rs` — `KnownHostsHandler`
+- Automated SSH key setup: Ed25519 is the only `KeyType` variant; the flow is a step state machine with commands that append to `authorized_keys`, disable password login, reload sshd, and roll back. Source: `crates/omnyssh-core/src/ssh/key_setup.rs` — `KeyType`, `KeySetupMachine`, `generate_key_pair`, `build_authorized_keys_command`, `build_disable_password_command`, `build_reload_sshd_command`, `build_rollback_command`, `setup_key_for_host`
+
+**Configuration**:
+
+- SSH config parser: reads `ProxyJump`, `IdentityFile`, `LocalForward`, `Include` and other directives; `Include` recursion is limited to 3 levels and glob patterns come from the `glob` crate. Source: `crates/omnyssh-core/src/config/ssh_config.rs` — `parse_ssh_config`, `load_from_file`, `crates/omnyssh-core/Cargo.toml` — `glob = "0.3"`
+- Application config (TOML): themes, keybindings, auto key-setup and update settings. Source: `crates/omnyssh-core/src/config/app_config.rs` — `AppConfig`, `UiConfig`, `KeybindingsConfig`, `UpdateConfig`, `load_app_config`
+- Snippets persisted as a TOML file. Source: `crates/omnyssh-core/src/config/snippets.rs` — `Snippet`, `SnippetsFile`, `load_snippets`, `save_snippets`
+- Host list load/save. Source: `crates/omnyssh-core/src/config/mod.rs` — `load_hosts`, `save_hosts`, `load_all_hosts`
+
+**Smart Server Context Discovery**: one SSH command runs a probe script; the output is parsed into named sections and each provider checks those sections. Source: `crates/omnyssh-core/src/ssh/discovery.rs` — `quick_scan`, `crates/omnyssh-core/src/ssh/probe.rs` — `generate_quick_scan_script`, `ProbeOutput`, `crates/omnyssh-core/src/ssh/services/mod.rs` — `ServiceProvider`, `ServiceRegistry`
+
+- Providers for Docker, Nginx, PostgreSQL, Redis and Node.js detect service presence from the probe's `SERVICES`, `PROCESS` and `LISTEN` sections (for example, PostgreSQL by a `postgresql` service or port 5432, Redis by port 6379 or a `redis` process, Node.js by a `node` process). Source: `crates/omnyssh-core/src/ssh/services/postgresql.rs` — `PostgreSQLProvider`, `.../redis.rs` — `RedisProvider`, `.../nodejs.rs` — `NodeJSProvider`, `.../nginx.rs` — `NginxProvider`
+- Only the Docker provider's inspected code emits metrics (`containers_total`, `containers_running`). Source: `crates/omnyssh-core/src/ssh/services/docker.rs` — `DockerProvider`, `crates/omnyssh-core/src/ssh/services/mod.rs` — `metric_int`
+
+**Event System (`event.rs`)**: domain events for background task communication. Source: `crates/omnyssh-core/src/event.rs` — `CoreEvent`, `Metrics`, `DetectedService`
+
+- Background tasks (metrics poller, SFTP, PTY sessions, discovery, tunnels, key setup, updater) report via the `CoreEvent` enum over an `mpsc` channel; the GUI's shared state holds a `mpsc::Sender<CoreEvent>`. Source: `crates/omnyssh-core/src/event.rs` — `CoreEvent`, `crates/omnyssh-core/src/ssh/pool.rs` — `PollManager::start`, `crates/omnyssh-gui/src/state.rs` — `engine_tx: mpsc::Sender<CoreEvent>`
+- Event variants include `MetricsUpdate`, `HostStatusChanged`, `FileTransferProgress`, `SftpConnected`, `PtyOutput`, `PtyExited`, `DiscoveryQuickScanDone`, `TunnelStatusChanged`, `KeySetupProgress`, `KeySetupComplete`, `PasswordRequired`, `UpdateAvailable`. Source: `crates/omnyssh-core/src/event.rs` — `CoreEvent`
+
+**Update Checker (`update.rs`)**: self-updater.
+
+- Queries the GitHub Releases API (`releases/latest`), downloads the archive, verifies a SHA256 checksum, extracts the binary from a gzip tarball, and replaces the running binary. Source: `crates/omnyssh-core/src/update.rs` — `check`, `perform_update`, `verify_checksum`, `extract_binary`, `install_binary`
+- Uses `reqwest` (Rustls TLS), `semver`, `sha2`, `flate2`, `tar`, and `self-replace`. Source: `crates/omnyssh-core/Cargo.toml` — `reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }`, `self-replace = "1"`
+
+### Data Flow
+
+1. **Metrics polling**: `PollManager::start` spawns a poller task per host on an interval → `run_host_poller` runs remote commands (top, free or vm_stat, df, uptime, ps) → the `parse_*` functions turn stdout into `Metrics` → `CoreEvent::MetricsUpdate` is sent → frontend renders dashboard bars. Source: `crates/omnyssh-core/src/ssh/pool.rs` — `PollManager::start`, `run_host_poller`, `crates/omnyssh-core/src/ssh/metrics.rs` — `parse_cpu_top`, `parse_disk_df`, `crates/omnyssh-core/src/event.rs` — `CoreEvent::MetricsUpdate`
+2. **PTY session**: the frontend calls `PtyManager::open` → a session task owns a russh channel on which a remote PTY and shell are requested → bytes read from `channel.wait()` are fed to a `vt100::Parser` shared as `Arc<Mutex<vt100::Parser>>` → `CoreEvent::PtyOutput(id)` is sent when output arrives → frontend reads the parser state and renders it. Source: `crates/omnyssh-core/src/ssh/pty.rs` — `PtyManager::open`, `PtyManager::parser_for`, `feed_parser`, `crates/omnyssh-core/src/event.rs` — `CoreEvent::PtyOutput`
+3. **SFTP file transfer**: a frontend sends `SftpCommand` values to `SftpManager::send` → the manager runs them over an SFTP channel and returns `FileEntry` lists via `CoreEvent::FileDirListed` → transfers report `CoreEvent::FileTransferProgress(transfer_id, done, total)` → progress bar updates. Source: `crates/omnyssh-core/src/ssh/sftp.rs` — `SftpManager::send`, `SftpCommand`, `FileEntry`, `crates/omnyssh-core/src/event.rs` — `CoreEvent::FileTransferProgress`, `CoreEvent::FileDirListed`
+
+### Dependencies
+
+Source for every version below: `Cargo.toml` (workspace) — `[workspace.dependencies]`, and `crates/omnyssh-core/Cargo.toml` — `[dependencies]`, both at tag `v1.1.4`.
+
+**Core SSH & Networking**:
+- `russh` (0.46) and `russh-keys` (0.46): SSH client and key handling
+- `russh-sftp` (2.0): SFTP protocol over russh channels
+
+**Async Runtime**: `tokio` (1.x) — workspace features `macros`, `rt-multi-thread`, `time`, `sync`, `process`, `fs`, `io-util`; `omnyssh-core` adds `net`
+
+**Serialization & Config**: `serde`, `toml` (0.8), `glob` (0.3) for SSH config `Include` patterns
+
+**Terminal Emulation**: `vt100-omnyssh` (0.15) — screen model parser for PTY output (a package renamed to `vt100` in `omnyssh-core/Cargo.toml`: `vt100 = { package = "vt100-omnyssh", version = "0.15" }`)
+
+**Error Handling**: `anyhow`, `thiserror` (2.x), `async-trait` (0.1)
+
+**Utilities**: `dirs` (5), `chrono` (0.4), `tracing` (0.1)
+
+**TUI (omnyssh crate)**: `ratatui` (0.29). Source: `crates/omnyssh/Cargo.toml`
+
+**GUI (omnyssh-gui crate)**: Tauri 2, SvelteKit. Source: `crates/omnyssh-gui/Cargo.toml` — `tauri = { version = "2", ... }`, `crates/omnyssh-gui/ui/package.json`
+
+### Extensibility
+
+- Frontends depend on `omnyssh-core` and the core does not depend on them: the TUI and GUI crates each declare `omnyssh-core` as a path dependency. Source: `crates/omnyssh-core/src/lib.rs` — crate-level doc comment, `crates/omnyssh/Cargo.toml` — `omnyssh-core`, `crates/omnyssh-gui/Cargo.toml` — `omnyssh-core`
+- Frontends receive domain events through the `CoreEvent` enum. Source: `crates/omnyssh-core/src/event.rs` — `CoreEvent`
+- Password prompts are routed through events rather than a frontend-implemented trait: `Prompter` sends `CoreEvent::PasswordRequired` and the frontend replies by calling `password::answer(request_id, password)`. The `AskPassword` trait that `Prompter` implements is `pub(crate)`. Source: `crates/omnyssh-core/src/ssh/password.rs` — `Prompter`, `answer`, `AskPassword`; passphrase prompts use `CoreEvent::KeyPassphraseRequired` in the same way. Source: `crates/omnyssh-core/src/ssh/identity.rs` — `ask_passphrase`, `unlock`
+
+---
+
+## Installation & Usage
+
+### Desktop GUI (macOS, Linux, Windows)
+
+**One-line installer** (auto-detects OS/architecture):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/timhartmann7/omnyssh/main/install.sh | sh
+```
+
+Optional flags:
+- `--tui` — install TUI only
+- `--both` — install both GUI and TUI
+
+Installs to `/Applications` (macOS) or the app menu (Linux), per the README.
+
+**Manual download** from [Releases](https://github.com/timhartmann7/omnyssh/releases/latest) (Releases page, accessed 2026-10-06; latest release version not recorded; asset names are the live page, not pinned to tag v1.1.4):
+- macOS Apple Silicon: `OmnySSH-aarch64-apple-darwin.dmg`
+- macOS Intel: `OmnySSH-x86_64-apple-darwin.dmg`
+- Linux x86_64: `OmnySSH-x86_64.AppImage`, `.deb`, or `.rpm`
+- Windows x86_64: `OmnySSH-x86_64-setup.exe`
+
+### Terminal User Interface (TUI)
+
+**Via cargo**:
+
+```bash
+cargo install omnyssh
+```
+
+**Via homebrew**:
+
+```bash
+brew install timhartmann7/tap/omnyssh
+```
+
+**Via nix**:
+
+```bash
+nix run github:timhartmann7/omnyssh
+```
+
+**Run**:
+
+```bash
+omny
+```
+
+**Keybindings** (TUI):
+- `a` — add host
+- `/` or `⌘K` — fuzzy search hosts and sessions
+- `?` — help/keybindings
+- `Shift+K` — set up SSH key on selected host
+- Remappable via `config.toml` in the application config directory. Source: `crates/omnyssh-core/src/utils/platform.rs` — `app_config_dir` returns `dirs::config_dir()` joined with `omnyssh`, so the directory is the OS-specific config directory of the `dirs` crate; the doc comments in `crates/omnyssh-core/src/config/mod.rs` write the path as `~/.config/omnyssh/`
+
+**Configuration** (TUI):
+
+```bash
+man omny
+```
+
+— Full man page with options, keybindings, themes, and config examples.
+
+### First Run
+
+The app opens with an empty dashboard. It reads existing `~/.ssh/config` at startup (hosts behind `ProxyJump` bastion included) but never writes to it. Manually added hosts are stored in `hosts.toml` in the application config directory (the `config/mod.rs` doc comments write `~/.config/omnyssh/hosts.toml`; the directory comes from `app_config_dir`, see Keybindings above), merged with hosts from `~/.ssh/config`. Source: `crates/omnyssh-core/src/config/mod.rs` — `load_hosts`, `save_hosts`, `load_all_hosts`, `crates/omnyssh-core/src/utils/platform.rs` — `app_config_dir`. The README's description of where manually added hosts are stored: Not mentioned in documentation.
+
+---
+
+## Limitations and Caveats
+
+**Documented caveats** (Source: README):
+- **No confirmation step in SSH key setup flow**: the README states of the **Set up SSH key** flow: "There is no confirmation step in between: starting the flow means going through with it." It also states that "Before touching `sshd_config` it saves a backup on the server. If any step fails, it restores the backup and leaves your access exactly as it was." Whether the flow can be cancelled once started: Not mentioned in documentation.
+
+**Limitations read from code at tag v1.1.4 (accessed 2026-10-06)**:
+- Only Ed25519 keys can be generated by the key-setup flow: `KeyType` has one variant. Source: `crates/omnyssh-core/src/ssh/key_setup.rs` — `KeyType`
+- `Include` recursion in SSH config parsing is limited to 3 levels. Source: `crates/omnyssh-core/src/config/ssh_config.rs` — `parse_ssh_config`
+- The GUI crate is excluded from bare `cargo build`. Source: `Cargo.toml` — `default-members`
+- Of the service providers inspected, only the Docker provider emits metrics. Source: `crates/omnyssh-core/src/ssh/services/docker.rs` — `DockerProvider`
+- Keybinding remapping applies to the TUI only (README). Source: README at tag v1.1.4
+
+**Undocumented limitations**: The README and CONTRIBUTING.md document no further limitations on compatibility, deployment environments, authentication methods, or operational constraints; `crates/omnyssh-core/src/lib.rs` was also read. (Confidence: low — absence of documented limitations does not confirm absence of limitations.)
+
+---
+
+## References
+
+All rows read at tag `v1.1.4` (commit `849acb72981e49f628fb923e1bb57ec246f4f90d`) except Releases, which is the live page.
+
+- [OmnySSH GitHub Repository (README)](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/README.md) — overview, size and RAM figures, Comparison table, SSH key setup, installation (accessed 2026-10-06)
+- [CONTRIBUTING.md](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/CONTRIBUTING.md) — workspace layout, development setup, architecture overview (accessed 2026-10-06)
+- [Cargo.toml (root workspace)](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/Cargo.toml) — workspace members, default-members, workspace dependencies (accessed 2026-10-06)
+- [omnyssh-core/Cargo.toml](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/crates/omnyssh-core/Cargo.toml) — dependencies, russh version, reqwest, glob, vt100 rename (accessed 2026-10-06)
+- [omnyssh/Cargo.toml](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/crates/omnyssh/Cargo.toml) — TUI binary `omny`, ratatui, omnyssh-core path dependency (accessed 2026-10-06)
+- [omnyssh-gui/Cargo.toml](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/crates/omnyssh-gui/Cargo.toml) — Tauri 2, omnyssh-core path dependency (accessed 2026-10-06)
+- [omnyssh-gui/src/bridge.rs](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/crates/omnyssh-gui/src/bridge.rs) — GUI Rust bridge to the core (accessed 2026-10-06)
+- [omnyssh-gui/src/state.rs](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/crates/omnyssh-gui/src/state.rs) — GUI shared state holding `mpsc::Sender<CoreEvent>` (accessed 2026-10-06)
+- [omnyssh-gui/ui/package.json](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/crates/omnyssh-gui/ui/package.json) — SvelteKit frontend dependencies (accessed 2026-10-06)
+- [omnyssh-core/src/lib.rs](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/crates/omnyssh-core/src/lib.rs) — module documentation, separation of concerns (accessed 2026-10-06)
+- [omnyssh-core/src/event.rs](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/crates/omnyssh-core/src/event.rs) — CoreEvent enum, background task communication (accessed 2026-10-06)
+- [omnyssh-core/src/update.rs](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/crates/omnyssh-core/src/update.rs) — self-updater: check, perform_update, verify_checksum (accessed 2026-10-06)
+- [omnyssh-core/src/config/](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/crates/omnyssh-core/src/config) — ssh_config.rs, app_config.rs, snippets.rs, mod.rs (accessed 2026-10-06)
+- [omnyssh-core/src/utils/platform.rs](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/crates/omnyssh-core/src/utils/platform.rs) — `app_config_dir` config directory resolution (accessed 2026-10-06)
+- [omnyssh-core/src/ssh/](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/crates/omnyssh-core/src/ssh) — client.rs, pool.rs, session.rs, sftp.rs, pty.rs, metrics.rs, discovery.rs, probe.rs, identity.rs, password.rs, known_hosts.rs, key_setup.rs, tunnel.rs, jump.rs (accessed 2026-10-06)
+- [omnyssh-core/src/ssh/services/](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/crates/omnyssh-core/src/ssh/services) — docker.rs, nginx.rs, nodejs.rs, postgresql.rs, redis.rs, mod.rs (accessed 2026-10-06)
+- [omnyssh/src/app/snippets.rs](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/crates/omnyssh/src/app/snippets.rs) — TUI snippet execution (accessed 2026-10-06)
+- [omnyssh-gui/ui/src/lib/stores/streamer.ts](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/crates/omnyssh-gui/ui/src/lib/stores/streamer.ts) — GUI streamer-mode state (accessed 2026-10-06)
+- [omnyssh-gui/ui/src/lib/components/CommandPalette.svelte](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/crates/omnyssh-gui/ui/src/lib/components/CommandPalette.svelte) — GUI fuzzy-search palette (accessed 2026-10-06)
+- [install.sh](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/install.sh) — one-line installer and `--tui`/`--both` flags (accessed 2026-10-06)
+- [doc/omny.1](https://github.com/timhartmann7/omnyssh/blob/v1.1.4/doc/omny.1) — man page for the TUI (accessed 2026-10-06)
+- [Releases](https://github.com/timhartmann7/omnyssh/releases/latest) — manual download artifacts (live page, accessed 2026-10-06; latest release version not recorded)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Byobu](./byobu.md) | developer-tools | Terminal multiplexer wrapper with live system metrics; directly competes in unified server management space |
+| [Tmuxp](./tmuxp.md) | developer-tools | Declarative tmux workspace configuration tool; shares multi-session orchestration and layout automation patterns |
+| [Libtmux](./libtmux.md) | developer-tools | Python ORM wrapper over tmux; enables programmatic session control complementary to OmnySSH's terminal management |
+| [Dtach](./dtach.md) | developer-tools | Session detachment and persistence daemon; lightweight alternative for long-running process attachment patterns |
+| [Shpool](./shpool.md) | developer-tools | Lightweight session multiplexer; shares persistence and multi-host terminal aggregation goals |
+| [Tori-cli](./tori-cli.md) | developer-tools | Host metrics collection tool; complements OmnySSH's live dashboard observability features |
+| [Sidecar](./sidecar.md) | developer-tools | Plugin-based terminal session manager; shares event-driven architecture and terminal UI patterns |
+| [Psmux](./psmux.md) | developer-tools | Process multiplexer with tmux compatibility layer; alternative multiplexing approach for process orchestration |

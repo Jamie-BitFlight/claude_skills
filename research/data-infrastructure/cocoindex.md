@@ -224,3 +224,4 @@ def text_embedding_flow(flow_builder: cocoindex.FlowBuilder, data_scope: cocoind
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [chroma](./chroma.md) | data-infrastructure | referenced by chroma (data-infrastructure) |
+| [vector](./vector.md) | data-infrastructure | Shares Rust-based real-time data transformation architecture and incremental processing patterns (bidirectional) |

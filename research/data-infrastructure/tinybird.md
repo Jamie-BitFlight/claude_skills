@@ -290,3 +290,4 @@ curl -X POST 'https://api.tinybird.co/v0/events?name=events' \
 |-------|----------|--------------|
 | [pandera](./pandera.md) | data-infrastructure | referenced by pandera (data-infrastructure) |
 | [pocketbase](./pocketbase.md) | data-infrastructure | referenced by pocketbase (data-infrastructure) |
+| [vector](./vector.md) | data-infrastructure | referenced by vector (data-infrastructure) |

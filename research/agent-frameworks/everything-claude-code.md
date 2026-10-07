@@ -399,3 +399,4 @@ node scripts/setup-package-manager.js --detect
 | [xyops](../task-management/xyops.md) | task-management | referenced by xyops (task-management) |
 | [ai-engineering-from-scratch](../ai-research-tools/ai-engineering-from-scratch.md) | ai-research-tools | referenced by ai-engineering-from-scratch (ai-research-tools) |
 | [foreman](./foreman.md) | agent-frameworks | referenced by foreman (agent-frameworks) |
+| [gentle-ai](./gentle-ai.md) | agent-frameworks | referenced by gentle-ai (agent-frameworks) |

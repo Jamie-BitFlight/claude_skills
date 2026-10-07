@@ -215,3 +215,9 @@ psmux capture-pane -t build:0.0 -p
 - [tppanel — Tmux Plugin Panel](https://github.com/marlocarlo/tppanel) (referenced in README, accessed 2026-03-01)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [omnyssh](./omnyssh.md) | developer-tools | referenced by omnyssh (developer-tools) |

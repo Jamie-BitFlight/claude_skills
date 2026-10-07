@@ -396,5 +396,6 @@ tori --socket /run/tori/tori.sock
 | [Orbstack](./orbstack.md) | developer-tools | Docker infrastructure alternative; tori monitors Docker deployments while orbstack optimizes Docker runtime for macOS development environments |
 | [devenv](./devenv.md) | developer-tools | Infrastructure-as-code philosophy; both provide single-binary/declarative configuration approaches to managing distributed server and development environments without external dependencies |
 | [emqutiti](./emqutiti.md) | developer-tools | referenced by emqutiti (developer-tools) |
+| [omnyssh](./omnyssh.md) | developer-tools | referenced by omnyssh (developer-tools) |
 
 ---

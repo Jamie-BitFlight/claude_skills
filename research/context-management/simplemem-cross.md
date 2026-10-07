@@ -330,5 +330,6 @@ SimpleMem-Cross is directly applicable to Claude Code's agent systems:
 | [mempalace](./mempalace.md) | context-management | referenced by mempalace (context-management) |
 | [mex](./mex.md) | context-management | referenced by mex (context-management) |
 | [chroma](../data-infrastructure/chroma.md) | data-infrastructure | referenced by chroma (data-infrastructure) |
+| [gentle-ai](../agent-frameworks/gentle-ai.md) | agent-frameworks | referenced by gentle-ai (agent-frameworks) |
 
 ---

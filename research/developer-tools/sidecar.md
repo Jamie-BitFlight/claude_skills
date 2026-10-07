@@ -281,5 +281,6 @@ Keyboard shortcuts:
 | [stoat](./stoat.md) | developer-tools | referenced by stoat (developer-tools) |
 | [tori-cli](./tori-cli.md) | developer-tools | referenced by tori-cli (developer-tools) |
 | [tui-studio](./tui-studio.md) | developer-tools | referenced by tui-studio (developer-tools) |
+| [omnyssh](./omnyssh.md) | developer-tools | referenced by omnyssh (developer-tools) |
 
 ---

@@ -320,3 +320,5 @@ Claude Code Harness is directly relevant to Claude Code development in these are
 | [open-spdd](../prompt-engineering/open-spdd.md) | prompt-engineering | referenced by open-spdd (prompt-engineering) |
 | [agent-skills](../skill-generation-tools/agent-skills.md) | skill-generation-tools | referenced by agent-skills (skill-generation-tools) |
 | [foreman](./foreman.md) | agent-frameworks | referenced by foreman (agent-frameworks) |
+| [coop](../agent-infrastructure/coop.md) | agent-infrastructure | referenced by coop (agent-infrastructure) |
+| [gentle-ai](./gentle-ai.md) | agent-frameworks | referenced by gentle-ai (agent-frameworks) |

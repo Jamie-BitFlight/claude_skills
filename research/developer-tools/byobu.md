@@ -294,3 +294,4 @@ docker run -it --rm byobu:6.14
 | [abtop](./abtop.md) | developer-tools | referenced by abtop (developer-tools) |
 | [sidecar](./sidecar.md) | developer-tools | referenced by sidecar (developer-tools) |
 | [tori-cli](./tori-cli.md) | developer-tools | referenced by tori-cli (developer-tools) |
+| [omnyssh](./omnyssh.md) | developer-tools | referenced by omnyssh (developer-tools) |
