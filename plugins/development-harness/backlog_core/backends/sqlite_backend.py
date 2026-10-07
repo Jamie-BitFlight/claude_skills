@@ -743,14 +743,15 @@ class SQLiteBackend:
         """
         if dry_run:
             return None
-        number = self._next_issue_number()
-        body = json.dumps(item.sections if hasattr(item, "sections") else {})
-        ts = _now()
-        self._conn.execute(
-            "INSERT INTO items (issue_number, title, status, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (number, item.title, "open", body, ts, ts),
-        )
-        self._conn.commit()
+        with self._conn:
+            self._conn.execute("BEGIN IMMEDIATE")
+            number = self._next_issue_number()
+            body = json.dumps(item.sections if hasattr(item, "sections") else {})
+            ts = _now()
+            self._conn.execute(
+                "INSERT INTO items (issue_number, title, status, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (number, item.title, "open", body, ts, ts),
+            )
         return number
 
     @_serialized_connection_operation

@@ -7,7 +7,10 @@ by an autouse fixture that redirects BACKLOG_DIR to tmp_path.
 
 from __future__ import annotations
 
+import contextlib
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Barrier, BrokenBarrierError
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import ANY, MagicMock
 
@@ -657,6 +660,59 @@ class TestAddItemCreatesLocalFile:
             reset_config()
             if isinstance(backend, SQLiteBackend):
                 backend._conn.close()
+
+    def test_concurrent_native_creation_sqlite_instances_preserve_both_records(
+        self, tmp_path: Path, mocker: MockerFixture
+    ) -> None:
+        """Concurrent SQLite connections must allocate separate references."""
+        database_path = tmp_path / "backlog.sqlite3"
+        first_backend = SQLiteBackend(str(database_path))
+        second_backend = SQLiteBackend(str(database_path))
+        allocation_barrier = Barrier(2)
+
+        def coordinate_allocator(allocate: Callable[[], int]) -> Callable[[], int]:
+            def coordinated_allocate() -> int:
+                number = allocate()
+                with contextlib.suppress(BrokenBarrierError):
+                    allocation_barrier.wait(timeout=0.1)
+                return number
+
+            return coordinated_allocate
+
+        mocker.patch.object(
+            first_backend, "_next_issue_number", side_effect=coordinate_allocator(first_backend._next_issue_number)
+        )
+        mocker.patch.object(
+            second_backend, "_next_issue_number", side_effect=coordinate_allocator(second_backend._next_issue_number)
+        )
+        start_barrier = Barrier(2)
+
+        def create(backend: SQLiteBackend, title: str) -> str:
+            start_barrier.wait(timeout=5)
+            item = BacklogItem(title=title, description=title, priority="P1")
+            issue_number = backend.create_issue_for_item(None, item)
+            assert issue_number is not None
+            reference = f"#{issue_number}"
+            backend.put_work_item(item.model_copy(update={"reference": reference, "issue": reference}))
+            return reference
+
+        try:
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                references = list(
+                    executor.map(
+                        lambda args: create(*args),
+                        [(first_backend, "SQLite native one"), (second_backend, "SQLite native two")],
+                    )
+                )
+
+            assert set(references) == {"#1", "#2"}
+            assert {item.title for item in first_backend.list_work_items()} == {
+                "SQLite native one",
+                "SQLite native two",
+            }
+        finally:
+            first_backend._conn.close()
+            second_backend._conn.close()
 
 
 class TestAddItemValidatesPriorityAndType:
