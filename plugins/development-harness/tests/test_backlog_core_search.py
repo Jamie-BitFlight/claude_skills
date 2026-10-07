@@ -96,11 +96,36 @@ class TestApplySearchFilter:
 
         with (
             patch("backlog_core.search.regex.compile", return_value=NoMatchPattern()),
-            patch("backlog_core.search.time.monotonic", side_effect=[100.0, 100.02, 100.06]),
+            patch("backlog_core.search.time.monotonic", side_effect=[100.0, 100.02, 100.04, 100.04, 100.06, 100.08]),
         ):
             assert apply_search_filter([_candidate("one", ""), _candidate("two", "")], "/miss/") == []
 
         assert timeouts == pytest.approx([0.08, 0.04])
+
+    def test_haystack_preparation_does_not_consume_matching_budget(self) -> None:
+        clock = 100.0
+        timeouts: list[float] = []
+
+        class NoMatchPattern:
+            def search(self, value: str, *, timeout: float) -> None:
+                del value
+                timeouts.append(timeout)
+                return
+
+        def slow_haystack(item: dict[str, str | bool]) -> str:
+            nonlocal clock
+            del item
+            clock += 0.2
+            return "slow"
+
+        with (
+            patch("backlog_core.search.regex.compile", return_value=NoMatchPattern()),
+            patch("backlog_core.search._build_haystack", side_effect=slow_haystack),
+            patch("backlog_core.search.time.monotonic", side_effect=lambda: clock),
+        ):
+            assert apply_search_filter([_candidate("slow", "")], "/miss/") == []
+
+        assert timeouts == pytest.approx([0.1])
 
 
 # ---------------------------------------------------------------------------

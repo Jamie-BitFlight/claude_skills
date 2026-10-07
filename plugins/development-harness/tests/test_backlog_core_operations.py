@@ -1284,6 +1284,32 @@ class TestCheckForDuplicatesFreshness:
         assert "Completely Unrelated New Feature Proposal" in stored_titles
 
 
+class TestRequestShapedSearch:
+    """Request-shaped GitHub listings share one prepared search evaluation."""
+
+    def test_request_page_compiles_once_and_shares_matching_budget(self, mocker: MockerFixture) -> None:
+        timeouts: list[float] = []
+
+        class NoMatchPattern:
+            def search(self, value: str, *, timeout: float) -> None:
+                del value
+                timeouts.append(timeout)
+                return
+
+        _seed_provider_items([
+            BacklogItem(title="first", section="P1", skip=False, issue="#1"),
+            BacklogItem(title="second", section="P1", skip=False, issue="#2"),
+        ])
+        compile_pattern = mocker.patch("backlog_core.search.regex.compile", return_value=NoMatchPattern())
+        mocker.patch("backlog_core.search.time.monotonic", side_effect=[100.0, 100.02, 100.04, 100.04, 100.06, 100.08])
+
+        result = list_items(search="/miss/")
+
+        assert result["items"] == []
+        assert compile_pattern.call_count == 1
+        assert timeouts == pytest.approx([0.08, 0.04])
+
+
 @pytest.mark.usefixtures("plain_memory_backend")
 class TestListItemsSearch:
     """list_items(search=...) filters via backlog_core.search; None skips filtering (AC4/AC7)."""

@@ -104,7 +104,14 @@ from .parsing import (
     view_result_from_local_item,
 )
 from .rendering import heading_to_unknown_key, unknown_key_to_heading as reconstruct_unknown_heading
-from .search import ContentDuplicateMatch, DuplicateCheckStatus, apply_search_filter, find_content_duplicates
+from .search import (
+    ContentDuplicateMatch,
+    DuplicateCheckStatus,
+    PreparedSearch,
+    apply_search_filter,
+    find_content_duplicates,
+    prepare_search_filter,
+)
 from .section_registry import SectionKey, resolve_section_name
 from .status_registry import STATUS_LABEL_PREFIX, StatusLabel, pick_primary_status_label
 from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS
@@ -2437,7 +2444,7 @@ def _page_match(
     topic: str | None,
     include_closed: bool,
     filter_by_key: dict[str, str] | None,
-    search: str | None,
+    prepared_search: PreparedSearch | None,
 ) -> bool:
     """The one local predicate a request-shaped list candidate must pass.
 
@@ -2470,11 +2477,11 @@ def _page_match(
     )
     if not matches:
         return False
-    if filter_by_key or search is not None:
+    if filter_by_key or prepared_search is not None:
         entry = _build_list_entry(item, status_map, status_live=True)
         if filter_by_key and not all(str(entry.get(key)) == value for key, value in filter_by_key.items()):
             return False
-        if search is not None and not apply_search_filter([entry], search):
+        if prepared_search is not None and not prepared_search.matches(entry):
             return False
     return True
 
@@ -2520,6 +2527,7 @@ def _read_list_page(
         limit=limit,
         hydrate=not metadata_only,
     )
+    prepared_search = prepare_search_filter(search) if search is not None else None
     page = context.page(
         request,
         match=lambda item, provider: _page_match(
@@ -2533,7 +2541,7 @@ def _read_list_page(
             topic=topic,
             include_closed=include_closed,
             filter_by_key=filter_by_key,
-            search=search,
+            prepared_search=prepared_search,
         ),
         force_hydration=_page_needs_hydration(
             section=section, type_=type_, topic=topic, search=search, filter_by_key=filter_by_key
@@ -3005,7 +3013,7 @@ def list_items(
     ]
     if filter_by_key:
         result_items = [it for it in result_items if all(str(it.get(k)) == v for k, v in filter_by_key.items())]
-    if search is not None:
+    if search is not None and page is None:
         result_items = apply_search_filter(result_items, search)
     (status_source, unavailable_capabilities, filters_evaluated_against_unavailable_data) = _listing_status_metadata(
         status_resolution, [str(item.get("issue", "")) for item in result_items], status, filter_by_key

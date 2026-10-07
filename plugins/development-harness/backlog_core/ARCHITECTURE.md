@@ -407,9 +407,10 @@ from markdown parsing, so it must not be folded into `parsing.py`.
 
 **Search engine**:
 
-- Tokenizer/parser: `tokenize_search()`, `_SearchParser` — recursive-descent grammar (`NOT` > `AND`
-  > `OR`, parenthetical grouping) built from `_Predicate` subclasses (`_TermPred`, `_AndPred`,
-  `_OrPred`, `_NotPred`, `_TruePred`).
+- Tokenizer/parser: `tokenize_search()`, `_SearchParser`, `PreparedSearch` — recursive-descent
+  grammar (`NOT` > `AND` > `OR`, parenthetical grouping) built from `_Predicate` subclasses
+  (`_TermPred`, `_AndPred`, `_OrPred`, `_NotPred`, `_TruePred`). A prepared search compiles once
+  and carries one matching-only budget through request-shaped callbacks.
 - Term matching: `_item_matches_term()` — supports `/regex/` or `regex:pattern`, `field:value`
   (`title`, `section`, `topic`, `type`, `body`), and plain substring terms against the
   `_SEARCH_FIELDS` haystack built by `_build_haystack()`. Accepted regex terms compile once before
@@ -435,8 +436,8 @@ from markdown parsing, so it must not be folded into `parsing.py`.
   title characters alone), and returns up to `max_results` `ContentDuplicateMatch` entries ordered by
   `match_count` descending.
 
-**Exports**: `tokenize_search`, `apply_search_filter`, `DuplicateCheckStatus`,
-`ContentDuplicateMatch`, `build_concept_query`, `find_content_duplicates`.
+**Exports**: `tokenize_search`, `prepare_search_filter`, `apply_search_filter`, `PreparedSearch`,
+`DuplicateCheckStatus`, `ContentDuplicateMatch`, `build_concept_query`, `find_content_duplicates`.
 
 **Imports from other modules**: None — no `fastmcp`/`mcp` imports, so both `server.py` and
 `operations.py` can depend on it without a cycle.

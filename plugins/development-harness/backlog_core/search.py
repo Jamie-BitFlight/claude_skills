@@ -344,6 +344,39 @@ class _SearchParser:
         return _TruePred()
 
 
+@dataclasses.dataclass
+class PreparedSearch:
+    """One compiled query and its shared regex-matching budget."""
+
+    predicate: _Predicate
+    remaining_matching_seconds: float = _REGEX_MATCH_TIMEOUT_SECONDS
+
+    def matches(self, item: dict[str, str | bool]) -> bool:
+        """Prepare one item outside the budget, then evaluate its predicate.
+
+        Returns:
+            ``True`` when the item matches the prepared query.
+        """
+        haystack = _build_haystack(item)
+        deadline = time.monotonic() + self.remaining_matching_seconds
+        try:
+            return self.predicate(item, haystack, deadline)
+        finally:
+            self.remaining_matching_seconds = max(deadline - time.monotonic(), 0.0)
+
+
+def prepare_search_filter(search: str) -> PreparedSearch | None:
+    """Parse and compile a search query once before candidate evaluation.
+
+    Returns:
+        A prepared search, or ``None`` for an empty query.
+    """
+    search = search.strip()
+    if not search:
+        return None
+    return PreparedSearch(_SearchParser(tokenize_search(search)).parse())
+
+
 def apply_search_filter(items: list[dict[str, str | bool]], search: str) -> list[dict[str, str | bool]]:
     """Filter items using the full-text search query syntax.
 
@@ -373,21 +406,10 @@ def apply_search_filter(items: list[dict[str, str | bool]], search: str) -> list
     Returns:
         Filtered list of items that match the search query.
     """
-    search = search.strip()
-    if not search:
+    prepared_search = prepare_search_filter(search)
+    if prepared_search is None:
         return items
-
-    tokens = tokenize_search(search)
-    parser = _SearchParser(tokens)
-    predicate = parser.parse()
-
-    deadline = time.monotonic() + _REGEX_MATCH_TIMEOUT_SECONDS
-    result = []
-    for item in items:
-        hs = _build_haystack(item)
-        if predicate(item, hs, deadline):
-            result.append(item)
-    return result
+    return [item for item in items if prepared_search.matches(item)]
 
 
 # ---------------------------------------------------------------------------
