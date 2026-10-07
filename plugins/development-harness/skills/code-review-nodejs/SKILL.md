@@ -1,17 +1,22 @@
 ---
 name: code-review-nodejs
-description: Applies Node.js-specific code review patterns for async I/O, streams, security, process management, and dependency hygiene. Use when reviewing Node.js server code, route handlers, middleware, or any JavaScript file alongside package.json without TypeScript. Triggers on sync I/O in request paths, missing stream backpressure, process.exit misuse, eval/exec injection risks, wildcard version ranges, missing lockfiles, EventEmitter cleanup gaps, and unvalidated environment variables at startup.
+description: Reviews Node.js runtime behavior in JavaScript or TypeScript, including server entrypoints, route handlers, middleware, streams, processes, dependencies, and environment configuration. Loads alongside language and CLI checks when applicable; investigates blocking I/O, backpressure, injection, lifecycle leaks, and misleading failure signals.
 user-invocable: false
 ---
 
 # Node.js Code Review Patterns
 
-Stack-specific rules loaded by `dh:code-reviewer` when `package.json` and `*.js`/`*.mjs` files are detected (without TypeScript).
+Load these checks when source, runtime entrypoints, or package scripts establish Node.js execution,
+including JavaScript, TypeScript, CJS, and MJS. Apply TypeScript or CLI checks alongside them when
+relevant; a `package.json` alone does not distinguish server code from a browser build.
+
+Read [Review principles](../../docs/review-principles.md) before applying these checks; it defines
+authority, applicability, evidence, and blocking criteria.
 
 ## Synchronous I/O in Request Path
 
-- `fs.readFileSync`, `fs.writeFileSync`, `execSync`, `spawnSync` in any function called during request handling are blocking findings
-- All file system operations in server code must use the async variants or `fs/promises`
+- Trace `fs.readFileSync`, `fs.writeFileSync`, `execSync`, or `spawnSync` to the active request/event-loop path and establish the blocking consequence or violated latency contract.
+- Use async variants or `fs/promises` for work that must not block that path. Do not flag isolated startup/setup I/O solely because it is in a server file.
 
 ```javascript
 // WRONG: blocks event loop
@@ -35,16 +40,16 @@ app.get("/config", async (req, res) => {
 
 ## Process Exit
 
-- `process.exit()` is only acceptable in CLI entrypoints — it is a blocking finding in library code, route handlers, or middleware
+- Keep process termination at the application/CLI boundary that owns shutdown, including fatal startup failure. Report library, route, or middleware exits that unexpectedly terminate unrelated work or bypass required cleanup.
 - Unhandled `process.on("uncaughtException")` that calls `process.exit()` without logging the error is a blocking finding
 
 ## Security
 
-- `eval()` is a blocking finding everywhere — no exceptions
+- Trace dynamic evaluation, including `eval()`, to its input authority and execution privileges; report untrusted-code execution or an explicit project prohibition.
 - `new Function(code)` with user-controlled `code` is a blocking finding
-- Shell arguments constructed by string concatenation with user input before passing to `exec` or `spawn` are a blocking finding
-- `execFile` is required over `exec` when calling external programs — `exec` invokes a shell and is vulnerable to injection
-- User-controlled values used as file paths must be validated against an allowed base directory (path traversal)
+- Trace user input into shell evaluation and command/option parsing. Distinguish shell interpolation from separate process arguments, and report the injection or unauthorized operation the actual call permits.
+- Prefer `execFile` with separate arguments when no shell behavior is needed. For deliberate shell use, inspect interpolation and input authority rather than treating a trusted constant command as user-input injection.
+- Constrain user-controlled paths to the resources authorized for the operation; verify allowed-root enforcement where the contract requires it and trace path traversal across that boundary.
 
 ```javascript
 // WRONG: shell injection vector
@@ -56,9 +61,8 @@ execFile("convert", [userInput, "output.png"]);
 
 ## Dependency Hygiene
 
-- `*` version ranges in `package.json` are a blocking finding — they produce non-reproducible installs
-- `^` ranges are acceptable; `~` is preferred for stricter patch-level pinning
-- `package-lock.json` or `yarn.lock` must be committed — without a lockfile, versions are not reproducible in CI
+- Check version ranges against the target's dependency and release policy; trace wildcard ranges to the actual resolution/install behavior before claiming non-reproducibility.
+- Verify the chosen package manager's lockfile and CI install mode preserve the required dependency resolution. Do not require an npm/yarn lockfile from a project using another supported package manager.
 - Dev-only dependencies must be in `devDependencies`, not `dependencies`
 
 ## Event Emitter Cleanup
@@ -69,8 +73,8 @@ execFile("convert", [userInput, "output.png"]);
 
 ## Environment Variables
 
-- All required environment variables must be validated at startup, before the server begins accepting requests
-- `process.env.SOME_VAR!` without validation is a blocking finding — the app will fail with a confusing error at runtime rather than a clear startup message
+- Validate configuration required for the selected execution mode before accepting work that depends on it. Do not require disabled optional features to supply credentials.
+- Trace `process.env.SOME_VAR!` to the relevant validation and consumer; report a missing required value or unsupported assumption with its actual failure path.
 - Provide a `.env.example` file listing all required variables — checked in, never containing real values
 
 ## Anti-Patterns

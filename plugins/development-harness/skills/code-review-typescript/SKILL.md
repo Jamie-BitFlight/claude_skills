@@ -8,26 +8,30 @@ user-invocable: false
 
 Stack-specific rules loaded by `dh:code-reviewer` when `tsconfig.json`, `*.ts`, or `*.tsx` files are detected.
 
+Read [Review principles](../../docs/review-principles.md) before applying these checks; it defines
+authority, applicability, evidence, and blocking criteria. Also apply Node.js checks for Node
+execution and Web checks for browser rendering, including TSX; language checks do not replace
+runtime checks.
+
 ## Strict Mode
 
-- `tsconfig.json` must enable `strict: true` — this covers `noImplicitAny`, `strictNullChecks`, `strictFunctionTypes`, and others
-- `exactOptionalPropertyTypes: true` is required in new projects — prevents `undefined` from being assigned to optional properties
-- `noUncheckedIndexedAccess: true` is required when indexing arrays or records — prevents silent `undefined` propagation
-- Any `@ts-ignore` comment without an accompanying explanation comment is a blocking finding
+- Apply the project's active compiler gates. Prefer strict checking for new projects; do not require a configuration migration solely to match a default.
+- Inspect optional-property and indexed-access behavior for unsupported `undefined` values; establish the affected contract before recommending stronger compiler flags such as `exactOptionalPropertyTypes` or `noUncheckedIndexedAccess`.
+- Investigate `@ts-ignore` and its justification: identify the diagnostic being hidden and whether the invariant is established elsewhere. An explanation alone does not prove safety.
 - `@ts-expect-error` is preferred over `@ts-ignore` — it fails if the error goes away
 
 ## Type Safety
 
-- `any` type without an explanatory comment is a blocking finding
-- Type assertions (`as SomeType`) without runtime validation at the same boundary are a blocking finding
+- Trace `any` and unchecked assertions to the dynamic boundary and their consumers; report unsupported assumptions that escape into typed code.
+- Distinguish assertions over unvalidated external input from internal refinements supported by construction or an established invariant. Do not require runtime parsing solely to justify every `as` expression.
 - `unknown` is the correct type for values from external sources — validate before narrowing, not after
-- `object` as a type is not meaningful — use `Record<string, unknown>` or a specific interface
-- Non-null assertions (`value!`) without a comment explaining why null is impossible are a blocking finding
+- Choose types for the actual contract: `object`, a record, and a named interface describe different guarantees. Replacing `any` with another broad type alone does not validate external data.
+- For non-null assertions (`value!`), verify why null is impossible on the relevant path; a comment is a claim to check, not sufficient evidence by itself.
 
 ## Discriminated Unions Over Booleans
 
-- Multiple boolean flags encoding state are a blocking finding — model as a discriminated union instead
-- State machine logic with `isLoading`, `isError`, `isSuccess` as separate booleans allows impossible combinations
+- When multiple flags encode mutually exclusive states, check whether callers can construct or observe an invalid combination. Use a discriminated union when it expresses that contract; independent boolean properties need not become a state machine.
+- Inspect transitions as well as the declared type; a state representation must preserve the supported loading, failure, and success behavior.
 
 ```typescript
 // WRONG: boolean flags allow impossible states
@@ -46,7 +50,7 @@ type State =
 
 ## Branded Types
 
-- Domain primitives that are structurally identical but semantically distinct must use branded types to prevent mix-ups
+- Inspect semantically distinct primitives for consequential interchange at call sites. Recommend branded types or the project's existing domain representation when it prevents a demonstrated class of mix-ups.
 - `UserId` and `OrderId` are both `string` at runtime — without brands, they are interchangeable to the type checker
 
 ```typescript
@@ -60,23 +64,22 @@ function makeUserId(id: string): UserId {
 
 ## ESM
 
-- `require()` calls are a blocking finding — use `import` syntax
+- Check `require()` and `import` against the project's supported runtime, package/module configuration, and emitted code; preserve a coherent CommonJS or ESM design.
 - Named exports are preferred over default exports — easier to refactor and search
-- `import type` must be used for type-only imports — prevents runtime errors and improves tree-shaking
+- Apply the project's type-only import rules and verify that emitted imports do not request runtime values that do not exist.
 - Dynamic `import()` must be typed with the expected module shape
 
 ## Async Patterns
 
-- Floating promises (calling an async function without `await` or `.then()/.catch()`) are a blocking finding
-- `Promise.all` is required for parallel independent async operations — sequential `await` in a loop is an anti-pattern when operations are independent
-- `await` inside a `for` loop that processes independent items is a blocking finding
-- Unhandled promise rejections must have explicit error handling at the call site
+- Verify async results are awaited, returned to a responsible caller, or deliberately detached with rejection handling; report lost completion or failure signals at the actual consumer.
+- Before recommending concurrency for sequential `await`, check ordering, rate limits, resource bounds, and failure/cancellation semantics. Use bounded concurrency or `Promise.all` only when the operation's contract supports it and there is a demonstrated benefit.
+- Identify who owns rejection handling. Propagating a promise to a caller is valid when that caller handles the failure contract; a detached promise needs its own explicit policy.
 
 ## Runtime Safety
 
-- User-controlled input entering the system must be validated against a schema (zod, valibot, or equivalent) at the boundary — no raw `as UserType` casts on external data
-- JSON.parse results must be validated before use — `JSON.parse(text) as MyType` is a blocking finding
-- Environment variables must be validated at startup with specific error messages — `process.env.API_KEY!` without validation is a blocking finding
+- Validate user-controlled input at its trust boundary with a schema or equivalent guard that establishes the required contract; a raw `as UserType` cast on external data establishes no runtime evidence.
+- Trace parsed external data to validation before trusted use; a `JSON.parse(text) as MyType` cast alone does not establish the required shape.
+- Validate environment values required by the selected execution mode before dependent work; trace assertions such as `process.env.API_KEY!` to the relevant guard and failure path.
 
 ## `satisfies` Operator
 
@@ -89,13 +92,13 @@ const config = {
   port: 3000,
   host: "localhost",
 } satisfies ServerConfig;
-// config.port is typed as 3000, not number
+// Check the inferred property types; satisfies validates compatibility.
 ```
 
 ## Anti-Patterns
 
 ```typescript
-// WRONG: any without comment
+// Unchecked boundary: the required event shape is not established.
 function process(data: any) { ... }
 
 // RIGHT: specific type or documented any
@@ -107,8 +110,8 @@ function process(data: unknown) {
 // WRONG: floating promise
 sendMetrics(event);
 
-// RIGHT: awaited or explicitly fire-and-forget
-void sendMetrics(event); // intentionally not awaited — best-effort telemetry
+// RIGHT: awaited, or deliberately detached with rejection handling
+void sendMetrics(event).catch(reportMetricsFailure); // best-effort telemetry
 // or
 await sendMetrics(event);
 ```

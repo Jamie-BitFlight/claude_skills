@@ -1,6 +1,6 @@
 ---
 name: code-review-llm
-description: Use when reviewing AI/ML code or LLM integration — activates on prompt templates, model selection logic, token budget concerns, or evaluation harness code. Enforces prompt hygiene, model tier matching, context window management, token economics, structured output validation, temperature settings, retry logic, streaming error handling, and PII/safety rules.
+description: Reviews LLM integration, prompt templates, model selection, token/cost budgets, evaluation harnesses, structured outputs, retries, and streaming. Checks trust boundaries and task evidence against the selected provider/model contract rather than prescribing universal model tiers or sampling settings.
 user-invocable: false
 ---
 
@@ -8,87 +8,80 @@ user-invocable: false
 
 Stack-specific rules loaded by `dh:code-reviewer` when prompt files, model selection logic, or evaluation harness code are detected.
 
+Read [Review principles](../../docs/review-principles.md) before applying these checks; it defines
+authority, applicability, evidence, and blocking criteria. Verify model identifiers, request
+parameters, and error semantics against the provider and SDK version the target actually uses.
+
 ## Prompt Hygiene
 
-- System prompt must be separated from user content — mixing them in a single string removes the security boundary
-- System prompts must not include user-controlled content unless that content is explicitly sanitized and bounded
-- Prompt templates must use structured variable substitution, not string concatenation — f-strings with raw user input are a blocking finding
-- Long prompts should be stored in dedicated files, not inline strings — inline multi-line strings are acceptable only below 10 lines
+- Keep instruction authority distinguishable from user/retrieved content. Trace where untrusted text can influence instructions, tool arguments, or consequential actions.
+- Check that user-controlled content is treated as data at its intended boundary. String interpolation, escaping, role separation, or templating alone does not establish resistance to prompt injection.
+- Review prompt composition for accidental instruction mixing, missing delimiters, or lost context using concrete inputs; do not report every f-string as an injection defect.
+- Recommend dedicated prompt resources when versioning, reuse, or review clarity benefits; do not impose a line-count rule on inline strings.
 
 ## Model Selection
 
-- Model tier must match task complexity — using Opus for tasks that Haiku can handle is a blocking finding (cost regression)
-- Using Haiku for tasks requiring multi-step reasoning, architecture decisions, or complex judgment is a blocking finding (quality regression)
-- Model selection must be documented with the rationale — `model = "haiku"  # retrieval only, no reasoning required`
-- Model names must not be hardcoded as full version strings — use the tier alias (`sonnet`, `haiku`, `opus`) so upgrades require one change
+- Evaluate the selected model against the task's quality, cost, latency, and reproducibility requirements using relevant evidence. Do not infer a cost or quality regression solely from a tier name or task label.
+- Check the selection rationale and configuration ownership, including fallback behavior when the chosen model is unavailable.
+- Verify that model identifiers are valid for the provider API or harness field being used. Choose pinned identifiers or aliases according to the target's reproducibility/update contract; do not substitute harness tier names into an unrelated API.
 
 ```python
-# WRONG: hardcoded version string
-model = "claude-haiku-4-5"
-
-# RIGHT: tier alias — version resolved by the client
-model = "claude-haiku-latest"
-# or better: configurable
-model = config.model_tier  # "haiku" | "sonnet" | "opus"
+# The configured identifier must match the selected provider and release policy.
+model = config.model_identifier
 ```
 
 ## Context Management
 
-- Unbounded context accumulation (appending all messages without a limit) is a blocking finding — long sessions will silently hit context limits and start dropping messages
-- Sliding window or summarization strategy must be implemented for conversations expected to exceed ~50 turns
+- Trace context growth against the selected model's input/output budgets and the application's supported workload; report overflow or loss of required context with the affected scenario.
+- Check that any truncation, summarization, or retention strategy preserves the task's important instructions, evidence, and state. Turn count alone does not determine context size.
 - Token count must be tracked and logged — silent context truncation is harder to debug than explicit overflow handling
 
 ## Token Economics
 
 - Token count must be estimated before sending requests in batch or high-volume operations — surprise cost overruns from unexpectedly large inputs are preventable
 - Fail fast on oversize inputs rather than truncating silently — silent truncation corrupts the task without surfacing an error
-- Structured output requests (JSON mode) reduce token waste from freeform formatting — use when parsing responses programmatically
+- For programmatic consumers, evaluate supported structured-output modes against the required schema, failure behavior, and measured cost; do not equate JSON syntax with valid content.
 
 ## Structured Output Validation
 
-- Model responses used programmatically must be validated against a schema before use — `json.loads(response)` without validation is a blocking finding
-- Schema validation must produce a specific error that includes the raw response for debugging — swallowing parse errors is a blocking finding
-- Partial response handling: when streaming, the validation schema must tolerate incomplete JSON until the stream closes
+- Establish the schema and semantic constraints required before a model response is consumed; `json.loads(response)` alone does not establish those constraints.
+- Validation failures must remain observable with useful diagnostics. Preserve evidence without disclosing secrets or sensitive response content beyond the project's logging/privacy contract.
+- Separate partial stream framing from final validation. Do not act on incomplete structured output unless the consumer has an explicit partial-output contract and its required checks have passed.
 
 ## Temperature and Sampling
 
-- Temperature setting must be documented with the rationale
-- `temperature=0` is required for deterministic tasks (classification, extraction, code generation with tests) — any other value is a blocking finding
-- `temperature>0` is required for creative tasks (variation generation, brainstorming) — using `0` eliminates variation intentionally
+- Check which sampling parameters the selected model supports and whether the application sends valid values.
+- Require evidence for the task's repeatability or variation needs; a temperature value alone does not prove either requirement. Review regression evaluations against permitted outcomes rather than prescribing one setting for every classification or creative task.
 
 ```python
-# RIGHT: documented temperature
-response = client.messages.create(
-    model="claude-sonnet-latest",
-    temperature=0,  # deterministic — this is a classification task
-    messages=[...],
-)
+# Send only parameters supported by the selected model; validate outcomes separately.
+response = client.messages.create(model=config.model_identifier, messages=[...], **config.sampling_parameters)
 ```
 
 ## Evaluation
 
-- Prompt changes must be accompanied by regression tests that verify the old expected outputs still hold
+- Verify material prompt changes against the approved behavior and preserved invariants using representative regression evidence. Do not treat incidental previous wording as the oracle.
 - Evaluation datasets must be versioned alongside the prompts that were evaluated against them
-- Evaluation harness must run in CI — manual evaluation without automation is a blocking finding for production prompts
+- Apply the target's required evaluation/release gate; report missing coverage or automation with the consequential failure it can allow. Source review and authored eval cases are not executed results.
 
 ## Safety
 
-- User-controlled content must not be passed as the system prompt — only static, developer-controlled content belongs in the system prompt
-- PII (names, email addresses, IP addresses, financial data) must not be passed to external model APIs without documented user consent and data retention agreements
+- Trace who controls instruction-bearing content and the permissions of downstream tools; prevent untrusted content from acquiring authority reserved for the application or user.
+- Check sensitive-data disclosure, retention, and diagnostics against the application's actual authorization/privacy contract; identify the external flow and missing protection rather than inventing a universal consent workflow.
 - Prompt injection vectors — places where user content could override or escape the intended prompt structure — must be identified and bounded
 
 ## Retry Logic
 
-- Retry logic must use exponential backoff with jitter — fixed-interval retries exacerbate rate limit pressure
-- Retry on `429` (rate limited) with backoff is correct
-- Retry on `400` (bad request, context length exceeded) is a blocking finding — these errors are not transient and retrying wastes budget
+- Classify retryable failures from the provider's documented semantics and retry guidance. Check backoff, jitter, or other coordination against rate limits and retry amplification.
+- Verify that retries cannot duplicate consequential downstream effects or silently exhaust the budget.
+- Do not blindly retry malformed or oversized requests; determine whether the request must change before another attempt can succeed.
 - Maximum retry count must be bounded — infinite retry loops are a blocking finding
 
 ## Streaming
 
-- Streaming clients must handle partial responses — a streaming handler that only processes the final concatenated string is acceptable but wastes the streaming benefit
+- Check partial responses, cancellation, completion markers, and the final assembled result against the consumer's streaming contract; buffering is acceptable when incremental delivery is not required.
 - Connection drops must be handled explicitly — unhandled streaming errors that silently return empty results are a blocking finding
-- Timeout on first token is separate from timeout on stream completion — both must be configured
+- Verify the timeout/cancellation policy bounds the supported wait for initial output and completion; identify unbounded or prematurely terminated paths.
 
 ## Anti-Patterns
 
@@ -115,4 +108,6 @@ for attempt in range(3):
         time.sleep(2**attempt + random.random())
     except APIError:
         raise  # non-retryable — propagate immediately
+else:
+    raise RuntimeError("Retry budget exhausted")
 ```
