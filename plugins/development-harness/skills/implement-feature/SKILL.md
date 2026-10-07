@@ -407,5 +407,5 @@ If the issue number is not known, skip registration.
 
 ## Completion Gate
 
-When all tasks show `COMPLETE`, load the `dh:complete-implementation` skill with `{plan_ref}` as
-its argument, in this workflow's own context.
+When `progress == done` — every task is accepted, deferred, or skipped — load the
+`dh:complete-implementation` skill with `{plan_ref}` as its argument, in this workflow's own context.

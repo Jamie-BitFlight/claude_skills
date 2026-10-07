@@ -376,6 +376,31 @@ def test_get_plan_status_all_complete_gives_100_pct(tmp_path: Path) -> None:
     assert abs(status.completion_pct - 100.0) < 0.01
 
 
+def test_get_plan_status_counts_all_successful_statuses(tmp_path: Path) -> None:
+    tasks = [
+        make_task("T1", status=TaskStatus.COMPLETE),
+        make_task("T2", status=TaskStatus.DEFERRED),
+        make_task("T3", status=TaskStatus.SKIPPED),
+    ]
+    path = tmp_path / "successful.yaml"
+    write_plan(Plan(feature="successful", version="1.0", tasks=tasks), path, force_single=True)
+
+    assert get_plan_status(path).completion_pct == pytest.approx(100.0)
+
+
+def test_get_plan_status_excludes_failed_from_completion(tmp_path: Path) -> None:
+    tasks = [
+        make_task("T1", status=TaskStatus.COMPLETE),
+        make_task("T2", status=TaskStatus.DEFERRED),
+        make_task("T3", status=TaskStatus.SKIPPED),
+        make_task("T4", status=TaskStatus.FAILED),
+    ]
+    path = tmp_path / "failed.yaml"
+    write_plan(Plan(feature="failed", version="1.0", tasks=tasks), path, force_single=True)
+
+    assert get_plan_status(path).completion_pct == pytest.approx(75.0)
+
+
 # ---------------------------------------------------------------------------
 # claim_task
 # ---------------------------------------------------------------------------
