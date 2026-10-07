@@ -10,7 +10,7 @@ through valid redesign. Plan only; return the design to the caller.
 
 Use [Testing principles](../../docs/testing-principles.md) as shared reference. For retention, read
 **Test admission gate** and **Test economics**. For boundary/oracle decisions, read **Contract
-altitude** and principles 2-5. For TDD, read **TDD contract**. Before execution planning, read
+altitude** and principles 2-5. For TDD, read **TDD use**. Before execution planning, read
 **Evidence execution boundary**.
 
 ## Procedure
