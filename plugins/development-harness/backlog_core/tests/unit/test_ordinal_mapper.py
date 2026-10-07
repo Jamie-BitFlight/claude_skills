@@ -35,6 +35,8 @@ from pathlib import Path
 import pytest
 import tiktoken
 import tiktoken.registry
+from backlog_core.content_normalizer import ItemContentNormalizer, NormalizedEntry, NormalizedSection
+from backlog_core.disclosure_handler import _ORDINAL_PATTERN
 from hypothesis import given, settings, strategies as st
 from progressive_markdown.exceptions import OrdinalNotFoundError
 
@@ -46,9 +48,6 @@ from progressive_markdown.ordinal_mapper import (
     _entry_ordinal_for_code,
     _entry_ordinal_for_sub_heading,
 )
-
-from backlog_core.content_normalizer import ItemContentNormalizer, NormalizedEntry, NormalizedSection
-from backlog_core.disclosure_handler import _ORDINAL_PATTERN
 
 # ---------------------------------------------------------------------------
 # Real-encoding availability guard
