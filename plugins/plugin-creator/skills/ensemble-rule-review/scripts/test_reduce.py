@@ -80,6 +80,16 @@ def test_different_groups_at_one_normalized_location_merge_cross_group() -> None
     assert survivors[0].weight == 2
 
 
+def test_format_report_renders_all_seen_groups_with_legacy_fallback() -> None:
+    multi_group = r.Merged(group="security", location="x.py:10", agents={"A"}, groups_seen={"style", "security"})
+    legacy = r.Merged(group="legacy", location="y.py:20", agents={"B"})
+
+    report = r.format_report({}, [multi_group, legacy], keep_threshold=1)
+
+    assert "group=security|style x.py:10" in report
+    assert "group=legacy y.py:20" in report
+
+
 def test_one_group_at_one_normalized_location_is_not_cross_group() -> None:
     reports = {
         "A": r.parse_report("- group: 1\n  rule: a\n  location: x.py:10\n"),

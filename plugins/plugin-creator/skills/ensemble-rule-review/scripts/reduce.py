@@ -249,7 +249,8 @@ def format_report(reports: dict[str, list[Finding]], survivors: list[Merged], ke
         tag = "KEEP" if m.weight >= CORROBORATION_MIN else "tail"
         agents = "".join(sorted(m.agents))
         rules = "|".join(sorted(m.rules)) or "?"
-        line = f"[{tag} w={m.weight}] group={m.group} {m.location}  sev={m.severity}  agents={agents}  rule={rules}"
+        groups = "|".join(sorted(m.groups_seen or {m.group}))
+        line = f"[{tag} w={m.weight}] group={groups} {m.location}  sev={m.severity}  agents={agents}  rule={rules}"
         if m.cross_group:
             line += "  cross_group=True"
         lines.append(line)
