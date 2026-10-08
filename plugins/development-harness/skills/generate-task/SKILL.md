@@ -16,7 +16,7 @@ You MUST follow the existing canonical task writing standard and structure:
 
 - CLEAR ordering (Context, Objective, Inputs, Requirements, Constraints, Expected Outputs, Acceptance Criteria, Verification Steps, CoVe Checks only if needed, Handoff).
 - Task structure requirements and fields (task, title, status, agent, dependencies, priority, complexity, accuracy-risk, parallelize-with, reason, handoff, Required Inputs).
-- For new scripts, tools, utilities, or dependencies, apply the existing [reuse-before-build gate](../../docs/reuse-before-build.md) and place its decision in the existing task sections before choosing a custom build.
+- For new scripts, tools, utilities, libraries, modules, dependencies, or bespoke capabilities, apply the existing [reuse-before-build gate](../../docs/reuse-before-build.md) and place its decision in the existing task sections before choosing a custom build.
 
 Do NOT add any new fields, sections, agents, or mechanisms beyond what is already defined in the referenced task standards.
 
