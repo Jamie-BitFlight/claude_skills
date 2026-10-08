@@ -76,4 +76,5 @@ apply_project_dir_from_argv()
 
 from backlog_core.server import mcp
 
-mcp.run()
+if __name__ == "__main__":
+    mcp.run()
