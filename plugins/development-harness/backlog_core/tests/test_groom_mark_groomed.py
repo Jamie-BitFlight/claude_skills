@@ -124,7 +124,6 @@ def test_groom_item_mark_groomed_reuses_one_selection(mocker: MockerFixture) -> 
     backend = _configure_memory_view(mocker, item=fake_item)
     mock_list = mocker.patch.object(backend, "list_work_items", side_effect=[[fake_item], []])
     mocker.patch("backlog_core.operations.update_item", return_value={"updated": True})
-    mock_update_metadata = mocker.patch("backlog_core.operations.update_item_metadata")
     mock_apply = mocker.patch("backlog_core.operations.apply_status_groomed")
 
     out = MagicMock()
@@ -135,7 +134,6 @@ def test_groom_item_mark_groomed_reuses_one_selection(mocker: MockerFixture) -> 
     )
 
     assert result.get("mark_groomed_applied") is True
-    mock_update_metadata.assert_called_once()
     mock_apply.assert_not_called()
     assert mock_list.call_count == 1
 

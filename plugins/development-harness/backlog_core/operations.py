@@ -68,6 +68,8 @@ from .models import (
     GitHubMutationOutcomeUnknownError,
     GroomedData,
     GroomedSectionMetadata,
+    GroomingIntent,
+    GroomingOperation,
     IssueLocalFields,
     IssueStatus,
     ItemNotFoundError,
@@ -174,11 +176,11 @@ def _has_live_provider_target(target: DecisionTarget) -> bool:
     )
 
 
-def _put_work_item(item: BacklogItem, repo: str = "") -> None:
+def _put_work_item(item: BacklogItem, repo: str = "", grooming_intent: GroomingIntent | None = None) -> None:
     """Persist one work item with repository identity when GitHub-backed."""
     backend = get_config().backend
-    if repo and getattr(backend, "supports_github_extras", False):
-        require_github_extras(backend, "put_work_item").put_work_item(item, repo)
+    if getattr(backend, "supports_github_extras", False) and (repo or grooming_intent is not None):
+        require_github_extras(backend, "put_work_item").put_work_item(item, repo, grooming_intent)
     else:
         backend.put_work_item(item)
 
@@ -1207,6 +1209,54 @@ def _warn_unregistered_section(name: str, key: str, output: Output | None) -> No
         output.warn(message)
 
 
+def _apply_grooming_intent(item: BacklogItem, intent: GroomingIntent) -> None:
+    """Apply precomputed grooming operations without generating new timestamps."""
+    intent.apply(item)
+
+
+def _grooming_intent(
+    item: BacklogItem,
+    content: str,
+    section_name: str | None,
+    *,
+    entry_id: str | None = None,
+    replace_section: bool = False,
+    reason: str | None = None,
+    append: bool = False,
+) -> GroomingIntent:
+    """Build one deterministic grooming operation from public grooming inputs.
+
+    Returns:
+        Transient intent ready to apply to selected and pending work items.
+    """
+    if section_name is None:
+        return GroomingIntent(groomed_date=today(), operations=[GroomingOperation(kind="top_level", content=content)])
+    section_key = _normalize_section_key(section_name)
+    existing = item.sections.get(section_key)
+    entries = existing.entries if isinstance(existing, Section) else []
+    operation = GroomingOperation(
+        kind="section",
+        content=content,
+        section_key=section_key,
+        append=append,
+        entry_id=entry_id or "",
+        replace_section=replace_section,
+        reason=reason or "",
+    )
+    if replace_section:
+        if not reason:
+            raise ValidationError("reason is required when replace_section=True")
+        operation.struck_at = now_iso()
+        operation.created_entry_id = now_iso()
+    elif entry_id:
+        operation.entry_id = _resolve_section_entry(entries, entry_id).id
+    elif not entry_id and (
+        append or (content.strip() and not any(entry.content == content and not entry.struck for entry in entries))
+    ):
+        operation.created_entry_id = now_iso()
+    return GroomingIntent(groomed_date=today(), operations=[operation])
+
+
 def _write_groomed_to_item(
     reference: str,
     groomed_content: str,
@@ -1244,32 +1294,20 @@ def _write_groomed_to_item(
         base_item: Already selected pending/provider content to mutate.
         repo: Repository that owns the selected work item.
     """
+    del added_date
     item = base_item if base_item is not None else _work_item(reference)
-    today_str = today()
-    item.metadata.groomed = today_str
-
-    if section_name is None:
-        existing = item.sections.get("groomed")
-        groomed_data = existing if isinstance(existing, GroomedData) else GroomedData(date=today_str)
-        groomed_data.date = today_str
-        groomed_data.subsections["content"] = groomed_content.strip()
-        item.sections["groomed"] = groomed_data
-    else:
-        section_key = _normalize_section_key(section_name)
-        existing_section = item.sections.get(section_key)
-        section = existing_section if isinstance(existing_section, Section) else Section()
-        _apply_groomed_entries(
-            section,
-            groomed_content,
-            append=append,
-            replace_section=replace_section,
-            reason=reason,
-            entry_id=entry_id,
-            added_date=added_date,
-        )
-        item.sections[section_key] = section
-
-    _put_work_item(item, repo)
+    intent = _grooming_intent(
+        item,
+        groomed_content,
+        section_name,
+        entry_id=entry_id,
+        replace_section=replace_section,
+        reason=reason,
+        append=append,
+    )
+    _apply_grooming_intent(item, intent)
+    _put_work_item(item, repo, intent)
+    section_key = intent.operations[0].section_key
     if section_name is not None and section_key.startswith("unknown__"):
         _warn_unregistered_section(section_name, section_key, output)
 
@@ -1518,26 +1556,19 @@ def _handle_batch_groomed(
         msg = "Item has no backend reference"
         # Nothing about the item changes by calling again; only attaching a reference helps.
         raise BacklogError(msg, retryable=False)
-    added_date = item.added if hasattr(item, "added") and item.added else "0000-00-00"
-
     # Phase 1: Local writes — load once, apply all sections in memory, save once.
     # Loading once avoids the legacy-MD-parser-on-YAML-content failure that occurs
     # when a YAML write targets a .md filepath and a subsequent backend read on
     # that same path incorrectly re-parses it as Markdown, losing prior sections.
     written: list[str] = []
     batch_item = item
-    today_str = today()
-    batch_item.metadata.groomed = today_str
+    intent = GroomingIntent(groomed_date=today())
     for section_name, content in sections.items():
-        section_key = _normalize_section_key(section_name)
-        existing_section = batch_item.sections.get(section_key)
-        section = existing_section if isinstance(existing_section, Section) else Section()
-        _apply_groomed_entries(
-            section, content, append=False, replace_section=False, reason=None, entry_id=None, added_date=added_date
-        )
-        batch_item.sections[section_key] = section
-        written.append(section_key)
-    _put_work_item(batch_item, repo)
+        operation_intent = _grooming_intent(batch_item, content, section_name)
+        intent.operations.extend(operation_intent.operations)
+        written.append(operation_intent.operations[0].section_key)
+    _apply_grooming_intent(batch_item, intent)
+    _put_work_item(batch_item, repo, intent)
     for section_name, section_key in zip(sections, written, strict=True):
         if section_key.startswith("unknown__"):
             _warn_unregistered_section(section_name, section_key, out)
@@ -5158,9 +5189,9 @@ def groom_item(
             result["mark_groomed_skipped"] = True
             result["mark_groomed_skip_reason"] = f"Item '{selector}' not found in re-parsed backlog"
         elif fresh_item.reference:
-            update_item_metadata(
-                fresh_item.reference, {"metadata": {"status": "groomed"}}, output=out, base_item=fresh_item, repo=repo
-            )
+            intent = GroomingIntent(operations=[GroomingOperation(kind="metadata")])
+            _apply_grooming_intent(fresh_item, intent)
+            _put_work_item(fresh_item, repo, intent)
             result["mark_groomed_applied"] = True
             out.info("  Status: groomed (local)")
             # This is a second local write after update_item's own (when

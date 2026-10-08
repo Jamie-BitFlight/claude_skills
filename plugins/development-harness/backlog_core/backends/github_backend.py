@@ -62,6 +62,7 @@ from backlog_core.models import (
     ContentRef,
     ContentUnavailableError,
     ContentWrite,
+    GroomingIntent,
     PatchResult,
     ProviderItem,
     ProviderPatch,
@@ -269,9 +270,9 @@ class GitHubBackend:
         """
         return self._reconciliation.has_pending_writes()
 
-    def put_work_item(self, item: BacklogItem, repo: str = "") -> None:
+    def put_work_item(self, item: BacklogItem, repo: str = "", grooming_intent: GroomingIntent | None = None) -> None:
         """Persist a work-item intent for provider reconciliation."""
-        self._reconciliation.put_work_item(item, repo)
+        self._reconciliation.put_work_item(item, repo, grooming_intent)
 
     def reconcile(self, request: ReconcileRequest, *, snapshot: ProviderSnapshot | None = None) -> ReconcileResult:
         """Reconcile provider state through the pure engine and private cache.

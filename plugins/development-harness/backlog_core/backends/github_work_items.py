@@ -56,6 +56,7 @@ from backlog_core.models import (
     ContentUnavailableError,
     ContentWrite,
     GitHubMutationOutcomeUnknownError,
+    GroomingIntent,
     PatchResult,
     ProviderItem,
     ProviderPatch,
@@ -1003,7 +1004,7 @@ class _GitHubReconciliation:
                 return record.item
         raise KeyError(reference)
 
-    def put_work_item(self, item: BacklogItem, repo: str = "") -> None:
+    def put_work_item(self, item: BacklogItem, repo: str = "", grooming_intent: GroomingIntent | None = None) -> None:
         """Persist a work-item intent for provider reconciliation.
 
         ``item.reference`` is guaranteed non-empty by
@@ -1017,7 +1018,7 @@ class _GitHubReconciliation:
         identity is persisted with the mutation so equal issue references in
         different repositories remain independent.
         """
-        self._cache._queue_work_item(item.reference, item.model_copy(), repo or self._default_repo)
+        self._cache._queue_work_item(item.reference, item.model_copy(), repo or self._default_repo, grooming_intent)
 
     def reconcile(self, request: ReconcileRequest, *, snapshot: ProviderSnapshot | None = None) -> ReconcileResult:
         """Reconcile provider state through the pure engine and private cache.

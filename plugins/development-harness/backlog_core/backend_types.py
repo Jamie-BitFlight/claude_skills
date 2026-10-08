@@ -24,6 +24,7 @@ if TYPE_CHECKING:
         ContentRef,
         ContentWrite,
         GroomedData,
+        GroomingIntent,
         IssueLocalFields,
         MergeResult,
         Output,
@@ -491,7 +492,9 @@ class GitHubExtras(Protocol):
     def get_github(self, repo: str = "", timeout: int = 15) -> Repository: ...
     def fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot: ...
     def pending_work_items(self, repo: str = "") -> list[BacklogItem]: ...
-    def put_work_item(self, item: BacklogItem, repo: str = "") -> None: ...
+    def put_work_item(
+        self, item: BacklogItem, repo: str = "", grooming_intent: GroomingIntent | None = None
+    ) -> None: ...
 
     # GraphQL utilities
     def _graphql_request(

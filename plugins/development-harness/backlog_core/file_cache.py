@@ -30,7 +30,15 @@ from .file_cache_state import (
     _work_item_identity,
     _work_item_mutation_key,
 )
-from .models import BacklogItem, ContentRecord, ContentRef, ContentUnavailableError, ContentWrite, parse_issue_number
+from .models import (
+    BacklogItem,
+    ContentRecord,
+    ContentRef,
+    ContentUnavailableError,
+    ContentWrite,
+    GroomingIntent,
+    parse_issue_number,
+)
 from .yaml_io import load_item, load_item_text, save_item
 
 _log = logging.getLogger(__name__)
@@ -297,33 +305,40 @@ class FileCache:
 
         self._state.transaction(reject)
 
-    def _queue_work_item(self, key: str, item: BacklogItem, repo: str = "") -> _PendingWorkItemMutation:
+    def _queue_work_item(
+        self, key: str, item: BacklogItem, repo: str = "", grooming_intent: GroomingIntent | None = None
+    ) -> _PendingWorkItemMutation:
         """Queue the newest work-item intent for one repository-local key.
 
         Returns:
             The durable mutation that replaced any prior matching intent.
         """
-        mutation = _PendingWorkItemMutation(
-            idempotency_key=_work_item_mutation_key(key, item, repo), key=key, item=item, repo=repo
-        )
         identity = _work_item_identity(repo, key, self._default_repo)
-        return self._state.transaction(
-            lambda state: (
-                state.model_copy(
-                    update={
-                        "pending_work_items": [
-                            *(
-                                entry
-                                for entry in state.pending_work_items
-                                if _work_item_identity(entry.repo, entry.key, self._default_repo) != identity
-                            ),
-                            mutation,
-                        ]
-                    }
+
+        def queue(state: _CacheState) -> tuple[_CacheState, _PendingWorkItemMutation]:
+            existing = next(
+                (
+                    entry
+                    for entry in state.pending_work_items
+                    if _work_item_identity(entry.repo, entry.key, self._default_repo) == identity
                 ),
-                mutation,
+                None,
             )
-        )
+            queued_item = item
+            if existing is not None and grooming_intent is not None:
+                queued_item = existing.item.model_copy(deep=True)
+                grooming_intent.apply(queued_item)
+            mutation = _PendingWorkItemMutation(
+                idempotency_key=_work_item_mutation_key(key, queued_item, repo), key=key, item=queued_item, repo=repo
+            )
+            pending = [
+                entry
+                for entry in state.pending_work_items
+                if _work_item_identity(entry.repo, entry.key, self._default_repo) != identity
+            ]
+            return state.model_copy(update={"pending_work_items": [*pending, mutation]}), mutation
+
+        return self._state.transaction(queue)
 
     def _pending_work_item_mutations(
         self, repo: str | None = None, *, default_repo: str = ""

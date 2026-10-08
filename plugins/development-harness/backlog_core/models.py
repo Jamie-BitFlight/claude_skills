@@ -945,6 +945,58 @@ class Section(BaseModel):
     entries: list[Entry] = Field(default_factory=list)
 
 
+class GroomingOperation(BaseModel):
+    """One transient grooming change that can be replayed onto a pending item."""
+
+    kind: Literal["section", "top_level", "metadata"]
+    content: str = ""
+    section_key: str = ""
+    append: bool = False
+    entry_id: str = ""
+    replace_section: bool = False
+    created_entry_id: str = ""
+    struck_at: str = ""
+    reason: str = ""
+
+
+class GroomingIntent(BaseModel):
+    """Transient ordered grooming operations for one GitHub work-item write."""
+
+    groomed_date: str = ""
+    operations: list[GroomingOperation] = Field(default_factory=list)
+
+    def apply(self, item: BacklogItem) -> None:
+        """Replay this intent onto one selected or pending work item."""
+        for operation in self.operations:
+            if operation.kind == "metadata":
+                item.metadata.status = "groomed"
+                continue
+            item.metadata.groomed = self.groomed_date
+            if operation.kind == "top_level":
+                groomed_data = item.sections.get("groomed")
+                updated = groomed_data if isinstance(groomed_data, GroomedData) else GroomedData()
+                updated.date = self.groomed_date
+                updated.subsections["content"] = operation.content.strip()
+                item.sections["groomed"] = updated
+                continue
+            section = item.sections.get(operation.section_key)
+            updated_section = section if isinstance(section, Section) else Section()
+            if operation.replace_section:
+                for entry in updated_section.entries:
+                    if not entry.struck:
+                        entry.struck = True
+                        entry.struck_at = operation.struck_at
+                        entry.struck_reason = operation.reason
+            if operation.entry_id:
+                target = next((entry for entry in updated_section.entries if entry.id == operation.entry_id), None)
+                if target is None:
+                    raise EntryNotFoundError(operation.entry_id, [entry.id for entry in updated_section.entries])
+                target.content = operation.content
+            elif operation.created_entry_id:
+                updated_section.entries.append(Entry(id=operation.created_entry_id, content=operation.content))
+            item.sections[operation.section_key] = updated_section
+
+
 _VALID_PRIORITIES = {"P0", "P1", "P2", "Ideas", "completed"}
 _VALID_TYPES = {"Feature", "Bug", "Refactor", "Docs", "Chore"}
 
