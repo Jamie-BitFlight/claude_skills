@@ -299,6 +299,34 @@ def test_default_same_section_grooms_append_and_explicit_target_replaces(
         _release_and_join(replacement, failures, [thread])
 
 
+def test_stale_identical_default_same_section_is_idempotent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, harness: FakeGitHubHarness
+) -> None:
+    """Two stale identical default updates retain one entry through replay."""
+    writer = _RendezvousBackend(harness, tmp_path / "writer-cache")
+    reference = _add_item(monkeypatch, writer)
+    writer.pause_after_writes(2)
+    selected, release_selection = _hold_common_base_selection(monkeypatch)
+
+    failures, threads = _groom_in_threads(
+        reference, harness.repo, ("Research", "IDENTICAL_DEFAULT"), ("Research", "IDENTICAL_DEFAULT")
+    )
+    try:
+        assert selected.wait(timeout=5), "both public grooming calls did not select the common base"
+        release_selection.set()
+        assert writer._queued.wait(timeout=5), "both public grooming calls did not reach the queue"
+        pending_entries = _entries(writer.pending_work_items(harness.repo)[0], "research")
+        assert [entry.content for entry in pending_entries if not entry.struck] == ["IDENTICAL_DEFAULT"]
+    finally:
+        release_selection.set()
+        _release_and_join(writer, failures, threads)
+
+    reader = harness.new_backend(tmp_path / "reader-cache")
+    reader.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, repo=harness.repo, references=[reference]))
+    persisted_entries = _entries(reader.get_work_item(reference), "research")
+    assert [entry.content for entry in persisted_entries if not entry.struck] == ["IDENTICAL_DEFAULT"]
+
+
 def test_regular_full_item_writes_still_replace_pending_snapshot(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, harness: FakeGitHubHarness
 ) -> None:

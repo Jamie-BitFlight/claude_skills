@@ -994,7 +994,14 @@ class GroomingIntent(BaseModel):
                     raise EntryNotFoundError(operation.entry_id, [entry.id for entry in updated_section.entries])
                 target.content = operation.content
             elif operation.created_entry_id:
-                updated_section.entries.append(Entry(id=operation.created_entry_id, content=operation.content))
+                if (
+                    operation.append
+                    or operation.replace_section
+                    or not any(
+                        entry.content == operation.content and not entry.struck for entry in updated_section.entries
+                    )
+                ):
+                    updated_section.entries.append(Entry(id=operation.created_entry_id, content=operation.content))
             item.sections[operation.section_key] = updated_section
 
 

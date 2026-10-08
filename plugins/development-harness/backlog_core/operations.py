@@ -42,6 +42,7 @@ from .backend_types import (
     SnapshotCompletenessProvider,
     SyncProvider,
 )
+from .backends.github_backend import GitHubBackend
 from .entry_blocks import (
     _render_entry_raw,
     find_entry_spans,
@@ -179,8 +180,10 @@ def _has_live_provider_target(target: DecisionTarget) -> bool:
 def _put_work_item(item: BacklogItem, repo: str = "", grooming_intent: GroomingIntent | None = None) -> None:
     """Persist one work item with repository identity when GitHub-backed."""
     backend = get_config().backend
-    if getattr(backend, "supports_github_extras", False) and (repo or grooming_intent is not None):
-        require_github_extras(backend, "put_work_item").put_work_item(item, repo, grooming_intent)
+    if isinstance(backend, GitHubBackend):
+        backend.put_work_item(item, repo, grooming_intent)
+    elif getattr(backend, "supports_github_extras", False) and repo:
+        require_github_extras(backend, "put_work_item").put_work_item(item, repo)
     else:
         backend.put_work_item(item)
 
