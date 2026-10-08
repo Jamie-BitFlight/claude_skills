@@ -667,10 +667,41 @@ FastMCP.run = controlled_run
     assert not marker.exists(), "spawned regex worker re-entered the production mcp.run() launcher"
 
 
-def test_sam_cli_launcher_regex_worker_does_not_reenter_cli() -> None:
+def test_sam_cli_launcher_regex_worker_does_not_reenter_cli(tmp_path: Path) -> None:
     """The shipped SAM wrapper must complete one regex command through its spawned worker."""
+    site_dir = tmp_path / "site"
+    site_dir.mkdir()
+    marker = tmp_path / "child-cli-run.txt"
+    (site_dir / "sitecustomize.py").write_text(
+        """
+import multiprocessing
+import os
+from pathlib import Path
+
+import typer
+
+
+original_call = typer.Typer.__call__
+
+
+def controlled_call(app, *args, **kwargs):
+    if multiprocessing.current_process().name != "MainProcess":
+        Path(os.environ["DH_TEST_CHILD_CLI_MARKER"]).write_text("child cli entered")
+        return None
+    return original_call(app, *args, **kwargs)
+
+
+typer.Typer.__call__ = controlled_call
+""".lstrip()
+    )
     runner = Path(__file__).parents[1] / "scripts" / "run_sam_cli.py"
-    environment = {**os.environ, "BACKLOG_BACKEND": "memory"}
+    environment = {
+        **os.environ,
+        "BACKLOG_BACKEND": "memory",
+        "DH_CLI_PYTHONPATH_CLEARED": "1",
+        "DH_TEST_CHILD_CLI_MARKER": str(marker),
+        "PYTHONPATH": os.pathsep.join(filter(None, [str(site_dir), os.environ.get("PYTHONPATH")])),
+    }
 
     result = run_cli_subprocess(
         [sys.executable, str(runner), "backlog", "list", "--search", "/needle/"],
@@ -681,6 +712,7 @@ def test_sam_cli_launcher_regex_worker_does_not_reenter_cli() -> None:
 
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout)["items"] == []
+    assert not marker.exists(), "spawned regex worker re-entered the production CLI launcher"
 
 
 async def test_github_regex_count_only_preserves_operations_total(mocker) -> None:
