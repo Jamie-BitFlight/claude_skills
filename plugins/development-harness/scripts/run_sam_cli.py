@@ -43,4 +43,5 @@ sys.path.insert(0, str(_plugin_root))
 
 from sam_schema.cli import app
 
-app()
+if __name__ == "__main__":
+    app()

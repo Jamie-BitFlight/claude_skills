@@ -428,7 +428,8 @@ def _predicate_with_regex_context(
         return right, contexts + right_contexts if right else []
     if isinstance(predicate, _OrPred):
         left, contexts = _predicate_with_regex_context(predicate.left, item, haystack, deadline)
-        return (True, contexts) if left else _predicate_with_regex_context(predicate.right, item, haystack, deadline)
+        right, right_contexts = _predicate_with_regex_context(predicate.right, item, haystack, deadline)
+        return left or right, contexts + right_contexts
     if isinstance(predicate, _NotPred):
         matched, _ = _predicate_with_regex_context(predicate.operand, item, haystack, deadline)
         return not matched, []

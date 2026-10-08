@@ -556,6 +556,17 @@ async def test_backlog_list_regex_context_uses_requested_width_after_real_worker
     assert response["items"][0]["matches"][0]["snippet"] == "...ijMATCHkl..."
 
 
+async def test_backlog_list_regex_or_context_includes_every_matching_branch() -> None:
+    backend = get_config().backend
+    assert isinstance(backend, ProviderMemoryBackend)
+    backend.provider_items.extend([BacklogItem(title="alpha beta", section="P1", issue="#1")])
+
+    response = await _call("backlog_list", {"search": "/alpha/ OR /beta/", "match_context": True})
+
+    assert [item["issue"] for item in response["items"]] == ["#1"]
+    assert [match["term"] for match in response["items"][0]["matches"]] == ["/alpha/", "/beta/"]
+
+
 async def test_backlog_list_dedup_keeps_each_retained_row_context() -> None:
     items = [
         {"issue": "#1", "title": "first context", "section": "P1", "body": ""},
@@ -654,6 +665,22 @@ FastMCP.run = controlled_run
     assert result.returncode == 0, result.stderr
     assert json.loads(response.read_text())["items"] == []
     assert not marker.exists(), "spawned regex worker re-entered the production mcp.run() launcher"
+
+
+def test_sam_cli_launcher_regex_worker_does_not_reenter_cli() -> None:
+    """The shipped SAM wrapper must complete one regex command through its spawned worker."""
+    runner = Path(__file__).parents[1] / "scripts" / "run_sam_cli.py"
+    environment = {**os.environ, "BACKLOG_BACKEND": "memory"}
+
+    result = run_cli_subprocess(
+        [sys.executable, str(runner), "backlog", "list", "--search", "/needle/"],
+        env=environment,
+        cwd=runner.parent,
+        timeout=20,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["items"] == []
 
 
 async def test_github_regex_count_only_preserves_operations_total(mocker) -> None:

@@ -34,6 +34,7 @@ from backlog_core.search import (
     _apply_regex_search_filter,
     _compile_regex_term,
     apply_search_filter,
+    apply_search_filter_with_context,
     build_concept_query,
     find_content_duplicates,
 )
@@ -83,6 +84,38 @@ class TestApplySearchFilter:
         result = apply_search_filter(items, "/alpha/ OR regex:beta")
 
         assert result == items[:2]
+
+    def test_regex_or_context_collects_every_matching_branch_fact(self) -> None:
+        item = _candidate("alpha beta", "")
+
+        matched, contexts = apply_search_filter_with_context([item], "/alpha/ OR /beta/")
+
+        assert matched == [item]
+        assert [context["term"] for context in contexts[0]] == ["/alpha/", "/beta/"]
+
+    @pytest.mark.parametrize(
+        ("title", "expected_term"),
+        [
+            pytest.param("beta", "/beta/", id="false_left_true_right"),
+            pytest.param("alpha", "/alpha/", id="true_left_false_right"),
+        ],
+    )
+    def test_regex_or_context_keeps_the_matching_branch_fact(self, title: str, expected_term: str) -> None:
+        matched, contexts = apply_search_filter_with_context([_candidate(title, "")], "/alpha/ OR /beta/")
+
+        assert [item["title"] for item in matched] == [title]
+        assert [context["term"] for context in contexts[0]] == [expected_term]
+
+    def test_regex_or_without_context_short_circuits_a_slow_right_branch(self) -> None:
+        item = _candidate("alpha", "a" * 50_000 + "!")
+
+        assert apply_search_filter([item], "/alpha/ OR /a+a+$/") == [item]
+
+    def test_regex_or_context_never_returns_partial_facts_after_a_slow_right_branch(self) -> None:
+        item = _candidate("alpha", "a" * 50_000 + "!")
+
+        with pytest.raises(SearchTimeoutError):
+            apply_search_filter_with_context([item], "/alpha/ OR /a+a+$/")
 
     def test_timeout_raises_non_retryable_search_error(self) -> None:
         with pytest.raises(SearchTimeoutError) as caught:
