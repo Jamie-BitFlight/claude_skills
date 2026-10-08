@@ -15,6 +15,9 @@ All imports are at module level.
 from __future__ import annotations
 
 import json
+import os
+import sys
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -30,10 +33,11 @@ from backlog_core.models import (
 )
 from backlog_core.search import apply_search_filter, apply_search_filter_with_context
 from backlog_core.server import mcp
+from dh_core import operations as dh_operations
 from fastmcp.client import Client
 
 from tests.conftest import ProviderMemoryBackend
-from tests.helpers import call_mcp_tool
+from tests.helpers import call_mcp_tool, run_cli_subprocess
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -599,6 +603,78 @@ async def test_backlog_list_repeated_body_sections_keep_their_worker_geometry() 
     snippets = [match["snippet"] for match in response["items"][0]["matches"] if match["field"] == "body:notes"]
     assert any("first" in snippet for snippet in snippets)
     assert any("second" in snippet for snippet in snippets)
+
+
+def test_source_launcher_regex_worker_does_not_reenter_mcp_run(tmp_path: Path) -> None:
+    """The source launcher must not run its server again in a spawned regex worker."""
+    site_dir = tmp_path / "site"
+    site_dir.mkdir()
+    marker = tmp_path / "child-run.txt"
+    response = tmp_path / "response.json"
+    (site_dir / "sitecustomize.py").write_text(
+        """
+import asyncio
+import multiprocessing
+import os
+from pathlib import Path
+
+from fastmcp import FastMCP
+
+
+def controlled_run(mcp, *args, **kwargs):
+    del args, kwargs
+    marker = Path(os.environ["DH_TEST_CHILD_RUN_MARKER"])
+    if multiprocessing.current_process().name != "MainProcess":
+        marker.write_text("child mcp.run entered")
+        return
+
+    async def request():
+        from fastmcp.client import Client
+
+        async with Client(mcp, timeout=None, init_timeout=5) as client:
+            result = await client.call_tool("backlog_list", {"search": "/needle/"}, timeout=5)
+        Path(os.environ["DH_TEST_MCP_RESPONSE"]).write_text(result.content[0].text)
+
+    asyncio.run(request())
+
+
+FastMCP.run = controlled_run
+""".lstrip()
+    )
+    runner = Path(__file__).parents[1] / "scripts" / "run_backlog_server.py"
+    environment = {
+        **os.environ,
+        "DH_TEST_CHILD_RUN_MARKER": str(marker),
+        "DH_TEST_MCP_RESPONSE": str(response),
+        "PYTHONPATH": os.pathsep.join(filter(None, [str(site_dir), os.environ.get("PYTHONPATH")])),
+    }
+
+    result = run_cli_subprocess([sys.executable, str(runner)], env=environment, cwd=runner.parent, timeout=20)
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(response.read_text())["items"] == []
+    assert not marker.exists(), "spawned regex worker re-entered the production mcp.run() launcher"
+
+
+async def test_github_regex_count_only_preserves_operations_total(mocker) -> None:
+    """A GitHub-shaped regex count must retain operations' exact total at MCP output."""
+    backend = get_config().backend
+    assert isinstance(backend, ProviderMemoryBackend)
+    backend.provider_items.extend([
+        BacklogItem(title="first match", section="P1", skip=False, issue="#1"),
+        BacklogItem(title="second match", section="P1", skip=False, issue="#2"),
+        BacklogItem(title="other", section="P1", skip=False, issue="#3"),
+    ])
+    fetch_page = mocker.spy(backend, "fetch_page")
+    operation_list = mocker.spy(dh_operations, "list_items")
+
+    response = await _call("backlog_list", {"search": "/match/", "count_only": True})
+
+    request = fetch_page.call_args.args[0]
+    assert (request.offset, request.limit) == (0, 0)
+    assert operation_list.spy_return["items"] == []
+    assert operation_list.spy_return["total"] == 2
+    assert response["count"] == operation_list.spy_return["total"]
 
 
 async def test_backlog_list_search_matches_body_content():
