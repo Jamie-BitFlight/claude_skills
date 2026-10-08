@@ -2018,7 +2018,11 @@ async def backlog_list(
     # walks to completion, so `all_items` is the *whole* matching set there and
     # the pre-existing token-budget slicing below applies exactly as before.
     page_already_shaped = operations_limit > 0 and "total" in result
-    total: int | None = cast("int | None", result.get("total")) if page_already_shaped or count_only else len(all_items)
+    total: int | None = (
+        cast("int | None", result.get("total"))
+        if page_already_shaped or (count_only and isinstance(result.get("total"), int))
+        else len(all_items)
+    )
 
     # cache_open_count reflects the same filter as the items list.
     # Hoisted above count_only short-circuit so divergence computation always has
