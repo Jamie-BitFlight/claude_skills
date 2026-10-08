@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.11,<3.15"
 # dependencies = [
-#     "fastmcp>=3.0.0rc1,<4",
+#     "fastmcp==4.0.11",
 #     "pydantic>=2.0",
 #     "rich>=13.0",
 #     "cairosvg>=2.7.0",
@@ -61,17 +61,17 @@ _MAX_SESSION_LIMIT: int = 1000
 _SUMMARY_RECORD_LIMIT: int = 200
 
 _READONLY_ANNOTATIONS: dict[str, bool] = {
-    "readOnlyHint": True,
-    "destructiveHint": False,
-    "idempotentHint": True,
-    "openWorldHint": False,
+    "read_only_hint": True,
+    "destructive_hint": False,
+    "idempotent_hint": True,
+    "open_world_hint": False,
 }
 
 _WRITE_ANNOTATIONS: dict[str, bool] = {
-    "readOnlyHint": False,
-    "destructiveHint": False,
-    "idempotentHint": True,
-    "openWorldHint": False,
+    "read_only_hint": False,
+    "destructive_hint": False,
+    "idempotent_hint": True,
+    "open_world_hint": False,
 }
 
 _DEFAULT_BATCH_TOKENS: int = 100_000

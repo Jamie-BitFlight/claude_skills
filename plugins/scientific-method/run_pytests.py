@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#   "fastmcp[tasks]>=4.0.0",
+#   "fastmcp[tasks]==4.0.11",
 #   "pydantic>=2.12.5",
 #   "pytest>=9.1.1",
 #   "pytest-asyncio>=1.4.0",
@@ -52,7 +52,7 @@ def main() -> int:
         f"pythonpath={shlex.join(str(PLUGIN_ROOT / path) for path in IMPORT_PATHS)}",
         "--strict-config",
         "--strict-markers",
-        "--import-mode=importlib",
+        "--import-mode=prepend",
         "--asyncio-mode=auto",
         "-m",
         FAST_MARKER,

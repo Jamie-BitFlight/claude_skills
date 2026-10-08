@@ -17,7 +17,7 @@ dev = [
     "cairosvg>=2.9.0",
     "defusedxml>=0.7.1",
     "duckdb>=1.5.5",
-    "fastmcp[tasks]>=4.0.0",
+    "fastmcp[tasks]==4.0.11",
     "gitpython>=3.1.59",
     "httpx>=0.28.1",
     "hypothesis>=6.164.0",

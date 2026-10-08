@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#   "fastmcp>=3.0.0",
+#   "fastmcp==4.0.11",
 #   "pydantic>=2.0",
 # ]
 #
@@ -57,7 +57,7 @@ def _make_state_manager(project_root: str | None) -> StateManager:
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool(annotations={"readOnlyHint": True})
+@mcp.tool(annotations={"read_only_hint": True})
 def list_experiment_types() -> dict[str, Any]:
     """List all registered experiment types with their names and descriptions.
 
@@ -72,7 +72,7 @@ def list_experiment_types() -> dict[str, Any]:
     return {"types": [{"name": t.name, "description": t.description} for t in types], "count": len(types)}
 
 
-@mcp.tool(annotations={"readOnlyHint": True})
+@mcp.tool(annotations={"read_only_hint": True})
 def inspect_experiment_type(
     name: Annotated[str, Field(description="Registry name of the experiment type, e.g. 'ai_agent_testing'.")],
 ) -> dict[str, Any]:
@@ -216,7 +216,7 @@ def start_experiment(
     }
 
 
-@mcp.tool(annotations={"readOnlyHint": True})
+@mcp.tool(annotations={"read_only_hint": True})
 def get_current_step(
     experiment_id: Annotated[str, Field(description="Unique experiment identifier returned by start_experiment.")],
     project_root: Annotated[
@@ -332,7 +332,7 @@ def complete_step(
     return dict(result)
 
 
-@mcp.tool(annotations={"readOnlyHint": True})
+@mcp.tool(annotations={"read_only_hint": True})
 def list_experiments(
     project_root: Annotated[
         str | None,
@@ -368,7 +368,7 @@ def list_experiments(
     return {"experiments": summaries, "count": len(summaries)}
 
 
-@mcp.tool(annotations={"readOnlyHint": True})
+@mcp.tool(annotations={"read_only_hint": True})
 def resume_experiment(
     experiment_id: Annotated[str, Field(description="Unique experiment identifier to resume.")],
     project_root: Annotated[
@@ -415,7 +415,7 @@ def resume_experiment(
     }
 
 
-@mcp.tool(annotations={"readOnlyHint": True})
+@mcp.tool(annotations={"read_only_hint": True})
 def get_experiment_summary(
     experiment_id: Annotated[str, Field(description="Unique experiment identifier.")],
     project_root: Annotated[

@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#   "fastmcp[tasks]>=4.0.0",
+#   "fastmcp[tasks]==4.0.11",
 #   "prefixspan>=0.5.2",
 #   "pydantic>=2.12.5",
 #   "pytest>=9.1.1",
