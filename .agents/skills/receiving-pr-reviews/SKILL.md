@@ -30,19 +30,12 @@ evidence into action-ready canonical state. One snapshot uses one executable tra
 2. Run `fetch --snapshot-file <path>` to persist one full canonical snapshot. Stdout contains only the
    live action view; the file retains complete reconciliation evidence. `SNAPSHOT_INCOMPLETE` stops
    assessment and all mutation.
-3. Read the [review-cycle contract](./references/review-cycle-contract.md). Build an exact census of
-   every inbound comment, question, approval, rejection/change request, bot summary, and other human,
-   reviewer, or stakeholder input. Assess each once, preserve resolved history, and record unknowns.
+3. Read the [review-cycle contract](./references/review-cycle-contract.md) and [technical review guidelines](./references/technical-review-guidelines.md) before assessment. Build an exact census of every inbound comment, question, approval, rejection/change request, bot summary, and other human, reviewer, or stakeholder input. Assess each once, preserve resolved history, and record unknowns.
 4. Cluster the exact census by shared invariant, cause, owning component, requested outcome, or
    verification surface; use explicit singleton clusters for unrelated inputs. Form one evidence-
    bearing systemic outcome and verification plan per cluster before changing source.
-5. When authorized, implement each accepted cluster at its owning seam, or record evidence for
-   `no_change`, `superseded`, or `clarification_required`. Verify every cluster and repository-required
-   gate. Push source changes to an inspectable current revision before citing them.
-6. Author the cycle state from the typed models. Use `validate-projection` for dry-run or check-only
-   state and `validate-cycle` for action readiness. When authorized, communicate every disposition
-   with provider-backed evidence, then resolve only where policy and capability permit. Clarifications
-   remain open; unavailable resolution is recorded as unavailable.
+5. When authorized, implement each accepted cluster at its owning seam, or record evidence for `no_change`, `superseded`, or `clarification_required`. Apply the technical guidelines' priority order among accepted independent clusters. Verify every cluster and repository-required gate. Push source changes to an inspectable current revision before citing them.
+6. Author the cycle state from the typed models. Use `validate-projection` for dry-run or check-only state and `validate-cycle` for action readiness. Apply the response guidance in the [technical review guidelines](./references/technical-review-guidelines.md). When authorized, communicate every disposition with provider-backed evidence, then resolve only where policy and capability permit. Clarifications remain open; unavailable resolution is recorded as unavailable.
 7. Persist a new complete snapshot. New or changed inputs, revision, provider state, fingerprints, or
    communication evidence return the complete set to census, assessment, and clustering. Use bounded
    `watch --snapshot-file <path>` calls only to sample for later change; an elapsed call is not
