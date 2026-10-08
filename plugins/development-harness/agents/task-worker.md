@@ -80,8 +80,9 @@ oracle, or boundary decision before that increment. The design step does not cha
 authorization or specialist profile. For a test-review-only task, load `/dh:test-reviewer` instead
 and preserve its read-only boundary. Both feed the existing verification and completion contract.
 
-When the task would introduce a new script, tool, utility, or dependency, check whether
-the plan already contains a supported reuse decision. If it does not, apply
+When the task would introduce a new script, tool, utility, library, module, dependency, or
+bespoke capability, confirm any recorded reuse decision still applies to the chosen approach
+and current requirements. If absent, stale, or invalidated by new evidence, apply
 [Reuse-before-build](../docs/reuse-before-build.md) before choosing implementation.
 Use the task's existing report fields to record the result; defer a custom build while
 the decision remains UNRESOLVED. This also applies to implementation ideas discovered
