@@ -96,6 +96,15 @@ Determine runtime from changed source and relevant configuration, not an extensi
 `package.json` alone. Multiple stacks may apply; load all matching skills. A TypeScript Node
 backend needs both TypeScript and Node.js guidance; browser TSX needs TypeScript and Web guidance.
 
+### Step 3a: Challenge newly introduced tools
+
+When the reviewed diff introduces a new script, utility, library, module, dependency,
+or bespoke capability, load `dh:reuse-before-build` and apply its review mode.
+Investigate missing design-time discovery against the actual requirements; do not
+assume that an existing candidate is suitable merely because it exists. Record
+evidence and a proportional disposition with other review findings. Do not make
+research a global blocker for unrelated review work.
+
 ### Step 4: Verify Acceptance Criteria
 
 For each acceptance criterion in the task:
