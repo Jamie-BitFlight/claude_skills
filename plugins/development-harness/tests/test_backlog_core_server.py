@@ -197,6 +197,27 @@ async def test_backlog_list_timeout_returns_non_retryable_error():
     assert response["retryable"] is False
 
 
+async def test_backlog_list_preserves_regex_operation_pagination():
+    op_result = {
+        "items": [{"title": "second \u0131", "section": "P1", "issue": "#2", "plan": ""}],
+        "count": 1,
+        "total": 2,
+        "has_more": False,
+        "from_cache": False,
+        "has_pending_writes": False,
+        "status_source": "live",
+        "unavailable_capabilities": [],
+        "filters_evaluated_against_unavailable_data": [],
+    }
+    with patch("dh_core.operations.list_items", return_value=op_result) as list_items:
+        response = await _call("backlog_list", {"search": "/i/", "offset": 1, "limit": 1})
+
+    assert list_items.call_args.kwargs["offset"] == 1
+    assert list_items.call_args.kwargs["limit"] == 1
+    assert response["items"][0]["title"] == "second \u0131"
+    assert response["pagination"] == {"offset": 1, "limit": 1, "total": 2, "has_more": False}
+
+
 async def test_backlog_list_passes_filter_params():
     """backlog_list forwards refresh and label flags."""
     op_result = {"items": []}

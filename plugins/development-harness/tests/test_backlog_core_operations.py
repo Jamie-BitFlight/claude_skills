@@ -1285,29 +1285,26 @@ class TestCheckForDuplicatesFreshness:
 
 
 class TestRequestShapedSearch:
-    """Request-shaped GitHub listings share one prepared search evaluation."""
+    """Request-shaped GitHub listings apply regex before pagination."""
 
-    def test_request_page_compiles_once_and_shares_matching_budget(self, mocker: MockerFixture) -> None:
-        timeouts: list[float] = []
-
-        class NoMatchPattern:
-            def search(self, value: str, *, timeout: float) -> None:
-                del value
-                timeouts.append(timeout)
-                return
-
+    def test_regex_search_reads_all_candidates_before_request_pagination(self, mocker: MockerFixture) -> None:
         _seed_provider_items([
-            BacklogItem(title="first", section="P1", skip=False, issue="#1"),
-            BacklogItem(title="second", section="P1", skip=False, issue="#2"),
+            BacklogItem(title="first \u0131", section="P1", skip=False, issue="#1"),
+            BacklogItem(title="second \u0131", section="P1", skip=False, issue="#2"),
+            BacklogItem(title="nonmatch", section="P1", skip=False, issue="#3"),
         ])
-        compile_pattern = mocker.patch("backlog_core.search.regex.compile", return_value=NoMatchPattern())
-        mocker.patch("backlog_core.search.time.monotonic", side_effect=[100.0, 100.02, 100.04, 100.04, 100.06, 100.08])
+        from backlog_core.backend_protocol import get_config
 
-        result = list_items(search="/miss/")
+        fetch_page = mocker.spy(get_config().backend, "fetch_page")
+        result = list_items(search="/i/", offset=1, limit=1)
 
-        assert result["items"] == []
-        assert compile_pattern.call_count == 1
-        assert timeouts == pytest.approx([0.08, 0.04])
+        request = fetch_page.call_args.args[0]
+        assert (request.offset, request.limit) == (0, 0)
+        assert [item["title"] for item in cast("list[dict[str, str | bool]]", result["items"])] == ["second \u0131"]
+        assert result["total"] == 2
+        assert result["has_more"] is False
+        assert result["from_cache"] is False
+        assert result["status_source"] == "live"
 
 
 @pytest.mark.usefixtures("plain_memory_backend")

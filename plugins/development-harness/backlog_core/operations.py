@@ -108,6 +108,7 @@ from .search import (
     ContentDuplicateMatch,
     DuplicateCheckStatus,
     PreparedSearch,
+    _contains_regex_form,
     apply_search_filter,
     find_content_duplicates,
     prepare_search_filter,
@@ -2519,15 +2520,16 @@ def _read_list_page(
     context = _decision_context(repo=repo, allow_cached=allow_cached, output=output)
     metadata_only = count_only and not refresh
     pushed_labels = [value for value in (label, _status_push_label(status)) if value]
+    regex_search = search is not None and _contains_regex_form(search)
     request = ListPageRequest(
         repo=repo,
         include_closed=include_closed,
         labels=pushed_labels,
-        offset=offset,
-        limit=limit,
+        offset=0 if regex_search else offset,
+        limit=0 if regex_search else limit,
         hydrate=not metadata_only,
     )
-    prepared_search = prepare_search_filter(search) if search is not None else None
+    prepared_search = prepare_search_filter(search) if search is not None and not regex_search else None
     page = context.page(
         request,
         match=lambda item, provider: _page_match(
@@ -2886,6 +2888,7 @@ def list_items(
     out = output or Output()
     backend = get_config().backend
     page: ListPage | None = None
+    regex_search = search is not None and _contains_regex_form(search)
     if getattr(backend, "supports_github_extras", False):
         page = _read_list_page(
             backend=backend,
@@ -3013,14 +3016,23 @@ def list_items(
     ]
     if filter_by_key:
         result_items = [it for it in result_items if all(str(it.get(k)) == v for k, v in filter_by_key.items())]
-    if search is not None and page is None:
+    regex_total: int | None = None
+    regex_has_more = False
+    if search is not None and (page is None or regex_search):
         result_items = apply_search_filter(result_items, search)
+    if page is not None and regex_search:
+        regex_total = len(result_items)
+        page_items = result_items[offset:]
+        if limit > 0:
+            regex_has_more = len(page_items) > limit
+            page_items = page_items[:limit]
+        result_items = [] if count_only else page_items
     (status_source, unavailable_capabilities, filters_evaluated_against_unavailable_data) = _listing_status_metadata(
         status_resolution, [str(item.get("issue", "")) for item in result_items], status, filter_by_key
     )
     result = {
         "items": result_items,
-        "count": len(result_items),
+        "count": regex_total if count_only and regex_total is not None else len(result_items),
         "from_cache": from_cache,
         "has_pending_writes": has_pending_writes,
         "status_source": status_source,
@@ -3031,8 +3043,8 @@ def list_items(
     if page is not None:
         # Already request-shaped and paginated (D3/D4) -- the caller (server.py)
         # must not re-slice or re-count this page against a full local fetch.
-        result["total"] = page.total
-        result["has_more"] = page.has_more
+        result["total"] = regex_total if regex_search else page.total
+        result["has_more"] = regex_has_more if regex_search else page.has_more
     return result
 
 

@@ -10,13 +10,14 @@ from __future__ import annotations
 
 import dataclasses
 import itertools
+import multiprocessing
 import operator
 import re
 import time
 from enum import StrEnum
-from typing import Protocol
+from multiprocessing.connection import Connection, wait
+from multiprocessing.process import BaseProcess
 
-import regex
 from pydantic import BaseModel, ConfigDict
 
 from .models import SearchTimeoutError
@@ -30,12 +31,8 @@ _SEARCH_FIELDS: tuple[str, ...] = ("title", "section", "topic", "type", "body")
 # Minimum length for a valid /pattern/ regex term (e.g. "/x/" has length 3).
 _REGEX_SLASH_MIN_LEN = 2
 _REGEX_MATCH_TIMEOUT_SECONDS = 0.1
-
-
-class _TimedRegexPattern(Protocol):
-    """The timeout-aware subset of a compiled ``regex`` pattern."""
-
-    def search(self, string: str, *, timeout: float) -> object: ...
+_MATCH_COMMAND_LENGTH = 2
+_RESULT_RECORD_LENGTH = 2
 
 
 def _regex_pattern_from_term(term: str) -> str | None:
@@ -47,20 +44,19 @@ def _regex_pattern_from_term(term: str) -> str | None:
     return None
 
 
-def _compile_regex_term(term: str) -> _TimedRegexPattern | None:
+def _compile_regex_term(term: str) -> re.Pattern[str] | None:
     """Compile accepted regex syntax once before evaluating candidates.
 
     Returns:
-        A timeout-aware pattern, or ``None`` for a non-regex or invalid term.
+        A stdlib pattern, or ``None`` for a non-regex or invalid term.
     """
     pattern_text = _regex_pattern_from_term(term)
     if pattern_text is None:
         return None
     try:
-        re.compile(pattern_text, re.IGNORECASE)
+        return re.compile(pattern_text, re.IGNORECASE)
     except re.error:
         return None
-    return regex.compile(pattern_text, regex.IGNORECASE | regex.VERSION0)
 
 
 def _item_field_text(item: dict[str, str | bool], field: str) -> str:
@@ -82,7 +78,7 @@ def _item_matches_term(
     term: str,
     haystack: str | None = None,
     *,
-    regex_pattern: _TimedRegexPattern | None = None,
+    regex_pattern: re.Pattern[str] | None = None,
     deadline: float,
 ) -> bool:
     """Return True if a single search term matches the item.
@@ -111,14 +107,8 @@ def _item_matches_term(
         return True
 
     if regex_pattern is not None:
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            raise SearchTimeoutError
         hs = haystack if haystack is not None else _build_haystack(item)
-        try:
-            return bool(regex_pattern.search(hs, timeout=remaining))
-        except TimeoutError:
-            raise SearchTimeoutError from None
+        return bool(regex_pattern.search(hs))
 
     # Field-specific form: field:value
     if ":" in term:
@@ -166,7 +156,7 @@ class _TermPred(_Predicate):
     """Match a single leaf term against an item."""
 
     term: str
-    regex_pattern: _TimedRegexPattern | None = dataclasses.field(init=False)
+    regex_pattern: re.Pattern[str] | None = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:
         self.regex_pattern = _compile_regex_term(self.term)
@@ -346,23 +336,18 @@ class _SearchParser:
 
 @dataclasses.dataclass
 class PreparedSearch:
-    """One compiled query and its shared regex-matching budget."""
+    """One compiled query for non-regex matching."""
 
     predicate: _Predicate
-    remaining_matching_seconds: float = _REGEX_MATCH_TIMEOUT_SECONDS
 
     def matches(self, item: dict[str, str | bool]) -> bool:
-        """Prepare one item outside the budget, then evaluate its predicate.
+        """Prepare one item, then evaluate its predicate.
 
         Returns:
             ``True`` when the item matches the prepared query.
         """
         haystack = _build_haystack(item)
-        deadline = time.monotonic() + self.remaining_matching_seconds
-        try:
-            return self.predicate(item, haystack, deadline)
-        finally:
-            self.remaining_matching_seconds = max(deadline - time.monotonic(), 0.0)
+        return self.predicate(item, haystack, float("inf"))
 
 
 def prepare_search_filter(search: str) -> PreparedSearch | None:
@@ -375,6 +360,99 @@ def prepare_search_filter(search: str) -> PreparedSearch | None:
     if not search:
         return None
     return PreparedSearch(_SearchParser(tokenize_search(search)).parse())
+
+
+def _contains_regex_form(search: str) -> bool:
+    """Return whether a query contains any accepted regex-form term."""
+    return any(_regex_pattern_from_term(term) is not None for term in tokenize_search(search))
+
+
+def _worker_record_is(record: object, kind: str) -> bool:
+    """Return whether a worker record has the expected message tag."""
+    return isinstance(record, tuple) and len(record) >= 1 and record[0] == kind
+
+
+def _regex_worker(items: list[dict[str, str | bool]], search: str, connection: Connection) -> None:
+    """Prepare and evaluate one regex search in a cancellable child process."""
+    try:
+        prepared_search = prepare_search_filter(search)
+        if prepared_search is None:
+            connection.send(("ERROR",))
+            return
+        prepared_items = [(item, _build_haystack(item)) for item in items]
+        connection.send(("READY",))
+        command = connection.recv()
+        if not (
+            _worker_record_is(command, "MATCH")
+            and isinstance(command, tuple)
+            and len(command) == _MATCH_COMMAND_LENGTH
+            and isinstance(command[1], float)
+        ):
+            connection.send(("ERROR",))
+            return
+        deadline = command[1]
+        matches = [item for item, haystack in prepared_items if prepared_search.predicate(item, haystack, deadline)]
+        connection.send(("RESULT", matches))
+    finally:
+        connection.close()
+
+
+def _cleanup_regex_worker(process: BaseProcess | None, connection: Connection) -> None:
+    """Stop and release one regex worker and the parent endpoint."""
+    try:
+        if process is not None:
+            if process.is_alive():
+                process.kill()
+            process.join()
+            process.close()
+    finally:
+        connection.close()
+
+
+def _apply_regex_search_filter(items: list[dict[str, str | bool]], search: str) -> list[dict[str, str | bool]]:
+    """Run one complete regex query in a spawned stdlib worker.
+
+    Returns:
+        The complete matching item list.
+    """
+    context = multiprocessing.get_context("spawn")
+    parent_connection, child_connection = context.Pipe(duplex=True)
+    process: BaseProcess | None = None
+    try:
+        process = context.Process(target=_regex_worker, args=(items, search, child_connection))
+        worker = process
+        worker.start()
+        child_connection.close()
+
+        ready_handles = wait([parent_connection, worker.sentinel], timeout=None)
+        if parent_connection not in ready_handles:
+            raise SearchTimeoutError
+        ready = parent_connection.recv()
+        if not (_worker_record_is(ready, "READY") and isinstance(ready, tuple) and len(ready) == 1):
+            raise SearchTimeoutError
+
+        deadline = time.monotonic() + _REGEX_MATCH_TIMEOUT_SECONDS
+        parent_connection.send(("MATCH", deadline))
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise SearchTimeoutError
+        result_handles = wait([parent_connection, worker.sentinel], timeout=remaining)
+        if parent_connection not in result_handles:
+            raise SearchTimeoutError
+        result = parent_connection.recv()
+        if not (
+            _worker_record_is(result, "RESULT")
+            and isinstance(result, tuple)
+            and len(result) == _RESULT_RECORD_LENGTH
+            and isinstance(result[1], list)
+            and all(isinstance(item, dict) for item in result[1])
+        ):
+            raise SearchTimeoutError
+        return result[1]
+    except (EOFError, OSError, ValueError, TypeError):
+        raise SearchTimeoutError from None
+    finally:
+        _cleanup_regex_worker(process, parent_connection)
 
 
 def apply_search_filter(items: list[dict[str, str | bool]], search: str) -> list[dict[str, str | bool]]:
@@ -400,12 +478,14 @@ def apply_search_filter(items: list[dict[str, str | bool]], search: str) -> list
         items: Backlog item dicts to filter.
         search: Query string.
 
-    Regex compilation happens before matching starts. The 100 ms request-wide
-    deadline applies only to matching because ``regex.compile()`` has no timeout.
+    Regex preparation happens before matching starts. Regex matching runs in a
+    spawned stdlib worker with a 100 ms request-wide deadline.
 
     Returns:
         Filtered list of items that match the search query.
     """
+    if _contains_regex_form(search):
+        return _apply_regex_search_filter(items, search)
     prepared_search = prepare_search_filter(search)
     if prepared_search is None:
         return items

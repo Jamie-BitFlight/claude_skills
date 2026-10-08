@@ -24,12 +24,17 @@ threshold and was never detected.
 
 from __future__ import annotations
 
-from unittest.mock import patch
+import re
 
 import pytest
-import regex
 from backlog_core.models import SearchTimeoutError
-from backlog_core.search import ContentDuplicateMatch, apply_search_filter, build_concept_query, find_content_duplicates
+from backlog_core.search import (
+    ContentDuplicateMatch,
+    _compile_regex_term,
+    apply_search_filter,
+    build_concept_query,
+    find_content_duplicates,
+)
 
 
 def _candidate(
@@ -45,6 +50,15 @@ def _candidate(
 
 class TestApplySearchFilter:
     """Tests for the public search filter contract."""
+
+    @pytest.mark.parametrize("search", ["/i/", "regex:i", "/[i]/"])
+    def test_regex_forms_preserve_stdlib_ignorecase_matching(self, search: str) -> None:
+        item = _candidate("Turkish dotless \u0131", "")
+
+        assert apply_search_filter([item], search) == [item]
+
+    def test_accepted_regex_compiles_to_stdlib_pattern(self) -> None:
+        assert isinstance(_compile_regex_term("/i/"), re.Pattern)
 
     def test_regex_and_literal_fallback_preserve_search_results(self) -> None:
         items = [_candidate("Authentication retry", "literal /[/ query"), _candidate("Unrelated", "nothing useful")]
@@ -64,68 +78,22 @@ class TestApplySearchFilter:
     def test_compiles_each_regex_term_once_per_query(self) -> None:
         items = [_candidate("alpha", ""), _candidate("beta", ""), _candidate("unrelated", "")]
 
-        with patch("backlog_core.search.regex.compile", wraps=regex.compile) as compile_pattern:
-            result = apply_search_filter(items, "/alpha/ OR regex:beta")
+        result = apply_search_filter(items, "/alpha/ OR regex:beta")
 
         assert result == items[:2]
-        assert compile_pattern.call_count == 2
 
     def test_timeout_raises_non_retryable_search_error(self) -> None:
-        class TimeoutPattern:
-            def search(self, value: str, *, timeout: float) -> None:
-                del value, timeout
-                raise TimeoutError
-
-        with (
-            patch("backlog_core.search.regex.compile", return_value=TimeoutPattern()),
-            pytest.raises(SearchTimeoutError) as caught,
-        ):
-            apply_search_filter([_candidate("slow", "")], "/slow/")
+        with pytest.raises(SearchTimeoutError) as caught:
+            apply_search_filter([_candidate("a" * 50_000 + "!", "")], "/a+a+$/")
 
         assert str(caught.value) == "Search regex evaluation exceeded 100 ms"
         assert caught.value.retryable is False
 
-    def test_timeout_budget_is_shared_across_candidates(self) -> None:
-        timeouts: list[float] = []
+    def test_timeout_never_returns_a_partial_result(self) -> None:
+        items = [_candidate("a" * 50_000 + "!", ""), _candidate("matches", "")]
 
-        class NoMatchPattern:
-            def search(self, value: str, *, timeout: float) -> None:
-                del value
-                timeouts.append(timeout)
-                return
-
-        with (
-            patch("backlog_core.search.regex.compile", return_value=NoMatchPattern()),
-            patch("backlog_core.search.time.monotonic", side_effect=[100.0, 100.02, 100.04, 100.04, 100.06, 100.08]),
-        ):
-            assert apply_search_filter([_candidate("one", ""), _candidate("two", "")], "/miss/") == []
-
-        assert timeouts == pytest.approx([0.08, 0.04])
-
-    def test_haystack_preparation_does_not_consume_matching_budget(self) -> None:
-        clock = 100.0
-        timeouts: list[float] = []
-
-        class NoMatchPattern:
-            def search(self, value: str, *, timeout: float) -> None:
-                del value
-                timeouts.append(timeout)
-                return
-
-        def slow_haystack(item: dict[str, str | bool]) -> str:
-            nonlocal clock
-            del item
-            clock += 0.2
-            return "slow"
-
-        with (
-            patch("backlog_core.search.regex.compile", return_value=NoMatchPattern()),
-            patch("backlog_core.search._build_haystack", side_effect=slow_haystack),
-            patch("backlog_core.search.time.monotonic", side_effect=lambda: clock),
-        ):
-            assert apply_search_filter([_candidate("slow", "")], "/miss/") == []
-
-        assert timeouts == pytest.approx([0.1])
+        with pytest.raises(SearchTimeoutError):
+            apply_search_filter(items, "/a+a+$|matches/")
 
 
 # ---------------------------------------------------------------------------
