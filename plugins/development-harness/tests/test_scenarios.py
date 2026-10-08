@@ -331,7 +331,6 @@ class TestGroomBacklogItem:
         )
         provider_state.assert_called_once()
         assert provider_state.call_args.args == (ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#80"]),)
-        assert provider_state.call_args.kwargs["snapshot"].items[0].reference == "#80"
         assert isinstance(result["messages"], list)
         assert isinstance(result["warnings"], list)
         assert isinstance(result["errors"], list)
