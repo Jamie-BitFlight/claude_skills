@@ -27,7 +27,9 @@ Keep the common trigger in CLEAR task design, task generation, and Task Worker.
 Put the detailed procedure in one shared reference. Reuse existing decision records
 when their requirements, environment, and selected implementation still match.
 Use existing task fields for ordinary choices and ADRs only for significant ones.
-Review bespoke mechanisms for evidence of rejected alternatives.
+Review bespoke mechanisms for evidence of rejected alternatives. The independent
+code reviewer invokes `dh:reuse-before-build` for introduced capabilities,
+recovering design-time discovery when necessary without modifying the diff.
 
 ## Alternatives and when to choose them
 
