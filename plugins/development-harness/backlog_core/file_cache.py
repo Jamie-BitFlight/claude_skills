@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import logging
 import os
 import tempfile
 import warnings
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from io import StringIO
 from pathlib import Path
 from urllib.parse import quote
@@ -94,6 +95,15 @@ class FileCache:
     def _set_default_repo(self, repo: str) -> None:
         self._default_repo = repo
         self._state.default_repo = repo
+
+    @contextlib.contextmanager
+    def _reconciliation_lock(self, repo: str) -> Iterator[None]:
+        """Serialize reconciliation publication for one repository across cache users."""
+        digest = hashlib.sha256(repo.encode()).hexdigest()
+        # ponytail: one repository-wide lock caps its cache root at one reconciliation;
+        # split this into ordered per-reference claims if measured unrelated-reference throughput requires it.
+        with self._state.coordination_lock(f"reconcile-{digest}.lock"):
+            yield
 
     def get_content(self, reference: ContentRef, *, stale: bool = False) -> ContentRecord:
         """Return cached content, distinguishing an offline miss from stale data.

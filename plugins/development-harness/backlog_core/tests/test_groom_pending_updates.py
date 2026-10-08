@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from threading import Event, Lock, Thread
+from threading import Barrier, Event, Lock, Thread
 from typing import TYPE_CHECKING
 
 import pytest
@@ -64,6 +64,39 @@ class _RendezvousBackend(GitHubBackend):
         if self.offline:
             raise BackendUnavailableError("controlled offline reconciliation")
         return super().reconcile(request, snapshot=snapshot)
+
+
+class _SharedPublication:
+    def __init__(self) -> None:
+        self.attempts = 0
+        self.first_apply = Event()
+        self.second_apply = Event()
+        self.release_apply = Event()
+        self.lock = Lock()
+
+
+class _SharedCacheBackend(GitHubBackend):
+    def __init__(
+        self, harness: FakeGitHubHarness, cache_dir: Path, invocation_barrier: Barrier, publication: _SharedPublication
+    ) -> None:
+        super().__init__(repo=harness.repo, cache=FileCache(cache_dir), contents=harness.contents)
+        self._fetch_targeted_issues = harness.network.fetch_targeted_issues  # ty: ignore[invalid-assignment]
+        self._invocation_barrier = invocation_barrier
+        self._publication = publication
+
+    def reconcile(self, request: ReconcileRequest, *, snapshot=None):  # type: ignore[no-untyped-def]
+        self._invocation_barrier.wait(timeout=5)
+        return super().reconcile(request, snapshot=snapshot)
+
+    def _apply_patches(self, patches, repo: str = ""):  # type: ignore[no-untyped-def]
+        with self._publication.lock:
+            self._publication.attempts += 1
+            if self._publication.attempts == 1:
+                self._publication.first_apply.set()
+            else:
+                self._publication.second_apply.set()
+        assert self._publication.release_apply.wait(timeout=5), "test did not release provider apply"
+        return super()._apply_patches(patches, repo)
 
 
 @pytest.fixture
@@ -163,6 +196,53 @@ def test_stale_different_section_grooms_coalesce_and_reconcile(
 
     reader = harness.new_backend(tmp_path / "reader-cache")
     reader.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, repo=harness.repo, references=[reference]))
+    persisted = reader.get_work_item(reference)
+    assert {entry.content for entry in _entries(persisted, "research")} == {"FIRST_RESEARCH"}
+    assert {entry.content for entry in _entries(persisted, "unknown__decision")} == {"SECOND_DECISION"}
+
+
+def test_shared_cache_reconciliation_publishes_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, harness: FakeGitHubHarness
+) -> None:
+    """Separate backends sharing a cache acknowledge one combined provider mutation."""
+    cache_dir = tmp_path / "shared-cache"
+    writer = _RendezvousBackend(harness, cache_dir)
+    reference = _add_item(monkeypatch, writer)
+    writer.offline = True
+    writer._expected_writes = 0
+    operations.groom_item(reference, section="Research", content="FIRST_RESEARCH", repo=harness.repo)
+    operations.groom_item(reference, section="Decision", content="SECOND_DECISION", repo=harness.repo)
+
+    invocation_barrier = Barrier(3)
+    publication = _SharedPublication()
+    backends = [_SharedCacheBackend(harness, cache_dir, invocation_barrier, publication) for _ in range(2)]
+    request = ReconcileRequest(scope=ReconcileScope.TARGETED, repo=harness.repo, references=[reference])
+    failures: list[BacklogError] = []
+
+    def reconcile(backend: _SharedCacheBackend) -> None:
+        try:
+            backend.reconcile(request)
+        except BacklogError as error:
+            failures.append(error)
+
+    threads = [Thread(target=reconcile, args=(backend,)) for backend in backends]
+    for thread in threads:
+        thread.start()
+    try:
+        invocation_barrier.wait(timeout=5)
+        assert publication.first_apply.wait(timeout=5), "no reconciliation reached provider apply"
+        publication.second_apply.wait(timeout=1)
+    finally:
+        publication.release_apply.set()
+        for thread in threads:
+            thread.join(timeout=5)
+            assert not thread.is_alive(), "reconciliation did not finish"
+    assert not failures
+    assert publication.attempts == 1
+    assert writer.pending_work_items(harness.repo) == []
+
+    reader = harness.new_backend(tmp_path / "reader-cache")
+    reader.reconcile(request)
     persisted = reader.get_work_item(reference)
     assert {entry.content for entry in _entries(persisted, "research")} == {"FIRST_RESEARCH"}
     assert {entry.content for entry in _entries(persisted, "unknown__decision")} == {"SECOND_DECISION"}
