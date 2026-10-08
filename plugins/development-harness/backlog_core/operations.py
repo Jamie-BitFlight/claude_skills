@@ -1250,7 +1250,8 @@ def _grooming_intent(
         operation.struck_at = now_iso()
         operation.created_entry_id = now_iso()
     elif entry_id:
-        operation.entry_id = _resolve_section_entry(entries, entry_id).id
+        operation.entry_index = resolve_entry_id([entry.id for entry in entries], entry_id)
+        operation.entry_id = entries[operation.entry_index].id
     elif content.strip() and not any(entry.content == content and not entry.struck for entry in entries):
         operation.created_entry_id = now_iso()
     return GroomingIntent(groomed_date=today(), operations=[operation])

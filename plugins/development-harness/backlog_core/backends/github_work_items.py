@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from threading import Lock
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from github import GithubException
@@ -913,6 +914,8 @@ class _GitHubReconciliation:
         # load, and False whenever no checkpoint exists yet to compare
         # against.
         self._last_snapshot_shortfall: bool = False
+        self._reconcile_locks: dict[str, Lock] = {}
+        self._reconcile_locks_lock = Lock()
 
     def list_work_items(self, repo: str = "") -> list[BacklogItem]:
         """List work items from the provider-private cache.
@@ -1021,6 +1024,25 @@ class _GitHubReconciliation:
         self._cache._queue_work_item(item.reference, item.model_copy(), repo or self._default_repo, grooming_intent)
 
     def reconcile(self, request: ReconcileRequest, *, snapshot: ProviderSnapshot | None = None) -> ReconcileResult:
+        """Reconcile one repository with exclusive provider-patch ownership.
+
+        Returns:
+            Completed reconciliation counts with changed logical references.
+        """
+        repo = request.repo or self._default_repo
+        with self._reconcile_lock(repo):
+            return self._reconcile(request, snapshot=snapshot)
+
+    def _reconcile_lock(self, repo: str) -> Lock:
+        """Return the reconciliation lock for one repository."""
+        with self._reconcile_locks_lock:
+            lock = self._reconcile_locks.get(repo)
+            if lock is None:
+                lock = Lock()
+                self._reconcile_locks[repo] = lock
+            return lock
+
+    def _reconcile(self, request: ReconcileRequest, *, snapshot: ProviderSnapshot | None = None) -> ReconcileResult:
         """Reconcile provider state through the pure engine and private cache.
 
         Returns:
@@ -1054,7 +1076,7 @@ class _GitHubReconciliation:
 
         patch_results = (
             self._provider._apply_patches(plan.provider_patches, effective_request.repo or self._default_repo)
-            if effective_request.apply_local_patches
+            if effective_request.apply_local_patches and plan.provider_patches
             else []
         )
         applied_revisions = {

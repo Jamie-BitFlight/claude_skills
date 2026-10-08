@@ -953,6 +953,7 @@ class GroomingOperation(BaseModel):
     section_key: str = ""
     append: bool = False
     entry_id: str = ""
+    entry_index: int | None = None
     replace_section: bool = False
     created_entry_id: str = ""
     struck_at: str = ""
@@ -988,13 +989,27 @@ class GroomingIntent(BaseModel):
                         entry.struck_at = operation.struck_at
                         entry.struck_reason = operation.reason
             if operation.entry_id:
-                target = next((entry for entry in updated_section.entries if entry.id == operation.entry_id), None)
+                target = _grooming_target(updated_section.entries, operation)
                 if target is None:
                     raise EntryNotFoundError(operation.entry_id, [entry.id for entry in updated_section.entries])
                 target.content = operation.content
             elif operation.created_entry_id:
                 updated_section.entries.append(Entry(id=operation.created_entry_id, content=operation.content))
             item.sections[operation.section_key] = updated_section
+
+
+def _grooming_target(entries: list[Entry], operation: GroomingOperation) -> Entry | None:
+    """Resolve a replay target using its preserved entry identity.
+
+    Returns:
+        The resolved entry, or ``None`` when its identity no longer matches.
+    """
+    if operation.entry_index is None:
+        return next((entry for entry in entries if entry.id == operation.entry_id), None)
+    if operation.entry_index >= len(entries):
+        return None
+    target = entries[operation.entry_index]
+    return target if target.id == operation.entry_id else None
 
 
 _VALID_PRIORITIES = {"P0", "P1", "P2", "Ideas", "completed"}
