@@ -18,6 +18,8 @@ Schedule accepted clusters by dependency. Run independent ready clusters concurr
 
 ## Communicate the decision
 
+Example: A reviewer requests removal of a compatibility branch. The build configuration still targets an older platform, and tests exercise that branch. Cite those facts and ask whether dropping older-platform support is intended before accepting the removal.
+
 For accepted changes, lead with the observed change, verification result, and inspectable revision. For a disputed finding, state the relevant evidence, consequence, and focused question or disposition. If new evidence changes an earlier assessment, correct the conclusion and cluster plan before responding.
 
 For PR/MR reviews, bind each disposition to its stable provider reference and follow the review-cycle communication gate. For conversational feedback, return the assessed findings directly. Distinguish provisional clarification from a verified fix: the current provider validator requires implementation readiness, so early clarification takes place in the user conversation until a validated provider clarification route exists.

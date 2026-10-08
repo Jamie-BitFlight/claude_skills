@@ -7,15 +7,7 @@ closed: MCP evidence cannot authorize source action, provider mutation, watch st
 
 ## Canonical source
 
-The exact GitHub predicates live only in `scripts/pr_review_github_logic.py`:
-
-- `CODEX_REACTOR_LOGINS` owns accepted actor identities;
-- `CODEX_EMPTY_REVIEW_BODY` and `is_codex_empty_review` own no-findings classification;
-- `is_codex_thumbs_up` owns approval-signal classification;
-- `latest_revision_at` owns the head-commit/force-push revision boundary;
-- `references_review` and `review_effective_timestamp` own provider-backed response matching.
-
-Use those symbols and the bundled GitHub adapter as the canonical source for classification.
+Use `scripts/pr_review_github_logic.py` and the bundled GitHub adapter as the source of truth for actor classification, approval signals, revision boundaries, and provider-backed response matching.
 
 ## Read-only diagnostic collection
 

@@ -1,6 +1,6 @@
 ---
 name: receiving-pr-reviews
-description: Process reviewer feedback for GitHub PRs and GitLab MRs. Use after pushing a commit to recheck reviews, or when asked to check or address comments, questions, approvals, change requests, or bot findings.
+description: Assess review feedback on GitHub PRs, GitLab MRs, or directly in conversation. Use to check reviews after a push, assess reviewer findings, address comments, or recheck approvals and change requests.
 ---
 
 # Receiving PR and MR Reviews
@@ -17,7 +17,7 @@ authority.
 
 ## Route
 
-For feedback outside a PR or MR, use the [technical review guidelines](./references/technical-review-guidelines.md) to assess and group findings, then report evidence-backed dispositions. `REVIEW_COMPLETE` applies to the provider workflow.
+For feedback outside a PR or MR, apply the [technical review guidelines](./references/technical-review-guidelines.md), group shared causes, and report evidence-backed dispositions. The provider lifecycle and `REVIEW_COMPLETE` apply to PRs and MRs.
 
 Use `scripts/pr_review_threads.py` to detect or select one target and provider. For a GitLab MR, read
 [GitLab review operations](./references/gitlab-review-operations.md). If the bundled CLI cannot use
@@ -31,7 +31,7 @@ Use `scripts/pr_review_threads.py` to detect or select one target and provider. 
 2. Run `fetch --snapshot-file <path>` to persist one full canonical snapshot. Stdout contains only the
    live action view; the file retains complete reconciliation evidence. `SNAPSHOT_INCOMPLETE` stops
    assessment and all mutation.
-3. Read the [review-cycle contract](./references/review-cycle-contract.md) for canonical state and [technical review guidelines](./references/technical-review-guidelines.md) for technical assessment. Build an exact census of every inbound comment, question, approval, rejection/change request, bot summary, and other human, reviewer, or stakeholder input. Assess each once, preserve resolved history, and record unknowns.
+3. Read the [review-cycle contract](./references/review-cycle-contract.md) for canonical state. Apply the [technical review guidelines](./references/technical-review-guidelines.md) to each assessment. Build an exact census of every inbound comment, question, approval, rejection/change request, bot summary, and other human, reviewer, or stakeholder input. Assess each once, preserve resolved history, and record unknowns.
 4. Cluster the exact census by shared invariant, cause, owning component, requested outcome, or
    verification surface; use explicit singleton clusters for unrelated inputs. Form one evidence-
    bearing systemic outcome and verification plan per cluster before changing source.
@@ -44,7 +44,7 @@ Use `scripts/pr_review_threads.py` to detect or select one target and provider. 
 8. Run `complete-cycle` against current provider state. Only its successful persisted result emits
    `REVIEW_COMPLETE`.
 
-## Stop conditions
+## Recovery
 
 - `SNAPSHOT_INCOMPLETE`: a required surface, page, conversation, schema, or transport observation is
   missing. Fetch a complete stable snapshot before proceeding.
@@ -58,10 +58,4 @@ Use `scripts/pr_review_threads.py` to detect or select one target and provider. 
 
 ## Command source
 
-Run `scripts/pr_review_threads.py <command> --help` for current targets, arguments, and bounds. The
-stable operations are `fetch`, `watch`, `validate-projection`, `validate-cycle`, `complete-cycle`,
-`reply`, `resolve`, `comment`, `reply-and-resolve`, and `reply-and-resolve-batch`. Default fetch and
-watch output contains only live unanswered inputs and their complete action content; `--summary`
-contains aggregate decision metadata only. Use focused provider commands for deeper inspection and
-`--snapshot-file` for internal reconciliation evidence. Exact fields and enum values live in the
-Pydantic models, while validation commands govern action and completion gates.
+Run `scripts/pr_review_threads.py <command> --help` for current arguments and supported operations. The Pydantic models own state fields and enums; validation commands own action and completion readiness.

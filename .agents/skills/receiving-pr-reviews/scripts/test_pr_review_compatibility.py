@@ -118,16 +118,7 @@ def test_review_contract_names_every_terminal_gate_and_input_class() -> None:
 def test_mcp_boundary_is_fail_closed_and_points_to_canonical_predicates() -> None:
     fallback = (SKILL_ROOT / "references/github-mcp-fallback.md").read_text(encoding="utf-8")
 
-    for symbol in (
-        "CODEX_REACTOR_LOGINS",
-        "CODEX_EMPTY_REVIEW_BODY",
-        "is_codex_empty_review",
-        "is_codex_thumbs_up",
-        "latest_revision_at",
-        "references_review",
-        "review_effective_timestamp",
-    ):
-        assert symbol in fallback
+    assert "scripts/pr_review_github_logic.py" in fallback
     assert "no executable ingress" in fallback
     assert "SNAPSHOT_INCOMPLETE" in fallback
     assert "chatgpt-codex-connector" not in fallback
