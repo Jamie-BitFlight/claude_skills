@@ -17,14 +17,13 @@ authority.
 
 ## Route
 
-For review feedback without a PR or MR, use the technical review guidelines directly: identify the intended outcome, assess each finding against available code and requirements, group shared causes, and return evidence-backed dispositions. Do not invent a provider snapshot or claim `REVIEW_COMPLETE`. The provider lifecycle below applies only to PRs and MRs.
+For feedback outside a PR or MR, use the [technical review guidelines](./references/technical-review-guidelines.md) to assess and group findings, then report evidence-backed dispositions. `REVIEW_COMPLETE` applies to the provider workflow.
 
 
 Use `scripts/pr_review_threads.py` to detect or select one target and provider. For a GitLab MR, read
 [GitLab review operations](./references/gitlab-review-operations.md). If the bundled CLI cannot use
 `gh` and a GitHub MCP connector is available, read the fail-closed
-[GitHub MCP boundary](./references/github-mcp-fallback.md). The current package cannot normalize MCP
-evidence into action-ready canonical state. One snapshot uses one executable transport.
+[GitHub MCP boundary](./references/github-mcp-fallback.md). The MCP route supplies diagnostics until the bundled CLI produces a complete canonical snapshot.
 
 ## Review cycle
 
@@ -37,7 +36,7 @@ evidence into action-ready canonical state. One snapshot uses one executable tra
 4. Cluster the exact census by shared invariant, cause, owning component, requested outcome, or
    verification surface; use explicit singleton clusters for unrelated inputs. Form one evidence-
    bearing systemic outcome and verification plan per cluster before changing source.
-5. When authorized, implement each accepted cluster at its owning seam, or record evidence for `no_change`, `superseded`, or `clarification_required`. Apply the technical guidelines' priority order among accepted independent clusters. Verify every cluster and repository-required gate. Push source changes to an inspectable current revision before citing them.
+5. When authorized, implement each accepted cluster at its owning seam, or record evidence for `no_change`, `superseded`, or `clarification_required`. Schedule accepted clusters by dependency, allowing independent ready work to proceed concurrently. Verify every cluster and repository-required gate. Push source changes to an inspectable current revision before citing them.
 6. Author the cycle state from the typed models. Use `validate-projection` for dry-run or check-only state and `validate-cycle` for action readiness. Apply the response guidance in the [technical review guidelines](./references/technical-review-guidelines.md). When authorized, communicate every disposition with provider-backed evidence, then resolve only where policy and capability permit. Clarifications remain open; unavailable resolution is recorded as unavailable.
 7. Persist a new complete snapshot. New or changed inputs, revision, provider state, fingerprints, or
    communication evidence return the complete set to census, assessment, and clustering. Use bounded
@@ -56,8 +55,7 @@ evidence into action-ready canonical state. One snapshot uses one executable tra
 - `ERROR`: collection, validation, or provider operation failed. Preserve confirmed evidence and do
   not label stale state clean.
 - `REVIEW_COMPLETE`: the complete current recheck is unchanged and has zero unresolved, outstanding,
-  new, or changed inputs, while every contract gate is terminal. Approval, rejection, a clear initial
-  snapshot, or a quiet watch window is an input or observation, never this terminal by itself.
+  new, or changed inputs, while every contract gate is terminal. The persisted `complete-cycle` result establishes this terminal.
 
 ## Command source
 

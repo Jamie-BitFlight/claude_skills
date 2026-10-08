@@ -6,8 +6,7 @@ policy; this branch supplies GitLab target, availability, and transport semantic
 ## Target and collection
 
 Select GitLab and bind the MR IID to its project. For a known self-managed target, provide its bare
-host and full namespace/project; otherwise let `glab repo view` resolve the current checkout. Failed
-or ambiguous detection stops rather than guessing. Run `fetch --help` for current syntax.
+host and full namespace/project; otherwise let `glab repo view` resolve the current checkout. If detection is ambiguous, request an explicit target before collection. Run `fetch --help` for current syntax.
 
 The adapter paginates every list surface and obtains a stable complete observation of discussions,
 notes, award emoji, diff versions, MR detail, approvals, and the current actor. A missing page,

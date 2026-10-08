@@ -8,8 +8,7 @@ cycle state. The Pydantic models are the exact schema; `validate-projection`, `v
 
 A trace, dry-run, or check-only request still materializes one exhaustive provider-neutral
 `ReviewCycleState`. Read its Pydantic models before authoring fields. A projection may use `pending`
-implementation states, but it must not omit an inbound input because the corresponding mutation did
-not run.
+implementation states, and retains every inbound input regardless of whether mutation ran.
 
 Run `validate-projection` against the saved snapshot and projected state. Success proves a complete,
 internally consistent snapshot with a canonical fingerprint; matching target, revision, and snapshot
@@ -58,8 +57,7 @@ explicit singleton clusters. A multi-input cluster records the shared invariant,
 cause, requested outcome, or verification surface that makes one outcome coherent.
 
 Each cluster has one systemic outcome, supporting evidence, exact verification commands,
-communication plan, and resolution policy. When inputs share a cause, repeated symptom patches do not
-satisfy this gate. Complete the census, assessments, unknown decisions, clusters, and plans before any
+communication plan, and resolution policy. One owning-seam change covers every finding sharing a cause. Complete the census, assessments, unknown decisions, clusters, and plans before any
 source action.
 
 ## Implementation or no-change evidence
@@ -95,7 +93,7 @@ resolution policy. A batch pre-authorizes every entry and action before its firs
 
 Communicate one evidence-bearing disposition for every inbound input, including approvals,
 rejections, bot summaries, no-change results, and superseded inputs. Bind it to the canonical stable
-reference. Provider-backed evidence, not caller-authored local state, proves completion.
+reference. Provider-backed communication establishes completion evidence.
 
 Reply successfully before resolving. Use the combined action for a normal eligible inline path; use
 reply-only for clarification, and resolve-only for recovery when completed communication is already
@@ -120,6 +118,4 @@ provider-backed communication; and one terminal annotation per input.
 
 Any actor-backed approval in the normalized snapshot remains an assessed input and can coexist with
 completion only after its full lifecycle is recorded. The selected adapter owns approval availability
-and equivalence mapping. Approval, rejection/change request, a clear initial snapshot, an elapsed quiet
-window, local communication without provider evidence, or resolution without recheck never completes
-a cycle. Only a successful persisted `complete-cycle` result emits `REVIEW_COMPLETE`.
+and equivalence mapping. Only a successful persisted `complete-cycle` result emits `REVIEW_COMPLETE`.

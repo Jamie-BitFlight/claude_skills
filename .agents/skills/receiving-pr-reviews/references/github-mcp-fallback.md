@@ -15,8 +15,7 @@ The exact GitHub predicates live only in `scripts/pr_review_github_logic.py`:
 - `latest_revision_at` owns the head-commit/force-push revision boundary;
 - `references_review` and `review_effective_timestamp` own provider-backed response matching.
 
-Treat those symbols and the bundled GitHub adapter as the source of truth. Do not copy their values or
-manually reproduce their outcomes from MCP responses.
+Use those symbols and the bundled GitHub adapter as the canonical source for classification.
 
 ## Read-only diagnostic collection
 
@@ -26,8 +25,4 @@ actor identity through one connector. A missing field, page, permission, or stab
 diagnostic collection incomplete. Report only observed provider facts and identify the missing
 surface.
 
-The cycle remains `SNAPSHOT_INCOMPLETE` because connector output has not crossed the canonical ingress.
-Do not author `review-cycle.json`, infer clean state, combine CLI and MCP evidence, reply, resolve,
-comment, watch, or run `complete-cycle` from this collection. If the bundled CLI remains unavailable,
-report `BLOCKED` with the unavailable executable transport. Resume the shared workflow only after
-`fetch` produces one complete canonical snapshot.
+MCP diagnostics remain `SNAPSHOT_INCOMPLETE` until the executable transport produces a complete canonical snapshot. Report observed facts and missing surfaces; if the CLI remains unavailable, report `BLOCKED` with the missing transport. Resume through `fetch` when available.
