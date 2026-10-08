@@ -14,5 +14,24 @@ async def test_mcp_protocol_preserves_public_tool_annotations() -> None:
     write_tools = {"extract_user_messages", "render_rage_receipt"}
 
     assert set(tools) == readonly_tools | write_tools
-    assert all(tools[name].annotations.read_only_hint is True for name in readonly_tools)
-    assert all(tools[name].annotations.read_only_hint is False for name in write_tools)
+    assert all(tools[name].annotations is not None for name in tools)
+    assert all(
+        (
+            tools[name].annotations.read_only_hint,
+            tools[name].annotations.destructive_hint,
+            tools[name].annotations.idempotent_hint,
+            tools[name].annotations.open_world_hint,
+        )
+        == (True, False, True, False)
+        for name in readonly_tools
+    )
+    assert all(
+        (
+            tools[name].annotations.read_only_hint,
+            tools[name].annotations.destructive_hint,
+            tools[name].annotations.idempotent_hint,
+            tools[name].annotations.open_world_hint,
+        )
+        == (False, False, True, False)
+        for name in write_tools
+    )
