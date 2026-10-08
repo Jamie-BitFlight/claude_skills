@@ -68,6 +68,7 @@ def test_instruction_links_are_one_hop_and_resolve_through_both_skill_paths() ->
     links = re.findall(r"\[[^]]+\]\(([^)]+\.md)\)", skill)
 
     assert links == [
+        "./references/technical-review-guidelines.md",
         "./references/gitlab-review-operations.md",
         "./references/github-mcp-fallback.md",
         "./references/review-cycle-contract.md",
