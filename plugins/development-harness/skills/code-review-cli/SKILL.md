@@ -8,12 +8,16 @@ user-invocable: false
 
 Stack-specific rules loaded by `dh:code-reviewer` when CLI entrypoints are detected (argparse, click, typer, commander.js, or similar argument parsing libraries).
 
+Read [Review principles](../../docs/review-principles.md) before applying these checks; it defines
+authority, applicability, evidence, and blocking criteria. Establish the command's supported
+platforms and human/machine output contracts before prescribing an exact flag or exit code.
+
 ## Exit Codes
 
-- Exit code `0` must be returned only on success — any error condition must produce a non-zero exit code
-- Returning exit code `0` after printing an error message is a blocking finding — tools in pipelines cannot detect the failure
+- Verify exit status distinguishes success from failure under the documented command contract, including partial-success or best-effort modes where supported.
+- Report success status after a required operation failed when callers cannot detect that failure; distinguish an overall failure from a documented recoverable warning.
 - Common conventions: `1` for general errors, `2` for usage/argument errors, `3+` for application-specific codes documented in `--help`
-- `sys.exit(1)` or `process.exit(1)` must be called on fatal errors, not just printing to stderr
+- Verify fatal paths reach a non-zero exit through the framework or explicit exit handling; printing to stderr alone is not a failure signal for a caller that checks exit status.
 
 ```python
 # WRONG: exits 0 even on error
@@ -36,10 +40,10 @@ def main():
 
 ## Help and Version Flags
 
-- `--help` must be present and print usage information, option descriptions, and examples — the auto-generated help from argparse/click/typer is acceptable as a minimum
-- `--version` must be present and print the version string matching `pyproject.toml` or `package.json`
+- Check that supported help/version interfaces are discoverable and usable by their intended callers; use `--help` and `--version` as conventions for new human-facing commands.
+- Verify help describes the actual options and examples, and version output agrees with the installed/distributed package's version source.
 - Help text must be consistent with actual behavior — stale help text is a blocking finding
-- `--help` must exit `0`; `--version` must exit `0`
+- Supported help and version requests must report success when they complete successfully.
 
 ## stdin / stdout / stderr Separation
 
@@ -50,37 +54,37 @@ def main():
 
 ## Non-Interactive Operation
 
-- Every interactive prompt (`input()`, `readline`, `inquirer`) must have a corresponding flag alternative (`--flag value`) for use in CI and scripts
+- For supported CI/script use, provide explicit inputs for interactive choices or a clear non-interactive failure; identify any prompt that makes the documented automation path unusable.
 - Interactive prompts that block in non-TTY environments (piped input, CI) are a blocking finding
-- Detect TTY with `sys.stdin.isatty()` or equivalent and skip interactive prompts in non-TTY mode
+- Detect non-TTY input with `sys.stdin.isatty()` or equivalent. Do not interpret an unavailable prompt as consent to a consequential operation.
 
 ## Signal Handling
 
-- SIGINT (Ctrl+C) must produce a clean exit — no stack traces, no partial file writes, exit code `130` by default
-- SIGTERM must be handled in long-running processes — clean up resources and exit gracefully
-- Temporary files created during execution must be cleaned up in signal handlers or `atexit` callbacks
+- Check interruption behavior for the supported platform/signals: required cleanup, an observable interrupted result, and preservation of valid durable state. Use conventional signal exit codes where that platform and command contract apply.
+- For long-running commands, trace termination through resource ownership and partial operations; report abandoned resources or corrupt writes rather than requiring a particular handler API.
+- Temporary resources need cleanup on relevant normal/error/interruption paths; a registered callback alone does not prove those paths are covered.
 
 ## Argument Validation
 
 - Validate all arguments before beginning any work — do not fail halfway through a destructive operation due to a missing flag
-- Report all validation errors at once rather than stopping at the first error
-- File path arguments must be validated for existence and permissions before the operation begins, not after
+- Report actionable validation errors; aggregate independent errors when that helps the caller without executing partial work.
+- Check path preconditions before consequential work and handle failures at the operation boundary; a preflight existence/permission check does not guarantee the later operation succeeds.
 
 ## ANSI Color Codes
 
 - ANSI escape codes must not be emitted when `NO_COLOR` environment variable is set (any non-empty value)
-- ANSI escape codes must not be emitted when stdout is not a TTY (piped output, file redirection)
+- Keep piped/redirected output free of unintended ANSI sequences by default; respect documented explicit color controls and the machine-output contract.
 - Check TTY with `sys.stdout.isatty()` or equivalent before colorizing output
 
 ## Dry Run for Destructive Operations
 
-- Any operation that deletes, modifies, or overwrites data must have a `--dry-run` flag that shows what would happen without doing it
-- `--dry-run` output must clearly distinguish what would be changed and what would remain untouched
+- For commands that delete or overwrite durable data, verify how the caller can inspect and authorize the intended effects before execution. Report missing safeguards with the unintended effect they permit.
+- Where the command promises `--dry-run`, verify it previews the relevant effects without performing them and clearly identifies affected resources. Do not require a specific flag name when the supported interface supplies equivalent protection.
 
 ## Anti-Patterns
 
 ```python
-# WRONG: no --dry-run for destructive command
+# Missing preview in a command whose contract requires --dry-run.
 @app.command()
 def delete_records(pattern: str):
     records = find_records(pattern)
@@ -107,6 +111,7 @@ def delete_records(pattern: str, dry_run: bool = typer.Option(False, "--dry-run"
 print(f"\033[32mSuccess\033[0m")
 
 # RIGHT: conditional color
+import os
 import sys
 
 USE_COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR")

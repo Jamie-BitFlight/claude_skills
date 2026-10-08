@@ -15,3 +15,13 @@
     documents that no longer parse.
   - Protected by: none (no automated eval covers this; a regression would surface as a corrupted
     `Review Results` section on a reused plan).
+
+## Review method provenance
+
+The shared review preparation and investigation guidance in `docs/review-methods.md` adapts
+questions about reach, consequences, failure controls and history from
+[NeoLabHQ context-engineering-kit review](https://github.com/NeoLabHQ/context-engineering-kit/tree/23e2428e809d77717f8acc9659c374a3a1fcb93e/plugins/review),
+especially `change-impact-agent.md`, `change-failure-agent.md`, `change-expectation-agent.md`,
+`contracts-reviewer.md` and `historical-context-reviewer.md`. The guidance is independently written
+and uses DH's existing impact-analysis, root-cause and test-review contracts. Risk prioritization
+does not narrow changed-file coverage or alter the raw-verdict conservation and gate contracts.

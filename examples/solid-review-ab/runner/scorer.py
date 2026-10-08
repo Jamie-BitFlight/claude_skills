@@ -130,7 +130,10 @@ def parse_report(text: str) -> list:
 
 
 def reduce_findings(reports: dict, keep_threshold: int) -> list:
-    """Reduce per-worker findings to a merged list with corroboration weighting.
+    """Reduce with threshold-only retention to isolate corroboration in E1.
+
+    Production retains critical/high findings below the threshold. Disable that
+    policy for both ablation thresholds so severity does not change the experiment.
 
     Args:
         reports: Mapping of worker_id to list of Finding objects.
@@ -139,7 +142,7 @@ def reduce_findings(reports: dict, keep_threshold: int) -> list:
     Returns:
         List of Merged finding objects with .group, .location, .weight.
     """
-    return list(_reduce.reduce_findings(reports, keep_threshold))
+    return list(_reduce.reduce_findings(reports, keep_threshold, preserve_high_severity=False))
 
 
 # ---------------------------------------------------------------------------

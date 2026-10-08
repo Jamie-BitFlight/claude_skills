@@ -43,8 +43,10 @@ rule-overlap within each shard.
   `keep_threshold=1` (recall-biased: keep everything, rank by weight, cut nothing). This default
   does NOT drop lone-worker findings — it relies on you reading the ranked output. For a
   **precision-biased gate** (where a lone worker's hallucination must fall away automatically),
-  pass `--keep-threshold 2` (or higher with more overlap) so only corroborated findings survive.
-  Choose the threshold deliberately per run; do not assume the default denoises.
+  pass `--keep-threshold 2` (or higher with more overlap). Critical/high findings survive below
+  this threshold as `PRESERVED`; their weight and `corroborated` field remain unchanged. Review
+  these exceptions explicitly: preservation is not confirmation. Choose the threshold
+  deliberately per run; do not assume the default denoises.
 
 ## Balanced rotating overlap (recommended construction)
 
@@ -126,8 +128,10 @@ def reduce(findings, keep_threshold=1):
         m["evidence"].append(f["evidence"])
         m["severity"] = max_sev(m["severity"], f.get("severity"))
 
-    # 3. weight = len(agents); drop the low-weight tail (a lone-worker finding has weight 1).
-    survivors = [(k, v) for k, v in merged.items() if len(v["agents"]) >= keep_threshold]
+    # 3. Retain critical/high findings below the threshold without adding votes.
+    survivors = [
+        (k, v) for k, v in merged.items() if len(v["agents"]) >= keep_threshold or v["severity"] in {"critical", "high"}
+    ]
 
     # 4. Rank: corroboration weight first, then severity. Correctness outranks cleanup.
     survivors.sort(key=lambda kv: (len(kv[1]["agents"]), sev_rank(kv[1]["severity"])), reverse=True)
@@ -146,7 +150,11 @@ Two contract points the live test proved necessary:
 
 `normalize` collapses trivial location differences (absolute-vs-relative path, whitespace) so the
 same line from two workers collides. Tune `keep_threshold`: for recall-biased ad-hoc work, keep
-weight ≥ 1 and rank; for precision-biased gates, raise it so only corroborated findings survive.
+weight ≥ 1 and rank; for precision-biased gates, raise it while preserving critical/high
+exceptions. `KEEP` means the requested threshold was met; `PRESERVED` means retention below it.
+Read actual corroboration separately: weight 1 remains uncorroborated, while weight 2 can be
+corroborated and still fall below a higher requested threshold. The report counts retained
+findings after filtering, including its below-threshold exceptions.
 
 ## Worker task types
 

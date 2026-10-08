@@ -1,6 +1,6 @@
 ---
 name: code-review-python
-description: Provides Python-specific code review rules for the dh code-reviewer agent. Activates on pyproject.toml or *.py file detection — enforces uv, ruff, ty, pytest, type annotation, error handling, and Python 3.11+ idioms including pathlib, match statements, and modern union syntax.
+description: Reviews Python boundaries, typing, error handling, tests, dependencies, and supported-version idioms against the target project's contracts and active tools. Loaded by dh:code-reviewer for Python source; uses Python-engineering standards when available and retains standalone checks otherwise.
 user-invocable: false
 ---
 
@@ -8,65 +8,68 @@ user-invocable: false
 
 Stack-specific rules loaded by `dh:code-reviewer` when `pyproject.toml` or `*.py` files are detected.
 
+Read [Review principles](../../docs/review-principles.md) before applying these checks; it defines
+authority, applicability, evidence, and blocking criteria.
+
+When available, load `/python-engineering:standards-for-python-development`; it owns the shared
+Python policy and contextual defaults. If that plugin is unavailable, use the checks below with
+the target's supported Python versions, contracts, and active tooling. Report the unavailable
+policy reference without making Python-engineering a prerequisite for review.
+
 ## Type Annotations
 
-- All public function boundaries must have type annotations — parameters and return type
-- `Any` is only acceptable with an inline comment explaining why a specific type cannot be used
-- `TypedDict` is required for dicts that cross module boundaries; plain `dict[str, ...]` is only acceptable within a single function
-- `Optional[X]` is legacy — use `X | None` (Python 3.10+ union syntax)
-- `Union[X, Y]` is legacy — use `X | Y`
-- Return type `None` must be explicit on functions that have no return value but have side effects
-- Protocol classes are preferred over ABC for structural typing
+- Check that public parameter and return annotations communicate the supported contract; apply the project's annotation gate, including explicit `None` returns where required.
+- Contain justified `Any`, broad `object`, and unchecked casts at explicit dynamic or external boundaries with typed outputs. An explanatory comment alone does not establish safety, and replacing `Any` with broad `object` alone does not strengthen the contract.
+- Match data shapes to their purpose: typed mappings where mapping behavior is required, typed value objects for internal data, and runtime validation where external data needs it. Do not require `TypedDict` for every cross-module value or migrate a coherent dataclass/Pydantic/mapping design solely for uniformity.
+- Prefer native generics and union syntax for new code when the supported Python floor permits them; do not report supported existing syntax as a correctness defect.
+- Check that a `Protocol` or ABC models a real substitutable contract; preserve the project's coherent choice.
 
-## Ruff Compliance
+## Linter Compliance
 
-- Bare `except:` is a blocking finding — must be `except ExceptionType:`
-- `print()` in library code (non-CLI, non-script) is a blocking finding (T201) — use `logging` instead
-- Magic numbers in comparisons are a blocking finding (PLR2004) — extract to named constants
-- Unused imports must be removed, not commented out
-- f-strings are required for string interpolation — `%` and `.format()` are legacy
-- `__all__` must be defined in modules that have public API surface
+- Read the active linter configuration and report violations of its enforced rules; do not enable additional rules during review.
+- Investigate bare catches and unintended library output for swallowed control signals or corruption of a caller's output contract. Prefer specific exception handling and the project's diagnostic channel.
+- Flag unexplained constants, unused imports, and export ambiguity when they violate a project gate or obscure a consequential contract. Do not classify every numeric comparison as a defect.
+- Preserve supported interpolation idioms, including deferred logging formatting; use the project's formatting rules rather than requiring a style migration.
+- Check intended exports, including `__all__` where the project or public import contract requires it.
 
-## ty Type Safety
+## Type Checker Evidence
 
-- Unresolved imports indicate a missing `uv add` — fix the import, not the type checker
-- `# ty: ignore` suppressions are prohibited — fix the code to satisfy ty
-- `ty extra-paths` in `pyproject.toml` must stay in sync with `pytest` `pythonpath`
-- TypedDict nominal incompatibility across modules means the TypedDict should be defined in a shared location, not duplicated
+- Discover the active checker and command from hooks/CI. Reproduce its relevant diagnostics before treating editor hints as project failures.
+- Trace unresolved imports through declared dependencies, supported runtime, and source roots; do not assume every failure requires adding a dependency.
+- Apply the project's suppression policy and investigate what a suppression hides. Do not invent inline ignores or relax project gates to obtain a clean result.
+- Verify that checker and test import paths resolve their intended sources; they need not contain identical entries when their scopes differ.
+- When independently defined shared types cause an observed incompatibility, inspect ownership and reuse the canonical contract instead of adding casts or duplicated definitions.
 
-## pytest Patterns
+## Test Patterns
 
-- Test names follow behavioral naming: `test_<what>_when_<condition>_returns_<result>` or `test_<what>_when_<condition>_raises_<exception>`
-- Tests assert on observable behavior, not on implementation details (internal state, private methods)
-- Integration tests hit real dependencies — mocking the thing under test is not a test
-- Fixtures are preferred over test-class instance state
-- `assert result is not None` is not a meaningful assertion — assert the actual expected value
-- Tests are isolated — no shared mutable state between test functions
-- Parametrize repetitive test cases with `@pytest.mark.parametrize`
-- Each test file mirrors the module it tests: `src/foo/bar.py` → `tests/foo/test_bar.py`
+Use `/dh:test-reviewer` for the effectiveness procedure and evidence-backed dispositions. Preserve
+the project's coherent framework and test layout. For Python tests, also check:
 
-## uv Usage
+- Behavior-oriented names identify the scenario and expected result.
+- Fixtures and doubles preserve the production boundary whose guarantee is being assessed.
+- Assertions distinguish the required result; a non-`None` check is sufficient only for a contract that requires exactly that observation.
+- Shared mutable state, fixtures, and cleanup do not make tests order-dependent.
+- Parametrization reduces repetition without obscuring distinct obligations or diagnostics.
 
-- All Python execution uses `uv run` — bare `python` invocations are only acceptable in CI where the venv is pre-activated
-- New dependencies are added with `uv add` — manual edits to `pyproject.toml` dependencies without running `uv add` leave the lockfile stale
-- Scripts with external dependencies declare PEP 723 inline metadata (`# /// script`) and also add those deps via `uv add --dev` for IDE tooling
-- `uv run --script` is used for standalone scripts with PEP 723 metadata
+## Execution and Dependencies
+
+- Use the execution and dependency commands the target actually supports; apply `uv` conventions where that is the chosen environment.
+- Verify dependency changes and lockfiles agree, and that the documented clean install can provide required imports.
+- For PEP 723 scripts, check inline dependencies and the supported script invocation, such as `uv run --script`. Do not require duplicate root dependencies merely for editor tooling when the standalone contract is self-contained.
 
 ## Error Handling
 
-- `except Exception:` is a blocking finding unless immediately followed by a re-raise or very specific logging
-- Empty `except` blocks are a blocking finding — they swallow all errors silently
+- Trace each catch to its recovery owner, added context, or deliberate boundary conversion. A broad catch needs a justified boundary and must preserve the relevant failure signal.
+- Report swallowed errors or misleading success when the caller cannot observe a required failure; distinguish documented best-effort behavior from accidental silence.
 - Exception messages must include enough context to diagnose without reading the source: `raise ValueError(f"Expected positive int, got {value!r}")` not `raise ValueError("invalid input")`
 - Sentinel return values (returning `None` or `-1` on error without raising) require a documented contract — silence must be intentional and documented
 
-## Modern Python 3.11+ Idioms
+## Supported Python Idioms
 
-- `match` statements are preferred for multi-branch dispatch on type or value (over long `if/elif` chains)
-- `pathlib.Path` is required for all file path operations — `os.path` is legacy
-- `tomllib` (stdlib in 3.11+) is used for reading TOML — do not add `tomli` as a dependency
-- `datetime.UTC` is used instead of `datetime.timezone.utc` (Python 3.11+)
-- `ExceptionGroup` and `except*` are used for concurrent exception handling where appropriate
-- `str.removeprefix()` and `str.removesuffix()` replace manual slicing for prefix/suffix removal
+- Check version-specific syntax and APIs against the target's supported Python floor.
+- Apply the shared Python policy's choices for `match`, `pathlib`, datetime, and exception groups when available; preserve coherent existing idioms unless a demonstrated problem justifies change.
+- For TOML, follow the shared policy when available and preserve an already suitable project library. In standalone review, distinguish read-only parsing from editing that must preserve formatting/comments, and respect stdlib-only deployment constraints. Do not require `tomllib`, `tomlkit`, or a new dependency merely because another form is present.
+- Investigate manual prefix/suffix slicing for incorrect boundary behavior; prefer clearer supported methods in new code where they preserve the contract.
 
 ## Anti-Patterns
 
@@ -84,21 +87,21 @@ except ConnectionError as e:
     logger.warning("Connection failed: %s", e)
     raise
 
-# WRONG: magic number
-if status == 429:
+# Unexplained domain limit: determine its contract before proposing a name.
+if attempts > 3:
     ...
 
-# RIGHT: named constant
-HTTP_TOO_MANY_REQUESTS = 429
-if status == HTTP_TOO_MANY_REQUESTS:
+# A named limit communicates an established retry contract.
+MAX_RETRY_ATTEMPTS = 3
+if attempts > MAX_RETRY_ATTEMPTS:
     ...
 
-# WRONG: os.path
+# Supported existing path construction; not a defect solely by style.
 import os
 
 path = os.path.join(base, "config.toml")
 
-# RIGHT: pathlib
+# New code may use pathlib when it fits the project.
 from pathlib import Path
 
 path = Path(base) / "config.toml"

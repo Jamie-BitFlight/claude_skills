@@ -28,12 +28,24 @@ absent.
 
 ---
 
-## Step 1: Resolve Changed Files
+## Step 1: Bind the Comparison and Resolve Changed Files
+
+Resolve both endpoints of the supplied committed comparison with
+`git rev-parse --verify '<endpoint>^{commit}'`. Store the concrete commits as `base_sha` and
+`head_sha`. Construct `review_diff` by concatenating `base_sha`, the supplied `..` or `...`
+operator, and `head_sha`; it must contain resolved commits, not moving branch names. For `...`,
+also record its effective comparison base with `git merge-base <base_sha> <head_sha>`; for `..`, the
+effective base is `base_sha`. Do not substitute a default branch or replace three-dot semantics
+with a comparison against the left endpoint.
+
+Use `review_diff` for this run's diffs, the effective base for baseline content and `head_sha`
+for candidate content. Failed revision resolution or a failed diff is an input error: report it
+and stop before creating a plan.
 
 Run:
 
 ```bash
-git diff --name-only <git-range>
+git diff --name-only <review_diff>
 ```
 
 Split stdout by newline. Trim empty lines. This is the `changed_files` list.
@@ -87,8 +99,16 @@ Changed files:
 {each file on its own line}
 ```
 
+Read [Review methods](../../docs/review-methods.md) before preparing the shared context; it owns
+revision/intent/authority/impact preparation and conditional investigation. Build
+`review_context_block` once using the resolved comparison and source references, then embed it
+unchanged alongside `changed_files_block` in each perspective task. It supplies navigation and
+explicit uncertainty; each reviewer independently verifies material claims against the pinned
+sources. Keep every changed file in scope regardless of its priority in the brief.
+
 Create all five tasks in one typed MCP call. Replace `{changed_files_block}` with the literal
-newline-separated changed-files block. Omit `issue` when `--issue` was not provided.
+newline-separated changed-files block and `{review_context_block}` with that shared context.
+Omit `issue` when `--issue` was not provided.
 
 **This workflow's plan stays on the content store.** It is authored, polled and read through the
 `sam_plan` and `sam_task` operations, and it never opens an attempt — no `dispatch`, no lease, no
@@ -114,7 +134,7 @@ mcp__plugin_dh_sam__sam_plan(
                 "complexity": "medium",
                 "dependencies": [],
                 "body": "Review every changed file through the security lens.\n"
-                "Return structured verdict per verdict-schema.md.\n\n{changed_files_block}",
+                "Return structured verdict per verdict-schema.md.\n\n{review_context_block}\n\n{changed_files_block}",
             },
             {
                 "id": "T2",
@@ -124,7 +144,7 @@ mcp__plugin_dh_sam__sam_plan(
                 "complexity": "medium",
                 "dependencies": [],
                 "body": "Review every changed file through the performance lens.\n"
-                "Return structured verdict per verdict-schema.md.\n\n{changed_files_block}",
+                "Return structured verdict per verdict-schema.md.\n\n{review_context_block}\n\n{changed_files_block}",
             },
             {
                 "id": "T3",
@@ -134,7 +154,7 @@ mcp__plugin_dh_sam__sam_plan(
                 "complexity": "medium",
                 "dependencies": [],
                 "body": "Review every changed file through the quality lens.\n"
-                "Return structured verdict per verdict-schema.md.\n\n{changed_files_block}",
+                "Return structured verdict per verdict-schema.md.\n\n{review_context_block}\n\n{changed_files_block}",
             },
             {
                 "id": "T4",
@@ -145,7 +165,7 @@ mcp__plugin_dh_sam__sam_plan(
                 "dependencies": [],
                 "body": "Apply the SKIP rule first. Otherwise review ARIA attributes, color-only "
                 "signals, and keyboard parity. Return structured verdict per verdict-schema.md."
-                "\n\n{changed_files_block}",
+                "\n\n{review_context_block}\n\n{changed_files_block}",
             },
             {
                 "id": "T5",
@@ -351,8 +371,9 @@ step, condition, and terminal outcome in Steps 1-7 above.
 
 - Dispatch uses `dh:task-worker` because the perspective reviewer agents cannot claim or close a SAM task. Specialist behavior is selected through the task profile. See `dh:dispatch-contract`.
 - **Each reviewer task body must embed the newline-separated changed-files list.** Reviewers read
-  their task body to obtain the scan target; they do not receive it via the prompt. T5 reads the
-  four verdict sections instead, so its body names those and carries no file list.
+  their task body to obtain the scan target and shared Review Context; they do not receive them
+  via the prompt. T5 reads the four verdict sections instead, so its body names those and carries
+  no file list or preparation-based verdict.
 
 ---
 

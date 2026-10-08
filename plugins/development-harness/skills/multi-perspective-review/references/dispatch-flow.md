@@ -1,7 +1,7 @@
 # Dispatch Flow — Multi-Perspective Review
 
 > [!IMPORTANT]
-> When provided a process map or Mermaid diagram, treat it as the authoritative procedure. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
+> This diagram describes the review dispatch procedure in this source file. The generated workflow graph is a derived, potentially stale artifact; do not treat it as an authority over current source instructions. Execute the steps and stop conditions defined here.
 > A Mermaid process diagram is an executable instruction set. Follow it exactly as written: respect sequence, conditions, loops, parallel paths, and terminal states. Do not improvise, reorder, or skip steps. If any node is ambiguous or missing required detail, pause and ask a clarifying question before continuing.
 > When interacting with a user, report before acting the interpreted path you will follow from the diagram, then execute.
 
@@ -10,8 +10,11 @@ flowchart TD
     Start(["dh:multi-perspective-review invoked"]) --> Parse["Parse --diff, --issue, --slug<br>from invocation arguments string"]
     Parse --> DiffCheck{"--diff argument present?"}
     DiffCheck -->|"No — required arg missing"| AbortUsage(["ABORT — print usage message<br>Stop before any plan is created"])
-    DiffCheck -->|"Yes"| Files["Run git diff --name-only range<br>Split stdout by newline, trim empty lines<br>→ changed_files list"]
-    Files --> EmptyCheck{"changed_files list empty?"}
+    DiffCheck -->|"Yes"| Files["Resolve endpoint commits and effective base; construct review_diff from SHAs and supplied operator; run git diff --name-only review_diff"]
+    Files --> SourceCheck{"Revision resolution and diff succeeded?"}
+    SourceCheck -->|"No"| AbortSource(["ABORT — report input error; stop before creating a plan"])
+    SourceCheck -->|"Yes"| ParseFiles["Split stdout by newline, trim empty lines → changed_files list"]
+    ParseFiles --> EmptyCheck{"changed_files list empty?"}
     EmptyCheck -->|"Yes"| AbortEmpty(["ABORT — print<br>'ERROR: No changed files found for diff range &lt;git-range&gt;. Nothing to review.'<br>Do not create a plan"])
     EmptyCheck -->|"No"| SlugArg{"--slug argument provided?"}
 
@@ -26,7 +29,8 @@ flowchart TD
 
     RunStamp["Run gen_run_stamp.py<br>Capture stdout as run_stamp"] --> BuildSlug["review_slug = review_base-run_stamp"]
 
-    BuildSlug --> CreatePlan["sam_plan create — T1 Security, T2 Performance,<br>T3 Quality, T4 Accessibility, T5 Synthesis<br>T5 depends on T1..T4<br>One typed MCP call<br>Always a new plan — never reused"]
+    BuildSlug --> Context["Read Review methods and prepare Review Context: revision, intent, authority, impact and source references; keep full changed-file scope"]
+    Context --> CreatePlan["sam_plan create: T1 Security, T2 Performance, T3 Quality, T4 Accessibility, T5 Synthesis; identical context and file list in T1..T4; T5 depends on T1..T4; one typed MCP call; always a new plan"]
     CreatePlan --> PlanAddr["Store returned plan_ref as PA<br>Completion criterion — plan_ref non-empty<br>AND task_count = 5"]
 
     PlanAddr --> Parallel["Dispatch 4 dh task-worker agents simultaneously via Agent()<br>No wait between spawns — all four run in parallel<br>Dispatch task-worker, not reviewer agents directly"]

@@ -24,6 +24,12 @@ Arms are declared in `arms.yaml` at the experiment root.  The seeded arms are:
 Both seeded arms review the SAME corpus and emit the SAME fixed candidate schema, so one scorer
 parses both identically.  The judgement system supports any number of additional arms.
 
+The scorer uses threshold-only retention (`preserve_high_severity=False`) for E1 and its
+reported ensemble metrics. Production review preserves critical/high findings below the
+threshold; that policy is disabled here to isolate corroboration. E0 still reports the actual
+number of distinct workers that flagged each decoy. These metrics do not evaluate production
+preservation; assess that policy separately with the exemption enabled.
+
 ### Adding a new arm
 
 1. Create a new directory at the experiment root (e.g. `opus-single-agent/`).
@@ -65,9 +71,9 @@ uv run ../../plugins/plugin-creator/skills/ensemble-rule-review/scripts/plan_ens
   ruleset/solid-rules.json --report-dir /abs/reports --window 2 --json
 ```
 
-The group letter (S/O/L/I/D) is the corroboration key; the `SRP-1`-style prefix in each rule is a
-stable rule id for the gold labels. `reduce.py` keys corroboration on `(group, location)`, so the
-scorer and gold do too.
+The group letter (S/O/L/I/D) identifies the review slice; the `SRP-1`-style prefix in each rule is
+a stable rule id for the gold labels. `reduce.py` keys corroboration on normalized location and
+retains every contributing group, so the scorer and gold do too.
 
 ## The fixed candidate schema (both arms emit this)
 
