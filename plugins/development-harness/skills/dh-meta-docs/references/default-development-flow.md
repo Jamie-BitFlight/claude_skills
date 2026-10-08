@@ -23,11 +23,7 @@ flowchart TD
     Human1 --> S2
     S2 -->|ARTIFACT:PLAN| S3[Stage 3 — Context Integration]
     S3 -->|Contextualized Plan| S4[Stage 4 — Task Decomposition]
-    S4 -->|ARTIFACT:TASK per task| Reuse{New tool or capability?}
-    Reuse -->|No, or applicable decision recorded| HT2{Human Touchpoint?}
-    Reuse -->|Yes, decision unresolved| Discover[Existing-solution research task]
-    Discover -->|ADOPT / ADAPT / BUILD JUSTIFIED| HT2
-    Discover -->|UNRESOLVED: defer affected task only| S4
+    S4 -->|ARTIFACT:TASK per task| HT2{Human Touchpoint?}
     HT2 -->|ARL — high complexity, novel architecture| Human2[Escalate to Human]
     HT2 -->|ARL — routine, patterns exist| S5[Stage 5 — Execution]
     Human2 --> S5
@@ -136,6 +132,9 @@ Each arrow represents a provider-owned artifact handoff. No stage reads from con
 - Map task dependencies and identify parallelization opportunities
 - Assign each task to the specialist agent `profile_list()` matches, or to the fallback agent
 - For proposed new tools or capabilities, apply [Reuse-before-build](../../../docs/reuse-before-build.md) before committing to a custom implementation. If unresolved, make discovery a predecessor for only the affected implementation task; continue independent tasks. Recheck decisions if requirements or chosen implementation change.
+
+The reuse decision is internal to S4 task design, not a new pipeline stage or artifact.
+Unresolved tool choice delays only the dependent task; unrelated tasks remain executable.
 
 **Output:** `ARTIFACT:TASK({task-id})` per task — create the task plan with
 `sam_plan(config={"action": "create", ...})`. Keep the returned `plan_ref`; discover plans with
