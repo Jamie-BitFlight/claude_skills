@@ -175,6 +175,19 @@ class TestFetchOnlyReconcileAdvancesTheCheckpoint:
 
         assert provider.fetch_snapshot_calls == []
 
+    def test_newer_supplied_snapshot_skips_a_second_provider_fetch(self, tmp_path: Path) -> None:
+        cache = FileCache(tmp_path)
+        cached = BacklogItem(title=_SHARED_TITLE, issue=_ISSUE_REFERENCE, section="P1")
+        cached.metadata.updated_at = "rev-0"
+        cache._save_work_item_snapshot("1", cached)
+        provider = _FakeReconcileProvider(_provider_snapshot())
+        reconciliation = _GitHubReconciliation(cache, provider)
+        request = ReconcileRequest(scope=ReconcileScope.TARGETED, references=[_ISSUE_REFERENCE])
+
+        reconciliation.reconcile(request, snapshot=_provider_snapshot())
+
+        assert provider.fetch_snapshot_calls == []
+
     def test_supplied_targeted_snapshot_must_cover_every_requested_reference(self, tmp_path: Path) -> None:
         reconciliation = _GitHubReconciliation(FileCache(tmp_path), _FakeReconcileProvider(_provider_snapshot()))
         request = ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#1", "#2"])

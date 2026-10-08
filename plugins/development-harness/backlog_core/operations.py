@@ -1384,6 +1384,8 @@ def _publish(
     target: DecisionTarget | None,
     output: Output,
     repo: str = "",
+    *,
+    refresh_grooming_snapshot: bool = False,
 ) -> None:
     """Publish one item's queued mutation immediately -- the sole publish step (design D4).
 
@@ -1420,6 +1422,8 @@ def _publish(
         output: Output aggregator that receives a reconciled/queued/
             unsupported status message.
         repo: Repository slug used for the command's provider observation.
+        refresh_grooming_snapshot: Fetch the provider state only after
+            reconciliation ownership is acquired for a grooming intent.
 
     Raises:
         CacheStateCorruptError: When the local cache state file is corrupted
@@ -1444,17 +1448,22 @@ def _publish(
     # context's copy specifically, since invalidate_snapshot() below only ever
     # updates the context, never a DecisionTarget the caller is still holding.
     snapshot: ProviderSnapshot | None = None
-    if context is not None and is_github:
+    if not refresh_grooming_snapshot and context is not None and is_github:
         try:
             snapshot = context.snapshot_for(
                 ReconcileRequest(scope=ReconcileScope.TARGETED, repo=repo, references=[item.issue])
             )
         except BacklogError:
             snapshot = None
-    if snapshot is None and target is not None and target.provider_snapshot is not None:
+    if (
+        not refresh_grooming_snapshot
+        and snapshot is None
+        and target is not None
+        and target.provider_snapshot is not None
+    ):
         holds_reference = any(provider_item.reference == item.issue for provider_item in target.provider_snapshot.items)
         snapshot = target.provider_snapshot if holds_reference else None
-    if snapshot is None and is_github:
+    if snapshot is None and is_github and not refresh_grooming_snapshot:
         output.info(f"Queued {item.issue} for provider reconciliation.")
         return
     try:
@@ -5076,7 +5085,7 @@ def update_item(
             append=append,
             sections=sections,
         )
-        _publish(item, context, target, out, repo)
+        _publish(item, context, target, out, repo, refresh_grooming_snapshot=True)
         return groomed_result
 
     if plan:
@@ -5197,7 +5206,7 @@ def groom_item(
             # has_input was False and this local write never happened, so a
             # bare mark_groomed=False call (or one that hit the two error/
             # not-found branches above) never publishes an unrelated no-op.
-            _publish(item, context, target, out, repo)
+            _publish(item, context, target, out, repo, refresh_grooming_snapshot=True)
     return result
 
 
