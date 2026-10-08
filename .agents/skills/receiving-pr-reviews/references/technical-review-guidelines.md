@@ -42,7 +42,7 @@ BEFORE implementing:
   2. Check: Breaks existing functionality?
   3. Check: Reason for current implementation?
   4. Check: Works on all platforms/versions?
-  5. Check: Does reviewer understand full context?
+  5. Check: Does feedback account for context established by code, tests, requirements, and prior decisions?
 
 IF suggestion seems wrong:
   Push back with technical reasoning
@@ -98,7 +98,7 @@ Push back when:
 - Reference working tests/code
 - Involve your human partner if architectural
 
-**If you're uncomfortable pushing back out loud:** Name that tension, then tell your partner about the issue you've seen. They'll appreciate your honesty.
+**If evidence remains insufficient or feedback conflicts with an architectural decision:** Identify the missing fact or conflicting requirement and ask the user a focused question.
 
 ## Avoid premature agreement
 
