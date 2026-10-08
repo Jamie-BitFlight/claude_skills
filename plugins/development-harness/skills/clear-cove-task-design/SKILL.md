@@ -75,6 +75,13 @@ criteria and verification sections. Keep planning at the current useful resoluti
 authorize test implementation or require a complete upfront suite for TDD. Continue independent
 planning when a design is partial; expose consequential missing decisions before execution.
 
+When a task proposes a new script, tool, utility, dependency, or implementation of a capability
+that may already exist, apply [Reuse-before-build](../../docs/reuse-before-build.md) before
+committing to the implementation approach. Carry the selected existing solution or justified
+build decision in the task's existing Context/Requirements/Verification fields. If the decision
+is unresolved, make discovery a predecessor task; do not pre-authorize custom implementation.
+Reuse an applicable prior decision without repeating its research.
+
 Every worker task must specify:
 
 - scope boundaries (what is in and out)
