@@ -79,7 +79,8 @@ When a task proposes a new script, tool, utility, dependency, or implementation 
 that may already exist, apply [Reuse-before-build](../../docs/reuse-before-build.md) before
 committing to the implementation approach. Carry the selected existing solution or justified
 build decision in the task's existing Context/Requirements/Verification fields. If the decision
-is unresolved, make discovery a predecessor task; do not pre-authorize custom implementation.
+is unresolved, make discovery a predecessor of the affected implementation only; continue
+independent work and do not pre-authorize custom implementation.
 Reuse an applicable prior decision without repeating its research.
 
 Every worker task must specify:
