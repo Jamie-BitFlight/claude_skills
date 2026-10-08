@@ -713,7 +713,11 @@ def _enrich_with_match_context(
     terms = _extract_leaf_terms(search) if search else []
     for item_index, item in enumerate(items):
         wide: dict[str, object] = dict(item)
-        raw_matches = list(regex_match_contexts[item_index]) if regex_match_contexts is not None else []
+        raw_matches = (
+            _render_regex_match_context(item, regex_match_contexts[item_index], snippet_context)
+            if regex_match_contexts is not None
+            else []
+        )
         for term in terms:
             if regex_match_contexts is not None and (
                 (term.startswith("/") and term.endswith("/") and len(term) > _REGEX_SLASH_MIN_LEN)
@@ -736,6 +740,24 @@ def _enrich_with_match_context(
         wide["matches"] = annotated
         enriched.append(wide)
     return enriched
+
+
+def _render_regex_match_context(
+    item: dict[str, str | bool], facts: list[dict[str, str]], snippet_context: int
+) -> list[dict[str, str]]:
+    """Render worker-produced match geometry with the caller's snippet width."""
+    body_sections = dict(_parse_body_sections(str(item.get("body", "") or "")))
+    rendered: list[dict[str, str]] = []
+    for fact in facts:
+        field = fact["field"]
+        text = body_sections.get(field, "") if field.startswith("body:") else str(item.get(field, "") or "")
+        start, end = int(fact["start"]), int(fact["end"])
+        rendered.append({
+            "field": field,
+            "term": fact["term"],
+            "snippet": _make_snippet(text, start, end, snippet_context),
+        })
+    return rendered
 
 
 # ---------------------------------------------------------------------------
@@ -773,6 +795,26 @@ def _dedup_by_issue_number(items: list[dict[str, str | bool]]) -> list[dict[str,
             seen.add(key)
         result.append(item)
     return result
+
+
+def _dedup_items_with_context(
+    items: list[dict[str, str | bool]], contexts: list[list[dict[str, str]]] | None
+) -> tuple[list[dict[str, str | bool]], list[list[dict[str, str]]] | None]:
+    """Deduplicate rows while preserving their worker context facts."""
+    if contexts is None:
+        return _dedup_by_issue_number(items), None
+    seen: set[str] = set()
+    retained_items: list[dict[str, str | bool]] = []
+    retained_contexts: list[list[dict[str, str]]] = []
+    for item, context in zip(items, contexts, strict=True):
+        key = str(item.get("issue", item.get("number", ""))).lstrip("#").strip()
+        if key and key.isdigit() and key in seen:
+            continue
+        if key and key.isdigit():
+            seen.add(key)
+        retained_items.append(item)
+        retained_contexts.append(context)
+    return retained_items, retained_contexts
 
 
 # ---------------------------------------------------------------------------
@@ -1956,7 +1998,12 @@ async def backlog_list(
     # Deduplicate by issue number — the cache may contain duplicate entries for
     # the same issue (observed: an issue appeared twice when multiple match paths
     # selected the same item).  Keyed on numeric issue number; first occurrence wins.
-    all_items = _dedup_by_issue_number(all_items)
+    regex_match_contexts = (
+        cast("list[list[dict[str, str]]]", result["regex_match_contexts"])
+        if isinstance(result.get("regex_match_contexts"), list)
+        else None
+    )
+    all_items, regex_match_contexts = _dedup_items_with_context(all_items, regex_match_contexts)
 
     # A GitHub-backed listing with an explicit positive limit already walked a
     # request-shaped page (D3/D4): `all_items` IS the requested slice, already
@@ -2017,9 +2064,13 @@ async def backlog_list(
         effective_limit = limit
         page_items = all_items
         has_more = bool(result.get("has_more"))
+        page_contexts = regex_match_contexts
     else:
         effective_limit = _resolve_effective_limit(all_items, offset, limit)
         page_items = all_items[offset : offset + effective_limit]
+        page_contexts = (
+            regex_match_contexts[offset : offset + effective_limit] if regex_match_contexts is not None else None
+        )
         # Not page_already_shaped means total was set to len(all_items) above -- always an int.
         has_more = (offset + effective_limit) < cast("int", total)
 
@@ -2031,13 +2082,9 @@ async def backlog_list(
     # Use a widened list type to accommodate the richer value types added by enrichment.
     match_pages: dict[str, object] | None = None
     if match_context:
-        raw_contexts = result.get("regex_match_contexts")
-        regex_match_contexts = (
-            cast("list[list[dict[str, str]]]", raw_contexts) if isinstance(raw_contexts, list) else None
-        )
         enriched_items, match_pages = _paginate_match_items(
             _enrich_with_match_context(
-                page_items, search, snippet_context=snippet_context, regex_match_contexts=regex_match_contexts
+                page_items, search, snippet_context=snippet_context, regex_match_contexts=page_contexts
             ),
             page=page,
             tokens_per_page=tokens_per_page,

@@ -200,7 +200,7 @@ async def test_backlog_list_timeout_returns_non_retryable_error():
 async def test_backlog_list_match_context_regex_uses_shared_timeout():
     op_result = {
         "items": [{"title": "a" * 50_000 + "!", "section": "P1", "issue": "#1", "plan": ""}],
-        "regex_match_contexts": [[{"field": "title", "term": "/a+a+$/", "snippet": "a"}]],
+        "regex_match_contexts": [[{"field": "title", "term": "/a+a+$/", "start": "0", "end": "1"}]],
         "count": 1,
         "total": 1,
         "has_more": False,

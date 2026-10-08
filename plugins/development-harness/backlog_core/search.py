@@ -373,16 +373,28 @@ def _worker_record_is(record: object, kind: str) -> bool:
     return isinstance(record, tuple) and len(record) >= 1 and record[0] == kind
 
 
-def _regex_term_context(item: dict[str, str | bool], term: str, pattern: re.Pattern[str]) -> list[dict[str, str]]:
-    """Return snippet records for one already-matched regex term."""
+def _regex_term_context(
+    item: dict[str, str | bool], term: str, pattern: re.Pattern[str] | None
+) -> list[dict[str, str]]:
+    """Return match geometry for one already-matched regex-form term."""
     matches: list[dict[str, str]] = []
+    needle = _regex_pattern_from_term(term)
+    if needle is None:
+        return matches
+    literal = pattern is None
     for field in ("title", "section", "topic", "type"):
         text = str(item.get(field, "") or "")
-        if match := pattern.search(text):
-            matches.append({"field": field, "term": term, "snippet": _make_snippet(text, match.start(), match.end())})
+        match = pattern.search(text) if pattern is not None else None
+        start = text.casefold().find(needle.casefold()) if literal else (match.start() if match else -1)
+        end = start + len(needle) if literal and start >= 0 else (match.end() if match else -1)
+        if start >= 0:
+            matches.append({"field": field, "term": term, "start": str(start), "end": str(end)})
     for field, text in _parse_body_sections(str(item.get("body", "") or "")):
-        if match := pattern.search(text):
-            matches.append({"field": field, "term": term, "snippet": _make_snippet(text, match.start(), match.end())})
+        match = pattern.search(text) if pattern is not None else None
+        start = text.casefold().find(needle.casefold()) if literal else (match.start() if match else -1)
+        end = start + len(needle) if literal and start >= 0 else (match.end() if match else -1)
+        if start >= 0:
+            matches.append({"field": field, "term": term, "start": str(start), "end": str(end)})
     return matches
 
 
@@ -398,7 +410,7 @@ def _predicate_with_regex_context(
         matched = predicate(item, haystack, deadline)
         contexts = (
             _regex_term_context(item, predicate.term, predicate.regex_pattern)
-            if (matched and predicate.regex_pattern is not None)
+            if (matched and _regex_pattern_from_term(predicate.term) is not None)
             else []
         )
         return matched, contexts
