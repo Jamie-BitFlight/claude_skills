@@ -1239,20 +1239,19 @@ def _grooming_intent(
         content=content,
         section_key=section_key,
         append=append,
-        entry_id=entry_id or "",
         replace_section=replace_section,
         reason=reason or "",
     )
-    if replace_section:
+    if append:
+        operation.created_entry_id = now_iso()
+    elif replace_section:
         if not reason:
             raise ValidationError("reason is required when replace_section=True")
         operation.struck_at = now_iso()
         operation.created_entry_id = now_iso()
     elif entry_id:
         operation.entry_id = _resolve_section_entry(entries, entry_id).id
-    elif not entry_id and (
-        append or (content.strip() and not any(entry.content == content and not entry.struck for entry in entries))
-    ):
+    elif content.strip() and not any(entry.content == content and not entry.struck for entry in entries):
         operation.created_entry_id = now_iso()
     return GroomingIntent(groomed_date=today(), operations=[operation])
 

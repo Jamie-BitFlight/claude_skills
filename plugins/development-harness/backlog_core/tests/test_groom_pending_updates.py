@@ -10,6 +10,7 @@ import pytest
 from backlog_core import operations
 from backlog_core.backend_types import BacklogConfig
 from backlog_core.backends.github_backend import GitHubBackend
+from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.file_cache import FileCache
 from backlog_core.models import (
     BackendUnavailableError,
@@ -20,6 +21,7 @@ from backlog_core.models import (
     ReconcileScope,
     Section,
 )
+from backlog_core.work_item_decisions import WorkItemDecisionContext
 
 from ._fake_github import FakeGitHubHarness, make_harness
 
@@ -102,6 +104,29 @@ def _groom_in_threads(reference: str, repo: str, *updates: tuple[str, str]) -> t
     return failures, threads
 
 
+def _hold_common_base_selection(monkeypatch: pytest.MonkeyPatch, expected_calls: int = 2) -> tuple[Event, Event]:
+    selected = Event()
+    release = Event()
+    lock = Lock()
+    calls = 0
+    original_select = WorkItemDecisionContext.select
+
+    def select_common_base(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        nonlocal calls
+        target = original_select(self, *args, **kwargs)
+        with lock:
+            calls += 1
+            hold = calls <= expected_calls
+            if calls == expected_calls:
+                selected.set()
+        if hold:
+            assert release.wait(timeout=5), "test did not release common-base selection"
+        return target
+
+    monkeypatch.setattr(WorkItemDecisionContext, "select", select_common_base)
+    return selected, release
+
+
 def _release_and_join(backend: _RendezvousBackend, failures: list[BacklogError], threads: list[Thread]) -> None:
     backend.release()
     for thread in threads:
@@ -117,18 +142,23 @@ def test_stale_different_section_grooms_coalesce_and_reconcile(
     writer = _RendezvousBackend(harness, tmp_path / "writer-cache")
     reference = _add_item(monkeypatch, writer)
     writer.pause_after_writes(2)
+    selected, release_selection = _hold_common_base_selection(monkeypatch)
 
     failures, threads = _groom_in_threads(
         reference, harness.repo, ("Research", "FIRST_RESEARCH"), ("Decision", "SECOND_DECISION")
     )
-    assert writer._queued.wait(timeout=5), "both public grooming calls did not reach the queue"
+    try:
+        assert selected.wait(timeout=5), "both public grooming calls did not select the common base"
+        release_selection.set()
+        assert writer._queued.wait(timeout=5), "both public grooming calls did not reach the queue"
 
-    pending = writer.pending_work_items(harness.repo)
-    assert len(pending) == 1
-    assert {entry.content for entry in _entries(pending[0], "research")} == {"FIRST_RESEARCH"}
-    assert {entry.content for entry in _entries(pending[0], "unknown__decision")} == {"SECOND_DECISION"}
-
-    _release_and_join(writer, failures, threads)
+        pending = writer.pending_work_items(harness.repo)
+        assert len(pending) == 1
+        assert {entry.content for entry in _entries(pending[0], "research")} == {"FIRST_RESEARCH"}
+        assert {entry.content for entry in _entries(pending[0], "unknown__decision")} == {"SECOND_DECISION"}
+    finally:
+        release_selection.set()
+        _release_and_join(writer, failures, threads)
     assert writer.pending_work_items(harness.repo) == []
 
     reader = harness.new_backend(tmp_path / "reader-cache")
@@ -145,16 +175,21 @@ def test_default_same_section_grooms_append_and_explicit_target_replaces(
     writer = _RendezvousBackend(harness, tmp_path / "writer-cache")
     reference = _add_item(monkeypatch, writer)
     writer.pause_after_writes(2)
+    selected, release_selection = _hold_common_base_selection(monkeypatch)
 
     failures, threads = _groom_in_threads(
         reference, harness.repo, ("Research", "FIRST_SAME"), ("Research", "SECOND_SAME")
     )
-    assert writer._queued.wait(timeout=5), "both public grooming calls did not reach the queue"
-    pending_entries = _entries(writer.pending_work_items(harness.repo)[0], "research")
-    assert {entry.content for entry in pending_entries} == {"FIRST_SAME", "SECOND_SAME"}
-    assert len({entry.id for entry in pending_entries}) == 2
-
-    _release_and_join(writer, failures, threads)
+    try:
+        assert selected.wait(timeout=5), "both public grooming calls did not select the common base"
+        release_selection.set()
+        assert writer._queued.wait(timeout=5), "both public grooming calls did not reach the queue"
+        pending_entries = _entries(writer.pending_work_items(harness.repo)[0], "research")
+        assert {entry.content for entry in pending_entries} == {"FIRST_SAME", "SECOND_SAME"}
+        assert len({entry.id for entry in pending_entries}) == 2
+    finally:
+        release_selection.set()
+        _release_and_join(writer, failures, threads)
     reader = harness.new_backend(tmp_path / "reader-cache")
     reader.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, repo=harness.repo, references=[reference]))
     first_id = next(
@@ -176,14 +211,12 @@ def test_default_same_section_grooms_append_and_explicit_target_replaces(
 
     thread = Thread(target=replace_target)
     thread.start()
-    assert replacement._queued.wait(timeout=5), "targeted replacement did not reach the queue"
-
-    pending = replacement.pending_work_items(harness.repo)
-    assert {entry.content for entry in _entries(pending[0], "research")} == {"REPLACED", "SECOND_SAME"}
-    replacement.release()
-    thread.join(timeout=5)
-    assert not thread.is_alive()
-    assert not failures
+    try:
+        assert replacement._queued.wait(timeout=5), "targeted replacement did not reach the queue"
+        pending = replacement.pending_work_items(harness.repo)
+        assert {entry.content for entry in _entries(pending[0], "research")} == {"REPLACED", "SECOND_SAME"}
+    finally:
+        _release_and_join(replacement, failures, [thread])
 
 
 def test_regular_full_item_writes_still_replace_pending_snapshot(
@@ -223,3 +256,41 @@ def test_mark_groomed_keeps_pending_groomed_section(
     assert len(pending) == 1
     assert {entry.content for entry in _entries(pending[0], "research")} == {"PRESERVE_WITH_STATUS"}
     assert pending[0].metadata.status == "groomed"
+
+
+def test_append_precedes_entry_target_for_public_grooming(monkeypatch: pytest.MonkeyPatch) -> None:
+    """append=True preserves the target and adds a new entry through groom_item."""
+    backend = InMemoryBackend()
+    item = BacklogItem(
+        title="Append precedence",
+        reference="append-precedence",
+        sections={"research": Section(entries=[Entry(id="old", content="OLD")])},
+    )
+    backend.put_work_item(item)
+    monkeypatch.setattr(operations, "get_config", lambda: BacklogConfig(backend=backend))
+
+    operations.groom_item(item.reference, section="Research", content="NEW", entry_id="old", append=True)
+
+    entries = _entries(backend.get_work_item(item.reference), "research")
+    assert {entry.content for entry in entries} == {"OLD", "NEW"}
+    assert len({entry.id for entry in entries}) == 2
+
+
+def test_replace_section_precedes_entry_target_for_public_grooming(monkeypatch: pytest.MonkeyPatch) -> None:
+    """replace_section=True strikes existing entries and appends a live replacement."""
+    backend = InMemoryBackend()
+    item = BacklogItem(
+        title="Replace precedence",
+        reference="replace-precedence",
+        sections={"research": Section(entries=[Entry(id="old", content="OLD")])},
+    )
+    backend.put_work_item(item)
+    monkeypatch.setattr(operations, "get_config", lambda: BacklogConfig(backend=backend))
+
+    operations.groom_item(
+        item.reference, section="Research", content="NEW", entry_id="old", replace_section=True, reason="superseded"
+    )
+
+    entries = _entries(backend.get_work_item(item.reference), "research")
+    assert [entry.content for entry in entries if not entry.struck] == ["NEW"]
+    assert all(entry.struck for entry in entries if entry.content == "OLD")
