@@ -1,54 +1,61 @@
 # Reuse-before-build decision
 
-Use this decision gate before choosing to author a new script, tool, utility, library, or
-implementation of a capability that might already be available. Apply it in task planning and
-recheck at execution when the implementation choice changes. Reuse an existing, still-applicable
-decision rather than repeating discovery.
+Before committing to a new script, tool, utility, library, module, dependency, or bespoke
+capability, determine whether a fit-for-purpose solution already exists. This is a
+decision gate, not a required research report. Reuse an applicable prior decision.
 
-## Decide at the smallest useful scale
+## Fast path
 
-1. **Specify the capability.** State required behavior, inputs/outputs, environment, constraints,
-   and how a candidate will be checked. Finish when the requirement is testable without assuming
-   a custom implementation.
-2. **Search nearest first.** Inspect platform/standard-library features, repository and installed
-   dependencies, existing CLI/MCP/skills, then maintained ecosystem packages and upstream tools.
-   Search external candidates when the capability is nontrivial or not locally solved. Finish when
-   plausible existing candidates are identified or a bounded search with sources is documented.
-3. **Understand viable candidates.** Read authoritative documentation and relevant implementation
-   or examples. Compare capability, interoperability, maintenance, license, supply-chain risk,
-   runtime/dependency cost, and replacement difficulty. Verify the package and version actually
-   exist. Finish when suitability and important unknowns are explicit.
-4. **Test the critical fit.** Prefer a minimal, safe, isolated proof against the hardest requirement.
-   Documentation-only assessment is acceptable for a trivial choice when a proof would not change
-   the decision; mark unverified claims. Finish when the decision is supported by evidence or
-   blocked by a specific unknown.
-5. **Choose the least new mechanism.** Prefer reuse/configuration; then a narrow adapter or
-   upstream extension; then custom implementation only with demonstrated deficiencies or
-   disproportionate integration cost. Finish with one of: ADOPT, ADAPT, BUILD JUSTIFIED,
-   or UNRESOLVED. UNRESOLVED defers implementation choice.
+1. **Define fit.** Name the required behavior and the requirement most likely to
+   disqualify a candidate. Do not assume a custom implementation.
+2. **Discover nearest first.** Check applicable prior decisions, platform/standard
+   library, repository code and installed dependencies, available CLI/MCP/skills,
+   then maintained ecosystem tools when the earlier sources do not establish fit.
+3. **Verify the decisive fit.** Read authoritative documentation and, when it could
+   change the decision, run a small safe proof of the hardest requirement.
+4. **Decide and stop.** Prefer ADOPT (reuse/configure), then ADAPT (narrow adapter
+   or upstream extension), then BUILD JUSTIFIED (evidence existing options fail or
+   integration costs materially outweigh reuse). UNRESOLVED defers only the
+   affected implementation choice. Stop searching once further evidence is
+   unlikely to change the choice.
 
-## Proportional evidence
+A candidate's existence is not proof of fit. Record decisive evidence and
+unverified claims separately. Recheck a prior decision only when requirements,
+environment, availability, or the selected implementation invalidate it.
 
-A trivial local helper can be resolved by inspecting existing code and standard-library APIs.
-A new parser, generator, test engine, or framework needs ecosystem comparison and a proof of
-the decisive behavior. Do not impose a new ADR or standalone artifact on every small change.
-For significant choices, record alternatives, evidence, trade-offs, and consequences in an
-existing design/decision record; for small tasks, use the task's existing context and handoff.
+## Escalate only when needed
 
-## Review check
+- **Known fit:** apply the still-valid decision without repeating research.
+- **Routine uncertainty:** inspect local facilities and a small number of plausible
+  candidates, testing the decisive requirement first.
+- **Novel, high-consequence, or unresolved:** compare credible external alternatives,
+  supported versions, interfaces, compatibility, license, maintenance, supply-chain
+  risk, and lifecycle cost; run a bounded proof where feasible.
 
-When reviewing a new custom mechanism, ask which existing options were checked and why they
-failed the requirement. Confirm the chosen option actually works at its intended boundary.
-If a fit-for-purpose tool was overlooked, recommend reuse before expanding bespoke code.
-Absence of a separate research document is not a defect when the decision is otherwise traceable.
+Do not assign a research tier or produce a matrix for every helper. A trivial local
+helper may need only repository and standard-library inspection. A new parser,
+generator, test engine, or framework normally merits external comparison.
 
-## References
+When a decisive check cannot run, label the claim unverified. Continue independent
+design, tests, or other tasks; do not authorize a custom build simply because
+discovery is incomplete. Ask for help only when the missing decision blocks the
+next consequential implementation step.
 
-- [Plugin Creator lifecycle](../../plugin-creator/skills/plugin-lifecycle/SKILL.md):
-  existing-solution research during new-plugin creation
-- [AWS ADR process](https://docs.aws.amazon.com/prescriptive-guidance/latest/architectural-decision-records/adr-process.html):
-  retain consequential technology-selection decisions
-- [ECC search-first](https://github.com/affaan-m/ECC/blob/main/skills/search-first/SKILL.md):
-  nearest-first discovery and proportional research
-- [Agentic Developer Cookbook](https://agenticdevelopercookbook.com/guidelines/planning/code-quality/reuse-before-build):
-  verify candidate availability and supply-chain suitability
+## Record and review
+
+Use existing task context, verification, and handoff fields for small decisions.
+For architecture-significant decisions, use the repository's ADR convention and
+record requirements, chosen option, decisive evidence, rejected alternatives,
+consequences, and invalidation conditions. Preserve enough context for a future
+agent to reuse the decision without replaying the search.
+
+When reviewing bespoke mechanisms, challenge the evidence of fit and rejected
+alternatives rather than requiring boilerplate. A missing standalone research
+document is not itself a defect.
+
+## Related guidance
+
+- [Decision architecture and alternatives](adrs/20261008-adaptive-reuse-before-build.md)
+- [Plugin Creator lifecycle](../../plugin-creator/skills/plugin-lifecycle/SKILL.md)
+- [AWS ADR process](https://docs.aws.amazon.com/prescriptive-guidance/latest/architectural-decision-records/adr-process.html)
+- [ECC search-first](https://github.com/affaan-m/ECC/blob/main/skills/search-first/SKILL.md)
