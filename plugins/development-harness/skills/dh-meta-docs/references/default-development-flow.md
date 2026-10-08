@@ -23,7 +23,7 @@ flowchart TD
     Human1 --> S2
     S2 -->|ARTIFACT:PLAN| S3[Stage 3 — Context Integration]
     S3 -->|Contextualized Plan| S4[Stage 4 — Task Decomposition]
-    S4 -->|ARTIFACT:TASK per task| HT2{Human Touchpoint?}
+    S4 -->|ARTIFACT:TASK per task| Reuse{New tool or capability?}\n    Reuse -->|No, or applicable decision recorded| HT2{Human Touchpoint?}\n    Reuse -->|Yes, decision unresolved| Discover[Existing-solution research task]\n    Discover -->|ADOPT / ADAPT / BUILD JUSTIFIED| HT2
     HT2 -->|ARL — high complexity, novel architecture| Human2[Escalate to Human]
     HT2 -->|ARL — routine, patterns exist| S5[Stage 5 — Execution]
     Human2 --> S5
@@ -130,7 +130,7 @@ Each arrow represents a provider-owned artifact handoff. No stage reads from con
 - Decompose plan into discrete tasks, each with clear scope
 - Write each task as a standalone record with inputs, acceptance criteria, and agent assignment
 - Map task dependencies and identify parallelization opportunities
-- Assign each task to the specialist agent `profile_list()` matches, or to the fallback agent
+- Assign each task to the specialist agent `profile_list()` matches, or to the fallback agent\n- For proposed new tools or capabilities, apply [Reuse-before-build](../../../docs/reuse-before-build.md) before committing to a custom implementation. If unresolved, make discovery a predecessor task; recheck decisions if requirements or chosen implementation change.
 
 **Output:** `ARTIFACT:TASK({task-id})` per task — create the task plan with
 `sam_plan(config={"action": "create", ...})`. Keep the returned `plan_ref`; discover plans with
