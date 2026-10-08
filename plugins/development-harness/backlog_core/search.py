@@ -378,7 +378,7 @@ def _regex_term_context(
 ) -> list[dict[str, str]]:
     """Return match geometry for one already-matched regex-form term."""
     matches: list[dict[str, str]] = []
-    needle = _regex_pattern_from_term(term)
+    needle = term if pattern is None else _regex_pattern_from_term(term)
     if needle is None:
         return matches
     literal = pattern is None
@@ -389,12 +389,18 @@ def _regex_term_context(
         end = start + len(needle) if literal and start >= 0 else (match.end() if match else -1)
         if start >= 0:
             matches.append({"field": field, "term": term, "start": str(start), "end": str(end)})
-    for field, text in _parse_body_sections(str(item.get("body", "") or "")):
+    for section_index, (field, text) in enumerate(_parse_body_sections(str(item.get("body", "") or ""))):
         match = pattern.search(text) if pattern is not None else None
         start = text.casefold().find(needle.casefold()) if literal else (match.start() if match else -1)
         end = start + len(needle) if literal and start >= 0 else (match.end() if match else -1)
         if start >= 0:
-            matches.append({"field": field, "term": term, "start": str(start), "end": str(end)})
+            matches.append({
+                "field": field,
+                "term": term,
+                "start": str(start),
+                "end": str(end),
+                "section_index": str(section_index),
+            })
     return matches
 
 

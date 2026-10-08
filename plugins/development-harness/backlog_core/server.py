@@ -746,11 +746,15 @@ def _render_regex_match_context(
     item: dict[str, str | bool], facts: list[dict[str, str]], snippet_context: int
 ) -> list[dict[str, str]]:
     """Render worker-produced match geometry with the caller's snippet width."""
-    body_sections = dict(_parse_body_sections(str(item.get("body", "") or "")))
+    body_sections = _parse_body_sections(str(item.get("body", "") or ""))
     rendered: list[dict[str, str]] = []
     for fact in facts:
         field = fact["field"]
-        text = body_sections.get(field, "") if field.startswith("body:") else str(item.get(field, "") or "")
+        text = (
+            body_sections[int(fact["section_index"])][1]
+            if field.startswith("body:")
+            else str(item.get(field, "") or "")
+        )
         start, end = int(fact["start"]), int(fact["end"])
         rendered.append({
             "field": field,
