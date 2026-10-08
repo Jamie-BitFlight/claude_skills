@@ -41,17 +41,17 @@ def reduce_frozen(manifest: dict, reports: list[dict], root: Path) -> dict:
     assignments = manifest["assignments"]
     if set(assignments) != {"w1", "w2", "w3"}:
         raise ExtractionError("invalid assignments")
-    if any(not isinstance(v, list) or not set(v) <= RULES or len(v) != len(set(v)) for v in assignments.values()):
+    if any(not isinstance(v, list) or any(not isinstance(rule, str) for rule in v)\n           or not set(v) <= RULES or len(v) != len(set(v)) for v in assignments.values()):
         raise ExtractionError("invalid rule slices")
     if any(sum(rule in assignments[w] for w in assignments) != 2 for rule in RULES):
         raise ExtractionError("each rule must have exactly two independent assignments")
     sources = {}
     for item in manifest["sources"]:
-        if set(item) != {"path", "sha256"}:
+        if not isinstance(item, dict) or set(item) != {"path", "sha256"}:
             raise ExtractionError("invalid source descriptor")
         name = item["path"]
         path = Path(name)
-        if path.is_absolute() or ".." in path.parts or not path.parts or name in sources:
+        if path.is_absolute() or ".." in path.parts or not path.parts or name in sources or str(path) != name:
             raise ExtractionError("unsafe or duplicate source path")
         full = root / path
         if not full.is_file() or full.is_symlink() or not full.resolve().is_relative_to(root.resolve()):
@@ -65,13 +65,13 @@ def reduce_frozen(manifest: dict, reports: list[dict], root: Path) -> dict:
     votes = defaultdict(set)
     for report in reports:
         worker = report["worker"]
-        if set(report) != {"worker", "findings"} or not isinstance(report["findings"], list):
+        if not isinstance(report, dict) or set(report) != {"worker", "findings"} or not isinstance(report["findings"], list):
             raise ExtractionError("invalid worker report")
         for finding in report["findings"]:
-            if set(finding) != {"rule", "path", "start", "end", "quote", "kind"}:
+            if not isinstance(finding, dict) or set(finding) != {"rule", "path", "start", "end", "quote", "kind"}:
                 raise ExtractionError("invalid finding shape")
             rule, name = finding["rule"], finding["path"]
-            if rule not in assignments[worker] or name not in sources:
+            if not isinstance(rule, str) or not isinstance(name, str) or rule not in assignments[worker] or name not in sources:
                 raise ExtractionError("unassigned rule or source")
             start, end = finding["start"], finding["end"]
             data = sources[name]
@@ -103,9 +103,9 @@ def main() -> int:
         parser.error("exactly three --worker files required")
     try:
         result = reduce_frozen(_load(args.manifest), [_load(p) for p in args.worker], args.root)
-    except (ExtractionError, OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
+    except (ExtractionError, OSError, KeyError, TypeError, ValueError, AttributeError, json.JSONDecodeError) as exc:
         parser.error(str(exc))
-    args.output.write_bytes(canonical(result))
+    # Output is staging only. Never overwrite an existing artifact implicitly.\n    try:\n        with args.output.open("xb") as stream:\n            stream.write(canonical(result))\n    except OSError as exc:\n        parser.error(f"cannot create staged output: {exc}")
     return 0
 
 
