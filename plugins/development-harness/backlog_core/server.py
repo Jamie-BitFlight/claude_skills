@@ -680,7 +680,10 @@ def _extract_leaf_terms(search: str) -> list[str]:
 
 
 def _enrich_with_match_context(
-    items: list[dict[str, str | bool]], search: str | None, snippet_context: int = _DEFAULT_SNIPPET_CONTEXT
+    items: list[dict[str, str | bool]],
+    search: str | None,
+    snippet_context: int = _DEFAULT_SNIPPET_CONTEXT,
+    regex_match_contexts: list[list[dict[str, str]]] | None = None,
 ) -> list[dict[str, object]]:
     """Add ``matches`` and ``match_header`` keys to each item based on the search query terms.
 
@@ -700,6 +703,7 @@ def _enrich_with_match_context(
         items: Items already filtered by search (via ``operations.list_items``).
         search: The original search query string, or ``None``.
         snippet_context: Total character budget for pre + post context per match.
+        regex_match_contexts: Worker-produced regex context records aligned to *items*.
 
     Returns:
         New list of dicts (widened to ``dict[str, object]``) with ``matches``
@@ -707,10 +711,15 @@ def _enrich_with_match_context(
     """
     enriched: list[dict[str, object]] = []
     terms = _extract_leaf_terms(search) if search else []
-    for item in items:
+    for item_index, item in enumerate(items):
         wide: dict[str, object] = dict(item)
-        raw_matches: list[dict[str, str]] = []
+        raw_matches = list(regex_match_contexts[item_index]) if regex_match_contexts is not None else []
         for term in terms:
+            if regex_match_contexts is not None and (
+                (term.startswith("/") and term.endswith("/") and len(term) > _REGEX_SLASH_MIN_LEN)
+                or term.startswith("regex:")
+            ):
+                continue
             raw_matches.extend(_collect_match_context(item, term, snippet_context=snippet_context))
 
         number = str(item.get("issue", item.get("number", ""))).lstrip("#")
@@ -1896,6 +1905,7 @@ async def backlog_list(
                 offset=operations_offset,
                 limit=operations_limit,
                 count_only=count_only,
+                match_context=match_context,
                 output=out,
             ),
             asyncio.to_thread(_probe_backend_status),
@@ -2021,8 +2031,14 @@ async def backlog_list(
     # Use a widened list type to accommodate the richer value types added by enrichment.
     match_pages: dict[str, object] | None = None
     if match_context:
+        raw_contexts = result.get("regex_match_contexts")
+        regex_match_contexts = (
+            cast("list[list[dict[str, str]]]", raw_contexts) if isinstance(raw_contexts, list) else None
+        )
         enriched_items, match_pages = _paginate_match_items(
-            _enrich_with_match_context(page_items, search, snippet_context=snippet_context),
+            _enrich_with_match_context(
+                page_items, search, snippet_context=snippet_context, regex_match_contexts=regex_match_contexts
+            ),
             page=page,
             tokens_per_page=tokens_per_page,
             page_token_limit=page_token_limit,

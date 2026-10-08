@@ -25,11 +25,13 @@ threshold and was never detected.
 from __future__ import annotations
 
 import re
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 from backlog_core.models import SearchTimeoutError
 from backlog_core.search import (
     ContentDuplicateMatch,
+    _apply_regex_search_filter,
     _compile_regex_term,
     apply_search_filter,
     build_concept_query,
@@ -94,6 +96,47 @@ class TestApplySearchFilter:
 
         with pytest.raises(SearchTimeoutError):
             apply_search_filter(items, "/a+a+$|matches/")
+
+    def test_completed_regex_result_transfers_after_matching_budget(self) -> None:
+        item = _candidate("match", "")
+        parent_connection = MagicMock()
+        child_connection = MagicMock()
+        worker = MagicMock()
+        worker.sentinel = object()
+        context = MagicMock()
+        context.Pipe.return_value = (parent_connection, child_connection)
+        context.Process.return_value = worker
+        parent_connection.recv.side_effect = [("READY",), ("MATCHED",), ("RESULT", [item], [])]
+
+        with (
+            patch("backlog_core.search.multiprocessing.get_context", return_value=context),
+            patch(
+                "backlog_core.search.wait", side_effect=[[parent_connection], [parent_connection], [parent_connection]]
+            ),
+            patch("backlog_core.search.time.monotonic", side_effect=[100.0, 100.01]),
+        ):
+            assert _apply_regex_search_filter([item], "/match/") == [item]
+
+        parent_connection.send.assert_has_calls([call(("MATCH", 100.1)), call(("TRANSFER",))])
+
+    def test_regex_worker_start_failure_is_typed_and_closes_endpoints(self) -> None:
+        parent_connection = MagicMock()
+        child_connection = MagicMock()
+        worker = MagicMock()
+        worker.start.side_effect = OSError("cannot start")
+        context = MagicMock()
+        context.Pipe.return_value = (parent_connection, child_connection)
+        context.Process.return_value = worker
+
+        with (
+            patch("backlog_core.search.multiprocessing.get_context", return_value=context),
+            pytest.raises(SearchTimeoutError),
+        ):
+            _apply_regex_search_filter([], "/match/")
+
+        parent_connection.close.assert_called_once()
+        child_connection.close.assert_called_once()
+        worker.kill.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

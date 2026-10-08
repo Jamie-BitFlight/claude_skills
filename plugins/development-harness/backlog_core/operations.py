@@ -110,6 +110,7 @@ from .search import (
     PreparedSearch,
     _contains_regex_form,
     apply_search_filter,
+    apply_search_filter_with_context,
     find_content_duplicates,
     prepare_search_filter,
 )
@@ -2809,6 +2810,41 @@ def _list_status_resolution(
     return _resolve_list_status_map(open_items, repo, status, output)
 
 
+def _apply_regex_result_page(
+    items: list[dict[str, str | bool]],
+    search: str | None,
+    regex_search: bool,
+    page: ListPage | None,
+    offset: int,
+    limit: int,
+    count_only: bool,
+    match_context: bool,
+) -> tuple[list[dict[str, str | bool]], int | None, bool, list[list[dict[str, str]]] | None]:
+    """Apply regex filtering and request pagination after candidate acquisition.
+
+    Returns:
+        Request-shaped items, exact regex total when known, ``has_more``, and
+        context records aligned with the returned items.
+    """
+    if search is None or (page is not None and not regex_search):
+        return items, None, False, None
+    contexts: list[list[dict[str, str]]] | None = None
+    if regex_search and match_context:
+        items, contexts = apply_search_filter_with_context(items, search)
+    else:
+        items = apply_search_filter(items, search)
+    if page is None or not regex_search:
+        return items, None, False, contexts
+    total = len(items)
+    page_items = items[offset:]
+    has_more = limit > 0 and len(page_items) > limit
+    if limit > 0:
+        page_items = page_items[:limit]
+    if contexts is not None:
+        contexts = contexts[offset : offset + limit] if limit > 0 else contexts[offset:]
+    return ([] if count_only else page_items), total, has_more, contexts
+
+
 def list_items(
     refresh: bool = False,
     allow_cached: bool = False,
@@ -2826,7 +2862,8 @@ def list_items(
     offset: int = 0,
     limit: int = 0,
     count_only: bool = False,
-) -> dict[str, int | bool | str | list[str] | list[dict[str, str | bool]] | None]:
+    match_context: bool = False,
+) -> dict[str, int | bool | str | list[str] | list[dict[str, str | bool]] | list[list[dict[str, str]]] | None]:
     """List backlog items from one live provider observation when supported.
 
     Provider-backed commands attempt the live read first and raise when it
@@ -2874,6 +2911,8 @@ def list_items(
             work-item content beyond what matching needs and writes nothing
             through to the cache, so the returned rows may carry raw issue
             bodies. With *refresh*, the page is read and reconciled in full.
+        match_context: Return worker-produced regex context records for the
+            MCP presentation layer.
 
     Returns:
         Dict with items list (each item a dict with section, title, issue, plan, type, topic,
@@ -3016,17 +3055,9 @@ def list_items(
     ]
     if filter_by_key:
         result_items = [it for it in result_items if all(str(it.get(k)) == v for k, v in filter_by_key.items())]
-    regex_total: int | None = None
-    regex_has_more = False
-    if search is not None and (page is None or regex_search):
-        result_items = apply_search_filter(result_items, search)
-    if page is not None and regex_search:
-        regex_total = len(result_items)
-        page_items = result_items[offset:]
-        if limit > 0:
-            regex_has_more = len(page_items) > limit
-            page_items = page_items[:limit]
-        result_items = [] if count_only else page_items
+    result_items, regex_total, regex_has_more, regex_match_contexts = _apply_regex_result_page(
+        result_items, search, regex_search, page, offset, limit, count_only, match_context
+    )
     (status_source, unavailable_capabilities, filters_evaluated_against_unavailable_data) = _listing_status_metadata(
         status_resolution, [str(item.get("issue", "")) for item in result_items], status, filter_by_key
     )
@@ -3045,6 +3076,8 @@ def list_items(
         # must not re-slice or re-count this page against a full local fetch.
         result["total"] = regex_total if regex_search else page.total
         result["has_more"] = regex_has_more if regex_search else page.has_more
+    if regex_match_contexts is not None and not count_only:
+        result["regex_match_contexts"] = regex_match_contexts
     return result
 
 

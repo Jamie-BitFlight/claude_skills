@@ -197,6 +197,25 @@ async def test_backlog_list_timeout_returns_non_retryable_error():
     assert response["retryable"] is False
 
 
+async def test_backlog_list_match_context_regex_uses_shared_timeout():
+    op_result = {
+        "items": [{"title": "a" * 50_000 + "!", "section": "P1", "issue": "#1", "plan": ""}],
+        "regex_match_contexts": [[{"field": "title", "term": "/a+a+$/", "snippet": "a"}]],
+        "count": 1,
+        "total": 1,
+        "has_more": False,
+        "from_cache": False,
+        "has_pending_writes": False,
+        "status_source": "live",
+        "unavailable_capabilities": [],
+        "filters_evaluated_against_unavailable_data": [],
+    }
+    with patch("dh_core.operations.list_items", return_value=op_result):
+        response = await _call("backlog_list", {"search": "/a+a+$/", "match_context": True, "limit": 1})
+
+    assert response["items"][0]["matches"][0]["term"] == "/a+a+$/"
+
+
 async def test_backlog_list_preserves_regex_operation_pagination():
     op_result = {
         "items": [{"title": "second \u0131", "section": "P1", "issue": "#2", "plan": ""}],

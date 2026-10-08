@@ -33,6 +33,7 @@ _REGEX_SLASH_MIN_LEN = 2
 _REGEX_MATCH_TIMEOUT_SECONDS = 0.1
 _MATCH_COMMAND_LENGTH = 2
 _RESULT_RECORD_LENGTH = 2
+_RESULT_RECORD_WITH_CONTEXT_LENGTH = 3
 
 
 def _regex_pattern_from_term(term: str) -> str | None:
@@ -372,7 +373,53 @@ def _worker_record_is(record: object, kind: str) -> bool:
     return isinstance(record, tuple) and len(record) >= 1 and record[0] == kind
 
 
-def _regex_worker(items: list[dict[str, str | bool]], search: str, connection: Connection) -> None:
+def _regex_term_context(item: dict[str, str | bool], term: str, pattern: re.Pattern[str]) -> list[dict[str, str]]:
+    """Return snippet records for one already-matched regex term."""
+    matches: list[dict[str, str]] = []
+    for field in ("title", "section", "topic", "type"):
+        text = str(item.get(field, "") or "")
+        if match := pattern.search(text):
+            matches.append({"field": field, "term": term, "snippet": _make_snippet(text, match.start(), match.end())})
+    for field, text in _parse_body_sections(str(item.get("body", "") or "")):
+        if match := pattern.search(text):
+            matches.append({"field": field, "term": term, "snippet": _make_snippet(text, match.start(), match.end())})
+    return matches
+
+
+def _predicate_with_regex_context(
+    predicate: _Predicate, item: dict[str, str | bool], haystack: str, deadline: float
+) -> tuple[bool, list[dict[str, str]]]:
+    """Evaluate a predicate once, retaining regex context from evaluated matching leaves.
+
+    Returns:
+        Whether the predicate matched and its evaluated regex context records.
+    """
+    if isinstance(predicate, _TermPred):
+        matched = predicate(item, haystack, deadline)
+        contexts = (
+            _regex_term_context(item, predicate.term, predicate.regex_pattern)
+            if (matched and predicate.regex_pattern is not None)
+            else []
+        )
+        return matched, contexts
+    if isinstance(predicate, _AndPred):
+        left, contexts = _predicate_with_regex_context(predicate.left, item, haystack, deadline)
+        if not left:
+            return False, []
+        right, right_contexts = _predicate_with_regex_context(predicate.right, item, haystack, deadline)
+        return right, contexts + right_contexts if right else []
+    if isinstance(predicate, _OrPred):
+        left, contexts = _predicate_with_regex_context(predicate.left, item, haystack, deadline)
+        return (True, contexts) if left else _predicate_with_regex_context(predicate.right, item, haystack, deadline)
+    if isinstance(predicate, _NotPred):
+        matched, _ = _predicate_with_regex_context(predicate.operand, item, haystack, deadline)
+        return not matched, []
+    return True, []
+
+
+def _regex_worker(
+    items: list[dict[str, str | bool]], search: str, include_match_context: bool, connection: Connection
+) -> None:
     """Prepare and evaluate one regex search in a cancellable child process."""
     try:
         prepared_search = prepare_search_filter(search)
@@ -391,25 +438,44 @@ def _regex_worker(items: list[dict[str, str | bool]], search: str, connection: C
             connection.send(("ERROR",))
             return
         deadline = command[1]
-        matches = [item for item, haystack in prepared_items if prepared_search.predicate(item, haystack, deadline)]
-        connection.send(("RESULT", matches))
+        matches: list[dict[str, str | bool]] = []
+        contexts: list[list[dict[str, str]]] = []
+        for item, haystack in prepared_items:
+            if include_match_context:
+                matched, item_context = _predicate_with_regex_context(
+                    prepared_search.predicate, item, haystack, deadline
+                )
+            else:
+                matched, item_context = prepared_search.predicate(item, haystack, deadline), []
+            if matched:
+                matches.append(item)
+                contexts.append(item_context)
+        connection.send(("MATCHED",))
+        if connection.recv() != ("TRANSFER",):
+            return
+        connection.send(("RESULT", matches, contexts))
     finally:
         connection.close()
 
 
-def _cleanup_regex_worker(process: BaseProcess | None, connection: Connection) -> None:
+def _cleanup_regex_worker(
+    process: BaseProcess | None, started: bool, parent_connection: Connection, child_connection: Connection
+) -> None:
     """Stop and release one regex worker and the parent endpoint."""
     try:
-        if process is not None:
+        if process is not None and started:
             if process.is_alive():
                 process.kill()
             process.join()
             process.close()
     finally:
-        connection.close()
+        parent_connection.close()
+        child_connection.close()
 
 
-def _apply_regex_search_filter(items: list[dict[str, str | bool]], search: str) -> list[dict[str, str | bool]]:
+def _apply_regex_search_filter_result(
+    items: list[dict[str, str | bool]], search: str, include_match_context: bool
+) -> tuple[list[dict[str, str | bool]], list[list[dict[str, str]]]]:
     """Run one complete regex query in a spawned stdlib worker.
 
     Returns:
@@ -418,10 +484,12 @@ def _apply_regex_search_filter(items: list[dict[str, str | bool]], search: str) 
     context = multiprocessing.get_context("spawn")
     parent_connection, child_connection = context.Pipe(duplex=True)
     process: BaseProcess | None = None
+    started = False
     try:
-        process = context.Process(target=_regex_worker, args=(items, search, child_connection))
+        process = context.Process(target=_regex_worker, args=(items, search, include_match_context, child_connection))
         worker = process
         worker.start()
+        started = True
         child_connection.close()
 
         ready_handles = wait([parent_connection, worker.sentinel], timeout=None)
@@ -440,19 +508,41 @@ def _apply_regex_search_filter(items: list[dict[str, str | bool]], search: str) 
         if parent_connection not in result_handles:
             raise SearchTimeoutError
         result = parent_connection.recv()
+        if not (_worker_record_is(result, "MATCHED") and isinstance(result, tuple) and len(result) == 1):
+            raise SearchTimeoutError
+        parent_connection.send(("TRANSFER",))
+        transfer_handles = wait([parent_connection, worker.sentinel], timeout=None)
+        if parent_connection not in transfer_handles:
+            raise SearchTimeoutError
+        result = parent_connection.recv()
         if not (
             _worker_record_is(result, "RESULT")
             and isinstance(result, tuple)
-            and len(result) == _RESULT_RECORD_LENGTH
+            and len(result) == _RESULT_RECORD_WITH_CONTEXT_LENGTH
             and isinstance(result[1], list)
+            and isinstance(result[2], list)
             and all(isinstance(item, dict) for item in result[1])
         ):
             raise SearchTimeoutError
-        return result[1]
-    except (EOFError, OSError, ValueError, TypeError):
+        return result[1], result[2]
+    except (AssertionError, EOFError, OSError, RuntimeError, ValueError, TypeError):
         raise SearchTimeoutError from None
     finally:
-        _cleanup_regex_worker(process, parent_connection)
+        _cleanup_regex_worker(process, started, parent_connection, child_connection)
+
+
+def _apply_regex_search_filter(items: list[dict[str, str | bool]], search: str) -> list[dict[str, str | bool]]:
+    """Return one complete regex-filtered list."""
+    return _apply_regex_search_filter_result(items, search, False)[0]
+
+
+def apply_search_filter_with_context(
+    items: list[dict[str, str | bool]], search: str
+) -> tuple[list[dict[str, str | bool]], list[list[dict[str, str]]]]:
+    """Return regex-filtered items and context from one worker pass."""
+    if _contains_regex_form(search):
+        return _apply_regex_search_filter_result(items, search, True)
+    return apply_search_filter(items, search), [[] for _ in items]
 
 
 def apply_search_filter(items: list[dict[str, str | bool]], search: str) -> list[dict[str, str | bool]]:
