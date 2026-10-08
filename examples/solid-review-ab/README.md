@@ -71,9 +71,9 @@ uv run ../../plugins/plugin-creator/skills/ensemble-rule-review/scripts/plan_ens
   ruleset/solid-rules.json --report-dir /abs/reports --window 2 --json
 ```
 
-The group letter (S/O/L/I/D) is the corroboration key; the `SRP-1`-style prefix in each rule is a
-stable rule id for the gold labels. `reduce.py` keys corroboration on `(group, location)`, so the
-scorer and gold do too.
+The group letter (S/O/L/I/D) identifies the review slice; the `SRP-1`-style prefix in each rule is
+a stable rule id for the gold labels. `reduce.py` keys corroboration on normalized location and
+retains every contributing group, so the scorer and gold do too.
 
 ## The fixed candidate schema (both arms emit this)
 

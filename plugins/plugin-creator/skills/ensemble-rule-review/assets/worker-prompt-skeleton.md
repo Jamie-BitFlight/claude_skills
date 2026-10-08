@@ -33,12 +33,12 @@ fields or change the leading "- group:"):
   severity: {{critical | high | medium | low}}
   evidence: "{{exact short quote from the input}}"
 
-CORROBORATION KEY — the reducer dedups on (group, location), NOT on your rule slug. `group` MUST
+CORROBORATION KEY — the reducer dedups on normalized location, NOT on your rule slug. `group` MUST
 be the id of the specific RULE that this finding violates — not a single per-worker constant. If
 you hold rules from two groups (e.g. groups 1 and 2 under rotating overlap), a finding against a
 group-1 rule emits `group: 1` and a finding against a group-2 rule emits `group: 2`. Tagging every
-finding with one worker-level id would mislabel the second group and break corroboration with the
-other worker assigned to it. The rule slug may differ between workers; only the group id must match.
+finding with one worker-level id would mislabel the second group. The reducer retains every group
+at the same normalized location; the rule slug may differ between workers and never controls merge.
 
 OUTPUT CONTRACT:
 Write all findings to {{OUTFILE}}. {{OUTFILE}} MUST be an ABSOLUTE path (e.g.
@@ -69,11 +69,11 @@ Trace every finding to a real located hit. No invented locations or quotes.
 ## Reducer input contract
 
 The reducer script `../scripts/reduce.py` consumes the worker output files and keys corroboration
-on `(group, location)` — never the free-form `rule` slug. Keep `group` identical across all
-workers who hold that group, and write `location` as `file:line` using the repo-relative path (not
-just the basename). The reducer strips any leading `/` and trims whitespace but PRESERVES the
-directory portion, so two workers reporting the same `path:line` collide into one weighted entry,
-while same-basename files in different directories (`src/foo/config.py:10` vs
+on normalized `location` — never the free-form `rule` slug. Emit the correct per-rule `group` and
+write `location` as `file:line` using the repo-relative path (not just the basename). The reducer
+strips any leading `/` and trims whitespace but PRESERVES the directory portion, so two workers
+reporting the same `path:line` collide into one weighted entry with all groups retained, while
+same-basename files in different directories (`src/foo/config.py:10` vs
 `tests/foo/config.py:10`) stay distinct and never fabricate a false corroboration. Run it with:
 
 ```bash

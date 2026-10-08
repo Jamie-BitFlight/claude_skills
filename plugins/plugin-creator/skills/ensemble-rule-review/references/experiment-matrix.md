@@ -15,7 +15,7 @@ confounded model tier, architecture, and measurement and proved nothing).
 | keep_threshold | 1 (recall) / 2 / majority `ceil(window/2)+` / `window` (strict) | Precision-recall trade; calibrate on gold set |
 | window `w` (overlap degree) | 2 / 3 / higher | Higher = stronger denoising + cost; raises uniform redundancy `r=w` |
 | weight function | distinct-agent count / count blended with severity / count blended with evidence presence | Whether severity or evidence should lift weak-corroboration findings |
-| corroboration key | `(group, location)` / `(group, normalized location)` | Path normalization granularity; never key on the free-form rule slug |
+| corroboration key | normalized location (fixed) | Preserve path normalization and contributing-group metadata; never key on the free-form rule slug |
 | minority-report carve-out | off / exempt critical+high from tail cut | Recovers lone true criticals; risks surfacing lone systematic false positives (guard with verifier) |
 
 ### B. Reviews (the workers)

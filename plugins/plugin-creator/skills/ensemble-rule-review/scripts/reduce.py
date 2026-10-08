@@ -5,11 +5,11 @@
 """Corroboration-weighting reducer for the ensemble-rule-review pattern.
 
 Reads one fixed-schema findings file per worker, deduplicates findings on a
-STABLE key (the worker's assigned group id plus the normalized location — never
-the free-form rule slug, which differs between workers), counts how many
-distinct workers independently reported each finding (the corroboration weight),
-drops PASS verdicts and the low-weight tail except critical/high findings, and
-prints a ranked report that distinguishes preservation from corroboration.
+STABLE normalized location key (never the free-form rule slug, which differs
+between workers), records all contributing groups, counts how many distinct
+workers reported each finding (the corroboration weight), drops PASS verdicts
+and the low-weight tail except critical/high findings, and prints a ranked
+report that distinguishes preservation from corroboration.
 
 Fixed finding schema each worker emits (one block per finding, blocks separated
 by the block-start field reappearing):
@@ -21,11 +21,10 @@ by the block-start field reappearing):
       severity: critical | high | medium | low
       evidence: "<exact snippet>"
 
-Why key on group, not rule: workers author their own `rule` slugs, so two
-workers flagging the same defect emit different slugs. Keying corroboration on
-the worker-authored slug would never corroborate. The `group` id is assigned by
-the orchestrator (the rule-group number from the rotating split) and is therefore
-identical across workers — the only stable corroboration key.
+Why key on location, not rule: workers author their own `rule` slugs, so two
+workers flagging the same defect emit different slugs. The reducer retains the
+first `group` as a compatibility field and records every contributing group in
+`groups_seen`; different groups at the same normalized location therefore merge.
 
 Usage:
     uv run reduce.py REPORT_DIR [--glob 'review-*.md'] [--keep-threshold N] [--slug-headings]
@@ -56,8 +55,7 @@ SEVERITY_RANK = {"critical": 4, "high": 3, "medium": 2, "low": 1}
 BLOCK_START_FIELD = "group"
 # A finding is "corroborated" once at least this many distinct workers report it.
 CORROBORATION_MIN = 2
-# A finding is "cross-group" once it was independently surfaced from at least this
-# many distinct rule groups (a stronger signal than same-group corroboration alone).
+# A finding is "cross-group" once it has at least this many distinct rule groups.
 CROSS_GROUP_MIN = 2
 
 
@@ -75,7 +73,7 @@ class Finding:
 
 @dataclass
 class Merged:
-    """A deduplicated finding with accumulated corroboration."""
+    """A location-deduplicated finding with representative and contributing groups."""
 
     group: str
     location: str
@@ -91,12 +89,7 @@ class Merged:
 
     @property
     def cross_group(self) -> bool:
-        """Whether this finding was corroborated across two or more distinct rule groups.
-
-        A finding corroborated across multiple rule groups is more credible than one
-        found only by workers within the same group, since it was independently
-        surfaced from different rule slices rather than repeated coverage of one slice.
-        """
+        """Whether this finding has two or more distinct contributing rule groups."""
         return len(self.groups_seen) >= CROSS_GROUP_MIN
 
 
@@ -205,13 +198,13 @@ def reduce_findings(
         Retained `Merged` findings, ranked by corroboration weight then severity,
         highest first. Preservation is not a verification verdict.
     """
-    merged: dict[tuple[str, str], Merged] = {}
+    merged: dict[str, Merged] = {}
     for agent, findings in reports.items():
         for finding in findings:
             if finding.verdict == "PASS":
                 continue
             location = normalize_location(finding.location, slug_headings=slug_headings)
-            key = (finding.group, location)
+            key = location
             entry = merged.get(key)
             if entry is None:
                 entry = Merged(group=finding.group, location=location)
@@ -270,7 +263,8 @@ def format_report(reports: dict[str, list[Finding]], survivors: list[Merged], ke
         tag = "KEEP" if m.weight >= keep_threshold else "PRESERVED"
         agents = "".join(sorted(m.agents))
         rules = "|".join(sorted(m.rules)) or "?"
-        line = f"[{tag} w={m.weight}] group={m.group} {m.location}  sev={m.severity}  agents={agents}  rule={rules}"
+        groups = "|".join(sorted(m.groups_seen or {m.group}))
+        line = f"[{tag} w={m.weight}] group={groups} {m.location}  sev={m.severity}  agents={agents}  rule={rules}"
         line += f"  corroborated={m.weight >= CORROBORATION_MIN}"
         if m.cross_group:
             line += "  cross_group=True"

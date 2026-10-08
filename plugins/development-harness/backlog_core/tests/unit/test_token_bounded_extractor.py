@@ -29,14 +29,14 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import pytest
-from progressive_markdown.list_navigator import ENCODING
-from progressive_markdown.token_bounded import BoundedContent, TokenBoundedExtractor
 
 # Intentionally fails at collection until T18 creates this module.
 from backlog_core.disclosure_handler import BacklogViewDisclosureHandler
 from backlog_core.disclosure_types import BoundedResponse
 from backlog_core.models import Output
 from backlog_core.tests.conftest import REAL_CL100K_AVAILABLE
+from progressive_markdown.list_navigator import ENCODING
+from progressive_markdown.token_bounded import BoundedContent, TokenBoundedExtractor
 
 # ---------------------------------------------------------------------------
 # Module-level mark — skip all tests when real cl100k_base is unavailable

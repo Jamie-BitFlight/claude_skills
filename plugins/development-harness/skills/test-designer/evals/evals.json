@@ -84,6 +84,48 @@
       "prompt": "A login test submits invalid credentials and asserts stderr is exactly \"Authentication failed\". That message is the documented observable that distinguishes the authentication-failure path from parser, network, and internal-error paths. Review the proposed assertion before implementation.",
       "expected_output": "Accept text as a legitimate oracle when this exact observable discriminates the consequential authentication-failure behavior/path and its authority is established. Do not reject it merely because it is an exact string; the protected claim is the error-path behavior, not the continued existence of arbitrary prose.",
       "files": []
+    },
+    {
+      "id": 15,
+      "prompt": "An API supports create/update/delete across authenticated and unauthenticated callers, JSON and form payloads, and primary/replica storage. The product contract requires every unauthenticated operation to be rejected without mutation. Design maintained test protection without writing code.",
+      "expected_output": "Recognize interacting factors and use systematic combination selection where economical. Do not constrain away reachable unauthenticated PUT/DELETE-style requests merely because they are invalid: preserve rejection and forbidden-mutation observations. Define factors/value partitions and a justified interaction strength, credit existing protection, independently justify the oracle, and distinguish generated combination coverage from executed behavioral evidence.",
+      "files": []
+    },
+    {
+      "id": 16,
+      "prompt": "A defect occurs only on Remote backend + Cold cache + Retry. The feature also has Local/Remote backend, Warm/Cold cache, and First/Retry attempt factors. Plan regression and broader interaction protection.",
+      "expected_output": "Preserve the known three-factor regression explicitly even if general interaction sampling is pairwise. Pairwise may be used for economical surrounding coverage only with its limitation stated; alternatively justify strength 3. Require an independently justified behavioral oracle and verify any claimed feasible interaction coverage rather than assuming generation proves it.",
+      "files": []
+    },
+    {
+      "id": 17,
+      "prompt": "A pure function maps two booleans to a documented result. Four direct contract examples already cover every possible input. Someone proposes adding a PICT/pairwise model because combinatorial testing is now available. Decide the test design.",
+      "expected_output": "Reuse the exhaustive existing protection and avoid combinatorial-tool ceremony or duplicate retained cases. Interaction modeling is conditional, not mandatory; NO NEW TEST JUSTIFIED is valid when existing protection already covers the admitted obligation more cheaply.",
+      "files": []
+    },
+    {
+      "id": 18,
+      "prompt": "A configuration has OS, database, authentication mode, and deployment tier. A covering-array generator is unavailable in this environment. Design interaction tests and report what evidence exists.",
+      "expected_output": "May propose a factor/value/constraint model and justified interaction strength, but must not claim generated or verified pairwise/t-way coverage without checking the resulting rows. Preserve explicit consequential/known-regression cases, identify feasibility constraints with rationale, and report generation/coverage as unvalidated while still providing useful independent oracle and boundary design.",
+      "files": []
+    },
+    {
+      "id": 19,
+      "prompt": "Design the next TDD test for a deterministic parse_status(text) function. The contract has one normal example and one malformed-input rejection. No configuration, environment, state, concurrency, or interacting modes affect behavior.",
+      "expected_output": "Follow the direct contract/TDD path without introducing factors, pairwise terminology, a covering array, or a generator. Produce the next bounded behavioral increment with an independent oracle and intended red. Interaction-specific output should be absent because the interaction branch does not fire.",
+      "files": []
+    },
+    {
+      "id": 20,
+      "prompt": "Design regression protection for a deployment resolver where region, storage backend, authentication mode, and retry mode can interact. A previous defect required EU + replica + workload identity + retry. Some combinations are impossible because workload identity is unsupported in one explicitly documented local-only region; unauthenticated requests are reachable and must be rejected without writes.",
+      "expected_output": "Trigger interaction coverage. Model behaviorally relevant factors and distinguish the documented impossible environment combination from reachable rejection cases. Preserve the known four-factor regression explicitly, choose and justify surrounding interaction strength rather than defaulting blindly to pairwise, credit existing protection, and claim generated/verified coverage only if rows were actually generated and checked. Keep oracle, forbidden-write observation, and temporal retry behavior separate from combinatorial coverage.",
+      "files": []
+    },
+    {
+      "id": 21,
+      "prompt": "A bug ticket says expired tokens must be rejected. Production currently lets refresh(expired_token) succeed, one existing test expects that success, and a security note says expired tokens cannot access protected resources but says nothing about refresh. Design the next test without changing files.",
+      "expected_output": "Keep the evidence provenance distinct: the ticket is authoritative only for the behavior it actually scopes, production and the existing test are observed/current behavior, and extending the security note from protected-resource access to refresh would be derived or assumed. Do not silently choose refresh policy and do not block unrelated separable design work. Name the consequential refresh-policy decision that needs authority before asserting it.",
+      "files": []
     }
   ]
 }
