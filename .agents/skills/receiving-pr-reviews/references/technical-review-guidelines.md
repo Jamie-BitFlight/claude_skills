@@ -64,7 +64,7 @@ IF reviewer suggests "implementing properly":
 
 ## Order accepted independent clusters
 
-After assessing and clustering the complete evidence set, apply this priority among accepted independent clusters. Preserve shared-cause cluster boundaries and dependency order.
+After assessing and clustering the complete evidence set, apply this priority among accepted independent clusters. Preserve shared-cause cluster boundaries and dependency order. Run independent clusters concurrently when resources allow; use the following priority only to select among ready clusters when capacity is constrained.
 
 - Blocking issues (breaks, security)
 - Simple fixes (typos, imports)
@@ -79,7 +79,7 @@ Use the cluster verification commands and repository-required gates.
 Push back when:
 
 - Suggestion breaks existing functionality
-- Reviewer lacks full context
+- Feedback omits or contradicts context established by the code, tests, requirements, or prior decisions
 - Violates YAGNI (unused feature)
 - Technically incorrect for this stack
 - Legacy/compatibility reasons exist
