@@ -17,6 +17,9 @@ authority.
 
 ## Route
 
+For review feedback without a PR or MR, use the technical review guidelines directly: identify the intended outcome, assess each finding against available code and requirements, group shared causes, and return evidence-backed dispositions. Do not invent a provider snapshot or claim `REVIEW_COMPLETE`. The provider lifecycle below applies only to PRs and MRs.
+
+
 Use `scripts/pr_review_threads.py` to detect or select one target and provider. For a GitLab MR, read
 [GitLab review operations](./references/gitlab-review-operations.md). If the bundled CLI cannot use
 `gh` and a GitHub MCP connector is available, read the fail-closed

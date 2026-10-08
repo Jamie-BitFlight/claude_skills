@@ -28,6 +28,10 @@ Code review requires technical evaluation, not emotional performance.
 4. EVALUATE: Technically sound for THIS codebase?
 ```
 
+## Source authority
+
+Treat the requesting user as authoritative on intended outcomes and architectural decisions, while verifying technical claims from every source, including the user. When feedback conflicts with a prior decision, identify the conflict and request direction rather than silently overriding it.
+
 ## Check technical context
 
 Apply these checks before accepting a source change. When a claim cannot be verified, record the missing fact and focused clarification as `clarification_required`; a request for direction does not replace the evidence or mutation-authority gates. Keep an input that conflicts with a prior user decision open until that conflict is resolved.
@@ -52,6 +56,8 @@ IF conflicts with your human partner's prior decisions:
 
 ## Check necessity and usage
 
+Investigate the relevant consumer boundary before declaring something unused: inspect known call sites, externally exposed entry points, and documented requirements proportionately. A local search miss is not proof that external consumers do not exist. Do not expand implementation merely because a reviewer proposes additional functionality.
+
 Apply the existing assessment evidence and mutation-authority requirements when choosing a branch below. A local search miss alone does not establish `unused`; record any unresolved usage question as `clarification_required`.
 
 ```text
@@ -64,7 +70,7 @@ IF reviewer suggests "implementing properly":
 
 ## Order accepted independent clusters
 
-After assessing and clustering the complete evidence set, apply this priority among accepted independent clusters. Preserve shared-cause cluster boundaries and dependency order. Run independent clusters concurrently when resources allow; use the following priority only to select among ready clusters when capacity is constrained.
+After assessing and clustering the complete evidence set, apply this priority among accepted independent clusters. Verify each coherent cluster before dependent work continues. Preserve shared-cause cluster boundaries and dependency order. If a clarification is required, pause only changes dependent on the missing fact; continue demonstrably independent work after complete assessment. Run independent clusters concurrently when resources allow; use the following priority only to select among ready clusters when capacity is constrained.
 
 - Blocking issues (breaks, security)
 - Simple fixes (typos, imports)
@@ -110,6 +116,8 @@ Push back when:
 
 ## Acknowledge verified feedback
 
+Lead with the observable change and its verification rather than lengthy agreement. A concise code reference is useful evidence, but does not replace the provider-backed reply required for PR/MR completion. For conversational reviews, report the assessed disposition directly without fabricating provider state.
+
 Use these concise statements after the cited change is implemented and verified. Include the exact input reference, supporting evidence, and inspectable revision required by the review-cycle contract.
 
 When feedback IS correct:
@@ -118,6 +126,10 @@ When feedback IS correct:
 ✅ "Fixed. [Brief description of what changed]"
 ✅ "Good catch - [specific issue]. Fixed in [location]."
 ```
+
+## Early discussion versus final disposition
+
+When a review question or disputed claim needs discussion before implementation, distinguish a provisional question from a verified final disposition. Do not promise or report a fix as completed until it is implemented and tested. The current PR/MR command validator requires completed implementation states before provider mutation; until an independently validated clarification-only command exists, raise early questions in the user conversation rather than bypassing that gate.
 
 ## Correct mistaken pushback
 
