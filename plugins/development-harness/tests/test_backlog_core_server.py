@@ -18,18 +18,21 @@ import json
 from unittest.mock import patch
 
 import pytest
+from backlog_core.backend_protocol import get_config
 from backlog_core.models import (
     BackendAvailability,
     BackendStatus,
     BacklogError,
+    BacklogItem,
     Output,
     SearchTimeoutError,
     ViewItemResult,
 )
-from backlog_core.search import apply_search_filter
+from backlog_core.search import apply_search_filter, apply_search_filter_with_context
 from backlog_core.server import mcp
 from fastmcp.client import Client
 
+from tests.conftest import ProviderMemoryBackend
 from tests.helpers import call_mcp_tool
 
 # ---------------------------------------------------------------------------
@@ -520,6 +523,82 @@ async def test_backlog_list_search_invalid_regex_falls_back_to_plain_text():
     returned_titles = [item["title"] for item in response["items"]]
     assert "/[invalid/ literal" in returned_titles
     assert "Unrelated" not in returned_titles
+
+
+async def test_backlog_list_invalid_regex_context_uses_the_complete_literal() -> None:
+    backend = get_config().backend
+    assert isinstance(backend, ProviderMemoryBackend)
+    backend.provider_items.extend([BacklogItem(title="[", description="prefix /[/ suffix", section="P1", issue="#1")])
+
+    response = await _call("backlog_list", {"search": "/[/", "match_context": True, "snippet_context": 4})
+
+    assert [item["title"] for item in response["items"]] == ["["]
+    matches = response["items"][0]["matches"]
+    assert [match["field"] for match in matches] == ["body:preamble"]
+    assert matches[0]["term"] == "/[/"
+    assert "/[/" in matches[0]["snippet"]
+
+
+async def test_backlog_list_regex_context_uses_requested_width_after_real_worker_handoff() -> None:
+    backend = get_config().backend
+    assert isinstance(backend, ProviderMemoryBackend)
+    backend.provider_items.extend([BacklogItem(title="abcdefghijMATCHklmnopqrst", section="P1", issue="#1")])
+
+    with patch(
+        "backlog_core.server._collect_regex_matches", side_effect=AssertionError("server must not evaluate the regex")
+    ):
+        response = await _call("backlog_list", {"search": "/MATCH/", "match_context": True, "snippet_context": 4})
+
+    assert response["items"][0]["matches"][0]["snippet"] == "...ijMATCHkl..."
+
+
+async def test_backlog_list_dedup_keeps_each_retained_row_context() -> None:
+    items = [
+        {"issue": "#1", "title": "first context", "section": "P1", "body": ""},
+        {"issue": "#1", "title": "discarded context", "section": "P1", "body": ""},
+        {"issue": "#2", "title": "second context", "section": "P1", "body": ""},
+    ]
+    contexts = [
+        [{"field": "title", "term": "/context/", "start": "6", "end": "13"}],
+        [{"field": "title", "term": "/context/", "start": "10", "end": "17"}],
+        [{"field": "title", "term": "/context/", "start": "7", "end": "14"}],
+    ]
+    with patch("dh_core.operations.list_items", return_value={"items": items, "regex_match_contexts": contexts}):
+        response = await _call("backlog_list", {"search": "/context/", "match_context": True})
+
+    assert [item["matches"][0]["snippet"] for item in response["items"]] == ["first context", "second context"]
+
+
+async def test_backlog_list_server_offset_keeps_the_second_row_context() -> None:
+    items = [
+        {"issue": "#1", "title": "first context", "section": "P1", "body": ""},
+        {"issue": "#2", "title": "second context", "section": "P1", "body": ""},
+    ]
+    contexts = [
+        [{"field": "title", "term": "/context/", "start": "6", "end": "13"}],
+        [{"field": "title", "term": "/context/", "start": "7", "end": "14"}],
+    ]
+    with patch("dh_core.operations.list_items", return_value={"items": items, "regex_match_contexts": contexts}):
+        response = await _call("backlog_list", {"search": "/context/", "match_context": True, "offset": 1, "limit": 1})
+
+    assert [item["title"] for item in response["items"]] == ["second context"]
+    assert response["items"][0]["matches"][0]["snippet"] == "second context"
+
+
+async def test_backlog_list_repeated_body_sections_keep_their_worker_geometry() -> None:
+    item: dict[str, str | bool] = {
+        "issue": "#1",
+        "title": "Repeated notes",
+        "section": "P1",
+        "body": "## Notes\nfirst needle tail\n## Notes\nsecond prefix needle tail\n",
+    }
+    matched, contexts = apply_search_filter_with_context([item], "/needle/")
+    with patch("dh_core.operations.list_items", return_value={"items": matched, "regex_match_contexts": contexts}):
+        response = await _call("backlog_list", {"search": "/needle/", "match_context": True, "snippet_context": 24})
+
+    snippets = [match["snippet"] for match in response["items"][0]["matches"] if match["field"] == "body:notes"]
+    assert any("first" in snippet for snippet in snippets)
+    assert any("second" in snippet for snippet in snippets)
 
 
 async def test_backlog_list_search_matches_body_content():

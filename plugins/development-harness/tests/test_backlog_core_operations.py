@@ -1306,6 +1306,44 @@ class TestRequestShapedSearch:
         assert result["from_cache"] is False
         assert result["status_source"] == "live"
 
+    def test_regex_count_only_acquires_unpaged_candidates_without_context_facts(self, mocker: MockerFixture) -> None:
+        _seed_provider_items([
+            BacklogItem(title="first match", section="P1", skip=False, issue="#1"),
+            BacklogItem(title="second match", section="P1", skip=False, issue="#2"),
+            BacklogItem(title="other", section="P1", skip=False, issue="#3"),
+        ])
+        from backlog_core.backend_protocol import get_config
+
+        fetch_page = mocker.spy(get_config().backend, "fetch_page")
+        with_context = mocker.spy(ops, "apply_search_filter_with_context")
+        result = list_items(search="/match/", count_only=True)
+
+        request = fetch_page.call_args.args[0]
+        assert (request.offset, request.limit) == (0, 0)
+        assert result["items"] == []
+        assert result["count"] == result["total"] == 2
+        assert "regex_match_contexts" not in result
+        with_context.assert_not_called()
+
+    def test_regex_limit_zero_keeps_all_contexts_aligned_with_candidates(self, mocker: MockerFixture) -> None:
+        _seed_provider_items([
+            BacklogItem(title="first match", section="P1", skip=False, issue="#1"),
+            BacklogItem(title="second match", section="P1", skip=False, issue="#2"),
+        ])
+        from backlog_core.backend_protocol import get_config
+
+        fetch_page = mocker.spy(get_config().backend, "fetch_page")
+        result = list_items(search="/match/", limit=0, match_context=True)
+
+        request = fetch_page.call_args.args[0]
+        assert (request.offset, request.limit) == (0, 0)
+        assert [item["title"] for item in cast("list[dict[str, str | bool]]", result["items"])] == [
+            "first match",
+            "second match",
+        ]
+        contexts = cast("list[list[dict[str, str]]]", result["regex_match_contexts"])
+        assert [[fact["term"] for fact in context] for context in contexts] == [["/match/"], ["/match/"]]
+
 
 @pytest.mark.usefixtures("plain_memory_backend")
 class TestListItemsSearch:

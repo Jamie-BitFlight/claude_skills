@@ -138,6 +138,54 @@ class TestApplySearchFilter:
         child_connection.close.assert_called_once()
         worker.kill.assert_not_called()
 
+    @pytest.mark.parametrize(
+        ("wait_results", "recv_effects", "worker_alive"),
+        [
+            pytest.param([["parent"]], [("ERROR",)], True, id="malformed_pre_ready"),
+            pytest.param([["worker"]], [], False, id="pre_ready_worker_death"),
+            pytest.param([["parent"]], [EOFError()], True, id="pre_ready_eof"),
+            pytest.param([["parent"], ["parent"]], [("READY",), ("ERROR",)], True, id="malformed_matched"),
+            pytest.param(
+                [["parent"], ["parent"], ["parent"]],
+                [("READY",), ("MATCHED",), ("RESULT", [])],
+                True,
+                id="malformed_result",
+            ),
+        ],
+    )
+    def test_worker_terminal_protocol_failures_are_typed_and_clean_up(
+        self, wait_results: list[list[str]], recv_effects: list[object], worker_alive: bool
+    ) -> None:
+        parent_connection = MagicMock()
+        child_connection = MagicMock()
+        worker = MagicMock()
+        worker.sentinel = "worker"
+        worker.is_alive.return_value = worker_alive
+        context = MagicMock()
+        context.Pipe.return_value = (parent_connection, child_connection)
+        context.Process.return_value = worker
+        parent_connection.recv.side_effect = recv_effects
+        handles = [
+            [parent_connection if value == "parent" else worker.sentinel for value in result] for result in wait_results
+        ]
+
+        with (
+            patch("backlog_core.search.multiprocessing.get_context", return_value=context),
+            patch("backlog_core.search.wait", side_effect=handles),
+            pytest.raises(SearchTimeoutError) as caught,
+        ):
+            _apply_regex_search_filter([_candidate("match", "")], "/match/")
+
+        assert caught.value.retryable is False
+        parent_connection.close.assert_called_once()
+        assert child_connection.close.call_count == 2
+        worker.join.assert_called_once()
+        worker.close.assert_called_once()
+        if worker_alive:
+            worker.kill.assert_called_once()
+        else:
+            worker.kill.assert_not_called()
+
 
 # ---------------------------------------------------------------------------
 # find_content_duplicates
