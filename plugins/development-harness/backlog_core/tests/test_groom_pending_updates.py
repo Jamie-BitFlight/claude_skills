@@ -122,12 +122,14 @@ def _entries(item: BacklogItem, section_key: str) -> list[Entry]:
     return section.entries
 
 
-def _groom_in_threads(reference: str, repo: str, *updates: tuple[str, str]) -> tuple[list[BacklogError], list[Thread]]:
+def _groom_in_threads(
+    reference: str, repo: str, *updates: tuple[str, str], append: bool = False
+) -> tuple[list[BacklogError], list[Thread]]:
     failures: list[BacklogError] = []
 
     def groom(section: str, content: str) -> None:
         try:
-            operations.groom_item(reference, section=section, content=content, repo=repo)
+            operations.groom_item(reference, section=section, content=content, repo=repo, append=append)
         except BacklogError as error:  # pragma: no cover - raised in the calling assertion
             failures.append(error)
 
@@ -193,6 +195,9 @@ def test_stale_different_section_grooms_coalesce_and_reconcile(
         release_selection.set()
         _release_and_join(writer, failures, threads)
     assert writer.pending_work_items(harness.repo) == []
+    writer_item = writer.get_work_item(reference)
+    assert {entry.content for entry in _entries(writer_item, "research")} == {"FIRST_RESEARCH"}
+    assert {entry.content for entry in _entries(writer_item, "unknown__decision")} == {"SECOND_DECISION"}
 
     reader = harness.new_backend(tmp_path / "reader-cache")
     reader.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, repo=harness.repo, references=[reference]))
@@ -325,6 +330,38 @@ def test_stale_identical_default_same_section_is_idempotent(
     reader.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, repo=harness.repo, references=[reference]))
     persisted_entries = _entries(reader.get_work_item(reference), "research")
     assert [entry.content for entry in persisted_entries if not entry.struck] == ["IDENTICAL_DEFAULT"]
+
+
+def test_stale_identical_append_same_section_retains_two_entries(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, harness: FakeGitHubHarness
+) -> None:
+    """Two stale intentional appends retain both generated entries through replay."""
+    writer = _RendezvousBackend(harness, tmp_path / "writer-cache")
+    reference = _add_item(monkeypatch, writer)
+    writer.pause_after_writes(2)
+    selected, release_selection = _hold_common_base_selection(monkeypatch)
+
+    failures, threads = _groom_in_threads(
+        reference, harness.repo, ("Research", "IDENTICAL_APPEND"), ("Research", "IDENTICAL_APPEND"), append=True
+    )
+    try:
+        assert selected.wait(timeout=5), "both public grooming calls did not select the common base"
+        release_selection.set()
+        assert writer._queued.wait(timeout=5), "both public grooming calls did not reach the queue"
+        pending = writer.pending_work_items(harness.repo)
+        assert len(pending) == 1
+        pending_entries = [entry for entry in _entries(pending[0], "research") if not entry.struck]
+        assert [entry.content for entry in pending_entries] == ["IDENTICAL_APPEND", "IDENTICAL_APPEND"]
+        assert len({entry.id for entry in pending_entries}) == 2
+    finally:
+        release_selection.set()
+        _release_and_join(writer, failures, threads)
+
+    reader = harness.new_backend(tmp_path / "reader-cache")
+    reader.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, repo=harness.repo, references=[reference]))
+    persisted_entries = [entry for entry in _entries(reader.get_work_item(reference), "research") if not entry.struck]
+    assert [entry.content for entry in persisted_entries] == ["IDENTICAL_APPEND", "IDENTICAL_APPEND"]
+    assert len({entry.id for entry in persisted_entries}) == 2
 
 
 def test_regular_full_item_writes_still_replace_pending_snapshot(

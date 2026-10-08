@@ -1037,7 +1037,8 @@ class _GitHubReconciliation:
             Completed reconciliation counts with changed logical references.
         """
         effective_request = self._with_snapshot_checkpoint(request)
-        if snapshot is None:
+        repo = effective_request.repo or self._default_repo
+        if snapshot is None or self._supplied_snapshot_is_stale(snapshot, repo):
             snapshot = self._provider.fetch_snapshot(effective_request)
         elif effective_request.scope in {ReconcileScope.LINKED, ReconcileScope.TARGETED}:
             observed = {item.reference for item in snapshot.items}
@@ -1131,6 +1132,19 @@ class _GitHubReconciliation:
                 + len(self._cache._corrupt_queue_entries()),
             }
         )
+
+    def _supplied_snapshot_is_stale(self, snapshot: ProviderSnapshot, repo: str) -> bool:
+        """Report whether a supplied provider snapshot predates the durable cache.
+
+        Returns:
+            ``True`` when a cached revision for a supplied item differs.
+        """
+        cached_revisions = {
+            record.item.reference: record.item.metadata.updated_at
+            for record in self.load_records(repo=repo)
+            if record.item.metadata.updated_at
+        }
+        return any(cached_revisions.get(item.reference, "") not in {"", item.revision} for item in snapshot.items)
 
     def load_records(
         self, pending_work_items: Sequence[_PendingWorkItemMutation] | None = None, *, repo: str = ""

@@ -43,10 +43,12 @@ from .backend_types import (
     WorkItemBackend,
 )
 from .models import (
+    BacklogItem,
     ContentConflictError,
     ContentNotFoundError,
     ContentProviderError,
     ContentUnavailableError,
+    GroomingIntent,
     UnsupportedCapabilityError,
     ValidationError,
     get_default_repo,
@@ -81,6 +83,7 @@ __all__ = [
     "WorkItemBackend",
     "create_backend",
     "get_config",
+    "persist_work_item",
     "require_branch_support",
     "require_github_extras",
     "require_milestone_support",
@@ -152,6 +155,18 @@ def reset_config() -> None:
     """
     global _active_config  # ruff: ignore[global-statement]
     _active_config = None
+
+
+def persist_work_item(
+    backend: WorkItemBackend, item: BacklogItem, repo: str = "", grooming_intent: GroomingIntent | None = None
+) -> None:
+    """Persist through the configured backend without exposing provider types to operations."""
+    if isinstance(backend, GitHubBackend):
+        backend.put_work_item(item, repo, grooming_intent)
+    elif getattr(backend, "supports_github_extras", False) and repo:
+        require_github_extras(backend, "put_work_item").put_work_item(item, repo)
+    else:
+        backend.put_work_item(item)
 
 
 # ---------------------------------------------------------------------------
