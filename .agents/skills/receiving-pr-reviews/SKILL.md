@@ -19,7 +19,6 @@ authority.
 
 For feedback outside a PR or MR, use the [technical review guidelines](./references/technical-review-guidelines.md) to assess and group findings, then report evidence-backed dispositions. `REVIEW_COMPLETE` applies to the provider workflow.
 
-
 Use `scripts/pr_review_threads.py` to detect or select one target and provider. For a GitLab MR, read
 [GitLab review operations](./references/gitlab-review-operations.md). If the bundled CLI cannot use
 `gh` and a GitHub MCP connector is available, read the fail-closed
@@ -32,7 +31,7 @@ Use `scripts/pr_review_threads.py` to detect or select one target and provider. 
 2. Run `fetch --snapshot-file <path>` to persist one full canonical snapshot. Stdout contains only the
    live action view; the file retains complete reconciliation evidence. `SNAPSHOT_INCOMPLETE` stops
    assessment and all mutation.
-3. Read the [review-cycle contract](./references/review-cycle-contract.md) and [technical review guidelines](./references/technical-review-guidelines.md) before assessment. Build an exact census of every inbound comment, question, approval, rejection/change request, bot summary, and other human, reviewer, or stakeholder input. Assess each once, preserve resolved history, and record unknowns.
+3. Read the [review-cycle contract](./references/review-cycle-contract.md) for canonical state and [technical review guidelines](./references/technical-review-guidelines.md) for technical assessment. Build an exact census of every inbound comment, question, approval, rejection/change request, bot summary, and other human, reviewer, or stakeholder input. Assess each once, preserve resolved history, and record unknowns.
 4. Cluster the exact census by shared invariant, cause, owning component, requested outcome, or
    verification surface; use explicit singleton clusters for unrelated inputs. Form one evidence-
    bearing systemic outcome and verification plan per cluster before changing source.

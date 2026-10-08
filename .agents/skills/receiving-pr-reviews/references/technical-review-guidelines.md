@@ -4,39 +4,23 @@ Apply these guidelines to every human, bot, reviewer, and stakeholder input duri
 
 ## Assess the claim
 
-Interpret the requested outcome, inspect the implementation and requirements, and record validity, relevance, evidence, and any missing fact.
-
-## Source authority
-
-Treat the requesting user as authoritative on intended outcomes and architectural decisions, while verifying technical claims from every source, including the user. When feedback conflicts with a prior decision, identify the conflict and request direction rather than silently overriding it.
-
-## Check technical context
-
-Before accepting a change, check compatibility, regression risk, implementation rationale, supported platforms, and whether feedback accounts for established context. When evidence is insufficient, record `clarification_required` with a focused question. Surface conflicts with prior user decisions for direction.
+1. Restate the requested technical outcome and identify the established requirements. The requesting user owns intended outcomes and architectural decisions; evaluate technical claims from every source against evidence.
+2. Inspect the affected implementation, existing rationale, compatibility, supported platforms, tests, and regression risk. Check whether the feedback accounts for relevant context.
+3. Record validity, relevance, evidence, and the proposed disposition. If a fact remains unresolved, use `clarification_required` with one focused question. Escalate conflicts with established user decisions for direction.
 
 ## Check necessity and usage
 
 For requests to expand or complete functionality, inspect the relevant consumer boundary: call sites, exposed entry points, and documented requirements. Base the decision on observed usage and requirements; unresolved usage becomes `clarification_required`.
 
-## Order accepted independent clusters
+## Implement accepted clusters
 
 Schedule accepted clusters by dependency. Run independent ready clusters concurrently when resources permit. When capacity is constrained, prioritize blockers, then simple changes, then complex changes. Verify each cluster before dependent work proceeds, using planned commands and repository gates. Pause only work dependent on unresolved clarification.
 
-## Push back with evidence
+## Communicate the decision
 
-When feedback conflicts with code, tests, requirements, compatibility, or prior decisions, state the evidence, consequence, and specific question or disposition. Escalate unresolved technical uncertainty or architectural conflicts to the user.
+For accepted changes, lead with the observed change, verification result, and inspectable revision. For a disputed finding, state the relevant evidence, consequence, and focused question or disposition. If new evidence changes an earlier assessment, correct the conclusion and cluster plan before responding.
 
-## Acknowledge verified feedback
-
-Lead with the observed change, verification result, and inspectable revision. For PR/MR reviews, communicate each disposition through the provider with its stable reference; for conversational feedback, report the assessment directly.
-
-## Early discussion versus final disposition
-
-Separate provisional clarification from verified final disposition. Report a fix as completed after implementation and verification. The current provider-action validator requires implementation readiness; use the user conversation for early clarification until a validated provider clarification route exists.
-
-## Correct mistaken pushback
-
-If new evidence overturns an earlier assessment, state the corrected conclusion and evidence, update the cluster plan, and follow the verification and communication gates.
+For PR/MR reviews, bind each disposition to its stable provider reference and follow the review-cycle communication gate. For conversational feedback, return the assessed findings directly. Distinguish provisional clarification from a verified fix: the current provider validator requires implementation readiness, so early clarification takes place in the user conversation until a validated provider clarification route exists.
 
 ## Source and license
 

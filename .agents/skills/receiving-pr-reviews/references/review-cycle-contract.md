@@ -57,8 +57,7 @@ explicit singleton clusters. A multi-input cluster records the shared invariant,
 cause, requested outcome, or verification surface that makes one outcome coherent.
 
 Each cluster has one systemic outcome, supporting evidence, exact verification commands,
-communication plan, and resolution policy. One owning-seam change covers every finding sharing a cause. Complete the census, assessments, unknown decisions, clusters, and plans before any
-source action.
+communication plan, and resolution policy. Complete the census, assessments, unknown decisions, clusters, and plans before any source action; one owning-seam change covers each shared cause.
 
 ## Implementation or no-change evidence
 
@@ -93,7 +92,7 @@ resolution policy. A batch pre-authorizes every entry and action before its firs
 
 Communicate one evidence-bearing disposition for every inbound input, including approvals,
 rejections, bot summaries, no-change results, and superseded inputs. Bind it to the canonical stable
-reference. Provider-backed communication establishes completion evidence.
+reference. Provider-backed communication evidence establishes the communication gate; the fresh `complete-cycle` result establishes terminal completion.
 
 Reply successfully before resolving. Use the combined action for a normal eligible inline path; use
 reply-only for clarification, and resolve-only for recovery when completed communication is already
