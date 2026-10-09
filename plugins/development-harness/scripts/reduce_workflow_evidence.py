@@ -40,7 +40,7 @@ def reduce_frozen(manifest: dict, reports: list[dict], root: Path) -> dict:
     assignments = manifest["assignments"]
     if set(assignments) != {"w1", "w2", "w3"}:
         raise ExtractionError("invalid assignments")
-    if any(not isinstance(v, list) or any(not isinstance(rule, str) for rule in v)\n           or not set(v) <= RULES or len(v) != len(set(v)) for v in assignments.values()):
+    if any(\n        not isinstance(v, list)\n        or any(not isinstance(rule, str) for rule in v)\n        or not set(v) <= RULES\n        or len(v) != len(set(v))\n        for v in assignments.values()\n    ):
         raise ExtractionError("invalid rule slices")
     if any(sum(rule in assignments[w] for w in assignments) != 2 for rule in RULES):
         raise ExtractionError("each rule must have exactly two independent assignments")
