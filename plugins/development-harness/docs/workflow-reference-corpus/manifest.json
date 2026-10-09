@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "status": "candidate-unverified",
+  "source_revision": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+  "workflow": "dh:multi-perspective-review",
+  "scope": [
+    "plugins/development-harness/skills/multi-perspective-review/references/dispatch-flow.md",
+    "plugins/development-harness/skills/multi-perspective-review/SKILL.md",
+    "plugins/development-harness/agents/review-synthesizer.md"
+  ],
+  "source_blobs": [
+    {
+      "path": "plugins/development-harness/skills/multi-perspective-review/references/dispatch-flow.md",
+      "sha": "2bed9605a1590e4afd65f4f4887bed34374a0363"
+    },
+    {
+      "path": "plugins/development-harness/skills/multi-perspective-review/SKILL.md",
+      "sha": "545a2edec509d8b4576c755123a72251155a9a09"
+    },
+    {
+      "path": "plugins/development-harness/agents/review-synthesizer.md",
+      "sha": "03a6f26ea9d6968b16d5e03c50d74a6d5fb3d8c4"
+    }
+  ],
+  "excluded": [
+    "dh:start-task profile implementation",
+    "sam_task persistence/runtime behavior",
+    "all alternate workflow entry points"
+  ],
+  "limitations": [
+    "No independent blind trace or adjudication",
+    "No runtime execution or completeness proof",
+    "Do not use as hidden gold labels for a candidate extractor"
+  ]
+}

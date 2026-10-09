@@ -1,0 +1,135 @@
+{
+  "version": 1,
+  "status": "candidate-unverified",
+  "workflow": "dh:multi-perspective-review",
+  "source_revision": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+  "relations": [
+    {
+      "id": "R01",
+      "from": "DiffCheck",
+      "to": "AbortUsage",
+      "condition": "--diff absent",
+      "kind": "terminal",
+      "evidence": {
+        "path": "plugins/development-harness/skills/multi-perspective-review/references/dispatch-flow.md",
+        "locator": "DiffCheck --> AbortUsage"
+      }
+    },
+    {
+      "id": "R02",
+      "from": "SourceCheck",
+      "to": "AbortSource",
+      "condition": "revision resolution or diff failed",
+      "kind": "terminal",
+      "evidence": {
+        "path": "plugins/development-harness/skills/multi-perspective-review/references/dispatch-flow.md",
+        "locator": "SourceCheck --> AbortSource"
+      }
+    },
+    {
+      "id": "R03",
+      "from": "EmptyCheck",
+      "to": "AbortEmpty",
+      "condition": "no changed files",
+      "kind": "terminal",
+      "evidence": {
+        "path": "plugins/development-harness/skills/multi-perspective-review/references/dispatch-flow.md",
+        "locator": "EmptyCheck --> AbortEmpty"
+      }
+    },
+    {
+      "id": "R04",
+      "from": "CreatePlan",
+      "to": "T1..T4",
+      "condition": "valid nonempty diff",
+      "kind": "parallel-dispatch",
+      "evidence": {
+        "path": "plugins/development-harness/skills/multi-perspective-review/references/dispatch-flow.md",
+        "locator": "CreatePlan --> PlanAddr --> Parallel --> W1..W4"
+      }
+    },
+    {
+      "id": "R05",
+      "from": "T1..T4",
+      "to": "Collect",
+      "condition": "workers terminal",
+      "kind": "barrier",
+      "evidence": {
+        "path": "plugins/development-harness/skills/multi-perspective-review/references/dispatch-flow.md",
+        "locator": "W1..W4 --> Collect"
+      }
+    },
+    {
+      "id": "R06",
+      "from": "Collect",
+      "to": "T5",
+      "condition": "T1..T4 terminal",
+      "kind": "dispatch",
+      "evidence": {
+        "path": "plugins/development-harness/skills/multi-perspective-review/references/dispatch-flow.md",
+        "locator": "Collect --> SynthDispatch"
+      }
+    },
+    {
+      "id": "R07",
+      "from": "T5",
+      "to": "Punch List",
+      "condition": "synthesizer executes",
+      "kind": "artifact-write",
+      "evidence": {
+        "path": "plugins/development-harness/agents/review-synthesizer.md",
+        "locator": "Read T1-T4 Review Results; write Punch List"
+      }
+    },
+    {
+      "id": "R08",
+      "from": "ParseCheck",
+      "to": "FailSynth",
+      "condition": "missing or invalid Punch List",
+      "kind": "terminal",
+      "evidence": {
+        "path": "plugins/development-harness/skills/multi-perspective-review/references/dispatch-flow.md",
+        "locator": "ParseCheck --> FailSynth"
+      }
+    },
+    {
+      "id": "R09",
+      "from": "GateReject",
+      "to": "FailReject",
+      "condition": "any REJECT",
+      "kind": "terminal",
+      "evidence": {
+        "path": "plugins/development-harness/skills/multi-perspective-review/references/dispatch-flow.md",
+        "locator": "GateReject --> FailReject"
+      }
+    },
+    {
+      "id": "R10",
+      "from": "GateAllSkip",
+      "to": "WarnPass",
+      "condition": "all SKIP",
+      "kind": "terminal",
+      "evidence": {
+        "path": "plugins/development-harness/skills/multi-perspective-review/references/dispatch-flow.md",
+        "locator": "GateAllSkip --> WarnPass"
+      }
+    }
+  ],
+  "unresolved": [
+    {
+      "id": "U01",
+      "question": "Does task-worker profile injection preserve actor and source context across the two-hop dispatch?",
+      "needs": "Follow dh:start-task and task-worker profile implementation"
+    },
+    {
+      "id": "U02",
+      "question": "Can T5 conserve repeated same-perspective findings under existing punch-list schema?",
+      "needs": "Resolve #4105"
+    },
+    {
+      "id": "U03",
+      "question": "Does the review's full scope include every affected consumer of a changed instruction?",
+      "needs": "Backward consumer tracing"
+    }
+  ]
+}
