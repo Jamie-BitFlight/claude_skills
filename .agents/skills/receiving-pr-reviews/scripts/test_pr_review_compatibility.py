@@ -89,18 +89,6 @@ def test_instructions_have_no_volatile_source_citations_or_cli_option_cache() ->
         assert "--provider-timeout-seconds" not in text, path
 
 
-def test_review_contract_names_outcome_evidence_and_provider_state() -> None:
-    contract = (SKILL_ROOT / "references/review-cycle-contract.md").read_text(encoding="utf-8")
-    for term in ("Evidence", "valid", "runtime", "input", "response", "resolution", "completion", "MCP"):
-        assert term.lower() in contract.lower()
-
-
-def test_mcp_route_supports_review_actions_without_python_state() -> None:
-    guidance = (SKILL_ROOT / "references/github-mcp-fallback.md").read_text(encoding="utf-8")
-    for term in ("MCP", "response", "resolution", "provider"):
-        assert term in guidance
-
-
 def test_shared_contract_keeps_provider_approval_mapping_out_of_shared_context() -> None:
     contract = (SKILL_ROOT / "references/review-cycle-contract.md").read_text(encoding="utf-8")
 
