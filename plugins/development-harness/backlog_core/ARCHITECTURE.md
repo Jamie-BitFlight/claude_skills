@@ -442,8 +442,8 @@ from markdown parsing, so it must not be folded into `parsing.py`.
 **Exports**: `tokenize_search`, `prepare_search_filter`, `apply_search_filter`, `PreparedSearch`,
 `DuplicateCheckStatus`, `ContentDuplicateMatch`, `build_concept_query`, `find_content_duplicates`.
 
-**Imports from other modules**: None — no `fastmcp`/`mcp` imports, so both `server.py` and
-`operations.py` can depend on it without a cycle.
+**Imports from other modules**: `.errors` only — no `fastmcp`/`mcp` imports, so both `server.py`
+and `operations.py` can depend on it without a cycle.
 
 ---
 

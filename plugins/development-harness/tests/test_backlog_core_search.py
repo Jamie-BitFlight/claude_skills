@@ -71,6 +71,15 @@ class TestApplySearchFilter:
         assert apply_search_filter(items, "/auth.*retry/") == [items[0]]
         assert apply_search_filter(items, "/[/") == [items[0]]
 
+    def test_literal_fallback_context_indexes_original_text_after_casefold_expansion(self) -> None:
+        item = _candidate("ß /[/", "")
+
+        assert apply_search_filter([item], "/[/") == [item]
+        matched, contexts = apply_search_filter_with_context([item], "/[/")
+
+        assert matched == [item]
+        assert contexts == [[{"field": "title", "term": "/[/", "start": "2", "end": "5"}]]
+
     def test_field_plain_and_logical_terms_keep_existing_semantics(self) -> None:
         items = [
             _candidate("Authentication login", "ready"),

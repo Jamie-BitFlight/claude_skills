@@ -373,6 +373,19 @@ def _worker_record_is(record: object, kind: str) -> bool:
     return isinstance(record, tuple) and len(record) >= 1 and record[0] == kind
 
 
+def _original_span_for_casefolded_match(text: str, start: int, end: int) -> tuple[int, int]:
+    """Return original-text coordinates for a range in ``text.casefold()``."""
+    folded_end = 0
+    original_start = 0
+    for original_index, character in enumerate(text):
+        folded_start, folded_end = folded_end, folded_end + len(character.casefold())
+        if start >= folded_start and start < folded_end:
+            original_start = original_index
+        if end <= folded_end:
+            return original_start, original_index + 1
+    return original_start, len(text)
+
+
 def _regex_term_context(
     item: dict[str, str | bool], term: str, pattern: re.Pattern[str] | None
 ) -> list[dict[str, str]]:
@@ -386,13 +399,17 @@ def _regex_term_context(
         text = str(item.get(field, "") or "")
         match = pattern.search(text) if pattern is not None else None
         start = text.casefold().find(needle.casefold()) if literal else (match.start() if match else -1)
-        end = start + len(needle) if literal and start >= 0 else (match.end() if match else -1)
+        end = start + len(needle.casefold()) if literal and start >= 0 else (match.end() if match else -1)
+        if literal and start >= 0:
+            start, end = _original_span_for_casefolded_match(text, start, end)
         if start >= 0:
             matches.append({"field": field, "term": term, "start": str(start), "end": str(end)})
     for section_index, (field, text) in enumerate(_parse_body_sections(str(item.get("body", "") or ""))):
         match = pattern.search(text) if pattern is not None else None
         start = text.casefold().find(needle.casefold()) if literal else (match.start() if match else -1)
-        end = start + len(needle) if literal and start >= 0 else (match.end() if match else -1)
+        end = start + len(needle.casefold()) if literal and start >= 0 else (match.end() if match else -1)
+        if literal and start >= 0:
+            start, end = _original_span_for_casefolded_match(text, start, end)
         if start >= 0:
             matches.append({
                 "field": field,
