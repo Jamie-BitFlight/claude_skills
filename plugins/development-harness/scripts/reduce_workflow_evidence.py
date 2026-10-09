@@ -24,8 +24,7 @@ RULES = frozenset({"fork", "branch", "reference", "dispatch", "tool", "artifact"
 
 
 def canonical(value: object) -> bytes:
-    return (json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":")) + "
-").encode("utf-8")
+    return (json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":")) + chr(10)).encode("utf-8")
 
 
 def _load(path: Path) -> object:
