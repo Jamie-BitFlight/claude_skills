@@ -23,9 +23,9 @@ A request to check reviews permits reading and reporting. Source edits, pushes, 
 4. **Respond and reconcile.** Refresh the current review input, thread state, and relevant remote revision before provider mutation; reconcile any changed evidence with the planned disposition. Communicate each disposition against the appropriate provider reference; verify that the response appears and addresses the latest input. Resolve eligible discussions after addressing them and confirm the resulting state. Clarification questions remain open until answered and reassessed. Include eligible unresolved discussions in outstanding work. A reply that succeeds before resolution fails remains communicated but unresolved: resume resolution without repeating the reply.
 5. **Recheck.** Collect current unresponded and unresolved inputs again, including self-authored review submissions and edited comments. Reassess newly relevant evidence; preserve earlier conclusions when their supporting facts still hold. Recheck the current remote revision and reconsider affected verification before completion. Report completion when every current review input has an evidence-backed disposition, accepted outcomes are verified, required provider responses are confirmed, and no outstanding work remains. A quiet polling window alone is only an observation.
 
-## Evidence and completion
+## Decision vocabulary
 
-Use the [review outcome contract](./references/review-cycle-contract.md) for definitions of evidence, validity, unresponded inputs, resolution, and completion. Keep the process above as the execution path.
+Use the [review outcome contract](./references/review-cycle-contract.md) to distinguish finding validity from solution suitability, addressed findings from resolved threads, review completion from PR readiness, and preferred tooling from required outcomes.
 
 ## Recovery
 
