@@ -1,33 +1,14 @@
-# GitHub MCP boundary
+# GitHub MCP provider operations
 
-Use this branch only when the bundled CLI cannot use `gh` and a GitHub MCP connector is available.
-MCP can supply read-only diagnostic evidence, but this package exposes no executable ingress that
-turns connector responses into a validated canonical `ReviewSnapshot`. The boundary therefore fails
-closed: MCP evidence cannot authorize source action, provider mutation, watch state, or completion.
+Read when the preferred helper is unavailable and GitHub MCP is available. Use connected tool schemas for invocation.
 
-## Canonical source
+## Direct-provider working path
 
-The exact GitHub predicates live only in `scripts/pr_review_github_logic.py`:
+- Collect submitted reviews, threads and nested replies, top-level comments, approvals, and resolved history. Check pagination and retain stable references.
+- Classify by provider relationship: self-authored review submissions and new threads are inbound; authenticated replies and top-level comments referencing existing findings are response candidates. Match responses to the latest input.
+- Keep a compact view of outstanding findings, dispositions, verification, observed replies, and resolution. Reuse assessments whose evidence remains valid.
+- Assess shared causes, implement authorized changes, and verify affected behavior and tests before replying or resolving. Group related edits when practical.
+- Before a group of provider mutations, refresh relevant state and check every planned action for current target, authorization, and capability. Confirm each reply and resolution separately. If resolution fails after a reply succeeds, retain the reply and resume resolution only.
+- Recheck new, edited, unresponded, and unresolved inputs. Use bounded repeated checks when monitoring.
 
-- `CODEX_REACTOR_LOGINS` owns accepted actor identities;
-- `CODEX_EMPTY_REVIEW_BODY` and `is_codex_empty_review` own no-findings classification;
-- `is_codex_thumbs_up` owns approval-signal classification;
-- `latest_revision_at` owns the head-commit/force-push revision boundary;
-- `references_review` and `review_effective_timestamp` own provider-backed response matching.
-
-Treat those symbols and the bundled GitHub adapter as the source of truth. Do not copy their values or
-manually reproduce their outcomes from MCP responses.
-
-## Read-only diagnostic collection
-
-When useful for reporting, collect PR identity, exact head revision, every page of review threads and
-nested comments, submitted reviews, PR-level comments, reactions, force-push events, and authenticated
-actor identity through one connector. A missing field, page, permission, or stable reference makes the
-diagnostic collection incomplete. Report only observed provider facts and identify the missing
-surface.
-
-The cycle remains `SNAPSHOT_INCOMPLETE` because connector output has not crossed the canonical ingress.
-Do not author `review-cycle.json`, infer clean state, combine CLI and MCP evidence, reply, resolve,
-comment, watch, or run `complete-cycle` from this collection. If the bundled CLI remains unavailable,
-report `BLOCKED` with the unavailable executable transport. Resume the shared workflow only after
-`fetch` produces one complete canonical snapshot.
+The helper automates these cross-references. MCP establishes the same [review outcomes](./review-cycle-contract.md) through provider observations.
