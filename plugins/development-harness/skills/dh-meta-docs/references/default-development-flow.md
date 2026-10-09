@@ -131,6 +131,10 @@ Each arrow represents a provider-owned artifact handoff. No stage reads from con
 - Write each task as a standalone record with inputs, acceptance criteria, and agent assignment
 - Map task dependencies and identify parallelization opportunities
 - Assign each task to the specialist agent `profile_list()` matches, or to the fallback agent
+- For proposed new tools or capabilities, apply [Reuse-before-build](../../../docs/reuse-before-build.md) before committing to a custom implementation. If unresolved, make discovery a predecessor for only the affected implementation task; continue independent tasks. Recheck decisions if requirements or chosen implementation change.
+
+The reuse decision is internal to S4 task design, not a new pipeline stage or artifact.
+Unresolved tool choice delays only the dependent task; unrelated tasks remain executable.
 
 **Output:** `ARTIFACT:TASK({task-id})` per task — create the task plan with
 `sam_plan(config={"action": "create", ...})`. Keep the returned `plan_ref`; discover plans with
