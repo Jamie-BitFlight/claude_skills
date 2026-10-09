@@ -522,6 +522,77 @@ async def test_plan_status_parity(dh_env: dict[str, str], tmp_path: Path) -> Non
     assert cli_status["total_tasks"] == mcp_status["total_tasks"]
 
 
+async def test_content_plan_status_and_ready_count_successful_statuses(dh_env: dict[str, str], tmp_path: Path) -> None:
+    """Content CLI and MCP routes agree on successful and failed task mixes."""
+    plan_dir = str(tmp_path / "plan")
+    Path(plan_dir).mkdir(parents=True, exist_ok=True)
+    plan_id = _invoke_cli([
+        "plan",
+        "create",
+        "--slug",
+        "successful-statuses",
+        "--goal",
+        "Successful status accounting",
+        "--plan-dir",
+        plan_dir,
+    ])["plan_id"]
+    for task_id in ("T01", "T02", "T03"):
+        _invoke_cli([
+            "plan",
+            "append-task",
+            "--plan-address",
+            plan_id,
+            *_task_args({**_TASK_DEF, "id": task_id}),
+            "--plan-dir",
+            plan_dir,
+        ])
+    _invoke_cli(["plan", "finalize", "--plan-address", plan_id, "--plan-dir", plan_dir])
+    for task_id, status in (("T01", "complete"), ("T02", "deferred"), ("T03", "skipped")):
+        _invoke_cli([
+            "plan",
+            "state",
+            "--address",
+            f"{plan_id}/{task_id}",
+            "--new-status",
+            status,
+            "--plan-dir",
+            plan_dir,
+        ])
+
+    cli_status = _invoke_cli(["plan", "status", "--plan-address", plan_id, "--plan-dir", plan_dir])
+    mcp_status = await call_mcp_tool(
+        sam_mcp, "sam_plan", {"config": {"action": "status"}, "plan": plan_id, "plan_dir": plan_dir}
+    )
+    cli_ready = _invoke_cli(["plan", "ready", "--plan-address", plan_id, "--plan-dir", plan_dir])
+    mcp_ready = await call_mcp_tool(
+        sam_mcp, "sam_plan", {"config": {"action": "ready"}, "plan": plan_id, "plan_dir": plan_dir}
+    )
+
+    assert cli_status["completion_pct"] == pytest.approx(100.0)
+    assert mcp_status["completion_pct"] == pytest.approx(100.0)
+    assert cli_ready["ready_tasks"] == mcp_ready["ready_tasks"] == []
+    assert cli_ready["count"] == mcp_ready["count"] == 0
+
+    _invoke_cli([
+        "plan",
+        "append-task",
+        "--plan-address",
+        plan_id,
+        *_task_args({**_TASK_DEF, "id": "T04"}),
+        "--plan-dir",
+        plan_dir,
+    ])
+    _invoke_cli(["plan", "state", "--address", f"{plan_id}/T04", "--new-status", "failed", "--plan-dir", plan_dir])
+
+    cli_status = _invoke_cli(["plan", "status", "--plan-address", plan_id, "--plan-dir", plan_dir])
+    mcp_status = await call_mcp_tool(
+        sam_mcp, "sam_plan", {"config": {"action": "status"}, "plan": plan_id, "plan_dir": plan_dir}
+    )
+
+    assert cli_status["completion_pct"] == pytest.approx(75.0)
+    assert mcp_status["completion_pct"] == pytest.approx(75.0)
+
+
 async def test_plan_list_parity(dh_env: dict[str, str], tmp_path: Path) -> None:
     """Plan list returns the same plans through both transports."""
     plan_dir = str(tmp_path / "plan")

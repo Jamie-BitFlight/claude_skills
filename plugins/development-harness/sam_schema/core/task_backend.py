@@ -343,7 +343,7 @@ class TaskBackend(Protocol):
         - ``"ready_tasks"``: list[str] — IDs of ready-to-dispatch tasks
         - ``"blocked_tasks"``: list[dict[str, list[str]]] — each entry maps a
           task ID to the list of unresolved dependency IDs
-        - ``"completion_pct"``: float — percentage of tasks with status complete
+        - ``"completion_pct"``: float — percentage of tasks in a successful status
         - ``"has_cycles"``: bool — True if the dependency graph contains a cycle
 
         Args:

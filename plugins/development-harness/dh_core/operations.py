@@ -71,7 +71,7 @@ from backlog_core.parsing import split_body_sections
 from dispatch_schema import Wave
 from github import GithubException
 from pydantic import AliasChoices, BaseModel
-from sam_schema.core.dependencies import BookendValidator, DependencyGraph
+from sam_schema.core.dependencies import SUCCESSFUL_STATUSES, BookendValidator, DependencyGraph
 from sam_schema.core.exceptions import (
     BookendValidationError,
     ConcurrentClaimUnsupportedError,
@@ -458,8 +458,8 @@ def get_plan_status(backend: TaskBackend, plan: str) -> PlanStatus:
     for task in plan_model.tasks:
         by_status[task.status] = by_status.get(task.status, 0) + 1
     total = len(plan_model.tasks)
-    complete_count = by_status.get(TaskStatus.COMPLETE, 0)
-    completion_pct = (complete_count / total * 100.0) if total > 0 else 0.0
+    successful_count = sum(by_status.get(status, 0) for status in SUCCESSFUL_STATUSES)
+    completion_pct = (successful_count / total * 100.0) if total > 0 else 0.0
     return PlanStatus(
         feature=plan_model.feature,
         total_tasks=total,

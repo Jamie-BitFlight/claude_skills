@@ -13,7 +13,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from sam_schema.core.dependencies import DependencyGraph
+from sam_schema.core.dependencies import SUCCESSFUL_STATUSES, DependencyGraph
 from sam_schema.core.models import Plan, PlanStatus, ReadResult, Task, TaskAssignment, TaskStatus
 from sam_schema.readers.detect import read_plan
 from sam_schema.readers.normalize import normalize_plan
@@ -399,8 +399,8 @@ def get_plan_status(plan_path: Path) -> PlanStatus:
     blocked_tasks = [{t.id: missing_deps} for t, missing_deps in graph.get_blocked_tasks()]
 
     total = len(plan.tasks)
-    complete_count = by_status.get(TaskStatus.COMPLETE, 0)
-    completion_pct = (complete_count / total * 100.0) if total > 0 else 0.0
+    successful_count = sum(by_status.get(status, 0) for status in SUCCESSFUL_STATUSES)
+    completion_pct = (successful_count / total * 100.0) if total > 0 else 0.0
 
     return PlanStatus(
         feature=plan.feature,
