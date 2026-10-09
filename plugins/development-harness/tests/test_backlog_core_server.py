@@ -28,6 +28,7 @@ from backlog_core.models import (
     BacklogError,
     BacklogItem,
     Output,
+    SearchExecutionError,
     SearchTimeoutError,
     ViewItemResult,
 )
@@ -202,6 +203,14 @@ async def test_backlog_list_timeout_returns_non_retryable_error():
 
     assert response["error"] == "Search regex evaluation exceeded 100 ms"
     assert response["retryable"] is False
+
+
+async def test_backlog_list_execution_error_omits_retryability_verdict():
+    with patch("dh_core.operations.list_items", side_effect=SearchExecutionError()):
+        response = await _call("backlog_list", {"search": "/slow/"})
+
+    assert response["error"] == "Search regex execution failed"
+    assert "retryable" not in response
 
 
 async def test_backlog_list_match_context_regex_uses_shared_timeout():

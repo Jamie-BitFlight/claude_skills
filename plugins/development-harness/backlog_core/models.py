@@ -18,6 +18,10 @@ from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, TypeAlias, assert_never
 
+from .errors import BacklogError, SearchExecutionError, SearchTimeoutError
+
+__all__ = ["BacklogError", "SearchExecutionError", "SearchTimeoutError"]
+
 if TYPE_CHECKING:
     from .search import ContentDuplicateMatch
 
@@ -476,42 +480,6 @@ def parse_issue_number(ref: str | None) -> int | None:
         num = int(stripped)
         return num if num > 0 else None
     return None
-
-
-# ---------------------------------------------------------------------------
-# Exception classes
-# ---------------------------------------------------------------------------
-
-
-class BacklogError(Exception):
-    """General backlog operation error.
-
-    Carries an optional ``retryable`` verdict for the MCP tool boundary, which reports whether
-    the same call can succeed on a later attempt. The class alone cannot answer that: the same
-    ``BacklogError`` is raised both for a fetch that never reached the backend and for a call the
-    backend refused on its merits, and nothing but the raise site knows which. Where the raising
-    condition fixes the answer -- a reserved name, an item that holds no such artifact, an open PR
-    that blocks a close -- the author states it once, here, rather than leaving a classifier to
-    infer it from prose. Left unset, the boundary reports no verdict at all, which is what
-    ``None`` means: not known, never "cannot succeed".
-
-    Attributes:
-        retryable: ``True`` when a later identical attempt may succeed, ``False`` when it cannot,
-            ``None`` when this raise site does not state a verdict.
-    """
-
-    def __init__(self, *args: object, retryable: bool | None = None) -> None:
-        """Initialize with the usual exception args plus an optional retry verdict."""
-        super().__init__(*args)
-        self.retryable = retryable
-
-
-class SearchTimeoutError(BacklogError):
-    """Raised when one search request exhausts its matching-time budget."""
-
-    def __init__(self) -> None:
-        """Initialize the stable, non-retryable matching-timeout error."""
-        super().__init__("Search regex evaluation exceeded 100 ms", retryable=False)
 
 
 class CacheStateCorruptError(BacklogError):

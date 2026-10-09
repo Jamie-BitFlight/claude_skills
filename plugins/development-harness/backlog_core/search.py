@@ -20,7 +20,7 @@ from multiprocessing.process import BaseProcess
 
 from pydantic import BaseModel, ConfigDict
 
-from .models import SearchTimeoutError
+from .errors import SearchExecutionError, SearchTimeoutError
 
 # Fields searched by default when no field-specific prefix is given.
 # ``body`` contains the full item content (description + all section entries)
@@ -513,10 +513,10 @@ def _apply_regex_search_filter_result(
 
         ready_handles = wait([parent_connection, worker.sentinel], timeout=None)
         if parent_connection not in ready_handles:
-            raise SearchTimeoutError
+            raise SearchExecutionError
         ready = parent_connection.recv()
         if not (_worker_record_is(ready, "READY") and isinstance(ready, tuple) and len(ready) == 1):
-            raise SearchTimeoutError
+            raise SearchExecutionError
 
         deadline = time.monotonic() + _REGEX_MATCH_TIMEOUT_SECONDS
         parent_connection.send(("MATCH", deadline))
@@ -525,14 +525,16 @@ def _apply_regex_search_filter_result(
             raise SearchTimeoutError
         result_handles = wait([parent_connection, worker.sentinel], timeout=remaining)
         if parent_connection not in result_handles:
+            if worker.sentinel in result_handles:
+                raise SearchExecutionError
             raise SearchTimeoutError
         result = parent_connection.recv()
         if not (_worker_record_is(result, "MATCHED") and isinstance(result, tuple) and len(result) == 1):
-            raise SearchTimeoutError
+            raise SearchExecutionError
         parent_connection.send(("TRANSFER",))
         transfer_handles = wait([parent_connection, worker.sentinel], timeout=None)
         if parent_connection not in transfer_handles:
-            raise SearchTimeoutError
+            raise SearchExecutionError
         result = parent_connection.recv()
         if not (
             _worker_record_is(result, "RESULT")
@@ -542,10 +544,10 @@ def _apply_regex_search_filter_result(
             and isinstance(result[2], list)
             and all(isinstance(item, dict) for item in result[1])
         ):
-            raise SearchTimeoutError
+            raise SearchExecutionError
         return result[1], result[2]
     except (AssertionError, EOFError, OSError, RuntimeError, ValueError, TypeError):
-        raise SearchTimeoutError from None
+        raise SearchExecutionError from None
     finally:
         _cleanup_regex_worker(process, started, parent_connection, child_connection)
 

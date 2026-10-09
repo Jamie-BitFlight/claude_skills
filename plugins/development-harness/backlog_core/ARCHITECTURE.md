@@ -65,12 +65,13 @@ conversion, serialisation, and round-trip verification to `FileCache`. The scrip
 
 ```text
 section_registry.py   ← standalone, no imports from other mcp modules; canonical section/subsection name registry
-models.py             ← standalone, no imports from other mcp modules
+errors.py             ← standalone public error hierarchy; no backlog-module or optional-dependency imports
+models.py             ← imports errors; owns domain models
 timestamps.py         ← standalone, no imports from other mcp modules; shared now_iso() UTC timestamp helper
 backend_types.py      ← provider-neutral protocols and node types; imports models for type annotations
 entry_blocks.py       ← timestamped entry block parse/render/rewrite; imports from models, timestamps
 parsing.py            ← imports from models, section_registry, entry_blocks; pure parsing, selection, and transformation helpers
-search.py             ← standalone, no imports from other mcp modules (never imports fastmcp/mcp); full-text search engine and content-based duplicate detection
+search.py             ← imports errors only; never imports fastmcp/mcp, models, or optional dependencies; full-text search and duplicate detection with a matching-only 100 ms budget
 yaml_io.py            ← private YAML codec imported only by file_cache.py
 file_cache.py         ← remote-provider cache, artifact files, checkpoints, and pending-write queue
 reconciliation.py     ← filesystem-free classification/merge engine; imports models and pure format helpers

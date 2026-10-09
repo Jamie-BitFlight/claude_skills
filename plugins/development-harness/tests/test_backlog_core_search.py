@@ -24,11 +24,13 @@ threshold and was never detected.
 
 from __future__ import annotations
 
+import ast
 import re
+from pathlib import Path
 from unittest.mock import MagicMock, call, patch
 
 import pytest
-from backlog_core.models import SearchTimeoutError
+from backlog_core.models import SearchExecutionError, SearchTimeoutError
 from backlog_core.search import (
     ContentDuplicateMatch,
     _apply_regex_search_filter,
@@ -152,7 +154,7 @@ class TestApplySearchFilter:
 
         parent_connection.send.assert_has_calls([call(("MATCH", 100.1)), call(("TRANSFER",))])
 
-    def test_regex_worker_start_failure_is_typed_and_closes_endpoints(self) -> None:
+    def test_regex_worker_start_failure_is_an_execution_error_and_closes_endpoints(self) -> None:
         parent_connection = MagicMock()
         child_connection = MagicMock()
         worker = MagicMock()
@@ -163,10 +165,11 @@ class TestApplySearchFilter:
 
         with (
             patch("backlog_core.search.multiprocessing.get_context", return_value=context),
-            pytest.raises(SearchTimeoutError),
+            pytest.raises(SearchExecutionError) as caught,
         ):
             _apply_regex_search_filter([], "/match/")
 
+        assert caught.value.retryable is None
         parent_connection.close.assert_called_once()
         child_connection.close.assert_called_once()
         worker.kill.assert_not_called()
@@ -177,6 +180,7 @@ class TestApplySearchFilter:
             pytest.param([["parent"]], [("ERROR",)], True, id="malformed_pre_ready"),
             pytest.param([["worker"]], [], False, id="pre_ready_worker_death"),
             pytest.param([["parent"]], [EOFError()], True, id="pre_ready_eof"),
+            pytest.param([["parent"], ["worker"]], [("READY",)], False, id="match_worker_death"),
             pytest.param([["parent"], ["parent"]], [("READY",), ("ERROR",)], True, id="malformed_matched"),
             pytest.param(
                 [["parent"], ["parent"], ["parent"]],
@@ -205,11 +209,11 @@ class TestApplySearchFilter:
         with (
             patch("backlog_core.search.multiprocessing.get_context", return_value=context),
             patch("backlog_core.search.wait", side_effect=handles),
-            pytest.raises(SearchTimeoutError) as caught,
+            pytest.raises(SearchExecutionError) as caught,
         ):
             _apply_regex_search_filter([_candidate("match", "")], "/match/")
 
-        assert caught.value.retryable is False
+        assert caught.value.retryable is None
         parent_connection.close.assert_called_once()
         assert child_connection.close.call_count == 2
         worker.join.assert_called_once()
@@ -218,6 +222,26 @@ class TestApplySearchFilter:
             worker.kill.assert_called_once()
         else:
             worker.kill.assert_not_called()
+
+
+def test_search_and_errors_keep_their_source_dependency_boundary() -> None:
+    plugin_root = Path(__file__).resolve().parents[1]
+    search_tree = ast.parse((plugin_root / "backlog_core/search.py").read_text(encoding="utf-8"))
+    errors_tree = ast.parse((plugin_root / "backlog_core/errors.py").read_text(encoding="utf-8"))
+    relative_imports = [
+        f"{'.' * node.level}{node.module or ''}"
+        for node in ast.walk(search_tree)
+        if isinstance(node, ast.ImportFrom) and node.level
+    ]
+    error_imports = [
+        node.module for node in ast.walk(errors_tree) if isinstance(node, ast.ImportFrom) and node.module is not None
+    ]
+
+    assert relative_imports == [".errors"]
+    assert not any(
+        imported == "git" or imported == "dh_paths" or imported.startswith(("backlog_core", "fastmcp", "mcp"))
+        for imported in error_imports
+    )
 
 
 # ---------------------------------------------------------------------------
