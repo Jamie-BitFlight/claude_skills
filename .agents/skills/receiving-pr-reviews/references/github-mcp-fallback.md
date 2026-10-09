@@ -1,20 +1,15 @@
-# GitHub MCP boundary
+# GitHub MCP review operations
 
-Use this branch only when the bundled CLI cannot use `gh` and a GitHub MCP connector is available.
-MCP can supply read-only diagnostic evidence, but this package exposes no executable ingress that
-turns connector responses into a validated canonical `ReviewSnapshot`. The boundary therefore fails
-closed: MCP evidence cannot authorize source action, provider mutation, watch state, or completion.
+Use this reference when GitHub MCP is the available provider interface, including cloud sandboxes. The connected tools' schemas own invocation details. The bundled Python helper is optional.
 
-## Canonical source
+## Intake
 
-Use `scripts/pr_review_github_logic.py` and the bundled GitHub adapter as the source of truth for actor classification, approval signals, revision boundaries, and provider-backed response matching.
+Collect the PR identity and current head, submitted reviews, review threads with nested replies and resolved history, top-level PR comments, and relevant approval signals. Follow pagination when the connector exposes it; disclose missing surfaces rather than claiming complete coverage.
 
-## Read-only diagnostic collection
+Review submissions, new threads, and standalone comments are inputs regardless of whether their author matches the authenticated account. Determine whether an input has been answered from the provider thread or comment relationship and the latest content. An existing response can remain valid across unrelated commits; revisit it when the underlying evidence changes.
 
-When useful for reporting, collect PR identity, exact head revision, every page of review threads and
-nested comments, submitted reviews, PR-level comments, reactions, force-push events, and authenticated
-actor identity through one connector. A missing field, page, permission, or stable reference makes the
-diagnostic collection incomplete. Report only observed provider facts and identify the missing
-surface.
+## Respond and monitor
 
-MCP diagnostics remain `SNAPSHOT_INCOMPLETE` until the executable transport produces a complete canonical snapshot. Report observed facts and missing surfaces; if the CLI remains unavailable, report `BLOCKED` with the missing transport. Resume through `fetch` when available.
+Assess related inputs together, then use available MCP actions to post an evidence-backed reply or comment. Confirm the observed response and resolve eligible threads separately. If the reply succeeds but resolution fails, retain that success and retry resolution alone. Check current unresponded and unresolved inputs after actions; use repeated checks when watching for later reviews.
+
+The helper's internal GitHub classification logic in `scripts/pr_review_github_logic.py` applies when running that helper. MCP does not require a canonical Python snapshot, fingerprint, or `ReviewCycleState`. Its outcome is established from the connected provider's observable state and the [shared review outcome contract](./review-cycle-contract.md).

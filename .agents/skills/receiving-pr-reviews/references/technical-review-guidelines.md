@@ -1,30 +1,24 @@
-# Technical review guidelines
+# Technical review judgment
 
-Apply these guidelines to every human, bot, reviewer, and stakeholder input during assessment. Record the conclusions in the assessment and cluster plan. Use the response guidance when planning and authoring communication under the [review-cycle contract](./review-cycle-contract.md).
+Use while assessing review findings or drafting responses. This is guidance for deciding what should change, not a substitute for the available provider tools.
 
-## Assess the claim
+## Assess impact and cause
 
-1. Restate the requested technical outcome and identify the established requirements. The requesting user owns intended outcomes and architectural decisions; evaluate technical claims from every source against evidence.
-2. Inspect the affected implementation, existing rationale, compatibility, supported platforms, tests, and regression risk. Check whether the feedback accounts for relevant context.
-3. Record validity, relevance, evidence, and the proposed disposition. If a fact remains unresolved, use `clarification_required` with one focused question. Escalate conflicts with established user decisions for direction.
+1. Establish the intended runtime user and the behavior they experience today. Verify the finding against code, tests, requirements, and observed usage. The requesting user owns intended outcomes; technical claims from every source require evidence.
+2. Determine whether the proposed change would improve that experience. Check for existing runtime handling, compatibility obligations, and regressions. A valid symptom may already be addressed by another mechanism.
+3. Look across related findings for a shared cause. Repeated exception handling, expanding regex patterns, or recurring fixes around one seam can signal that the chosen mechanism is unsuitable. Compare reuse of existing tools, structured APIs, programmatic validation, and LLM/subagent judgment before extending the mechanism.
+4. Choose a proportionate disposition: local fix, shared-cause fix, redesign, no change, superseded, or clarification. Record why the chosen level is sufficient and how to verify its runtime effect.
 
-## Check necessity and usage
+For proposed functionality expansion, inspect known call sites, external entry points, and documented requirements before concluding it is needed or unused. Escalate conflicts with prior user decisions.
 
-For requests to expand or complete functionality, inspect the relevant consumer boundary: call sites, exposed entry points, and documented requirements. Base the decision on observed usage and requirements; unresolved usage becomes `clarification_required`.
+## Implement and communicate
 
-## Implement accepted clusters
+Schedule independent ready work concurrently where possible; respect dependencies and prioritize blockers when capacity is limited. Verify the affected behavior and repository gates.
 
-Schedule accepted clusters by dependency. Run independent ready clusters concurrently when resources permit. When capacity is constrained, prioritize blockers, then simple changes, then complex changes. Verify each cluster before dependent work proceeds, using planned commands and repository gates. Pause only work dependent on unresolved clarification.
+For accepted findings, lead with the observed change, verification, and inspectable revision. For disputed findings, explain the evidence and consequence, then give a focused question or disposition. If later evidence changes the conclusion, correct the assessment and its response.
 
-## Communicate the decision
-
-Example: A reviewer requests removal of a compatibility branch. The build configuration still targets an older platform, and tests exercise that branch. Cite those facts and ask whether dropping older-platform support is intended before accepting the removal.
-
-For accepted changes, lead with the observed change, verification result, and inspectable revision. For a disputed finding, state the relevant evidence, consequence, and focused question or disposition. If new evidence changes an earlier assessment, correct the conclusion and cluster plan before responding.
-
-For PR/MR reviews, bind each disposition to its stable provider reference and follow the review-cycle communication gate. For conversational feedback, return the assessed findings directly. Distinguish provisional clarification from a verified fix: the current provider validator requires implementation readiness, so early clarification takes place in the user conversation until a validated provider clarification route exists.
+Example: A reviewer proposes removing compatibility code. The current build target and tests still exercise the older platform. Establish the consumer impact and ask whether support is intentionally being dropped before accepting the removal.
 
 ## Source and license
 
-SOURCE: [obra/superpowers receiving-code-review](https://github.com/obra/superpowers/blob/8ca22dba9a94f28898bbce59f2537ff4d87c747d/skills/receiving-code-review/SKILL.md).
-The excerpts are licensed under the [MIT license](./superpowers-license.txt), Copyright (c) 2025 Jesse Vincent.
+Adapted from [obra/superpowers receiving-code-review](https://github.com/obra/superpowers/blob/8ca22dba9a94f28898bbce59f2537ff4d87c747d/skills/receiving-code-review/SKILL.md). The earlier imported excerpts and attribution remain covered by the [MIT license](./superpowers-license.txt), Copyright (c) 2025 Jesse Vincent.
