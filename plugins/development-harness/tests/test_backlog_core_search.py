@@ -141,7 +141,7 @@ class TestApplySearchFilter:
         context = MagicMock()
         context.Pipe.return_value = (parent_connection, child_connection)
         context.Process.return_value = worker
-        parent_connection.recv.side_effect = [("READY",), ("MATCHED",), ("RESULT", [item], [])]
+        parent_connection.recv.side_effect = [("READY",), ("MATCHED",), ("RESULT", [item], [[]])]
 
         with (
             patch("backlog_core.search.multiprocessing.get_context", return_value=context),
@@ -153,6 +153,59 @@ class TestApplySearchFilter:
             assert _apply_regex_search_filter([item], "/match/") == [item]
 
         parent_connection.send.assert_has_calls([call(("MATCH", 100.1)), call(("TRANSFER",))])
+
+    @pytest.mark.parametrize(
+        "contexts",
+        [
+            pytest.param([], id="unaligned_rows"),
+            pytest.param([{}], id="context_row_is_not_a_list"),
+            pytest.param([[{}]], id="fact_is_missing_required_keys"),
+            pytest.param(
+                [[{"field": "title", "term": "/match/", "start": "1", "end": "0"}]], id="fact_geometry_is_reversed"
+            ),
+            pytest.param(
+                [[{"field": "body:preamble", "term": "/match/", "start": "0", "end": "0", "section_index": "0"}]],
+                id="body_fact_has_invalid_provenance",
+            ),
+        ],
+    )
+    def test_malformed_worker_context_results_are_typed_and_cleaned_up(self, contexts: object) -> None:
+        item = _candidate("match", "")
+        parent_connection = MagicMock()
+        child_connection = MagicMock()
+        worker = MagicMock()
+        worker.sentinel = object()
+        worker.is_alive.return_value = True
+        context = MagicMock()
+        context.Pipe.return_value = (parent_connection, child_connection)
+        context.Process.return_value = worker
+        parent_connection.recv.side_effect = [("READY",), ("MATCHED",), ("RESULT", [item], contexts)]
+
+        with (
+            patch("backlog_core.search.multiprocessing.get_context", return_value=context),
+            patch(
+                "backlog_core.search.wait", side_effect=[[parent_connection], [parent_connection], [parent_connection]]
+            ),
+            patch("backlog_core.search.time.monotonic", side_effect=[100.0, 100.01]),
+            pytest.raises(SearchExecutionError) as caught,
+        ):
+            apply_search_filter_with_context([item], "/match/")
+
+        assert caught.value.retryable is None
+        parent_connection.close.assert_called_once()
+        assert child_connection.close.call_count == 2
+        worker.kill.assert_called_once()
+        worker.join.assert_called_once()
+        worker.close.assert_called_once()
+
+    def test_zero_width_regex_context_remains_valid(self) -> None:
+        item = _candidate("match", "")
+
+        matched, contexts = apply_search_filter_with_context([item], "/^/")
+
+        assert matched == [item]
+        assert contexts[0][0] == {"field": "title", "term": "/^/", "start": "0", "end": "0"}
+        assert all(fact["start"] == fact["end"] == "0" for fact in contexts[0])
 
     def test_regex_worker_start_failure_is_an_execution_error_and_closes_endpoints(self) -> None:
         parent_connection = MagicMock()

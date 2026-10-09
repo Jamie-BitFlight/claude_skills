@@ -492,6 +492,52 @@ def _cleanup_regex_worker(
         child_connection.close()
 
 
+def _worker_context_fact_is_valid(item: dict[str, str | bool], fact: object) -> bool:
+    """Return whether one worker context fact is safe for presentation."""
+    required_keys = {"field", "term", "start", "end"}
+    if not isinstance(fact, dict) or not required_keys <= fact.keys():
+        return False
+    if not all(isinstance(fact[key], str) for key in required_keys):
+        return False
+
+    field = fact["field"]
+    try:
+        if field.startswith("body:"):
+            raw_section_index = fact.get("section_index")
+            if not isinstance(raw_section_index, str):
+                return False
+            section_index = int(raw_section_index)
+            sections = _parse_body_sections(str(item.get("body", "") or ""))
+            text = sections[section_index][1]
+            valid_schema = (
+                set(fact) == required_keys | {"section_index"}
+                and raw_section_index == str(section_index)
+                and 0 <= section_index < len(sections)
+                and field == sections[section_index][0]
+            )
+        elif field in {"title", "section", "topic", "type"}:
+            text = str(item.get(field, "") or "")
+            valid_schema = set(fact) == required_keys
+        else:
+            return False
+        start, end = int(fact["start"]), int(fact["end"])
+    except (IndexError, TypeError, ValueError):
+        return False
+    return valid_schema and fact["start"] == str(start) and fact["end"] == str(end) and 0 <= start <= end <= len(text)
+
+
+def _worker_contexts_are_valid(items: list[dict[str, str | bool]], contexts: object) -> bool:
+    """Return whether worker context rows align with their matching items."""
+    return (
+        isinstance(contexts, list)
+        and len(items) == len(contexts)
+        and all(
+            isinstance(context, list) and all(_worker_context_fact_is_valid(item, fact) for fact in context)
+            for item, context in zip(items, contexts, strict=True)
+        )
+    )
+
+
 def _apply_regex_search_filter_result(
     items: list[dict[str, str | bool]], search: str, include_match_context: bool
 ) -> tuple[list[dict[str, str | bool]], list[list[dict[str, str]]]]:
@@ -543,6 +589,7 @@ def _apply_regex_search_filter_result(
             and isinstance(result[1], list)
             and isinstance(result[2], list)
             and all(isinstance(item, dict) for item in result[1])
+            and _worker_contexts_are_valid(result[1], result[2])
         ):
             raise SearchExecutionError
         return result[1], result[2]
