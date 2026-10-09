@@ -55,7 +55,7 @@
 
 **F5 — P1: scope and publication trust gaps.** Enumerate warns on missing references; merge_layer writes directly. Both conflict with fail-closed admitted inventory and sole-publisher architecture.
 
-**F6 — P1: source graph drift.** T5 and SourceCheck are present in source but absent from committed graph layers. Current graph is not a verified current execution model.
+**F6 — P1: revision-scoped graph drift.** T5 is present on pinned `main` but absent from its committed graph layers. SourceCheck is present in #4095, not that `main` revision; verify its graph freshness against the matching #4095 revision rather than claiming current-main drift.
 
 **F7 — P2: authority ambiguity.** Historical PRD, active extraction rule, and later reviewed A6 plan disagree about worker/reducer ownership. Document the controlling contract before dispatch.
 

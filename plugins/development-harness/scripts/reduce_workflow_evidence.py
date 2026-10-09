@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # /// script
 # requires-python = ">=3.11"
 # dependencies = []
@@ -54,7 +53,9 @@ def reduce_frozen(manifest: dict, reports: list[dict], root: Path) -> dict:
         if path.is_absolute() or ".." in path.parts or not path.parts or name in sources or str(path) != name:
             raise ExtractionError("unsafe or duplicate source path")
         full = root / path
-        if not full.is_file() or full.is_symlink() or not full.resolve().is_relative_to(root.resolve()):
+        if any(component.is_symlink() for component in (root / Path(*path.parts[:i]) for i in range(1, len(path.parts) + 1))):
+            raise ExtractionError("symlinked source path component")
+        if not full.is_file() or not full.resolve().is_relative_to(root.resolve()):
             raise ExtractionError("missing or escaped source")
         data = full.read_bytes()
         if hashlib.sha256(data).hexdigest() != item["sha256"]:
@@ -105,7 +106,12 @@ def main() -> int:
         result = reduce_frozen(_load(args.manifest), [_load(p) for p in args.worker], args.root)
     except (ExtractionError, OSError, KeyError, TypeError, ValueError, AttributeError, json.JSONDecodeError) as exc:
         parser.error(str(exc))
-    # Output is staging only. Never overwrite an existing artifact implicitly.\n    try:\n        with args.output.open("xb") as stream:\n            stream.write(canonical(result))\n    except OSError as exc:\n        parser.error(f"cannot create staged output: {exc}")
+    # Output is staging only. Never overwrite an existing artifact implicitly.
+    try:
+        with args.output.open("xb") as stream:
+            stream.write(canonical(result))
+    except OSError as exc:
+        parser.error(f"cannot create staged output: {exc}")
     return 0
 
 

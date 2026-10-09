@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-SCRIPT = Path(__file__).resolve().parents[1] / "reduce_workflow_evidence.py"
+SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "reduce_workflow_evidence.py"
 spec = importlib.util.spec_from_file_location("workflow_reducer", SCRIPT)
 assert spec and spec.loader
 module = importlib.util.module_from_spec(spec)
@@ -61,4 +61,17 @@ def test_reject_hostile_evidence(tmp_path, mutation):
     elif mutation == "invalid_assignment":
         manifest["assignments"]["w3"] = []
     with pytest.raises((module.ExtractionError, TypeError, KeyError, ValueError)):
+        module.reduce_frozen(manifest, reports, tmp_path)
+
+
+def test_in_root_symlink_component_rejected(tmp_path):
+    manifest, reports = fixture(tmp_path)
+    (tmp_path / "real").mkdir()
+    (tmp_path / "real" / "source.md").write_text("hello world", encoding="utf-8")
+    (tmp_path / "alias").symlink_to(tmp_path / "real", target_is_directory=True)
+    manifest["sources"][0]["path"] = "alias/source.md"
+    for report in reports:
+        for finding in report["findings"]:
+            finding["path"] = "alias/source.md"
+    with pytest.raises(module.ExtractionError, match="symlinked"):
         module.reduce_frozen(manifest, reports, tmp_path)
