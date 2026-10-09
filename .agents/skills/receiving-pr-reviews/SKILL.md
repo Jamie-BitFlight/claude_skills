@@ -1,70 +1,32 @@
 ---
 name: receiving-pr-reviews
-description: Process reviewer feedback for GitHub PRs and GitLab MRs. Use after pushing a commit to recheck reviews, or when asked to check or address comments, questions, approvals, change requests, or bot findings.
+description: Assess and address review feedback on GitHub PRs, GitLab MRs, or in conversation. Use when checking new reviews, responding to comments, rechecking after a push, or following up on approvals and change requests.
 ---
 
-# Receiving PR and MR Reviews
+# Receiving reviews
 
-Treat every human, bot, reviewer, and stakeholder input as one evidence set. Assess the complete set
-before acting; its shared patterns determine the systemic response.
+Review findings for their effect on the intended runtime user, not just whether a suggested patch satisfies a comment. Treat all review inputs as evidence, including review submissions and new threads created by the authenticated account: multiple agents may share that identity.
 
-## Authority
+## Choose the available route
 
-A check-only request authorizes fetch, assessment, validation, and reporting. Source edits, pushes,
-provider replies/comments, and provider resolutions are separate mutation classes; each requires the
-user's request or an explicit repository standing rule. Passing validation proves readiness, not
-authority.
+For a PR or MR, first use `scripts/pr_review_threads.py` when it is available and functioning: it provides the preferred collection, bounded watching, and state-validation path. Consult its `--help` for operations. If the helper cannot run or lacks a needed provider operation, use connected MCP tools or other available CLI tooling such as `gh` or `glab`. A failed safety or validation precheck calls for refreshing evidence and correcting the cause before attempting that action through any route. In cloud sandboxes without the helper, use MCP directly. All routes follow the same [review outcome contract](./references/review-cycle-contract.md); the helper's internal state format is required only when using that helper.
 
-## Route
+For GitLab-specific approval and discussion behavior, read [GitLab review operations](./references/gitlab-review-operations.md). For GitHub MCP intake and response matching, read [GitHub MCP operations](./references/github-mcp-fallback.md). For feedback outside a PR/MR, assess it using [technical review guidelines](./references/technical-review-guidelines.md) and report the disposition directly.
 
-For review feedback without a PR or MR, use the technical review guidelines directly: identify the intended outcome, assess each finding against available code and requirements, group shared causes, and return evidence-backed dispositions. Do not invent a provider snapshot or claim `REVIEW_COMPLETE`. The provider lifecycle below applies only to PRs and MRs.
+A request to check reviews permits reading and reporting. Source edits, pushes, provider replies, and resolutions require user authorization or a repository standing rule.
 
+## Review process
 
-Use `scripts/pr_review_threads.py` to detect or select one target and provider. For a GitLab MR, read
-[GitLab review operations](./references/gitlab-review-operations.md). If the bundled CLI cannot use
-`gh` and a GitHub MCP connector is available, read the fail-closed
-[GitHub MCP boundary](./references/github-mcp-fallback.md). The current package cannot normalize MCP
-evidence into action-ready canonical state. One snapshot uses one executable transport.
+1. **Collect and monitor.** Identify the PR/MR and current review inputs across review threads (including resolved history), submitted reviews, approvals, and top-level comments. Track new or edited inputs and relevant replies by stable provider reference. Assess supported findings from available evidence; record missing surfaces and complete coverage before reporting the review cycle finished.
+2. **Assess the system.** Read [technical review guidelines](./references/technical-review-guidelines.md). Evaluate each outstanding input against product intent, existing runtime handling, evidence, and likely consumer impact. Group related findings by shared cause. Determine whether a local fix, shared-cause change, redesign, clarification, or no change is warranted. Every outstanding input needs a supported disposition.
+3. **Act and verify.** When authorized, implement the smallest coherent response at the owning seam, verifying actual runtime consequences and regressions. Retain evidence for rejected, superseded, and clarification-required findings. Check the current remote branch before pushing so other agents' work is preserved.
+4. **Respond and reconcile.** Refresh the current review input, thread state, and relevant remote revision before provider mutation; reconcile any changed evidence with the planned disposition. Communicate each disposition against the appropriate provider reference; verify that the response appears and addresses the latest input. Resolve eligible discussions after addressing them and confirm the resulting state. Include eligible unresolved discussions in outstanding work. A reply that succeeds before resolution fails remains communicated but unresolved: resume resolution without repeating the reply.
+5. **Recheck.** Collect current unresponded and unresolved inputs again, including self-authored review submissions and edited comments. Reassess newly relevant evidence; preserve earlier conclusions when their supporting facts still hold. Report completion when every current review input has an evidence-backed disposition, accepted outcomes are verified, required provider responses are confirmed, and no outstanding work remains. A quiet polling window alone is only an observation.
 
-## Review cycle
+## Evidence and completion
 
-1. Establish the target, current remote revision, intended outcome, repository instructions, and
-   mutation authority. This step closes when those facts and authority classes are explicit.
-2. Run `fetch --snapshot-file <path>` to persist one full canonical snapshot. Stdout contains only the
-   live action view; the file retains complete reconciliation evidence. `SNAPSHOT_INCOMPLETE` stops
-   assessment and all mutation.
-3. Read the [review-cycle contract](./references/review-cycle-contract.md) and [technical review guidelines](./references/technical-review-guidelines.md) before assessment. Build an exact census of every inbound comment, question, approval, rejection/change request, bot summary, and other human, reviewer, or stakeholder input. Assess each once, preserve resolved history, and record unknowns.
-4. Cluster the exact census by shared invariant, cause, owning component, requested outcome, or
-   verification surface; use explicit singleton clusters for unrelated inputs. Form one evidence-
-   bearing systemic outcome and verification plan per cluster before changing source.
-5. When authorized, implement each accepted cluster at its owning seam, or record evidence for `no_change`, `superseded`, or `clarification_required`. Apply the technical guidelines' priority order among accepted independent clusters. Verify every cluster and repository-required gate. Push source changes to an inspectable current revision before citing them.
-6. Author the cycle state from the typed models. Use `validate-projection` for dry-run or check-only state and `validate-cycle` for action readiness. Apply the response guidance in the [technical review guidelines](./references/technical-review-guidelines.md). When authorized, communicate every disposition with provider-backed evidence, then resolve only where policy and capability permit. Clarifications remain open; unavailable resolution is recorded as unavailable.
-7. Persist a new complete snapshot. New or changed inputs, revision, provider state, fingerprints, or
-   communication evidence return the complete set to census, assessment, and clustering. Use bounded
-   `watch --snapshot-file <path>` calls only to sample for later change; an elapsed call is not
-   completion.
-8. Run `complete-cycle` against current provider state. Only its successful persisted result emits
-   `REVIEW_COMPLETE`.
+Use the [review outcome contract](./references/review-cycle-contract.md) for definitions of evidence, validity, unresponded inputs, resolution, and completion. Keep the process above as the execution path.
 
-## Stop conditions
+## Recovery
 
-- `SNAPSHOT_INCOMPLETE`: a required surface, page, conversation, schema, or transport observation is
-  missing. Fetch a complete stable snapshot before proceeding.
-- `clarification_required`: this disposition records that evidence cannot determine validity or
-  relevance. Ask one focused question, keep the input open, and keep the cycle non-terminal.
-- `BLOCKED`: required authority, capability, or external fact is absent. Report the exact blocker.
-- `ERROR`: collection, validation, or provider operation failed. Preserve confirmed evidence and do
-  not label stale state clean.
-- `REVIEW_COMPLETE`: the complete current recheck is unchanged and has zero unresolved, outstanding,
-  new, or changed inputs, while every contract gate is terminal. Approval, rejection, a clear initial
-  snapshot, or a quiet watch window is an input or observation, never this terminal by itself.
-
-## Command source
-
-Run `scripts/pr_review_threads.py <command> --help` for current targets, arguments, and bounds. The
-stable operations are `fetch`, `watch`, `validate-projection`, `validate-cycle`, `complete-cycle`,
-`reply`, `resolve`, `comment`, `reply-and-resolve`, and `reply-and-resolve-batch`. Default fetch and
-watch output contains only live unanswered inputs and their complete action content; `--summary`
-contains aggregate decision metadata only. Use focused provider commands for deeper inspection and
-`--snapshot-file` for internal reconciliation evidence. Exact fields and enum values live in the
-Pydantic models, while validation commands govern action and completion gates.
+If provider collection is incomplete, report which evidence is missing and continue once it is available. If authority or capability is absent, report the blocked action. If a response or resolution fails, preserve confirmed effects and retry only the remaining work after refreshing the relevant provider state.
