@@ -9,7 +9,7 @@ Review findings for their effect on the intended runtime user, not just whether 
 
 ## Choose the available route
 
-For a PR or MR, use available provider capabilities to collect reviews, reply, and resolve. In a local environment, `scripts/pr_review_threads.py` offers collection, bounded watching, and state validation; consult its `--help` when using it. In a cloud environment, use the connected MCP tools directly. Both routes follow the same [review outcome contract](./references/review-cycle-contract.md); the bundled CLI's state format is an implementation detail of that helper, not a prerequisite for MCP.
+For a PR or MR, first use `scripts/pr_review_threads.py` when it is available and functioning: it provides the preferred collection, bounded watching, and state-validation path. Consult its `--help` for operations. If the helper is unavailable, fails, or lacks a needed capability, continue with connected MCP tools or other available CLI tooling such as `gh` or `glab`. In cloud sandboxes without the helper, use MCP directly. All routes follow the same [review outcome contract](./references/review-cycle-contract.md); the helper's internal state format is required only when using that helper.
 
 For GitLab-specific approval and discussion behavior, read [GitLab review operations](./references/gitlab-review-operations.md). For GitHub MCP intake and response matching, read [GitHub MCP operations](./references/github-mcp-fallback.md). For feedback outside a PR/MR, assess it using [technical review guidelines](./references/technical-review-guidelines.md) and report the disposition directly.
 

@@ -1,6 +1,6 @@
 # Review outcome contract
 
-Use this contract when assessing review evidence or deciding whether a PR/MR review cycle is complete. It applies to local CLI and connected MCP workflows alike. The bundled CLI's Pydantic state and validators are optional implementation aids for that transport.
+Use this contract when assessing review evidence or deciding whether a PR/MR review cycle is complete. It applies to local CLI and connected MCP workflows alike. The bundled helper is the preferred implementation when available and working. Its Pydantic state and validators apply when using that helper; other transports establish the same outcomes through their own provider evidence.
 
 ## Evidence and validity
 
@@ -26,4 +26,4 @@ Confirm communication before resolution. If resolution fails after a successful 
 
 After responding, check for new, edited, unresponded, or unresolved inputs. Reassess decisions affected by changed evidence; reuse unaffected assessments. Report completion only when current relevant review work has been accounted for, accepted outcomes are verified, responses are observed, and no required clarification or other outstanding work remains.
 
-A quiet watch window, approval alone, or a locally recorded action is not completion evidence. If the optional CLI helper is used, its `validate-projection`, `validate-cycle`, and `complete-cycle` commands enforce its own stricter state representation; MCP workflows establish the same review outcomes through provider observations without producing that representation.
+A quiet watch window, approval alone, or a locally recorded action is not completion evidence. When using the preferred CLI helper, its `validate-projection`, `validate-cycle`, and `complete-cycle` commands enforce its own stricter state representation; MCP workflows establish the same review outcomes through provider observations without producing that representation.

@@ -1,6 +1,6 @@
 # GitHub MCP review operations
 
-Use this reference when GitHub MCP is the available provider interface, including cloud sandboxes. The connected tools' schemas own invocation details. The bundled Python helper is optional.
+Use this reference when the preferred bundled helper is unavailable, fails, or lacks a needed operation and GitHub MCP is available, including cloud sandboxes where the helper cannot run. The connected tools' schemas own invocation details.
 
 ## Intake
 
