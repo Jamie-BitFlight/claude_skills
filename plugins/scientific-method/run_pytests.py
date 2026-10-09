@@ -21,6 +21,7 @@ import pytest
 
 PLUGIN_ROOT = Path(__file__).resolve().parent
 TEST_PATHS = ("mcp/experiment-registry/tests",)
+COLLECTION_ROOT = PLUGIN_ROOT / "mcp" / "experiment-registry"
 IMPORT_PATHS: tuple[str, ...] = ()
 FAST_MARKER = "not e2e and not cross_backend and not integration and not research_vault"
 
@@ -43,7 +44,7 @@ def main() -> int:
         "-c",
         os.devnull,
         "--rootdir",
-        str(PLUGIN_ROOT),
+        str(COLLECTION_ROOT),
         "--confcutdir",
         str(PLUGIN_ROOT),
         "-o",
@@ -52,7 +53,7 @@ def main() -> int:
         f"pythonpath={shlex.join(str(PLUGIN_ROOT / path) for path in IMPORT_PATHS)}",
         "--strict-config",
         "--strict-markers",
-        "--import-mode=prepend",
+        "--import-mode=importlib",
         "--asyncio-mode=auto",
         "-m",
         FAST_MARKER,

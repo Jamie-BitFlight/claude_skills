@@ -118,10 +118,12 @@ def test_runner_hands_pytest_its_own_isolated_configuration(runner: Path, monkey
     monkeypatch.setattr(sys, "argv", [str(runner)])
     assert module.main() == 0
     args = captured[0]
-    root = str(runner.parent)
+    root = runner.parent.resolve()
+    collection_root = Path(args[args.index("--rootdir") + 1]).resolve()
     assert args[args.index("-c") + 1] == os.devnull
-    assert args[args.index("--rootdir") + 1] == root
-    assert args[args.index("--confcutdir") + 1] == root
+    assert collection_root.is_relative_to(root)
+    assert all((root / path).resolve().is_relative_to(collection_root) for path in module.TEST_PATHS)
+    assert args[args.index("--confcutdir") + 1] == str(root)
     assert {"--strict-config", "--strict-markers", "--import-mode=importlib", "--asyncio-mode=auto"} <= set(args)
     assert f"testpaths={shlex.join(module.TEST_PATHS)}" in args
     assert args[args.index("-m") + 1] == root_fast_marker() == module.FAST_MARKER
