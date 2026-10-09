@@ -53,9 +53,13 @@ def test_model_invoked_description_covers_both_providers_and_trigger_branches() 
     description = next(
         line.removeprefix("description: ") for line in skill.splitlines() if line.startswith("description:")
     )
-    assert len(description.split()) <= 40
-    for trigger in ("GitHub PR", "GitLab MR", "conversation", "reviews", "comments"):
-        assert trigger in description
+
+    assert len(description.split()) <= 35
+    assert description.startswith("Process reviewer feedback")
+    assert "GitHub PR" in description
+    assert "GitLab MR" in description
+    assert "after pushing a commit to recheck reviews" in description
+    assert "asked to check or address comments" in description
     assert "disable-model-invocation" not in skill
 
 
@@ -64,12 +68,11 @@ def test_instruction_links_are_one_hop_and_resolve_through_both_skill_paths() ->
     links = re.findall(r"\[[^]]+\]\(([^)]+\.md)\)", skill)
 
     assert links == [
-        "./references/review-cycle-contract.md",
         "./references/gitlab-review-operations.md",
         "./references/github-mcp-fallback.md",
-        "./references/technical-review-guidelines.md",
-        "./references/technical-review-guidelines.md",
         "./references/review-cycle-contract.md",
+        "./references/technical-review-guidelines.md",
+        "./references/technical-review-guidelines.md",
     ]
     for link in links:
         relative = link.removeprefix("./")
@@ -89,16 +92,44 @@ def test_instructions_have_no_volatile_source_citations_or_cli_option_cache() ->
         assert "--provider-timeout-seconds" not in text, path
 
 
-def test_review_contract_names_outcome_evidence_and_provider_state() -> None:
+def test_review_contract_names_every_terminal_gate_and_input_class() -> None:
     contract = (SKILL_ROOT / "references/review-cycle-contract.md").read_text(encoding="utf-8")
-    for term in ("Evidence", "valid", "runtime", "input", "response", "resolution", "completion", "MCP"):
-        assert term.lower() in contract.lower()
+
+    for term in (
+        "comment",
+        "question",
+        "approval",
+        "rejection/change request",
+        "bot summary",
+        "stakeholder input",
+        "Clusters",
+        "systemic",
+        "no_change",
+        "Verification",
+        "Communication",
+        "resolution",
+        "Recheck",
+        "REVIEW_COMPLETE",
+    ):
+        assert term in contract
 
 
-def test_mcp_route_supports_review_actions_without_python_state() -> None:
-    guidance = (SKILL_ROOT / "references/github-mcp-fallback.md").read_text(encoding="utf-8")
-    for term in ("MCP", "response", "resolution", "provider"):
-        assert term in guidance
+def test_mcp_boundary_is_fail_closed_and_points_to_canonical_predicates() -> None:
+    fallback = (SKILL_ROOT / "references/github-mcp-fallback.md").read_text(encoding="utf-8")
+
+    for symbol in (
+        "CODEX_REACTOR_LOGINS",
+        "CODEX_EMPTY_REVIEW_BODY",
+        "is_codex_empty_review",
+        "is_codex_thumbs_up",
+        "latest_revision_at",
+        "references_review",
+        "review_effective_timestamp",
+    ):
+        assert symbol in fallback
+    assert "no executable ingress" in fallback
+    assert "SNAPSHOT_INCOMPLETE" in fallback
+    assert "chatgpt-codex-connector" not in fallback
 
 
 def test_shared_contract_keeps_provider_approval_mapping_out_of_shared_context() -> None:
