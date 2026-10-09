@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#   "fastmcp==4.0.11",
+#   "fastmcp==4.1.0",
 #   "pydantic>=2.0",
 # ]
 #
