@@ -16,12 +16,12 @@ A submitted review or new thread is inbound even when authored by the authentica
 
 **Additional verification** is useful when it can settle a specific uncertainty relevant to the disposition. Existing evidence can be sufficient; requesting another artifact or check is itself a proposal to assess, rather than an automatic prerequisite.
 
-For each current finding, establish a supported change, no-change decision, supersession, or focused clarification. Keep clarification questions open until answered and reassessed. Preserve enough of its provider reference, latest content, disposition, verification, and response evidence to determine outstanding work. Match responses to current content; a recorded attempt alone is insufficient evidence of delivery.
+For each current finding, establish a supported change, no-change decision, supersession, or focused clarification. Keep clarification questions open until answered and reassessed. Preserve enough of its provider reference, latest content, disposition, verification, and response evidence to determine outstanding work. Match responses to current content; a recorded attempt alone is insufficient evidence of delivery. Confirmed effects remain attributable to their individual inputs. When another input changes, reassess decisions affected by that change while retaining still-valid evidence and completed actions for the others.
 
 ## Completion
 
 **Review-cycle completion** means all current review inputs have supported dispositions, observed required responses, and appropriate discussion states. It does not assert PR merge readiness. An unresolved clarification keeps review work open; a provider discussion without a resolution capability can be reported as unavailable rather than treated as an unperformed fix.
 
- Assess supported findings from partial evidence and identify missing surfaces; establish full relevant coverage and confirm eligible discussions are resolved before reporting completion.
+Assess supported findings from partial evidence and identify missing surfaces; establish full relevant coverage and confirm eligible discussions are resolved before reporting completion.
 
 **Preferred transport** is the bundled helper because it automates intake and cross-referencing; **required outcome** is the review evidence and completion contract, independent of transport. When using the helper, include each inbound input in exactly one shared-cause or singleton cluster. The helper's `validate-projection`, `validate-cycle`, and `complete-cycle` commands validate its own state representation when that route is used. MCP and other transports establish the same observable outcomes through their provider capabilities.
