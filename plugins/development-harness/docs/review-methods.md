@@ -91,3 +91,76 @@ architecture or implementation supersedes that rationale; age and change frequen
 implicit contracts and delayed effects; read its relevant guidance when those trigger the inquiry.
 If history cannot be retrieved or does not establish purpose, name the remaining uncertainty and
 the evidence needed. Do not invent historical incidents or treat repeated claims as corroboration.
+
+## Preserve finding identity and provenance
+
+A source location is an anchor for inspection, not a defect identity. Two reports at the
+same line can concern different violated guarantees; one failure may have evidence at several
+locations. Never infer semantic equivalence from normalized location, rule group, severity,
+or matching reviewer wording alone.
+
+For every candidate, retain the original report and identify:
+
+- The governing contract and its authoritative source (or mark it unresolved).
+- The triggering input/state and the observable incorrect behavior.
+- The failure mechanism, supporting anchors, and any counterevidence.
+- The reporting worker and perspective, rule/group assignment, and reviewed revision.
+
+Use location overlap to nominate candidates for comparison. In the current DH
+multi-perspective punch-list contract, merge only findings that satisfy the authoritative
+same-file-and-line rule in `skills/review-verdict-contract/references/verdict-schema.md`.
+Preserve its explicit exception: a `line: null` finding may merge with a concrete-line
+finding in the same file **only when both describe the same defect**. Two distinct
+failures at one line remain separate entries. Other cross-line or cross-file semantic
+equivalence is an investigation note, not permission to merge those entries: retain each
+original anchor and cross-reference the related findings in narrative until the owning
+schema and all consumers support multiple anchors. At the
+same location, keep distinct failures distinguishable in the original reviewer verdicts;
+the existing punch-list schema permits separate entries for distinct same-line defects,
+but source location alone cannot establish semantic identity or cross-anchor correlation.
+Preserve raw reviewer findings in their owning Review Results sections. The current
+punch-list schema requires one entry per distinct defect and has a count-based
+conservation rule. Two same-defect observations from one perspective expose an
+unresolved producer/schema/consumer gap: do not split one canonical defect into
+multiple entries, duplicate perspective identities, or claim both observations
+are conserved by T5. Investigate the owning contract under #4105 before changing
+its representation; a repeated report is not independent corroboration.
+
+Verification is separate from candidate grouping. During investigation, distinguish
+VERIFIED (applicable contract and defect established), REFUTED (specific counterevidence
+disproves the claim), and UNRESOLVED (discriminating evidence unavailable). These are
+reasoning categories, **not persisted statuses or new verdict fields**. Preserve every
+raw finding through the existing DH verdict/synthesis contract; do not turn an unresolved
+candidate into a confirmed blocker. When an existing authorized durable report section
+can hold a concise explanation, use it without changing its schema. Otherwise report
+only what the existing contract supports, and mark the missing adjudication audit trail
+as a limitation. A durable per-candidate reason/source/next-check record requires an
+explicit owner and schema migration tracked in #4098; never claim an ephemeral worker
+response is a durable audit trail.
+
+## Coverage and review execution boundary
+
+In review preparation, inventory every changed path, including renamed/deleted files and
+agent-facing Markdown, configuration, schemas, scripts and tests. The orchestrator should
+track reviewed, delegated and uncovered paths and their reasons in its run context, but
+this is not a persisted or enforceable DH coverage gate yet. Existing worker verdict and
+punch-list schemas do not carry per-path coverage; do not add fields to their JSON blocks
+or claim that approval proves every path was read. Report known omissions only when
+the caller provides an authorized durable reporting channel; the DH multi-perspective
+worker verdict and T5 canonical summary currently provide no such coverage channel.
+Otherwise leave the coverage record explicitly unavailable rather than inventing a
+persistence path. A future persisted coverage manifest requires an
+explicit owner, schema and reconciliation gate (tracked in #4098).
+A bounded review budget may prioritize investigation but must not turn unread paths
+into an implicit approval. Validate comment anchors against the pinned comparison,
+using unchanged consumer lines as supporting evidence when necessary.
+Source-position confidence must not be confused with defect confidence.
+
+Prefer deterministic extraction, path normalization, source matching, schema validation,
+and coverage accounting. Use agent judgment for intent, semantic equivalence, and causal
+interpretation. Run conditional deeper probes only when their expected information can
+change a review decision; record unavailable probes rather than claiming they ran.
+
+The plugin-creator ensemble reducer is a distinct consumer: its location-based merge
+and threshold experiment are not the DH verdict/synthesis contract. Do not route DH
+verdicts through that reducer or reinterpret a location merge as semantic agreement.
