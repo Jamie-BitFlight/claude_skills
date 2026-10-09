@@ -242,6 +242,10 @@ def _is_forbidden_search_dependency(imported: str) -> bool:
     return imported == "git" or imported == "dh_paths" or imported.startswith(("backlog_core", "fastmcp", "mcp"))
 
 
+def _errors_leaf_has_forbidden_dependency(imports: list[str]) -> bool:
+    return any(imported.startswith(".") or _is_forbidden_search_dependency(imported) for imported in imports)
+
+
 def test_search_and_errors_reject_forbidden_source_dependency_families() -> None:
     plugin_root = Path(__file__).resolve().parents[1]
     search_tree = ast.parse((plugin_root / "backlog_core/search.py").read_text(encoding="utf-8"))
@@ -251,7 +255,8 @@ def test_search_and_errors_reject_forbidden_source_dependency_families() -> None
     relative_search_imports = [imported for imported in search_imports if imported.startswith(".")]
 
     assert relative_search_imports == [".errors"]
-    assert not any(_is_forbidden_search_dependency(imported) for imported in search_imports + error_imports)
+    assert not any(_is_forbidden_search_dependency(imported) for imported in search_imports)
+    assert not _errors_leaf_has_forbidden_dependency(error_imports)
 
     for faulted_source in (
         "import git",
@@ -262,6 +267,8 @@ def test_search_and_errors_reject_forbidden_source_dependency_families() -> None
         assert any(
             _is_forbidden_search_dependency(imported) for imported in _imported_modules(ast.parse(faulted_source))
         )
+
+    assert _errors_leaf_has_forbidden_dependency(_imported_modules(ast.parse("from . import models")))
 
 
 # ---------------------------------------------------------------------------
