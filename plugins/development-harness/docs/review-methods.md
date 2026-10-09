@@ -118,7 +118,13 @@ schema and all consumers support multiple anchors. At the
 same location, keep distinct failures distinguishable in the original reviewer verdicts;
 the existing punch-list schema permits separate entries for distinct same-line defects,
 but source location alone cannot establish semantic identity or cross-anchor correlation.
-Preserve each raw finding and its severity in the owning perspective verdict.\nThe current punch-list schema has one description per raising perspective and a\ncount-based conservation invariant. It cannot collapse two raw findings from the\nsame perspective into one entry without losing an observation. Keep distinct raw\nobservations in distinct punch-list entries even when they appear to concern the\nsame defect, until #4105 establishes a compatible representation. Count a\nperspective once for corroboration; repeated reports do not create an additional\nindependent reviewer.
+Preserve raw reviewer findings in their owning Review Results sections. The current
+punch-list schema requires one entry per distinct defect and has a count-based
+conservation rule. Two same-defect observations from one perspective expose an
+unresolved producer/schema/consumer gap: do not split one canonical defect into
+multiple entries, duplicate perspective identities, or claim both observations
+are conserved by T5. Investigate the owning contract under #4105 before changing
+its representation; a repeated report is not independent corroboration.
 
 Verification is separate from candidate grouping. During investigation, distinguish
 VERIFIED (applicable contract and defect established), REFUTED (specific counterevidence
