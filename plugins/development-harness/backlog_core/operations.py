@@ -106,7 +106,16 @@ from .parsing import (
     view_result_from_local_item,
 )
 from .rendering import heading_to_unknown_key, unknown_key_to_heading as reconstruct_unknown_heading
-from .search import ContentDuplicateMatch, DuplicateCheckStatus, apply_search_filter, find_content_duplicates
+from .search import (
+    ContentDuplicateMatch,
+    DuplicateCheckStatus,
+    PreparedSearch,
+    _contains_regex_form,
+    apply_search_filter,
+    apply_search_filter_with_context,
+    find_content_duplicates,
+    prepare_search_filter,
+)
 from .section_registry import SectionKey, resolve_section_name
 from .status_registry import STATUS_LABEL_PREFIX, StatusLabel, pick_primary_status_label
 from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS
@@ -2473,7 +2482,7 @@ def _page_match(
     topic: str | None,
     include_closed: bool,
     filter_by_key: dict[str, str] | None,
-    search: str | None,
+    prepared_search: PreparedSearch | None,
 ) -> bool:
     """The one local predicate a request-shaped list candidate must pass.
 
@@ -2506,11 +2515,11 @@ def _page_match(
     )
     if not matches:
         return False
-    if filter_by_key or search is not None:
+    if filter_by_key or prepared_search is not None:
         entry = _build_list_entry(item, status_map, status_live=True)
         if filter_by_key and not all(str(entry.get(key)) == value for key, value in filter_by_key.items()):
             return False
-        if search is not None and not apply_search_filter([entry], search):
+        if prepared_search is not None and not prepared_search.matches(entry):
             return False
     return True
 
@@ -2548,14 +2557,16 @@ def _read_list_page(
     context = _decision_context(repo=repo, allow_cached=allow_cached, output=output)
     metadata_only = count_only and not refresh
     pushed_labels = [value for value in (label, _status_push_label(status)) if value]
+    regex_search = search is not None and _contains_regex_form(search)
     request = ListPageRequest(
         repo=repo,
         include_closed=include_closed,
         labels=pushed_labels,
-        offset=offset,
-        limit=limit,
+        offset=0 if regex_search else offset,
+        limit=0 if regex_search else limit,
         hydrate=not metadata_only,
     )
+    prepared_search = prepare_search_filter(search) if search is not None and not regex_search else None
     page = context.page(
         request,
         match=lambda item, provider: _page_match(
@@ -2569,7 +2580,7 @@ def _read_list_page(
             topic=topic,
             include_closed=include_closed,
             filter_by_key=filter_by_key,
-            search=search,
+            prepared_search=prepared_search,
         ),
         force_hydration=_page_needs_hydration(
             section=section, type_=type_, topic=topic, search=search, filter_by_key=filter_by_key
@@ -2835,6 +2846,41 @@ def _list_status_resolution(
     return _resolve_list_status_map(open_items, repo, status, output)
 
 
+def _apply_regex_result_page(
+    items: list[dict[str, str | bool]],
+    search: str | None,
+    regex_search: bool,
+    page: ListPage | None,
+    offset: int,
+    limit: int,
+    count_only: bool,
+    match_context: bool,
+) -> tuple[list[dict[str, str | bool]], int | None, bool, list[list[dict[str, str]]] | None]:
+    """Apply regex filtering and request pagination after candidate acquisition.
+
+    Returns:
+        Request-shaped items, exact regex total when known, ``has_more``, and
+        context records aligned with the returned items.
+    """
+    if search is None or (page is not None and not regex_search):
+        return items, None, False, None
+    contexts: list[list[dict[str, str]]] | None = None
+    if regex_search and match_context:
+        items, contexts = apply_search_filter_with_context(items, search)
+    else:
+        items = apply_search_filter(items, search)
+    if page is None or not regex_search:
+        return items, None, False, contexts
+    total = len(items)
+    page_items = items[offset:]
+    has_more = limit > 0 and len(page_items) > limit
+    if limit > 0:
+        page_items = page_items[:limit]
+    if contexts is not None:
+        contexts = contexts[offset : offset + limit] if limit > 0 else contexts[offset:]
+    return ([] if count_only else page_items), total, has_more, contexts
+
+
 def list_items(
     refresh: bool = False,
     allow_cached: bool = False,
@@ -2852,7 +2898,8 @@ def list_items(
     offset: int = 0,
     limit: int = 0,
     count_only: bool = False,
-) -> dict[str, int | bool | str | list[str] | list[dict[str, str | bool]] | None]:
+    match_context: bool = False,
+) -> dict[str, int | bool | str | list[str] | list[dict[str, str | bool]] | list[list[dict[str, str]]] | None]:
     """List backlog items from one live provider observation when supported.
 
     Provider-backed commands attempt the live read first and raise when it
@@ -2900,6 +2947,8 @@ def list_items(
             work-item content beyond what matching needs and writes nothing
             through to the cache, so the returned rows may carry raw issue
             bodies. With *refresh*, the page is read and reconciled in full.
+        match_context: Return worker-produced regex context records for the
+            MCP presentation layer.
 
     Returns:
         Dict with items list (each item a dict with section, title, issue, plan, type, topic,
@@ -2914,6 +2963,7 @@ def list_items(
     out = output or Output()
     backend = get_config().backend
     page: ListPage | None = None
+    regex_search = search is not None and _contains_regex_form(search)
     if getattr(backend, "supports_github_extras", False):
         page = _read_list_page(
             backend=backend,
@@ -3041,14 +3091,15 @@ def list_items(
     ]
     if filter_by_key:
         result_items = [it for it in result_items if all(str(it.get(k)) == v for k, v in filter_by_key.items())]
-    if search is not None:
-        result_items = apply_search_filter(result_items, search)
+    result_items, regex_total, regex_has_more, regex_match_contexts = _apply_regex_result_page(
+        result_items, search, regex_search, page, offset, limit, count_only, match_context
+    )
     (status_source, unavailable_capabilities, filters_evaluated_against_unavailable_data) = _listing_status_metadata(
         status_resolution, [str(item.get("issue", "")) for item in result_items], status, filter_by_key
     )
     result = {
         "items": result_items,
-        "count": len(result_items),
+        "count": regex_total if count_only and regex_total is not None else len(result_items),
         "from_cache": from_cache,
         "has_pending_writes": has_pending_writes,
         "status_source": status_source,
@@ -3059,8 +3110,10 @@ def list_items(
     if page is not None:
         # Already request-shaped and paginated (D3/D4) -- the caller (server.py)
         # must not re-slice or re-count this page against a full local fetch.
-        result["total"] = page.total
-        result["has_more"] = page.has_more
+        result["total"] = regex_total if regex_search else page.total
+        result["has_more"] = regex_has_more if regex_search else page.has_more
+    if regex_match_contexts is not None and not count_only:
+        result["regex_match_contexts"] = regex_match_contexts
     return result
 
 

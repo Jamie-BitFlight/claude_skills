@@ -51,29 +51,30 @@ load_dotenv()
 # the 403, set NO_PROXY, and turn a working REST path into a uniformly failing one.
 _HTTP_FORBIDDEN = 403
 
-_github_token = os.environ.get("GITHUB_TOKEN")
-if _github_token:
-    import httpx
-
-    try:
-        _probe = httpx.get(
-            "https://api.github.com/user", headers={"Authorization": f"Bearer {_github_token}"}, timeout=5.0
-        )
-        _proxy_blocks_github = _probe.status_code == _HTTP_FORBIDDEN
-    except httpx.HTTPError:
-        _proxy_blocks_github = False
-
-    if _proxy_blocks_github:
-        _gh_domains = "api.github.com,*.github.com,*.githubusercontent.com,uploads.github.com"
-        for _var in ("no_proxy", "NO_PROXY"):
-            existing = os.environ.get(_var, "")
-            if _gh_domains not in existing:
-                os.environ[_var] = f"{existing},{_gh_domains}".lstrip(",")
-
 from dh_mcp_preinit import apply_project_dir_from_argv
 
-apply_project_dir_from_argv()
+if __name__ == "__main__":
+    _github_token = os.environ.get("GITHUB_TOKEN")
+    if _github_token:
+        import httpx
 
-from backlog_core.server import mcp
+        try:
+            _probe = httpx.get(
+                "https://api.github.com/user", headers={"Authorization": f"Bearer {_github_token}"}, timeout=5.0
+            )
+            _proxy_blocks_github = _probe.status_code == _HTTP_FORBIDDEN
+        except httpx.HTTPError:
+            _proxy_blocks_github = False
 
-mcp.run()
+        if _proxy_blocks_github:
+            _gh_domains = "api.github.com,*.github.com,*.githubusercontent.com,uploads.github.com"
+            for _var in ("no_proxy", "NO_PROXY"):
+                existing = os.environ.get(_var, "")
+                if _gh_domains not in existing:
+                    os.environ[_var] = f"{existing},{_gh_domains}".lstrip(",")
+
+    apply_project_dir_from_argv()
+
+    from backlog_core.server import mcp
+
+    mcp.run()

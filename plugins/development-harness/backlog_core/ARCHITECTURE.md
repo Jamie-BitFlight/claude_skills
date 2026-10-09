@@ -65,12 +65,13 @@ conversion, serialisation, and round-trip verification to `FileCache`. The scrip
 
 ```text
 section_registry.py   ← standalone, no imports from other mcp modules; canonical section/subsection name registry
-models.py             ← standalone, no imports from other mcp modules
+errors.py             ← standalone public error hierarchy; no backlog-module or optional-dependency imports
+models.py             ← imports errors; owns domain models
 timestamps.py         ← standalone, no imports from other mcp modules; shared now_iso() UTC timestamp helper
 backend_types.py      ← provider-neutral protocols and node types; imports models for type annotations
 entry_blocks.py       ← timestamped entry block parse/render/rewrite; imports from models, timestamps
 parsing.py            ← imports from models, section_registry, entry_blocks; pure parsing, selection, and transformation helpers
-search.py             ← standalone, no imports from other mcp modules (never imports fastmcp/mcp); full-text search engine and content-based duplicate detection
+search.py             ← imports errors only; never imports fastmcp/mcp, models, or optional dependencies; full-text search and duplicate detection with a matching-only 100 ms budget
 yaml_io.py            ← private YAML codec imported only by file_cache.py
 file_cache.py         ← remote-provider cache, artifact files, checkpoints, and pending-write queue
 reconciliation.py     ← filesystem-free classification/merge engine; imports models and pure format helpers
@@ -407,12 +408,17 @@ from markdown parsing, so it must not be folded into `parsing.py`.
 
 **Search engine**:
 
-- Tokenizer/parser: `tokenize_search()`, `_SearchParser` — recursive-descent grammar (`NOT` > `AND`
-  > `OR`, parenthetical grouping) built from `_Predicate` subclasses (`_TermPred`, `_AndPred`,
-  `_OrPred`, `_NotPred`, `_TruePred`).
+- Tokenizer/parser: `tokenize_search()`, `_SearchParser`, `PreparedSearch` — recursive-descent
+  grammar (`NOT` > `AND` > `OR`, parenthetical grouping) built from `_Predicate` subclasses
+  (`_TermPred`, `_AndPred`, `_OrPred`, `_NotPred`, `_TruePred`). A prepared search compiles once
+  for ordinary substring queries. Regex-form queries prepare in one spawned
+  stdlib worker before the matching budget begins.
 - Term matching: `_item_matches_term()` — supports `/regex/` or `regex:pattern`, `field:value`
   (`title`, `section`, `topic`, `type`, `body`), and plain substring terms against the
-  `_SEARCH_FIELDS` haystack built by `_build_haystack()`.
+  `_SEARCH_FIELDS` haystack built by `_build_haystack()`. Accepted regex terms compile with
+  `re.compile(..., re.IGNORECASE)` before candidate evaluation. One worker evaluates the complete
+  candidate set under a 100 ms request-wide matching deadline; startup, compilation, preparation,
+  and result serialization are outside that deadline.
 - Public entry point: `apply_search_filter(items, search)` — used by both `operations.list_items()`
   (MCP and CLI `backlog list --search`) and `find_content_duplicates()` below.
 - Snippet helpers: `_make_snippet()`, `_make_snippet_parts()`, `_format_match_text()`,
@@ -433,11 +439,11 @@ from markdown parsing, so it must not be folded into `parsing.py`.
   title characters alone), and returns up to `max_results` `ContentDuplicateMatch` entries ordered by
   `match_count` descending.
 
-**Exports**: `tokenize_search`, `apply_search_filter`, `DuplicateCheckStatus`,
-`ContentDuplicateMatch`, `build_concept_query`, `find_content_duplicates`.
+**Exports**: `tokenize_search`, `prepare_search_filter`, `apply_search_filter`, `PreparedSearch`,
+`DuplicateCheckStatus`, `ContentDuplicateMatch`, `build_concept_query`, `find_content_duplicates`.
 
-**Imports from other modules**: None — no `fastmcp`/`mcp` imports, so both `server.py` and
-`operations.py` can depend on it without a cycle.
+**Imports from other modules**: `.errors` only — no `fastmcp`/`mcp` imports, so both `server.py`
+and `operations.py` can depend on it without a cycle.
 
 ---
 

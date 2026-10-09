@@ -10,11 +10,17 @@ from __future__ import annotations
 
 import dataclasses
 import itertools
+import multiprocessing
 import operator
 import re
+import time
 from enum import StrEnum
+from multiprocessing.connection import Connection, wait
+from multiprocessing.process import BaseProcess
 
 from pydantic import BaseModel, ConfigDict
+
+from .errors import SearchExecutionError, SearchTimeoutError
 
 # Fields searched by default when no field-specific prefix is given.
 # ``body`` contains the full item content (description + all section entries)
@@ -24,6 +30,34 @@ _SEARCH_FIELDS: tuple[str, ...] = ("title", "section", "topic", "type", "body")
 
 # Minimum length for a valid /pattern/ regex term (e.g. "/x/" has length 3).
 _REGEX_SLASH_MIN_LEN = 2
+_REGEX_MATCH_TIMEOUT_SECONDS = 0.1
+_MATCH_COMMAND_LENGTH = 2
+_RESULT_RECORD_LENGTH = 2
+_RESULT_RECORD_WITH_CONTEXT_LENGTH = 3
+
+
+def _regex_pattern_from_term(term: str) -> str | None:
+    """Return the regex text for a regex-form term, if present."""
+    if term.startswith("/") and term.endswith("/") and len(term) > _REGEX_SLASH_MIN_LEN:
+        return term[1:-1]
+    if term.startswith("regex:"):
+        return term[len("regex:") :]
+    return None
+
+
+def _compile_regex_term(term: str) -> re.Pattern[str] | None:
+    """Compile accepted regex syntax once before evaluating candidates.
+
+    Returns:
+        A stdlib pattern, or ``None`` for a non-regex or invalid term.
+    """
+    pattern_text = _regex_pattern_from_term(term)
+    if pattern_text is None:
+        return None
+    try:
+        return re.compile(pattern_text, re.IGNORECASE)
+    except re.error:
+        return None
 
 
 def _item_field_text(item: dict[str, str | bool], field: str) -> str:
@@ -40,7 +74,14 @@ def _build_haystack(item: dict[str, str | bool]) -> str:
     return " ".join(_item_field_text(item, f) for f in _SEARCH_FIELDS)
 
 
-def _item_matches_term(item: dict[str, str | bool], term: str, haystack: str | None = None) -> bool:
+def _item_matches_term(
+    item: dict[str, str | bool],
+    term: str,
+    haystack: str | None = None,
+    *,
+    regex_pattern: re.Pattern[str] | None = None,
+    deadline: float,
+) -> bool:
     """Return True if a single search term matches the item.
 
     Supported term forms (evaluated in order):
@@ -59,22 +100,16 @@ def _item_matches_term(item: dict[str, str | bool], term: str, haystack: str | N
         haystack: Pre-computed full-text string from ``_build_haystack``.
             When provided, avoids rebuilding the haystack inside this call.
             Pass ``None`` (default) to let this function build it on demand.
+        regex_pattern: Accepted regex compiled before candidate evaluation.
+        deadline: Monotonic deadline shared by every matching call in a query.
     """
     term = term.strip()
     if not term:
         return True
 
-    # Regex form: /pattern/ or regex:pattern
-    if (term.startswith("/") and term.endswith("/") and len(term) > _REGEX_SLASH_MIN_LEN) or term.startswith("regex:"):
-        pattern_str = term[1:-1] if term.startswith("/") else term[len("regex:") :]
-        try:
-            pattern = re.compile(pattern_str, re.IGNORECASE)
-        except re.error:
-            # Invalid regex — fall through to plain substring match on the raw term.
-            pass
-        else:
-            hs = haystack if haystack is not None else _build_haystack(item)
-            return bool(pattern.search(hs))
+    if regex_pattern is not None:
+        hs = haystack if haystack is not None else _build_haystack(item)
+        return bool(regex_pattern.search(hs))
 
     # Field-specific form: field:value
     if ":" in term:
@@ -100,15 +135,16 @@ def _item_matches_term(item: dict[str, str | bool], term: str, haystack: str | N
 class _Predicate:
     """Base class for search predicates.
 
-    Subclasses implement ``__call__(item, haystack) -> bool``.
+    Subclasses implement ``__call__(item, haystack, deadline) -> bool``.
     """
 
-    def __call__(self, item: dict[str, str | bool], haystack: str) -> bool:
+    def __call__(self, item: dict[str, str | bool], haystack: str, deadline: float) -> bool:
         """Evaluate the predicate against a single backlog item.
 
         Args:
             item: Backlog item dict.
             haystack: Pre-computed full-text string from ``_build_haystack``.
+            deadline: Monotonic deadline shared by every matching call in a query.
 
         Returns:
             True if the item matches the predicate.
@@ -121,9 +157,13 @@ class _TermPred(_Predicate):
     """Match a single leaf term against an item."""
 
     term: str
+    regex_pattern: re.Pattern[str] | None = dataclasses.field(init=False)
 
-    def __call__(self, item: dict[str, str | bool], haystack: str) -> bool:
-        return _item_matches_term(item, self.term, haystack)
+    def __post_init__(self) -> None:
+        self.regex_pattern = _compile_regex_term(self.term)
+
+    def __call__(self, item: dict[str, str | bool], haystack: str, deadline: float) -> bool:
+        return _item_matches_term(item, self.term, haystack, regex_pattern=self.regex_pattern, deadline=deadline)
 
 
 @dataclasses.dataclass
@@ -133,8 +173,8 @@ class _AndPred(_Predicate):
     left: _Predicate
     right: _Predicate
 
-    def __call__(self, item: dict[str, str | bool], haystack: str) -> bool:
-        return self.left(item, haystack) and self.right(item, haystack)
+    def __call__(self, item: dict[str, str | bool], haystack: str, deadline: float) -> bool:
+        return self.left(item, haystack, deadline) and self.right(item, haystack, deadline)
 
 
 @dataclasses.dataclass
@@ -144,8 +184,8 @@ class _OrPred(_Predicate):
     left: _Predicate
     right: _Predicate
 
-    def __call__(self, item: dict[str, str | bool], haystack: str) -> bool:
-        return self.left(item, haystack) or self.right(item, haystack)
+    def __call__(self, item: dict[str, str | bool], haystack: str, deadline: float) -> bool:
+        return self.left(item, haystack, deadline) or self.right(item, haystack, deadline)
 
 
 @dataclasses.dataclass
@@ -154,14 +194,14 @@ class _NotPred(_Predicate):
 
     operand: _Predicate
 
-    def __call__(self, item: dict[str, str | bool], haystack: str) -> bool:
-        return not self.operand(item, haystack)
+    def __call__(self, item: dict[str, str | bool], haystack: str, deadline: float) -> bool:
+        return not self.operand(item, haystack, deadline)
 
 
 class _TruePred(_Predicate):
     """Always-true predicate used as a safe no-op fallback."""
 
-    def __call__(self, item: dict[str, str | bool], haystack: str) -> bool:
+    def __call__(self, item: dict[str, str | bool], haystack: str, deadline: float) -> bool:
         return True
 
 
@@ -295,6 +335,301 @@ class _SearchParser:
         return _TruePred()
 
 
+@dataclasses.dataclass
+class PreparedSearch:
+    """One compiled query for non-regex matching."""
+
+    predicate: _Predicate
+
+    def matches(self, item: dict[str, str | bool]) -> bool:
+        """Prepare one item, then evaluate its predicate.
+
+        Returns:
+            ``True`` when the item matches the prepared query.
+        """
+        haystack = _build_haystack(item)
+        return self.predicate(item, haystack, float("inf"))
+
+
+def prepare_search_filter(search: str) -> PreparedSearch | None:
+    """Parse and compile a search query once before candidate evaluation.
+
+    Returns:
+        A prepared search, or ``None`` for an empty query.
+    """
+    search = search.strip()
+    if not search:
+        return None
+    return PreparedSearch(_SearchParser(tokenize_search(search)).parse())
+
+
+def _contains_regex_form(search: str) -> bool:
+    """Return whether a query contains any accepted regex-form term."""
+    return any(_regex_pattern_from_term(term) is not None for term in tokenize_search(search))
+
+
+def _worker_record_is(record: object, kind: str) -> bool:
+    """Return whether a worker record has the expected message tag."""
+    return isinstance(record, tuple) and len(record) >= 1 and record[0] == kind
+
+
+def _original_span_for_casefolded_match(text: str, start: int, end: int) -> tuple[int, int]:
+    """Return original-text coordinates for a range in ``text.casefold()``."""
+    folded_end = 0
+    original_start = 0
+    for original_index, character in enumerate(text):
+        folded_start, folded_end = folded_end, folded_end + len(character.casefold())
+        if start >= folded_start and start < folded_end:
+            original_start = original_index
+        if end <= folded_end:
+            return original_start, original_index + 1
+    return original_start, len(text)
+
+
+def _regex_term_context(
+    item: dict[str, str | bool], term: str, pattern: re.Pattern[str] | None
+) -> list[dict[str, str]]:
+    """Return match geometry for one already-matched regex-form term."""
+    matches: list[dict[str, str]] = []
+    needle = term if pattern is None else _regex_pattern_from_term(term)
+    if needle is None:
+        return matches
+    literal = pattern is None
+    for field in ("title", "section", "topic", "type"):
+        text = str(item.get(field, "") or "")
+        match = pattern.search(text) if pattern is not None else None
+        start = text.casefold().find(needle.casefold()) if literal else (match.start() if match else -1)
+        end = start + len(needle.casefold()) if literal and start >= 0 else (match.end() if match else -1)
+        if literal and start >= 0:
+            start, end = _original_span_for_casefolded_match(text, start, end)
+        if start >= 0:
+            matches.append({"field": field, "term": term, "start": str(start), "end": str(end)})
+    for section_index, (field, text) in enumerate(_parse_body_sections(str(item.get("body", "") or ""))):
+        match = pattern.search(text) if pattern is not None else None
+        start = text.casefold().find(needle.casefold()) if literal else (match.start() if match else -1)
+        end = start + len(needle.casefold()) if literal and start >= 0 else (match.end() if match else -1)
+        if literal and start >= 0:
+            start, end = _original_span_for_casefolded_match(text, start, end)
+        if start >= 0:
+            matches.append({
+                "field": field,
+                "term": term,
+                "start": str(start),
+                "end": str(end),
+                "section_index": str(section_index),
+            })
+    return matches
+
+
+def _predicate_with_regex_context(
+    predicate: _Predicate, item: dict[str, str | bool], haystack: str, deadline: float
+) -> tuple[bool, list[dict[str, str]]]:
+    """Evaluate a predicate once, retaining regex context from evaluated matching leaves.
+
+    Returns:
+        Whether the predicate matched and its evaluated regex context records.
+    """
+    if isinstance(predicate, _TermPred):
+        matched = predicate(item, haystack, deadline)
+        contexts = (
+            _regex_term_context(item, predicate.term, predicate.regex_pattern)
+            if (matched and _regex_pattern_from_term(predicate.term) is not None)
+            else []
+        )
+        return matched, contexts
+    if isinstance(predicate, _AndPred):
+        left, contexts = _predicate_with_regex_context(predicate.left, item, haystack, deadline)
+        if not left:
+            return False, []
+        right, right_contexts = _predicate_with_regex_context(predicate.right, item, haystack, deadline)
+        return right, contexts + right_contexts if right else []
+    if isinstance(predicate, _OrPred):
+        left, contexts = _predicate_with_regex_context(predicate.left, item, haystack, deadline)
+        right, right_contexts = _predicate_with_regex_context(predicate.right, item, haystack, deadline)
+        return left or right, contexts + right_contexts
+    if isinstance(predicate, _NotPred):
+        matched, _ = _predicate_with_regex_context(predicate.operand, item, haystack, deadline)
+        return not matched, []
+    return True, []
+
+
+def _regex_worker(
+    items: list[dict[str, str | bool]], search: str, include_match_context: bool, connection: Connection
+) -> None:
+    """Prepare and evaluate one regex search in a cancellable child process."""
+    try:
+        prepared_search = prepare_search_filter(search)
+        if prepared_search is None:
+            connection.send(("ERROR",))
+            return
+        prepared_items = [(item, _build_haystack(item)) for item in items]
+        connection.send(("READY",))
+        command = connection.recv()
+        if not (
+            _worker_record_is(command, "MATCH")
+            and isinstance(command, tuple)
+            and len(command) == _MATCH_COMMAND_LENGTH
+            and isinstance(command[1], float)
+        ):
+            connection.send(("ERROR",))
+            return
+        deadline = command[1]
+        matches: list[dict[str, str | bool]] = []
+        contexts: list[list[dict[str, str]]] = []
+        for item, haystack in prepared_items:
+            if include_match_context:
+                matched, item_context = _predicate_with_regex_context(
+                    prepared_search.predicate, item, haystack, deadline
+                )
+            else:
+                matched, item_context = prepared_search.predicate(item, haystack, deadline), []
+            if matched:
+                matches.append(item)
+                contexts.append(item_context)
+        connection.send(("MATCHED",))
+        if connection.recv() != ("TRANSFER",):
+            return
+        connection.send(("RESULT", matches, contexts))
+    finally:
+        connection.close()
+
+
+def _cleanup_regex_worker(
+    process: BaseProcess | None, started: bool, parent_connection: Connection, child_connection: Connection
+) -> None:
+    """Stop and release one regex worker and the parent endpoint."""
+    try:
+        if process is not None and started:
+            if process.is_alive():
+                process.kill()
+            process.join()
+            process.close()
+    finally:
+        parent_connection.close()
+        child_connection.close()
+
+
+def _worker_context_fact_is_valid(item: dict[str, str | bool], fact: object) -> bool:
+    """Return whether one worker context fact is safe for presentation."""
+    required_keys = {"field", "term", "start", "end"}
+    if not isinstance(fact, dict) or not required_keys <= fact.keys():
+        return False
+    if not all(isinstance(fact[key], str) for key in required_keys):
+        return False
+
+    field = fact["field"]
+    try:
+        if field.startswith("body:"):
+            raw_section_index = fact.get("section_index")
+            if not isinstance(raw_section_index, str):
+                return False
+            section_index = int(raw_section_index)
+            sections = _parse_body_sections(str(item.get("body", "") or ""))
+            text = sections[section_index][1]
+            valid_schema = (
+                set(fact) == required_keys | {"section_index"}
+                and raw_section_index == str(section_index)
+                and 0 <= section_index < len(sections)
+                and field == sections[section_index][0]
+            )
+        elif field in {"title", "section", "topic", "type"}:
+            text = str(item.get(field, "") or "")
+            valid_schema = set(fact) == required_keys
+        else:
+            return False
+        start, end = int(fact["start"]), int(fact["end"])
+    except (IndexError, TypeError, ValueError):
+        return False
+    return valid_schema and fact["start"] == str(start) and fact["end"] == str(end) and 0 <= start <= end <= len(text)
+
+
+def _worker_contexts_are_valid(items: list[dict[str, str | bool]], contexts: object) -> bool:
+    """Return whether worker context rows align with their matching items."""
+    return (
+        isinstance(contexts, list)
+        and len(items) == len(contexts)
+        and all(
+            isinstance(context, list) and all(_worker_context_fact_is_valid(item, fact) for fact in context)
+            for item, context in zip(items, contexts, strict=True)
+        )
+    )
+
+
+def _apply_regex_search_filter_result(
+    items: list[dict[str, str | bool]], search: str, include_match_context: bool
+) -> tuple[list[dict[str, str | bool]], list[list[dict[str, str]]]]:
+    """Run one complete regex query in a spawned stdlib worker.
+
+    Returns:
+        The complete matching item list.
+    """
+    context = multiprocessing.get_context("spawn")
+    parent_connection, child_connection = context.Pipe(duplex=True)
+    process: BaseProcess | None = None
+    started = False
+    try:
+        process = context.Process(target=_regex_worker, args=(items, search, include_match_context, child_connection))
+        worker = process
+        worker.start()
+        started = True
+        child_connection.close()
+
+        ready_handles = wait([parent_connection, worker.sentinel], timeout=None)
+        if parent_connection not in ready_handles:
+            raise SearchExecutionError
+        ready = parent_connection.recv()
+        if not (_worker_record_is(ready, "READY") and isinstance(ready, tuple) and len(ready) == 1):
+            raise SearchExecutionError
+
+        deadline = time.monotonic() + _REGEX_MATCH_TIMEOUT_SECONDS
+        parent_connection.send(("MATCH", deadline))
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise SearchTimeoutError
+        result_handles = wait([parent_connection, worker.sentinel], timeout=remaining)
+        if parent_connection not in result_handles:
+            if worker.sentinel in result_handles:
+                raise SearchExecutionError
+            raise SearchTimeoutError
+        result = parent_connection.recv()
+        if not (_worker_record_is(result, "MATCHED") and isinstance(result, tuple) and len(result) == 1):
+            raise SearchExecutionError
+        parent_connection.send(("TRANSFER",))
+        transfer_handles = wait([parent_connection, worker.sentinel], timeout=None)
+        if parent_connection not in transfer_handles:
+            raise SearchExecutionError
+        result = parent_connection.recv()
+        if not (
+            _worker_record_is(result, "RESULT")
+            and isinstance(result, tuple)
+            and len(result) == _RESULT_RECORD_WITH_CONTEXT_LENGTH
+            and isinstance(result[1], list)
+            and isinstance(result[2], list)
+            and all(isinstance(item, dict) for item in result[1])
+            and _worker_contexts_are_valid(result[1], result[2])
+        ):
+            raise SearchExecutionError
+        return result[1], result[2]
+    except (AssertionError, EOFError, OSError, RuntimeError, ValueError, TypeError):
+        raise SearchExecutionError from None
+    finally:
+        _cleanup_regex_worker(process, started, parent_connection, child_connection)
+
+
+def _apply_regex_search_filter(items: list[dict[str, str | bool]], search: str) -> list[dict[str, str | bool]]:
+    """Return one complete regex-filtered list."""
+    return _apply_regex_search_filter_result(items, search, False)[0]
+
+
+def apply_search_filter_with_context(
+    items: list[dict[str, str | bool]], search: str
+) -> tuple[list[dict[str, str | bool]], list[list[dict[str, str]]]]:
+    """Return regex-filtered items and context from one worker pass."""
+    if _contains_regex_form(search):
+        return _apply_regex_search_filter_result(items, search, True)
+    return apply_search_filter(items, search), [[] for _ in items]
+
+
 def apply_search_filter(items: list[dict[str, str | bool]], search: str) -> list[dict[str, str | bool]]:
     """Filter items using the full-text search query syntax.
 
@@ -318,23 +653,18 @@ def apply_search_filter(items: list[dict[str, str | bool]], search: str) -> list
         items: Backlog item dicts to filter.
         search: Query string.
 
+    Regex preparation happens before matching starts. Regex matching runs in a
+    spawned stdlib worker with a 100 ms request-wide deadline.
+
     Returns:
         Filtered list of items that match the search query.
     """
-    search = search.strip()
-    if not search:
+    if _contains_regex_form(search):
+        return _apply_regex_search_filter(items, search)
+    prepared_search = prepare_search_filter(search)
+    if prepared_search is None:
         return items
-
-    tokens = tokenize_search(search)
-    parser = _SearchParser(tokens)
-    predicate = parser.parse()
-
-    result = []
-    for item in items:
-        hs = _build_haystack(item)
-        if predicate(item, hs):
-            result.append(item)
-    return result
+    return [item for item in items if prepared_search.matches(item)]
 
 
 # ---------------------------------------------------------------------------

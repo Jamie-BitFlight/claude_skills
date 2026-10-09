@@ -15,15 +15,30 @@ All imports are at module level.
 from __future__ import annotations
 
 import json
+import os
+import sys
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from backlog_core.models import BackendAvailability, BackendStatus, BacklogError, Output, ViewItemResult
-from backlog_core.search import apply_search_filter
+from backlog_core.backend_protocol import get_config
+from backlog_core.models import (
+    BackendAvailability,
+    BackendStatus,
+    BacklogError,
+    BacklogItem,
+    Output,
+    SearchExecutionError,
+    SearchTimeoutError,
+    ViewItemResult,
+)
+from backlog_core.search import apply_search_filter, apply_search_filter_with_context
 from backlog_core.server import mcp
+from dh_core import operations as dh_operations
 from fastmcp.client import Client
 
-from tests.helpers import call_mcp_tool
+from tests.conftest import ProviderMemoryBackend
+from tests.helpers import call_mcp_tool, run_cli_subprocess
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -180,6 +195,62 @@ async def test_backlog_list_success_returns_items():
     assert call_kwargs["refresh"] is False
     assert call_kwargs["label"] is None
     assert response["items"][0]["title"] == "Item A"
+
+
+async def test_backlog_list_timeout_returns_non_retryable_error():
+    with patch("dh_core.operations.list_items", side_effect=SearchTimeoutError()):
+        response = await _call("backlog_list", {"search": "/slow/"})
+
+    assert response["error"] == "Search regex evaluation exceeded 100 ms"
+    assert response["retryable"] is False
+
+
+async def test_backlog_list_execution_error_omits_retryability_verdict():
+    with patch("dh_core.operations.list_items", side_effect=SearchExecutionError()):
+        response = await _call("backlog_list", {"search": "/slow/"})
+
+    assert response["error"] == "Search regex execution failed"
+    assert "retryable" not in response
+
+
+async def test_backlog_list_match_context_regex_uses_shared_timeout():
+    op_result = {
+        "items": [{"title": "a" * 50_000 + "!", "section": "P1", "issue": "#1", "plan": ""}],
+        "regex_match_contexts": [[{"field": "title", "term": "/a+a+$/", "start": "0", "end": "1"}]],
+        "count": 1,
+        "total": 1,
+        "has_more": False,
+        "from_cache": False,
+        "has_pending_writes": False,
+        "status_source": "live",
+        "unavailable_capabilities": [],
+        "filters_evaluated_against_unavailable_data": [],
+    }
+    with patch("dh_core.operations.list_items", return_value=op_result):
+        response = await _call("backlog_list", {"search": "/a+a+$/", "match_context": True, "limit": 1})
+
+    assert response["items"][0]["matches"][0]["term"] == "/a+a+$/"
+
+
+async def test_backlog_list_preserves_regex_operation_pagination():
+    op_result = {
+        "items": [{"title": "second \u0131", "section": "P1", "issue": "#2", "plan": ""}],
+        "count": 1,
+        "total": 2,
+        "has_more": False,
+        "from_cache": False,
+        "has_pending_writes": False,
+        "status_source": "live",
+        "unavailable_capabilities": [],
+        "filters_evaluated_against_unavailable_data": [],
+    }
+    with patch("dh_core.operations.list_items", return_value=op_result) as list_items:
+        response = await _call("backlog_list", {"search": "/i/", "offset": 1, "limit": 1})
+
+    assert list_items.call_args.kwargs["offset"] == 1
+    assert list_items.call_args.kwargs["limit"] == 1
+    assert response["items"][0]["title"] == "second \u0131"
+    assert response["pagination"] == {"offset": 1, "limit": 1, "total": 2, "has_more": False}
 
 
 async def test_backlog_list_passes_filter_params():
@@ -465,6 +536,213 @@ async def test_backlog_list_search_invalid_regex_falls_back_to_plain_text():
     returned_titles = [item["title"] for item in response["items"]]
     assert "/[invalid/ literal" in returned_titles
     assert "Unrelated" not in returned_titles
+
+
+async def test_backlog_list_invalid_regex_context_uses_the_complete_literal() -> None:
+    backend = get_config().backend
+    assert isinstance(backend, ProviderMemoryBackend)
+    backend.provider_items.extend([BacklogItem(title="[", description="prefix /[/ suffix", section="P1", issue="#1")])
+
+    response = await _call("backlog_list", {"search": "/[/", "match_context": True, "snippet_context": 4})
+
+    assert [item["title"] for item in response["items"]] == ["["]
+    matches = response["items"][0]["matches"]
+    assert [match["field"] for match in matches] == ["body:preamble"]
+    assert matches[0]["term"] == "/[/"
+    assert "/[/" in matches[0]["snippet"]
+
+
+async def test_backlog_list_regex_context_uses_requested_width_after_real_worker_handoff() -> None:
+    backend = get_config().backend
+    assert isinstance(backend, ProviderMemoryBackend)
+    backend.provider_items.extend([BacklogItem(title="abcdefghijMATCHklmnopqrst", section="P1", issue="#1")])
+
+    with patch(
+        "backlog_core.server._collect_regex_matches", side_effect=AssertionError("server must not evaluate the regex")
+    ):
+        response = await _call("backlog_list", {"search": "/MATCH/", "match_context": True, "snippet_context": 4})
+
+    assert response["items"][0]["matches"][0]["snippet"] == "...ijMATCHkl..."
+
+
+async def test_backlog_list_regex_or_context_includes_every_matching_branch() -> None:
+    backend = get_config().backend
+    assert isinstance(backend, ProviderMemoryBackend)
+    backend.provider_items.extend([BacklogItem(title="alpha beta", section="P1", issue="#1")])
+
+    response = await _call("backlog_list", {"search": "/alpha/ OR /beta/", "match_context": True})
+
+    assert [item["issue"] for item in response["items"]] == ["#1"]
+    assert [match["term"] for match in response["items"][0]["matches"]] == ["/alpha/", "/beta/"]
+
+
+async def test_backlog_list_dedup_keeps_each_retained_row_context() -> None:
+    items = [
+        {"issue": "#1", "title": "first context", "section": "P1", "body": ""},
+        {"issue": "#1", "title": "discarded context", "section": "P1", "body": ""},
+        {"issue": "#2", "title": "second context", "section": "P1", "body": ""},
+    ]
+    contexts = [
+        [{"field": "title", "term": "/context/", "start": "6", "end": "13"}],
+        [{"field": "title", "term": "/context/", "start": "10", "end": "17"}],
+        [{"field": "title", "term": "/context/", "start": "7", "end": "14"}],
+    ]
+    with patch("dh_core.operations.list_items", return_value={"items": items, "regex_match_contexts": contexts}):
+        response = await _call("backlog_list", {"search": "/context/", "match_context": True})
+
+    assert [item["matches"][0]["snippet"] for item in response["items"]] == ["first context", "second context"]
+
+
+async def test_backlog_list_server_offset_keeps_the_second_row_context() -> None:
+    items = [
+        {"issue": "#1", "title": "first context", "section": "P1", "body": ""},
+        {"issue": "#2", "title": "second context", "section": "P1", "body": ""},
+    ]
+    contexts = [
+        [{"field": "title", "term": "/context/", "start": "6", "end": "13"}],
+        [{"field": "title", "term": "/context/", "start": "7", "end": "14"}],
+    ]
+    with patch("dh_core.operations.list_items", return_value={"items": items, "regex_match_contexts": contexts}):
+        response = await _call("backlog_list", {"search": "/context/", "match_context": True, "offset": 1, "limit": 1})
+
+    assert [item["title"] for item in response["items"]] == ["second context"]
+    assert response["items"][0]["matches"][0]["snippet"] == "second context"
+
+
+async def test_backlog_list_repeated_body_sections_keep_their_worker_geometry() -> None:
+    item: dict[str, str | bool] = {
+        "issue": "#1",
+        "title": "Repeated notes",
+        "section": "P1",
+        "body": "## Notes\nfirst needle tail\n## Notes\nsecond prefix needle tail\n",
+    }
+    matched, contexts = apply_search_filter_with_context([item], "/needle/")
+    with patch("dh_core.operations.list_items", return_value={"items": matched, "regex_match_contexts": contexts}):
+        response = await _call("backlog_list", {"search": "/needle/", "match_context": True, "snippet_context": 24})
+
+    snippets = [match["snippet"] for match in response["items"][0]["matches"] if match["field"] == "body:notes"]
+    assert any("first" in snippet for snippet in snippets)
+    assert any("second" in snippet for snippet in snippets)
+
+
+def test_source_launcher_regex_worker_does_not_reenter_mcp_run(tmp_path: Path) -> None:
+    """The source launcher must not run its server again in a spawned regex worker."""
+    site_dir = tmp_path / "site"
+    site_dir.mkdir()
+    marker = tmp_path / "child-run.txt"
+    response = tmp_path / "response.json"
+    (site_dir / "sitecustomize.py").write_text(
+        """
+import asyncio
+import multiprocessing
+import os
+from pathlib import Path
+
+from fastmcp import FastMCP
+
+
+def controlled_run(mcp, *args, **kwargs):
+    del args, kwargs
+    marker = Path(os.environ["DH_TEST_CHILD_RUN_MARKER"])
+    if multiprocessing.current_process().name != "MainProcess":
+        marker.write_text("child mcp.run entered")
+        return
+
+    async def request():
+        from fastmcp.client import Client
+
+        async with Client(mcp, timeout=None, init_timeout=5) as client:
+            result = await client.call_tool("backlog_list", {"search": "/needle/"}, timeout=5)
+        Path(os.environ["DH_TEST_MCP_RESPONSE"]).write_text(result.content[0].text)
+
+    asyncio.run(request())
+
+
+FastMCP.run = controlled_run
+""".lstrip()
+    )
+    runner = Path(__file__).parents[1] / "scripts" / "run_backlog_server.py"
+    environment = {
+        **os.environ,
+        "DH_TEST_CHILD_RUN_MARKER": str(marker),
+        "DH_TEST_MCP_RESPONSE": str(response),
+        "PYTHONPATH": os.pathsep.join(filter(None, [str(site_dir), os.environ.get("PYTHONPATH")])),
+    }
+
+    result = run_cli_subprocess([sys.executable, str(runner)], env=environment, cwd=runner.parent, timeout=20)
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(response.read_text())["items"] == []
+    assert not marker.exists(), "spawned regex worker re-entered the production mcp.run() launcher"
+
+
+def test_sam_cli_launcher_regex_worker_does_not_reenter_cli(tmp_path: Path) -> None:
+    """The shipped SAM wrapper must complete one regex command through its spawned worker."""
+    site_dir = tmp_path / "site"
+    site_dir.mkdir()
+    marker = tmp_path / "child-cli-run.txt"
+    (site_dir / "sitecustomize.py").write_text(
+        """
+import multiprocessing
+import os
+from pathlib import Path
+
+import typer
+
+
+original_call = typer.Typer.__call__
+
+
+def controlled_call(app, *args, **kwargs):
+    if multiprocessing.current_process().name != "MainProcess":
+        Path(os.environ["DH_TEST_CHILD_CLI_MARKER"]).write_text("child cli entered")
+        return None
+    return original_call(app, *args, **kwargs)
+
+
+typer.Typer.__call__ = controlled_call
+""".lstrip()
+    )
+    runner = Path(__file__).parents[1] / "scripts" / "run_sam_cli.py"
+    environment = {
+        **os.environ,
+        "BACKLOG_BACKEND": "memory",
+        "DH_CLI_PYTHONPATH_CLEARED": "1",
+        "DH_TEST_CHILD_CLI_MARKER": str(marker),
+        "PYTHONPATH": os.pathsep.join(filter(None, [str(site_dir), os.environ.get("PYTHONPATH")])),
+    }
+
+    result = run_cli_subprocess(
+        [sys.executable, str(runner), "backlog", "list", "--search", "/needle/"],
+        env=environment,
+        cwd=runner.parent,
+        timeout=20,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["items"] == []
+    assert not marker.exists(), "spawned regex worker re-entered the production CLI launcher"
+
+
+async def test_github_regex_count_only_preserves_operations_total(mocker) -> None:
+    """A GitHub-shaped regex count must retain operations' exact total at MCP output."""
+    backend = get_config().backend
+    assert isinstance(backend, ProviderMemoryBackend)
+    backend.provider_items.extend([
+        BacklogItem(title="first match", section="P1", skip=False, issue="#1"),
+        BacklogItem(title="second match", section="P1", skip=False, issue="#2"),
+        BacklogItem(title="other", section="P1", skip=False, issue="#3"),
+    ])
+    fetch_page = mocker.spy(backend, "fetch_page")
+    operation_list = mocker.spy(dh_operations, "list_items")
+
+    response = await _call("backlog_list", {"search": "/match/", "count_only": True})
+
+    request = fetch_page.call_args.args[0]
+    assert (request.offset, request.limit) == (0, 0)
+    assert operation_list.spy_return["items"] == []
+    assert operation_list.spy_return["total"] == 2
+    assert response["count"] == operation_list.spy_return["total"]
 
 
 async def test_backlog_list_search_matches_body_content():

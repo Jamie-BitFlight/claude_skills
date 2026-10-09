@@ -22,7 +22,14 @@ from backlog_core import operations
 from backlog_core.backend_protocol import reset_config, set_config
 from backlog_core.backend_types import BacklogConfig
 from backlog_core.backends.memory_backend import InMemoryBackend
-from backlog_core.models import BacklogError, BacklogItem, BacklogItemMetadata, Output, ViewItemResult
+from backlog_core.models import (
+    BacklogError,
+    BacklogItem,
+    BacklogItemMetadata,
+    Output,
+    SearchTimeoutError,
+    ViewItemResult,
+)
 from typer.testing import CliRunner
 
 from sam_schema.cli import app
@@ -340,6 +347,15 @@ class TestBacklogListCliSearch:
 
         assert cli_titles == filtered_titles == {"Sync engine retry handling"}
         assert 0 < len(cli_titles) < len(unfiltered_items)
+
+    def test_timeout_emits_json_error_and_exits_nonzero(self, mocker: MockerFixture) -> None:
+        mocker.patch("sam_schema.backlog.operations.list_items", side_effect=SearchTimeoutError())
+
+        result = runner.invoke(app, ["backlog", "list", "--search", "/slow/"], env=_CLI_ENV)
+
+        assert result.exit_code == 1
+        assert json.loads(result.stdout)["error"] == "Search regex evaluation exceeded 100 ms"
+        assert result.stderr == ""
 
 
 class TestBacklogAddCliContentDuplicateEndToEnd:

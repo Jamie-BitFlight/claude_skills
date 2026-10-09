@@ -24,8 +24,22 @@ threshold and was never detected.
 
 from __future__ import annotations
 
+import ast
+import re
+from pathlib import Path
+from unittest.mock import MagicMock, call, patch
+
 import pytest
-from backlog_core.search import ContentDuplicateMatch, build_concept_query, find_content_duplicates
+from backlog_core.models import SearchExecutionError, SearchTimeoutError
+from backlog_core.search import (
+    ContentDuplicateMatch,
+    _apply_regex_search_filter,
+    _compile_regex_term,
+    apply_search_filter,
+    apply_search_filter_with_context,
+    build_concept_query,
+    find_content_duplicates,
+)
 
 
 def _candidate(
@@ -37,6 +51,286 @@ def _candidate(
     if file_path:
         entry["file_path"] = file_path
     return entry
+
+
+class TestApplySearchFilter:
+    """Tests for the public search filter contract."""
+
+    @pytest.mark.parametrize("search", ["/i/", "regex:i", "/[i]/"])
+    def test_regex_forms_preserve_stdlib_ignorecase_matching(self, search: str) -> None:
+        item = _candidate("Turkish dotless \u0131", "")
+
+        assert apply_search_filter([item], search) == [item]
+
+    def test_accepted_regex_compiles_to_stdlib_pattern(self) -> None:
+        assert isinstance(_compile_regex_term("/i/"), re.Pattern)
+
+    def test_regex_and_literal_fallback_preserve_search_results(self) -> None:
+        items = [_candidate("Authentication retry", "literal /[/ query"), _candidate("Unrelated", "nothing useful")]
+
+        assert apply_search_filter(items, "/auth.*retry/") == [items[0]]
+        assert apply_search_filter(items, "/[/") == [items[0]]
+
+    def test_literal_fallback_context_indexes_original_text_after_casefold_expansion(self) -> None:
+        item = _candidate("ß /[/", "")
+
+        assert apply_search_filter([item], "/[/") == [item]
+        matched, contexts = apply_search_filter_with_context([item], "/[/")
+
+        assert matched == [item]
+        assert contexts == [[{"field": "title", "term": "/[/", "start": "2", "end": "5"}]]
+
+    def test_field_plain_and_logical_terms_keep_existing_semantics(self) -> None:
+        items = [
+            _candidate("Authentication login", "ready"),
+            _candidate("Authentication logout", "archived"),
+            _candidate("Authentication token", "ready"),
+        ]
+
+        assert apply_search_filter(items, "title:authentication AND (login OR logout) AND NOT archived") == [items[0]]
+
+    def test_compiles_each_regex_term_once_per_query(self) -> None:
+        items = [_candidate("alpha", ""), _candidate("beta", ""), _candidate("unrelated", "")]
+
+        result = apply_search_filter(items, "/alpha/ OR regex:beta")
+
+        assert result == items[:2]
+
+    def test_regex_or_context_collects_every_matching_branch_fact(self) -> None:
+        item = _candidate("alpha beta", "")
+
+        matched, contexts = apply_search_filter_with_context([item], "/alpha/ OR /beta/")
+
+        assert matched == [item]
+        assert [context["term"] for context in contexts[0]] == ["/alpha/", "/beta/"]
+
+    @pytest.mark.parametrize(
+        ("title", "expected_term"),
+        [
+            pytest.param("beta", "/beta/", id="false_left_true_right"),
+            pytest.param("alpha", "/alpha/", id="true_left_false_right"),
+        ],
+    )
+    def test_regex_or_context_keeps_the_matching_branch_fact(self, title: str, expected_term: str) -> None:
+        matched, contexts = apply_search_filter_with_context([_candidate(title, "")], "/alpha/ OR /beta/")
+
+        assert [item["title"] for item in matched] == [title]
+        assert [context["term"] for context in contexts[0]] == [expected_term]
+
+    def test_regex_or_without_context_short_circuits_a_slow_right_branch(self) -> None:
+        item = _candidate("alpha", "a" * 50_000 + "!")
+
+        assert apply_search_filter([item], "/alpha/ OR /a+a+$/") == [item]
+
+    def test_regex_or_context_never_returns_partial_facts_after_a_slow_right_branch(self) -> None:
+        item = _candidate("alpha", "a" * 50_000 + "!")
+
+        with pytest.raises(SearchTimeoutError):
+            apply_search_filter_with_context([item], "/alpha/ OR /a+a+$/")
+
+    def test_timeout_raises_non_retryable_search_error(self) -> None:
+        with pytest.raises(SearchTimeoutError) as caught:
+            apply_search_filter([_candidate("a" * 50_000 + "!", "")], "/a+a+$/")
+
+        assert str(caught.value) == "Search regex evaluation exceeded 100 ms"
+        assert caught.value.retryable is False
+
+    def test_timeout_never_returns_a_partial_result(self) -> None:
+        items = [_candidate("a" * 50_000 + "!", ""), _candidate("matches", "")]
+
+        with pytest.raises(SearchTimeoutError):
+            apply_search_filter(items, "/a+a+$|matches/")
+
+    def test_completed_regex_result_transfers_after_matching_budget(self) -> None:
+        item = _candidate("match", "")
+        parent_connection = MagicMock()
+        child_connection = MagicMock()
+        worker = MagicMock()
+        worker.sentinel = object()
+        context = MagicMock()
+        context.Pipe.return_value = (parent_connection, child_connection)
+        context.Process.return_value = worker
+        parent_connection.recv.side_effect = [("READY",), ("MATCHED",), ("RESULT", [item], [[]])]
+
+        with (
+            patch("backlog_core.search.multiprocessing.get_context", return_value=context),
+            patch(
+                "backlog_core.search.wait", side_effect=[[parent_connection], [parent_connection], [parent_connection]]
+            ),
+            patch("backlog_core.search.time.monotonic", side_effect=[100.0, 100.01]),
+        ):
+            assert _apply_regex_search_filter([item], "/match/") == [item]
+
+        parent_connection.send.assert_has_calls([call(("MATCH", 100.1)), call(("TRANSFER",))])
+
+    @pytest.mark.parametrize(
+        "contexts",
+        [
+            pytest.param([], id="unaligned_rows"),
+            pytest.param([{}], id="context_row_is_not_a_list"),
+            pytest.param([[{}]], id="fact_is_missing_required_keys"),
+            pytest.param(
+                [[{"field": "title", "term": "/match/", "start": "1", "end": "0"}]], id="fact_geometry_is_reversed"
+            ),
+            pytest.param(
+                [[{"field": "body:preamble", "term": "/match/", "start": "0", "end": "0", "section_index": "0"}]],
+                id="body_fact_has_invalid_provenance",
+            ),
+        ],
+    )
+    def test_malformed_worker_context_results_are_typed_and_cleaned_up(self, contexts: object) -> None:
+        item = _candidate("match", "")
+        parent_connection = MagicMock()
+        child_connection = MagicMock()
+        worker = MagicMock()
+        worker.sentinel = object()
+        worker.is_alive.return_value = True
+        context = MagicMock()
+        context.Pipe.return_value = (parent_connection, child_connection)
+        context.Process.return_value = worker
+        parent_connection.recv.side_effect = [("READY",), ("MATCHED",), ("RESULT", [item], contexts)]
+
+        with (
+            patch("backlog_core.search.multiprocessing.get_context", return_value=context),
+            patch(
+                "backlog_core.search.wait", side_effect=[[parent_connection], [parent_connection], [parent_connection]]
+            ),
+            patch("backlog_core.search.time.monotonic", side_effect=[100.0, 100.01]),
+            pytest.raises(SearchExecutionError) as caught,
+        ):
+            apply_search_filter_with_context([item], "/match/")
+
+        assert caught.value.retryable is None
+        parent_connection.close.assert_called_once()
+        assert child_connection.close.call_count == 2
+        worker.kill.assert_called_once()
+        worker.join.assert_called_once()
+        worker.close.assert_called_once()
+
+    def test_zero_width_regex_context_remains_valid(self) -> None:
+        item = _candidate("match", "")
+
+        matched, contexts = apply_search_filter_with_context([item], "/^/")
+
+        assert matched == [item]
+        assert contexts[0][0] == {"field": "title", "term": "/^/", "start": "0", "end": "0"}
+        assert all(fact["start"] == fact["end"] == "0" for fact in contexts[0])
+
+    def test_regex_worker_start_failure_is_an_execution_error_and_closes_endpoints(self) -> None:
+        parent_connection = MagicMock()
+        child_connection = MagicMock()
+        worker = MagicMock()
+        worker.start.side_effect = OSError("cannot start")
+        context = MagicMock()
+        context.Pipe.return_value = (parent_connection, child_connection)
+        context.Process.return_value = worker
+
+        with (
+            patch("backlog_core.search.multiprocessing.get_context", return_value=context),
+            pytest.raises(SearchExecutionError) as caught,
+        ):
+            _apply_regex_search_filter([], "/match/")
+
+        assert caught.value.retryable is None
+        parent_connection.close.assert_called_once()
+        child_connection.close.assert_called_once()
+        worker.kill.assert_not_called()
+
+    @pytest.mark.parametrize(
+        ("wait_results", "recv_effects", "worker_alive"),
+        [
+            pytest.param([["parent"]], [("ERROR",)], True, id="malformed_pre_ready"),
+            pytest.param([["worker"]], [], False, id="pre_ready_worker_death"),
+            pytest.param([["parent"]], [EOFError()], True, id="pre_ready_eof"),
+            pytest.param([["parent"], ["worker"]], [("READY",)], False, id="match_worker_death"),
+            pytest.param([["parent"], ["parent"]], [("READY",), ("ERROR",)], True, id="malformed_matched"),
+            pytest.param(
+                [["parent"], ["parent"], ["parent"]],
+                [("READY",), ("MATCHED",), ("RESULT", [])],
+                True,
+                id="malformed_result",
+            ),
+        ],
+    )
+    def test_worker_terminal_protocol_failures_are_typed_and_clean_up(
+        self, wait_results: list[list[str]], recv_effects: list[object], worker_alive: bool
+    ) -> None:
+        parent_connection = MagicMock()
+        child_connection = MagicMock()
+        worker = MagicMock()
+        worker.sentinel = "worker"
+        worker.is_alive.return_value = worker_alive
+        context = MagicMock()
+        context.Pipe.return_value = (parent_connection, child_connection)
+        context.Process.return_value = worker
+        parent_connection.recv.side_effect = recv_effects
+        handles = [
+            [parent_connection if value == "parent" else worker.sentinel for value in result] for result in wait_results
+        ]
+
+        with (
+            patch("backlog_core.search.multiprocessing.get_context", return_value=context),
+            patch("backlog_core.search.wait", side_effect=handles),
+            pytest.raises(SearchExecutionError) as caught,
+        ):
+            _apply_regex_search_filter([_candidate("match", "")], "/match/")
+
+        assert caught.value.retryable is None
+        parent_connection.close.assert_called_once()
+        assert child_connection.close.call_count == 2
+        worker.join.assert_called_once()
+        worker.close.assert_called_once()
+        if worker_alive:
+            worker.kill.assert_called_once()
+        else:
+            worker.kill.assert_not_called()
+
+
+def _imported_modules(tree: ast.AST) -> list[str]:
+    modules: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            modules.extend(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            prefix = "." * node.level
+            if node.module is not None:
+                modules.append(f"{prefix}{node.module}")
+            else:
+                modules.extend(f"{prefix}{alias.name}" for alias in node.names)
+    return modules
+
+
+def _is_forbidden_search_dependency(imported: str) -> bool:
+    return imported == "git" or imported == "dh_paths" or imported.startswith(("backlog_core", "fastmcp", "mcp"))
+
+
+def _errors_leaf_has_forbidden_dependency(imports: list[str]) -> bool:
+    return any(imported.startswith(".") or _is_forbidden_search_dependency(imported) for imported in imports)
+
+
+def test_search_and_errors_reject_forbidden_source_dependency_families() -> None:
+    plugin_root = Path(__file__).resolve().parents[1]
+    search_tree = ast.parse((plugin_root / "backlog_core/search.py").read_text(encoding="utf-8"))
+    errors_tree = ast.parse((plugin_root / "backlog_core/errors.py").read_text(encoding="utf-8"))
+    search_imports = _imported_modules(search_tree)
+    error_imports = _imported_modules(errors_tree)
+    relative_search_imports = [imported for imported in search_imports if imported.startswith(".")]
+
+    assert relative_search_imports == [".errors"]
+    assert not any(_is_forbidden_search_dependency(imported) for imported in search_imports)
+    assert not _errors_leaf_has_forbidden_dependency(error_imports)
+
+    for faulted_source in (
+        "import git",
+        "import fastmcp",
+        "import backlog_core.models",
+        "from backlog_core import models",
+    ):
+        assert any(
+            _is_forbidden_search_dependency(imported) for imported in _imported_modules(ast.parse(faulted_source))
+        )
+
+    assert _errors_leaf_has_forbidden_dependency(_imported_modules(ast.parse("from . import models")))
 
 
 # ---------------------------------------------------------------------------
