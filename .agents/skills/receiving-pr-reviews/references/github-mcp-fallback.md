@@ -7,6 +7,10 @@ Read when GitHub MCP is the available fallback, including cloud sandboxes withou
 - A response remains relevant across unrelated commits when its supporting evidence still holds. Revisit edited comments and materially changed implementation evidence.
 - Confirm posted replies and thread resolution from provider observations. A successful reply followed by failed resolution remains communicated and unresolved.
 
+## Observed cloud-session lessons
+
+In PR #4107, direct MCP successfully retrieved review threads, submitted reviews, and top-level comments; posted evidence-backed replies; resolved threads; and rechecked open work. The failures were procedural: an initial check stopped without implementing authorized fixes, self-authored feedback was initially mistaken for the human user's instruction, top-level same-account replies needed distinct classification from new feedback, and compatibility assertions were repeatedly missed after editing the skill. Keep the review cycle moving through verified changes and responses, classify by provider relationship rather than account name, and verify affected tests before resolving findings. This is observed-use evidence, not a substitute for checking current provider state.
+
 ## Work the helper normally performs
 
 When using MCP or another direct provider interface, the agent performs these cross-references itself:
