@@ -69,6 +69,7 @@ def test_instruction_links_are_one_hop_and_resolve_through_both_skill_paths() ->
         "./references/github-mcp-fallback.md",
         "./references/technical-review-guidelines.md",
         "./references/technical-review-guidelines.md",
+        "./references/review-cycle-contract.md",
     ]
     for link in links:
         relative = link.removeprefix("./")

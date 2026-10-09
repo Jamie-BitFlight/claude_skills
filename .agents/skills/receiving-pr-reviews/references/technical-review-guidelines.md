@@ -11,14 +11,12 @@ Use while assessing review findings or drafting responses. This is guidance for 
 
 For proposed functionality expansion, inspect known call sites, external entry points, and documented requirements before concluding it is needed or unused. Escalate conflicts with prior user decisions.
 
-## Implement and communicate
+## Communicate technical conclusions
 
-Schedule independent ready work concurrently where possible; respect dependencies and prioritize blockers when capacity is limited. Verify the affected behavior and repository gates.
-
-For accepted findings, lead with the observed change, verification, and inspectable revision. For disputed findings, explain the evidence and consequence, then give a focused question or disposition. If later evidence changes the conclusion, correct the assessment and its response.
+For accepted findings, explain the observed change, verification, and inspectable revision. For disputed findings, explain the evidence and consequence, then give a focused question or disposition. Correct an earlier conclusion when new evidence warrants it.
 
 Example: A reviewer proposes removing compatibility code. The current build target and tests still exercise the older platform. Establish the consumer impact and ask whether support is intentionally being dropped before accepting the removal.
 
 ## Source and license
 
-Adapted from [obra/superpowers receiving-code-review](https://github.com/obra/superpowers/blob/8ca22dba9a94f28898bbce59f2537ff4d87c747d/skills/receiving-code-review/SKILL.md). The earlier imported excerpts and attribution remain covered by the [MIT license](./superpowers-license.txt), Copyright (c) 2025 Jesse Vincent.
+Adapted from [obra/superpowers receiving-code-review](https://github.com/obra/superpowers/blob/8ca22dba9a94f28898bbce59f2537ff4d87c747d/skills/receiving-code-review/SKILL.md). Upstream source is MIT-licensed; the [license notice](./superpowers-license.txt) is retained, Copyright (c) 2025 Jesse Vincent. This reference contains adapted guidance rather than verbatim upstream procedures.

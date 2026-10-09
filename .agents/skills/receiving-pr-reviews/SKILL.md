@@ -17,20 +17,15 @@ A request to check reviews permits reading and reporting. Source edits, pushes, 
 
 ## Review process
 
-1. **Collect and monitor.** Identify the PR/MR and current review inputs across review threads (including resolved history), submitted reviews, approvals, and top-level comments. Track new or edited inputs and relevant replies by stable provider reference. The working view is sufficient when all available relevant surfaces have been checked and gaps are disclosed.
+1. **Collect and monitor.** Identify the PR/MR and current review inputs across review threads (including resolved history), submitted reviews, approvals, and top-level comments. Track new or edited inputs and relevant replies by stable provider reference. Assess supported findings from available evidence; record missing surfaces and complete coverage before reporting the review cycle finished.
 2. **Assess the system.** Read [technical review guidelines](./references/technical-review-guidelines.md). Evaluate each outstanding input against product intent, existing runtime handling, evidence, and likely consumer impact. Group related findings by shared cause. Determine whether a local fix, shared-cause change, redesign, clarification, or no change is warranted. Every outstanding input needs a supported disposition.
 3. **Act and verify.** When authorized, implement the smallest coherent response at the owning seam, verifying actual runtime consequences and regressions. Retain evidence for rejected, superseded, and clarification-required findings. Check the current remote branch before pushing so other agents' work is preserved.
 4. **Respond and reconcile.** Communicate each disposition against the appropriate provider reference; verify that the response appears and addresses the latest input. Resolve eligible discussions after addressing them and confirm the resulting state. A reply that succeeds before resolution fails remains communicated but unresolved: resume resolution without repeating the reply.
-5. **Recheck.** Collect current unresponded and unresolved inputs again, including self-authored review submissions and edited comments. Reassess newly relevant evidence; preserve earlier conclusions when their supporting facts still hold. Report completion when no outstanding work remains and accepted outcomes are verified. A quiet polling window alone is only an observation.
+5. **Recheck.** Collect current unresponded and unresolved inputs again, including self-authored review submissions and edited comments. Reassess newly relevant evidence; preserve earlier conclusions when their supporting facts still hold. Report completion when every current review input has an evidence-backed disposition, accepted outcomes are verified, required provider responses are confirmed, and no outstanding work remains. A quiet polling window alone is only an observation.
 
-## Working definitions
+## Evidence and completion
 
-- **Evidence:** inspectable code, tests, runtime behavior, requirements, history, or provider observations relevant to a claim.
-- **Valid finding:** a claim supported within its stated scope; the suggested fix is assessed separately.
-- **Runtime consequence:** the current or proposed effect on the intended consumer, including reliability, usability, cost, and maintenance.
-- **Unresponded:** a review input without a relevant, provider-observed response to its latest content, regardless of author identity.
-- **Unresolved:** a provider discussion still open; it may already have a response.
-- **Outstanding:** work still requiring assessment, implementation, verification, clarification, or response. Completion concerns outstanding work, not just thread flags.
+Use the [review outcome contract](./references/review-cycle-contract.md) for definitions of evidence, validity, unresponded inputs, resolution, and completion. Keep the process above as the execution path.
 
 ## Recovery
 
