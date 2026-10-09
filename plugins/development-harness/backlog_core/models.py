@@ -1,6 +1,6 @@
 """Constants, regex patterns, type maps, Pydantic models, and exceptions for the backlog MCP package.
 
-This module is standalone — it has no imports from other mcp submodules.
+This module imports the dependency-neutral error leaf and owns the domain models.
 All models use Pydantic BaseModel for natural integration with FastMCP 3.x.
 """
 
@@ -18,9 +18,11 @@ from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, TypeAlias, assert_never
 
-from .errors import BacklogError, SearchExecutionError, SearchTimeoutError
+from . import errors
 
-__all__ = ["BacklogError", "SearchExecutionError", "SearchTimeoutError"]
+BacklogError = errors.BacklogError
+SearchExecutionError = errors.SearchExecutionError
+SearchTimeoutError = errors.SearchTimeoutError
 
 if TYPE_CHECKING:
     from .search import ContentDuplicateMatch

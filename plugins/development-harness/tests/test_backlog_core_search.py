@@ -224,24 +224,44 @@ class TestApplySearchFilter:
             worker.kill.assert_not_called()
 
 
-def test_search_and_errors_keep_their_source_dependency_boundary() -> None:
+def _imported_modules(tree: ast.AST) -> list[str]:
+    modules: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            modules.extend(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            prefix = "." * node.level
+            if node.module is not None:
+                modules.append(f"{prefix}{node.module}")
+            else:
+                modules.extend(f"{prefix}{alias.name}" for alias in node.names)
+    return modules
+
+
+def _is_forbidden_search_dependency(imported: str) -> bool:
+    return imported == "git" or imported == "dh_paths" or imported.startswith(("backlog_core", "fastmcp", "mcp"))
+
+
+def test_search_and_errors_reject_forbidden_source_dependency_families() -> None:
     plugin_root = Path(__file__).resolve().parents[1]
     search_tree = ast.parse((plugin_root / "backlog_core/search.py").read_text(encoding="utf-8"))
     errors_tree = ast.parse((plugin_root / "backlog_core/errors.py").read_text(encoding="utf-8"))
-    relative_imports = [
-        f"{'.' * node.level}{node.module or ''}"
-        for node in ast.walk(search_tree)
-        if isinstance(node, ast.ImportFrom) and node.level
-    ]
-    error_imports = [
-        node.module for node in ast.walk(errors_tree) if isinstance(node, ast.ImportFrom) and node.module is not None
-    ]
+    search_imports = _imported_modules(search_tree)
+    error_imports = _imported_modules(errors_tree)
+    relative_search_imports = [imported for imported in search_imports if imported.startswith(".")]
 
-    assert relative_imports == [".errors"]
-    assert not any(
-        imported == "git" or imported == "dh_paths" or imported.startswith(("backlog_core", "fastmcp", "mcp"))
-        for imported in error_imports
-    )
+    assert relative_search_imports == [".errors"]
+    assert not any(_is_forbidden_search_dependency(imported) for imported in search_imports + error_imports)
+
+    for faulted_source in (
+        "import git",
+        "import fastmcp",
+        "import backlog_core.models",
+        "from backlog_core import models",
+    ):
+        assert any(
+            _is_forbidden_search_dependency(imported) for imported in _imported_modules(ast.parse(faulted_source))
+        )
 
 
 # ---------------------------------------------------------------------------
