@@ -56,6 +56,7 @@ from backlog_core.models import (
     ContentUnavailableError,
     ContentWrite,
     GitHubMutationOutcomeUnknownError,
+    GroomingIntent,
     PatchResult,
     ProviderItem,
     ProviderPatch,
@@ -1003,7 +1004,7 @@ class _GitHubReconciliation:
                 return record.item
         raise KeyError(reference)
 
-    def put_work_item(self, item: BacklogItem, repo: str = "") -> None:
+    def put_work_item(self, item: BacklogItem, repo: str = "", grooming_intent: GroomingIntent | None = None) -> None:
         """Persist a work-item intent for provider reconciliation.
 
         ``item.reference`` is guaranteed non-empty by
@@ -1017,9 +1018,19 @@ class _GitHubReconciliation:
         identity is persisted with the mutation so equal issue references in
         different repositories remain independent.
         """
-        self._cache._queue_work_item(item.reference, item.model_copy(), repo or self._default_repo)
+        self._cache._queue_work_item(item.reference, item.model_copy(), repo or self._default_repo, grooming_intent)
 
     def reconcile(self, request: ReconcileRequest, *, snapshot: ProviderSnapshot | None = None) -> ReconcileResult:
+        """Reconcile one repository with exclusive provider-patch ownership.
+
+        Returns:
+            Completed reconciliation counts with changed logical references.
+        """
+        repo = request.repo or self._default_repo
+        with self._cache._reconciliation_lock(repo):
+            return self._reconcile(request, snapshot=snapshot)
+
+    def _reconcile(self, request: ReconcileRequest, *, snapshot: ProviderSnapshot | None = None) -> ReconcileResult:
         """Reconcile provider state through the pure engine and private cache.
 
         Returns:
@@ -1053,7 +1064,7 @@ class _GitHubReconciliation:
 
         patch_results = (
             self._provider._apply_patches(plan.provider_patches, effective_request.repo or self._default_repo)
-            if effective_request.apply_local_patches
+            if effective_request.apply_local_patches and plan.provider_patches
             else []
         )
         applied_revisions = {

@@ -344,12 +344,13 @@ class _CacheStateStore:
             return self.load()
 
     @contextlib.contextmanager
-    def _lock(self) -> Iterator[None]:
+    def _lock(self, lock_file: str = _LOCK_FILE) -> Iterator[None]:
         self._root.mkdir(mode=0o700, parents=True, exist_ok=True)
+        lock_path = self._root / lock_file
         with _THREAD_LOCKS_GUARD:
-            thread_lock = _THREAD_LOCKS.setdefault(self._root.resolve(), Lock())
+            thread_lock = _THREAD_LOCKS.setdefault(lock_path.resolve(), Lock())
         with thread_lock:
-            lock_fd = os.open(str(self._root / _LOCK_FILE), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+            lock_fd = os.open(str(lock_path), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
             try:
                 if os.name == "nt":
                     msvcrt.locking(lock_fd, msvcrt.LK_LOCK, 1)
@@ -364,6 +365,16 @@ class _CacheStateStore:
                         fcntl.flock(lock_fd, fcntl.LOCK_UN)
             finally:
                 os.close(lock_fd)
+
+    @contextlib.contextmanager
+    def coordination_lock(self, lock_file: str) -> Iterator[None]:
+        """Acquire one named cross-process coordination lock.
+
+        Yields:
+            While the named lock is exclusively held.
+        """
+        with self._lock(lock_file):
+            yield
 
     def _migrate_legacy_state_file(self) -> None:
         """Move a pre-rename ``cache.yaml`` onto ``cache.json``.
