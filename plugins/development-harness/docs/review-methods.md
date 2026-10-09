@@ -118,9 +118,7 @@ schema and all consumers support multiple anchors. At the
 same location, keep distinct failures distinguishable in the original reviewer verdicts;
 the existing punch-list schema permits separate entries for distinct same-line defects,
 but source location alone cannot establish semantic identity or cross-anchor correlation.
-Preserve all constituent source reports and original severity claims. A single worker
-reporting twice counts as one worker, and two workers repeating the same assumption
-are not independent verification of that assumption.
+Preserve each raw finding and its severity in the owning perspective verdict.\nThe current punch-list schema has one description per raising perspective and a\ncount-based conservation invariant. It cannot collapse two raw findings from the\nsame perspective into one entry without losing an observation. Keep distinct raw\nobservations in distinct punch-list entries even when they appear to concern the\nsame defect, until #4105 establishes a compatible representation. Count a\nperspective once for corroboration; repeated reports do not create an additional\nindependent reviewer.
 
 Verification is separate from candidate grouping. During investigation, distinguish
 VERIFIED (applicable contract and defect established), REFUTED (specific counterevidence
