@@ -4,22 +4,22 @@
 
 # FastMCP Creator
 
-Expert-level guidance for building FastMCP v3 Python MCP servers — tools, resources, prompts,
-providers, transforms, auth, testing, and production deployment. Grounded in local v3.1 docs;
+Expert-level guidance for building FastMCP v4 Python MCP servers — tools, resources, prompts,
+providers, transforms, auth, testing, and production deployment. Grounded in local v4 docs;
 no speculation.
 
 ## The Problem It Solves
 
-FastMCP v3 introduced a provider/transform architecture that is fundamentally different from
-v2. Code written from training-data memory uses deprecated syntax — `@mcp.tool()` with
-parentheses, missing `task=True` for background tools, wrong transport flags. This plugin
-loads verified v3.1 reference docs and enforces correct patterns at every step.
+FastMCP v4 removes deprecated v3 APIs and rebuilds on MCP SDK v2. Code written from
+training-data memory can use removed server methods, stale SDK field names, or omit the
+required `TasksExtension` for background tools. This plugin loads verified v4 reference docs
+and enforces correct patterns at every step.
 
 ## What's Inside
 
 | Component | Name | Activates on |
 |-----------|------|--------------|
-| Skill | `fastmcp-creator` | Building, extending, or debugging FastMCP v3 servers |
+| Skill | `fastmcp-creator` | Building, extending, or debugging FastMCP v4 servers |
 | Skill | `fastmcp-client-cli` | Running `fastmcp list` / `fastmcp call` against a running server |
 | Skill | `fastmcp-python-tests` | Writing pytest suites for FastMCP servers |
 
@@ -36,7 +36,7 @@ Then ask Claude to build a server:
 Build an MCP server that wraps the GitHub REST API — issues and PRs only.
 ```
 
-Claude will load the v3.1 reference docs, select the right provider type and transport, write
+Claude will load the v4 reference docs, select the right provider type and transport, write
 validated Python, and include tests.
 
 ## Minimal Server
@@ -90,6 +90,11 @@ from fastmcp.transforms import BM25SearchTransform
 **Run long tasks without blocking**
 
 ```python
+from fastmcp_tasks import TasksExtension
+
+mcp.add_extension(TasksExtension())
+
+
 @mcp.tool(task=True)
 async def long_job(params: str) -> str: ...
 ```
@@ -138,7 +143,7 @@ def client(mcp_server):  # in-memory transport
 
 async def test_greet(client):
     result = await client.call_tool("greet", {"name": "world"})
-    assert result.content[0].text == "Hello, world!"
+    assert result.data == "Hello, world!"
 ```
 
 ## Querying a Running Server
@@ -150,17 +155,17 @@ The `fastmcp-client-cli` skill covers `fastmcp list` and `fastmcp call`:
 fastmcp list --command "uv run --script server.py"
 
 # Call a tool
-fastmcp call --command "uv run --script server.py" greet '{"name": "world"}'
+fastmcp call --command "uv run --script server.py" --target greet --input-json '{"name": "world"}'
 ```
 
 ## Version Coverage
 
 | Version | Status |
 |---------|--------|
-| FastMCP 3.1 | Current — full coverage |
-| FastMCP 3.0 | Available — all core features |
-| FastMCP v2 | Legacy reference; migration guide included |
-| TypeScript | Legacy reference only — not updated for v3 |
+| FastMCP 4 | Current — full coverage |
+| FastMCP 3 | Migration reference included |
+| FastMCP v2 | Legacy migration reference included |
+| TypeScript | Legacy reference only — not updated for v4 |
 
 ## Requirements
 

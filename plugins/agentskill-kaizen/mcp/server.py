@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#     "fastmcp>=3.0.0rc1,<4",
+#     "fastmcp==4.1.0",
 #     "prefixspan>=0.5.2",
 #     "pydantic>=2.12.5",
 # ]
@@ -48,10 +48,10 @@ _DEFAULT_N_CLUSTERS: int = 3
 _TOP_TOOLS_PER_CLUSTER: int = 5
 
 _READONLY_ANNOTATIONS: dict[str, bool] = {
-    "readOnlyHint": True,
-    "destructiveHint": False,
-    "idempotentHint": True,
-    "openWorldHint": False,
+    "read_only_hint": True,
+    "destructive_hint": False,
+    "idempotent_hint": True,
+    "open_world_hint": False,
 }
 
 mcp = FastMCP("kaizen-analysis", mask_error_details=False)

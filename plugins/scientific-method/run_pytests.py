@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#   "fastmcp[tasks]>=4.0.0",
+#   "fastmcp[tasks]==4.1.0",
 #   "pydantic>=2.12.5",
 #   "pytest>=9.1.1",
 #   "pytest-asyncio>=1.4.0",
@@ -21,6 +21,7 @@ import pytest
 
 PLUGIN_ROOT = Path(__file__).resolve().parent
 TEST_PATHS = ("mcp/experiment-registry/tests",)
+COLLECTION_ROOT = PLUGIN_ROOT / "mcp" / "experiment-registry"
 IMPORT_PATHS: tuple[str, ...] = ()
 FAST_MARKER = "not e2e and not cross_backend and not integration and not research_vault"
 
@@ -43,7 +44,7 @@ def main() -> int:
         "-c",
         os.devnull,
         "--rootdir",
-        str(PLUGIN_ROOT),
+        str(COLLECTION_ROOT),
         "--confcutdir",
         str(PLUGIN_ROOT),
         "-o",

@@ -27,6 +27,17 @@ async def test_mcp_server_lists_expected_tools() -> None:
         "find_frequent_patterns",
         "cluster_sessions",
     }
+    assert all(tool.annotations is not None for tool in tools)
+    assert all(
+        (
+            tool.annotations.read_only_hint,
+            tool.annotations.destructive_hint,
+            tool.annotations.idempotent_hint,
+            tool.annotations.open_world_hint,
+        )
+        == (True, False, True, False)
+        for tool in tools
+    )
 
 
 async def test_mcp_get_transcript_jsonl_schema_returns_markdown() -> None:

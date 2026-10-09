@@ -8,7 +8,7 @@
 #   "typer>=0.21.2",
 #   "gitpython>=3.1.59",
 #   "pygithub>=2.8.1",
-#   "fastmcp>=3.0.2",
+#   "fastmcp==4.1.0",
 #   "tiktoken>=0.12.0",
 #   "typing-extensions>=4.0.0",
 #   "marko>=2.0.0",
