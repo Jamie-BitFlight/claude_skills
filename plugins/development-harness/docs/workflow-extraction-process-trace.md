@@ -12,12 +12,12 @@
 | 3. Derive extraction shapes | `workflow-trace-methodology.md` | Read sources first, derive schema from observed structure | Proposed per-layer shape | No persisted approval/evidence contract proving shape covers implicit handoffs |
 | 4. Assign extraction workers | `.claude/rules/workflow-extraction.md`, methodology | 3 independent workers, twofold rule overlap | Rule slices and jobs | Historical planner may create per-rule workers; replacement dispatcher absent. Assignment coverage not runtime-enforced |
 | 5. Extract per file | methodology, retired extractor references | Workers interpret Mermaid/prose and expand file links | Raw candidate findings | Worker/profile executable absent; slices can separate necessary context; no complete-route omission oracle |
-| 6. Corroborate | `plugin-creator/.../reduce.py` (historical instruction) | Deterministic weight threshold 2 | Survivors + singleton list | Current reducer groups by normalized location; this is not semantic identity. Evidence/provenance and cross-anchor equivalence insufficient |
+| 6. Corroborate | `plugins/plugin-creator/skills/ensemble-rule-review/scripts/reduce.py` at the declared `cd563c240ecaffa11d7eb749debdba8c669ede16` source revision | Deduplicate by normalized location; retain only findings with `weight >= keep_threshold` | Survivor report only; raw per-worker reports remain the source of singleton evidence | The reducer does not emit a singleton list. With threshold 2, every weight-one finding is dropped. The caller's default threshold 1 can include weight-one survivors in the ranked report, but they are not a separate singleton output. Normalized-location grouping is not semantic identity, and evidence/provenance plus cross-anchor equivalence remain insufficient. |
 | 7. Verify/reduce | `agents/workflow-extractor-reducer.md` | Sonnet verifies quotes and writes fragment | `items`, `unverified_items` | **Direct conflict**: ≥80% quote overlap and PLAUSIBLE promotion versus reviewed A6 exact-byte/fail-closed rule. Profile count semantics also distinguish plausible and confirmed inconsistently |
-| 8. Join relationships | methodology Phase C | Resolve dispatch → agent → tool, including two-hop task-worker profile | Cross-file spans and edges | No maintained executable join with explicit unknown/contradiction handling |
-| 9. Merge layer | `scripts/merge_layer.py` | Replace source contribution in layer file | Mutated layer JSON | Existing writer is not the reviewed A6-F single-publisher gate; wall-clock metadata and direct mutation contradict staged-only producer boundary |
-| 10. Assemble | `docs/assemble_graph.py` | Read layer JSON, build graph and explorer | `dh-workflow-graph.json` | Assembles stale inputs correctly; does not reconstruct omitted relationships |
-| 11. Publish/verify | COVERAGE, A6 issue plan | Independently check graph freshness and publish atomically | Trusted graph at pinned revision | No completed trusted dispatcher/checker/publication evidence; no end-to-end freshness gate |
+| 8. Join relationships | methodology Phase C | Resolve dispatch → agent → tool, including two-hop task-worker profile | Cross-file spans and edges | No maintained executable join with explicit unknown/contradiction handling. |
+| 9. Merge layer | `scripts/merge_layer.py` | `merge_fragment(layer_path, fragment)` replaces one source contribution at the caller-selected `layer_path` through `write_layer()` | Layer JSON at that supplied path | The helper provides atomic replacement capability, but the inspected source shows no admitted production caller or publication gate. Its direct test callers do not establish publisher authority. |
+| 10. Assemble | `docs/assemble_graph.py` | Read layer JSON, build graph and explorer | `dh-workflow-graph.json` | Assembles supplied inputs; it does not reconstruct omitted relationships. |
+| 11. Proposed publish/verify boundary | Older A6 proposal | Independently check graph freshness and atomically publish after an admitted producer/checker | A later trusted graph at a pinned revision | A6-F is a proposed later boundary, not established current behavior. No completed trusted dispatcher/checker/publication evidence is recorded here. |
 
 ## Backward trace from required outcomes
 
@@ -49,11 +49,11 @@
 
 **F2 — P0: no completeness oracle.** Two-worker corroboration validates repeated candidates, not omitted branches. No demonstrated complete-route source coverage gate.
 
-**F3 — P0: wrong identity for graph relationships.** Current experimental reducer uses location keys; draft #4101 uses exact tuples. Neither represents equivalent cross-anchor edges or distinct same-span semantics.
+**F3 — P0: unestablished relationship identity.** The historical reducer keys findings by location; the #4101 experiment keys frozen claims by exact tuple and returns below-threshold records in `unverified_items`. Neither establishes an identity for equivalent cross-anchor relationships or distinct same-span semantics.
 
-**F4 — P1: incompatible verifier policy.** Historical Sonnet reducer permits fuzzy and plausible promotions, while A6 requires exact byte evidence and deterministic checks. Must retire or reconcile the former before execution.
+**F4 — P1: incompatible verifier policy.** Historical Sonnet reducer permits fuzzy and plausible promotions, while the older A6 proposal requires exact byte evidence and deterministic checks. The conflict is evidence for #4103 to evaluate; it does not authorize a current implementation choice.
 
-**F5 — P1: scope and publication trust gaps.** Enumerate warns on missing references; merge_layer writes directly. Both conflict with fail-closed admitted inventory and sole-publisher architecture.
+**F5 — P1: scope and publication trust gaps.** The enumerator warns on missing references. `merge_layer.py` can atomically replace a caller-selected layer file, but capability alone does not identify its caller as an authorized publisher. A fail-closed inventory and a sole publication boundary remain unimplemented design requirements, not a defect proven solely by this helper.
 
 **F6 — P1: revision-scoped graph drift.** T5 is present on pinned `main` but absent from its committed graph layers. SourceCheck is present in #4095, not that `main` revision; verify its graph freshness against the matching #4095 revision rather than claiming current-main drift.
 
@@ -66,15 +66,12 @@
 - Whether the graph schema can represent all prose-dependent conditions without incompatible consumer changes.
 - Exact runtime cost and precision/recall of live extraction; no empirical baseline available.
 
-## Recommended corrections, in dependency order
+## Next decision sequence
 
-1. Freeze an authoritative goal/acceptance contract and resolve precedence among the PRD, rule file, and reviewed A6 plan.
-2. Independently verify complete T5/SourceCheck, grooming, and prose-heavy reference traces as a gold corpus; include unknowns and contradictions.
-3. Derive typed semantic edge identity and multi-anchor evidence from those traces. Explicitly represent missing/uncertain relationships.
-4. Build runtime admission, worker extraction and immutable capture against that contract. Preserve whole-route context across rule slices.
-5. Add an independent source-to-graph completeness and contradiction checker. Test adversarial scenarios above.
-6. Separate producer staging from A6-F publication and enforce pinned-revision freshness.
-7. Benchmark on gold traces and record coverage, false edges, missed edges, model cost and time. Only then refresh and verify T5/SourceCheck/grooming graph layers.
+1. Complete #4102's independent, revision-pinned T5/SourceCheck, grooming, and prose-heavy reference corpus, retaining unknowns and contradictions.
+2. Use #4103 to compare the scoped-trace, revision-bound evidence, and broad-graph configurations against that corpus, including the adversarial probes where they apply.
+3. Select the smallest adequate architecture from observed results. A typed identity, runtime admission, worker extraction, parser, completeness checker, staging path, or publication boundary is follow-on work only when the selected option requires it.
+4. Keep #3223's desired source-faithful and checked-publication outcome open. Do not refresh layers or call a graph current from this static assessment.
 
 ## Evidence limitations
 

@@ -31,22 +31,21 @@ The committed `docs/workflow-layers/G4-concurrency.json`, `L0-forks.json`, and `
 
 The current schema describes step nodes but the assembled node-type counts contain no step nodes. This is a **representation/coverage question** requiring investigation, not proof that the assembler is defective.
 
-## 4. A6 design evaluated against outcome
+## 4. Candidate methods assessed against the outcome
 
-| Required capability | Current plan/mechanism | Assessment |
+| Required capability | Candidate or observed mechanism | Assessment |
 |---|---|---|
-| Source scope and revision | Enumerate paths + digests | Partly specified; missing strict end-to-end coverage/freshness enforcement |
-| Mermaid/prose/nested links | Three agent workers with rule slices | Plausible, unvalidated on complete routes |
-| Actor and two-hop handoff | Extract and join agent identities | Described, no working producer established |
-| Exact source provenance | UTF-8 byte spans and digests | Necessary; proves citation presence, not semantic relationship |
-| Semantic identity/equivalence | Exact tuple corroboration in draft #4101 | **Insufficient:** differing anchors/phrasing for same relationship cannot corroborate; same quote does not prove relation |
-| False interpretation detection | Two-worker agreement | **Insufficient:** correlated error can survive |
-| Omission detection | Three-worker overlap | **Insufficient:** two workers may omit the same branch; need independently traced coverage/negative checks |
-| Typed graph assembly | A6-F future publisher | Not implemented |
-| Freshness and publication | Deterministic staging, independent checker | Correct boundary, no complete executable pipeline |
-| Repeatability | Frozen-input deterministic reducer | Valid local property, not proof of live semantic repeatability |
+| Source scope and revision | Enumerate paths + digests | Partly specified; the inspected source does not establish strict end-to-end coverage or freshness enforcement. |
+| Mermaid/prose/nested links | Agent-led reconstruction with rule slices | Plausible, but unvalidated on complete routes. |
+| Actor and two-hop handoff | Extract and join agent identities | Described, with no working producer established by this assessment. |
+| Exact source provenance | UTF-8 byte spans and digests | Necessary; proves citation presence, not the asserted relationship. |
+| Semantic identity/equivalence | Exact tuple corroboration in draft #4101 | Insufficient: distinct anchors or wording for one relationship cannot corroborate, and one quote does not prove a relationship. |
+| False interpretation detection | Worker agreement | Insufficient: correlated error can survive. |
+| Omission detection | Worker overlap | Insufficient: shared omissions require independent route coverage or negative checks. |
+| Staging and publication | #4101's exclusive-create staging output; older A6-F proposal | The experiment writes a new staging file only. A6-F is a proposal for a later checked publication boundary, not an established publisher. |
+| Repeatability | Frozen-input deterministic reducer | Valid local property, not proof of live semantic repeatability. |
 
-**Decision:** retain agent-led semantic reconstruction as the leading design, but do not promote the draft reducer schema as the final graph relationship contract. Preserve deterministic source/provenance checking and independent publication. Do not substitute a syntax parser for semantic extraction. An optional Mermaid parser may be used only to check explicit syntax or expose missed edges, subject to a measured benefit.
+**Decision:** do not select an implementation architecture from this assessment. The next decision is #4103's comparison of scoped tracing, revision-bound reusable evidence, and broad extraction against the completed #4102 corpus. Preserve source/provenance checks as candidate controls. A deterministic Mermaid parser is eligible only where the comparison shows that it improves an explicit-syntax or omission check; it is not a replacement for prose and cross-file interpretation.
 
 ## 5. Falsification cases before architecture approval
 
@@ -59,18 +58,16 @@ The current schema describes step nodes but the assembled node-type counts conta
 - Renamed/missing file or changed SHA: publication must fail closed.
 - A source change adding T5 or SourceCheck: freshness check must detect missing generated graph edges.
 
-## 6. Revised design gate and implementation order
+## 6. Comparison-first handoff
 
-1. **Gold set first:** independently trace 2–3 complete routes (multi-perspective including T5/SourceCheck, grooming, and a prose-heavy handoff). Record authoritative source revision, actors, edges, terminals, unknowns and citations.
-2. **Graph contract second:** derive typed relationship shapes from those traces, including multi-anchor evidence, conditional edges, expansion/return, provenance, contradictions, and unknowns. Check compatibility with existing L0/L1/G1–G8 schema and consumers.
-3. **Producer third:** implement source inventory, live runtime admission, isolated agent extraction, frozen evidence, and typed candidate output. Reuse existing tools where they satisfy a verified contract.
-4. **Checker fourth:** independently trace paths and verify both claimed and missing edges; check consumer semantics, not only byte spans. Treat consensus as a signal, not proof.
-5. **Publication fifth:** stage, validate, atomically publish through A6-F, assemble graph, and test revision freshness.
-6. **Benchmark:** compare against gold traces for edge precision/recall, terminal/actor correctness, missing links, false confidence, latency and model cost. No numeric acceptance thresholds are justified until baseline measurements exist.
+1. **Complete #4102 first.** Independently trace the bounded required routes, at their matching revisions, with actors, transitions, terminals, unknowns, citations, and controls frozen before adjudication. This document's reference table remains a candidate, not a gold set.
+2. **Run #4103 second.** Use those traces to compare A (scoped trace), B (revision-bound reusable evidence), and C (broad extraction plus graph) for the same questions. Measure fidelity, uncertainty handling, affected-consumer accuracy, elapsed time, model calls, and maintenance only where the evaluation exposes them. Do not invent thresholds or savings.
+3. **Select the smallest adequate architecture from the comparison.** #4104 designs typed relations only if the selected option needs them. A graph, persistent evidence store, parser, live producer, checker, or publication path is not a prerequisite unless the comparison establishes its need.
+4. **Keep #3223's required publication outcome outstanding, not this handoff's next implementation step.** The issue still requires re-extraction of affected G4, L0, and L1 layers before the matching graph/explorer rebuild and checked publication. A #4103 method choice can constrain how that is delivered, but cannot waive it; define and independently validate the admission, caller, destination, freshness, and publication boundary before claiming #3223 progress.
 
 ## 7. Recommendation for draft #4101
 
-Keep it draft. The current reducer is a useful experiment in source-byte validation but is not yet a reliable workflow relationship reducer. Do not extend it further until step 2 defines typed semantic identity. The initial implementation should be revised or replaced based on measured compatibility with the gold set. This avoids building a technically correct subsystem that cannot deliver the graph.
+Keep it an experiment. At its declared source revision, the reducer mechanically validates frozen source spans, counts distinct-worker occurrences, returns threshold survivors in `verified`, and retains below-threshold exact candidate records in `unverified_items`. That is useful occurrence evidence, not semantic relationship truth, route coverage, or a graph contract. #4103 can decide whether this primitive is reused, changed, or rejected; this document does not prescribe a typed reducer or production pipeline.
 
 ## 8. Open decisions requiring evidence
 

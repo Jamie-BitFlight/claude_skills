@@ -52,4 +52,10 @@ Deterministic Mermaid syntax parsing is not a viable replacement for understandi
 
 ## Next agent handoff
 
-Read this checkpoint plus `workflow-extraction-outcome-assessment.md` and `workflow-extraction-process-trace.md`. First build the independent gold traces and evaluation harness. Do **not** continue building the reducer just because it already exists. Produce an evaluation report with actual measurements and propose the smallest end-to-end architecture satisfying the outcome. Leave #4101 draft until the architecture is verified.
+Read this checkpoint plus `workflow-extraction-outcome-assessment.md` and `workflow-extraction-process-trace.md`.
+
+1. Complete #4102's independently checked, revision-pinned reference corpus and controls. Keep candidate findings, prior traces, gold answers, and control answers out of the independent tracer/checker inputs; freeze their outputs before adjudication.
+2. Use that corpus in #4103 to compare A, B, and C for the same questions. Report observed fidelity, unknowns, affected-consumer accuracy, elapsed time, model calls, and maintenance only when exposed. Select the smallest adequate option for each demonstrated use case and reject candidates the evidence does not support.
+3. Open #4104 design work only if the selected option requires a typed relationship contract. Define no graph, parser, persistent evidence layer, runtime producer, checker, or publisher merely because an earlier proposal described one.
+
+Do **not** continue building #4101's reducer merely because it exists. It remains a frozen-evidence experiment until the comparison establishes a role for it. This handoff neither completes #4102 nor selects an architecture, refreshes a graph, or establishes a #3223 publisher; it also does not waive #3223's required G4/L0/L1 re-extraction and checked graph/explorer publication.
