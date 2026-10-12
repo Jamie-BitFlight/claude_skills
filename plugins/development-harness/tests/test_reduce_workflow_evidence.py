@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -142,3 +143,47 @@ def test_cli_rejects_decoded_non_objects_without_overwriting_output(tmp_path):
     assert completed.returncode == 2
     assert "manifest must decode to an object" in completed.stderr
     assert output.read_bytes() == sentinel
+
+
+def test_cli_refuses_unencodable_metadata_before_staging(tmp_path):
+    manifest, reports = fixture(tmp_path)
+    source = tmp_path / "source.md"
+    original_source = source.read_bytes()
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    worker_paths = [tmp_path / f"worker-{index}.json" for index in range(len(reports))]
+    output = tmp_path / "staged.json"
+    command = [sys.executable, str(SCRIPT), "--root", str(tmp_path), "--manifest", str(manifest_path)]
+    for path in worker_paths:
+        command.extend(["--worker", str(path)])
+    command.extend(["--output", str(output)])
+
+    for report in reports[:2]:
+        report["findings"][0]["kind"] = "\ud800"
+    for path, report in zip(worker_paths, reports, strict=True):
+        path.write_text(json.dumps(report), encoding="utf-8")
+    rejected = subprocess.run(command, check=False, capture_output=True, text=True, timeout=30)
+
+    assert rejected.returncode == 2
+    assert "error:" in rejected.stderr
+    assert "Traceback" not in rejected.stderr
+    assert not output.exists()
+    assert source.read_bytes() == original_source
+
+    for report in reports[:2]:
+        report["findings"][0]["kind"] = "décision"
+    for path, report in zip(worker_paths, reports, strict=True):
+        path.write_text(json.dumps(report), encoding="utf-8")
+    accepted = subprocess.run(command, check=False, capture_output=True, text=True, timeout=30)
+
+    assert accepted.returncode == 0, accepted.stderr
+    assert json.loads(output.read_text(encoding="utf-8"))["verified"][0]["kind"] == "décision"
+    assert source.read_bytes() == original_source
+
+    sentinel = b"existing staged artifact"
+    output.write_bytes(sentinel)
+    existing = subprocess.run(command, check=False, capture_output=True, text=True, timeout=30)
+
+    assert existing.returncode == 2
+    assert output.read_bytes() == sentinel
+    assert source.read_bytes() == original_source

@@ -190,12 +190,13 @@ def main() -> int:
             [_load_mapping(path, "worker report") for path in args.worker],
             args.root,
         )
+        result_bytes = canonical(result)
     except (ExtractionError, OSError, KeyError, TypeError, ValueError, AttributeError, json.JSONDecodeError) as exc:
         parser.error(str(exc))
     # Output is staging only. Never overwrite an existing artifact implicitly.
     try:
         with args.output.open("xb") as stream:
-            stream.write(canonical(result))
+            stream.write(result_bytes)
     except OSError as exc:
         parser.error(f"cannot create staged output: {exc}")
     return 0
