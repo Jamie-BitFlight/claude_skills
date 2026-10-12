@@ -20,7 +20,7 @@ Do not select B or C merely because a graph/store seems useful. Repeated-query b
 
 ## Initial bounded observations (not a comparative benchmark)
 
-Source inspected: `main` at `cd563c240ecaffa11d7eb749debdba8c669ede16`; multi-perspective review `SKILL.md`, `references/dispatch-flow.md`, `agents/review-synthesizer.md`, verdict schema and `docs/dh-workflow-graph.json`.
+Source inspected: historical `main` at `cd563c240ecaffa11d7eb749debdba8c669ede16`; multi-perspective review `SKILL.md`, `references/dispatch-flow.md`, `agents/review-synthesizer.md`, verdict schema and `docs/dh-workflow-graph.json`. The #4101 tuple assessment refers separately to the [original experiment source binding](./trusted-workflow-extraction-design.md#experiment-source-binding).
 
 - Source defines T1–T4 parallel reviewer workers, then T5 synthesis that reads four Review Results sections and writes the Punch List. Source also defines schema/conservation checks and pass/fail terminals.
 - Existing graph contains four named perspective worker nodes but no `review-synthesizer` node or `Punch List` node/handoff. It therefore cannot answer the inspected T5 questions.

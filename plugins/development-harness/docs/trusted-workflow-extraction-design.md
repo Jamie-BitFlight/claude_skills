@@ -4,7 +4,9 @@
 
 #3223 requires a current, source-faithful workflow graph and explorer: re-extract the affected G4, L0, and L1 layers for the T5 synthesis change at the matching source revision, then rebuild and check the graph/explorer publication. The existing graph cannot stand in for that re-extraction. This stabilization does not deliver those artifacts and cannot waive them.
 
-The #4101 experiment is narrower: at its declared source revision, `reduce_workflow_evidence.py` validates frozen source bytes and exact spans, counts distinct-worker occurrences, emits threshold survivors in `verified`, retains below-threshold exact candidate records in `unverified_items`, and exclusive-creates a caller-supplied staging file. It does not extract routes, establish semantic relationships, validate a graph schema, refresh layers, or publish a graph. It does not close #3223.
+### Experiment source binding
+
+The #4101 experiment assessed here is pinned to `14393af5c966d1093abb406fc08a31a461b15327`, separately from the workflow and graph snapshots. Its immutable [`reduce_frozen()` source](https://github.com/Jamie-BitFlight/claude_skills/blob/14393af5c966d1093abb406fc08a31a461b15327/plugins/development-harness/scripts/reduce_workflow_evidence.py#L34-L99) validates frozen source bytes and exact spans, counts distinct-worker occurrences by exact tuple, emits threshold survivors in `verified`, and retains below-threshold exact candidate records in `unverified_items`. Its [`main()` source](https://github.com/Jamie-BitFlight/claude_skills/blob/14393af5c966d1093abb406fc08a31a461b15327/plugins/development-harness/scripts/reduce_workflow_evidence.py#L102-L120) exclusive-creates a caller-supplied staging file. These observations do not establish route extraction, semantic relationships, graph-schema validation, layer refresh, or graph publication. They do not close #3223.
 
 Worker agreement and exact quotations are useful occurrence evidence, not semantic truth or completeness. Three agents and a threshold are therefore candidate controls, not an architecture decision or a universal correctness guarantee.
 

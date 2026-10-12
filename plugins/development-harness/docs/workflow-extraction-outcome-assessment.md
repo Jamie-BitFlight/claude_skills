@@ -1,6 +1,6 @@
 # #3223 outcome-first architecture assessment — source-traced baseline
 
-**Assessment scope:** current `main` at `cd563c240ecaffa11d7eb749debdba8c669ede16`, plus #4095's dispatch flow at `e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947`. This is a source inspection and design assessment, **not** a live extractor evaluation. No agent run, corpus-wide ground truth, or cost benchmark has been performed.
+**Assessment scope:** historical `main` at `cd563c240ecaffa11d7eb749debdba8c669ede16`, plus #4095's dispatch flow at `e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947`. #4101 reducer mechanics refer separately to the [original experiment source binding](./trusted-workflow-extraction-design.md#experiment-source-binding). This is a source inspection and design assessment, **not** a live extractor evaluation. No agent run, corpus-wide ground truth, or cost benchmark has been performed.
 
 ## 1. Outcome and discriminating questions
 
@@ -67,7 +67,7 @@ The current schema describes step nodes but the assembled node-type counts conta
 
 ## 7. Recommendation for draft #4101
 
-Keep it an experiment. At its declared source revision, the reducer mechanically validates frozen source spans, counts distinct-worker occurrences, returns threshold survivors in `verified`, and retains below-threshold exact candidate records in `unverified_items`. That is useful occurrence evidence, not semantic relationship truth, route coverage, or a graph contract. #4103 can decide whether this primitive is reused, changed, or rejected; this document does not prescribe a typed reducer or production pipeline.
+Keep it an experiment. At the [bound original #4101 revision](./trusted-workflow-extraction-design.md#experiment-source-binding), the reducer mechanically validates frozen source spans, counts distinct-worker occurrences, returns threshold survivors in `verified`, and retains below-threshold exact candidate records in `unverified_items`. That is useful occurrence evidence, not semantic relationship truth, route coverage, or a graph contract. #4103 can decide whether this primitive is reused, changed, or rejected; this document does not prescribe a typed reducer or production pipeline.
 
 ## 8. Open decisions requiring evidence
 

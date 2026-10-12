@@ -1,6 +1,6 @@
 # #3223 workflow extraction: forward/backward/adversarial process trace
 
-**Scope and status:** source inspection of the maintained refresh skill, extraction rules, methodology, current scripts, reducer profile, assembler, and current graph layers on `main` at `cd563c240ecaffa11d7eb749debdba8c669ede16`. This is a **static trace**, not a successful live execution or a complete corpus-wide audit. The earlier outcome assessment in `workflow-extraction-outcome-assessment.md` supplies the required graph contract.
+**Scope and status:** source inspection of the maintained refresh skill, extraction rules, methodology, scripts, reducer profile, assembler, and graph layers on historical `main` at `cd563c240ecaffa11d7eb749debdba8c669ede16`. SourceCheck is a separate #4095 source/graph comparison at `e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947`; it is not part of that main snapshot. #4101 mechanics refer to the [original experiment source binding](./trusted-workflow-extraction-design.md#experiment-source-binding), not either workflow snapshot. This is a **static trace**, not a successful live execution or a complete corpus-wide audit. The earlier outcome assessment in `workflow-extraction-outcome-assessment.md` supplies the required graph contract.
 
 ## Forward trace: current documented execution
 
@@ -30,7 +30,8 @@
 | Explicit unresolved/contradicted edges | Typed relationship contract | Negative/contradiction oracle | Missing |
 | Source revision freshness | Strict source inventory + digests | Manifest-to-graph revision check | Missing end-to-end |
 | Atomic verified publication | A6-F | Independent publication checker | Missing |
-| T5 and SourceCheck graph fidelity | Targeted re-extraction | Source-to-graph comparison | Fails current snapshot (no matching strings) |
+| T5 graph fidelity at `cd563c240ecaffa11d7eb749debdba8c669ede16` | Targeted re-extraction | Source-to-graph comparison at the same revision | Source defines T5; inspected graph/layers lack its synthesis representation. SourceCheck is N/A: this source has no such branch. |
+| SourceCheck graph fidelity at #4095's `e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947` | Targeted re-extraction | Source-to-graph comparison at that separate revision | Source defines SourceCheck; its inspected graph/layers lack that representation. This is not a defect attributed to `cd563c240ecaffa11d7eb749debdba8c669ede16`. |
 
 ## Adversarial walkthroughs (design probes; not executed)
 
@@ -38,7 +39,7 @@
 2. **Two-hop actor:** orchestrator dispatches task-worker, which loads review-synthesizer profile. Recording only task-worker misses actual behavior ownership. Must follow profile load and T5 artifact write.
 3. **Correlated omission:** all three workers skip a failure branch. Threshold-two corroboration sees no candidate and cannot detect the omission. Independent source-branch inventory must flag it.
 4. **False relationship with valid quote:** a worker cites the exact 'Load X.md' phrase but asserts that X runs unconditionally. Byte match passes; semantic/condition checker must reject it.
-5. **Same relationship, different evidence:** two workers cite distinct spans for the same handoff. Exact tuple equality splits them into singletons. A typed relationship identity is required before corroboration.
+5. **Same relationship, different evidence:** two workers cite distinct spans for the same handoff. Exact tuple equality splits them into singletons. Evaluate whether the cited source supports one equivalent handoff without conflating anchor equality with relationship truth. A typed identity is follow-on #4104 design only if the option selected by #4103 requires it.
 6. **Unresolved reference:** enumerator warns and continues. A trusted publication gate must reject or explicitly classify the missing route as an unresolved coverage blocker.
 7. **Retry/partial publication:** producer fails after staging some fragments. Existing published graph must remain unchanged; A6-F must verify and atomically commit a complete coherent snapshot.
 8. **Stale graph:** T5/SourceCheck exist in source but not in layers. Reassembling old layers passes mechanical checks but fails semantic freshness.
