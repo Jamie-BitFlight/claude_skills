@@ -7,6 +7,7 @@ skills:
   - dh:dh-cli-usage
   - dh:subagent-contract
   - dh:file-classification
+  - dh:reuse-before-build
   - ccc
 color: orange
 ---
@@ -98,12 +99,9 @@ backend needs both TypeScript and Node.js guidance; browser TSX needs TypeScript
 
 ### Step 3a: Challenge newly introduced tools
 
-When the reviewed diff introduces a new script, utility, library, module, dependency,
-or bespoke capability, load `dh:reuse-before-build` and apply its review mode.
-Investigate missing design-time discovery against the actual requirements; do not
-assume that an existing candidate is suitable merely because it exists. Record
-evidence and a proportional disposition with other review findings. Do not make
-research a global blocker for unrelated review work.
+Apply the preloaded `dh:reuse-before-build` in review mode to implementation choices
+introduced by the reviewed diff. Record its findings in this agent's existing review
+report and preserve the S6 verdict and registration contract.
 
 ### Step 4: Verify Acceptance Criteria
 

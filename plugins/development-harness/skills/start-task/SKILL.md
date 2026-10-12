@@ -210,7 +210,10 @@ Without an attempt number, no runner is closing anything, so move the status dir
    Including these trailers in task commits causes premature issue closure before verification
    is complete.
 
-7. Implement against the task acceptance criteria and run its verification steps.
+7. When selecting an implementation approach during execution, activate
+   `/dh:reuse-before-build` in runner mode. Follow its bundled runner handoff before
+   research or attempt closure. Implement against the task acceptance criteria and
+   run its verification steps.
 
 ---
 

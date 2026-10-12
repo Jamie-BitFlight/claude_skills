@@ -5,6 +5,7 @@ model: sonnet
 skills:
   - dh:dh-cli-usage
   - dh:subagent-contract
+  - dh:reuse-before-build
 ---
 
 # Task Worker
@@ -70,7 +71,8 @@ mcp__plugin_dh_backlog__profile_load(agent_name="{agent-field-value}")
 
 If `profile_load` returns an error: output the exact error text and return STATUS: BLOCKED. A task that specifies an `agent` field requires that specialist — continuing without the profile produces unreliable output.
 
-If `profile_load` succeeds: inject the `body` field into your context. Then load every skill named in the `skills` list, using each entry's `uri` value as the skill name. Loading a skill twice is a no-op.
+If `profile_load` succeeds: inject the `body` field into your context. The returned `skills` is a
+list of strings; load each string directly as the skill name. Loading a skill twice is a no-op.
 
 ## Step 3 — Load start-task and run it
 
@@ -81,19 +83,8 @@ authorization or specialist profile. For a test-review-only task, load `/dh:test
 and preserve its read-only boundary. Both feed the existing verification and completion contract.
 
 Load the `dh:start-task` skill with the plan address, task ID, and attempt number
-(`{plan} --task {task_id} --attempt {A}`), and apply the reuse gate during its execution
-before writing new tooling.
-
-Load `dh:start-task` before performing potentially long reuse research so its lease-renewal
-contract remains active. The reuse decision must still precede any custom implementation.
-
-When the task would introduce a new script, tool, utility, library, module, dependency, or
-bespoke capability, confirm any recorded reuse decision still applies to the chosen approach
-and current requirements. If absent, stale, or invalidated by new evidence, apply
-[Reuse-before-build](../docs/reuse-before-build.md) before choosing implementation.
-Use the task's existing report fields to record the result; defer a custom build while
-the decision remains UNRESOLVED. This also applies to implementation ideas discovered
-after planning.
+(`{plan} --task {task_id} --attempt {A}`). During its execution, apply the preloaded
+`dh:reuse-before-build` in runner mode when selecting an implementation approach.
 
 `start-task` owns the round from here:
 
