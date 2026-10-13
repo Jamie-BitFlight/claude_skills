@@ -99,11 +99,11 @@ commands.
 If the dispatcher's prompt names skills to load, load them before calling start-task. Loading a
 skill twice is a no-op.
 
-## Completion Report
+## Final Response
 
-After `start-task` has recorded closure or a refusal has prevented it, return the first-line
-status selected under `dh:subagent-contract`. Follow it with the task report body; when a
-`Completion Report` was appended, return that same body:
+With an attempt, after `start-task` has recorded closure or a refusal has prevented it, return the
+first-line status selected under `dh:subagent-contract`. Follow it with the task report body; when
+a `Completion Report` was appended, return that same body:
 
 ```text
 STATUS: {DONE or BLOCKED under dh:subagent-contract}
@@ -113,6 +113,15 @@ FILES_CHANGED: {list of files modified}
 COMMITS: {list of commit hashes or messages}
 NOTES: {design decisions, discoveries, out-of-scope work identified}
 ```
+
+Without an attempt, return the completed implementation and reuse decision as `STATUS: DONE`, or
+`STATUS: BLOCKED` when the stated work cannot be completed. Include the same task report body and:
+
+```text
+LEDGER: no runner attempt; no ledger closure was requested
+```
+
+That response is immediate caller output, not a `Completion Report`, refusal, or `plan finish`.
 
 ## Cross-References
 
