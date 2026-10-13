@@ -1,6 +1,6 @@
 ---
 name: start-task
-description: Use when executing a task the orchestrator dispatched — reads the task and its orchestrator response from the work ledger, loads task-level skills, implements against acceptance criteria, records divergences and the completion report as task sections, and closes the attempt. Triggers on task execution within the implement-feature loop or when an agent picks up a specific task from a plan.
+description: Use when executing a task — reads the task and its orchestrator response from the work ledger, loads task-level skills, and implements against acceptance criteria. A dispatch-owned attempt also records divergences and the completion report, then closes; a direct invocation returns without runner closure. Triggers on task execution within the implement-feature loop or when an agent picks up a specific task from a plan.
 argument-hint: <plan-address> [--task <task-id>] [--attempt <n>] [--complete <task-id>]
 user-invocable: true
 ---
@@ -107,7 +107,11 @@ Without an attempt number, no runner is closing anything, so move the status dir
    - If a skill fails to load, log a warning and continue. Do not abort task execution.
    - Task-level skills are **additive** to any skills already declared in the agent definition's frontmatter.
 
-3. Your attempt is already open.
+3. Without `--attempt`, skip runner-only steps 3a, 4a, and 5. Do not renew a lease, append task
+   sections, or close an attempt. Those operations belong only to a dispatch-owned attempt. Step 4
+   still registers session context; then continue with step 6 and step 7.
+
+3a. With `--attempt`, your attempt is already open.
 
    `dispatch` opened it when the orchestrator launched you, which is what set the task
    `in-progress` and started the lease. There is nothing to claim, and nothing to write to the
@@ -141,7 +145,7 @@ Without an attempt number, no runner is closing anything, so move the status dir
    `str | int` — GitHub integer IDs (e.g., `42`) and beads string IDs (e.g., `"bd-a3f8"`) are both
    valid.
 
-4a. **Renew the lease before work that may outrun it.**
+4a. **With `--attempt`, renew the lease before work that may outrun it.**
 
    Your lease has a deadline. Before starting anything long — a full test suite, a build, a large
    refactor — push it out:
@@ -155,7 +159,7 @@ Without an attempt number, no runner is closing anything, so move the status dir
    you where the new deadline sits. A lease left to expire lets the orchestrator take the task back
    and hand it to another runner, and your commands then answer `stale-attempt`.
 
-5. **Record divergence observations during implementation.**
+5. **With `--attempt`, record divergence observations during implementation.**
 
    While implementing, if you discover that the architect spec or feature-context
    describes something that does not match what you are implementing, record a

@@ -1,11 +1,10 @@
 ---
 name: task-worker
-description: Blank-canvas SAM task executor carrying the dh tools and skills a workflow needs — receives a task address and the attempt number the orchestrator opened for it, reads the task from the work ledger, loads the specialist agent profile named by the task's agent field, then loads the start-task skill and runs the attempt to its close. Use in place of a generic agent whenever a dh workflow dispatches a ledger task and no prebuilt specialist fits, or when the fitting specialist cannot reach the SAM CLI needed to read the task and close its attempt.
+description: Blank-canvas SAM task executor carrying the dh tools and skills a workflow needs — reads a task from the work ledger, loads the specialist agent profile named by the task's agent field, then runs start-task. A dispatch-owned attempt adds runner persistence and closure; a direct task run returns its result without changing runner state. Use in place of a generic agent whenever a dh workflow dispatches a ledger task and no prebuilt specialist fits, or when the fitting specialist cannot reach the SAM CLI needed to read the task and close a dispatch-owned attempt.
 model: sonnet
 skills:
   - dh:dh-cli-usage
   - dh:subagent-contract
-  - dh:reuse-before-build
 ---
 
 # Task Worker
@@ -30,9 +29,10 @@ Parse the plan address and task ID from your prompt. They arrive as:
   "working on", or
 - A `dh:start-task` invocation (`P{N} --task T{M} --attempt {A}`), or a bare `P{N}/T{M}`
 
-An orchestrator that opened an attempt for you names its number too — `--attempt {A}`, or the
-sentence "attempt {A}". Carry that number on every ledger command you run; it is the key that
-proves the command belongs to this dispatch and not a superseded one.
+When an orchestrator opened an attempt, it names `--attempt {A}` or the sentence "attempt {A}".
+Carry that number on every runner-owned ledger command; it is the key that proves the command
+belongs to this dispatch and not a superseded one. Without an attempt, read the task without
+`--attempt` and leave runner state unchanged.
 
 Read the task through the SAM CLI:
 
@@ -52,10 +52,10 @@ The result carries the task row and its sections. Two of them decide what you do
 
 If the command fails or returns an error: output the exact error text and return STATUS: BLOCKED.
 
-Your attempt is already open. `dispatch` opened it when the orchestrator launched you, so there is
-nothing for you to claim, and the CLI's `plan claim` command does not reach the ledger at all — it
-writes to the content store, leaving the ledger row untouched and the orchestrator watching a task
-that never moved.
+With an attempt, `dispatch` already opened it, so there is nothing to claim. The CLI's `plan claim`
+command does not reach the ledger: it writes to the content store, leaving the ledger row untouched
+and the orchestrator watching a task that never moved. Without an attempt, do not claim, renew,
+append task sections, or close a runner attempt.
 
 ## Step 2 — Load Agent Profile (if specified)
 
@@ -83,10 +83,9 @@ authorization or specialist profile. For a test-review-only task, load `/dh:test
 and preserve its read-only boundary. Both feed the existing verification and completion contract.
 
 Load the `dh:start-task` skill with the plan address, task ID, and the attempt number when the
-dispatch supplied one (`{plan} --task {task_id} --attempt {A}`). During its execution, apply the
-preloaded `dh:reuse-before-build` in runner mode when selecting an implementation approach. A
-worker without an attempt must not invoke the handoff's attempt-owned persistence or closure
-commands.
+dispatch supplied one (`{plan} --task {task_id} --attempt {A}`). It loads `dh:reuse-before-build`
+in runner mode when an implementation choice needs the gate. A worker without an attempt must not
+invoke the handoff's attempt-owned persistence or closure commands.
 
 `start-task` owns the round from here:
 
