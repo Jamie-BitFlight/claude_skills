@@ -1,0 +1,68 @@
+{
+  "case": "sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+  "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+  "actor": "corpus-review-A",
+  "freeze_timestamp_utc": "2026-10-12T05:50:37.189784+00:00",
+  "source_only": true,
+  "target_execution_or_import": false,
+  "not_gold_or_independent_verification": true,
+  "status": "RAW_SOURCE_CLOSURE_RECORDED",
+  "model": "openai/gpt-6.1-sol",
+  "harness": "Claude Agent SDK according to injected environment",
+  "runtime_version": null,
+  "relationships_count": 171,
+  "required_source_paths_count": 30,
+  "missing_committed_source_count": 0,
+  "input_manifest_hashes": [
+    {
+      "path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+      "source_pin_sha256": "842cc20d6d1300aa27dc8ea95a115151a423e52edb5017550813644f1a5ce7c2",
+      "file_manifest_sha256": "5d06e2f9c4131fea9204452af4ab7c1dc57e10278cb33f97c6d83fe20ca1d276"
+    },
+    {
+      "path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1",
+      "source_pin_sha256": "21196eb0f07e706b67d4efcd06ef4c9c2f791aa22dfff5029b760b449b7aa41b",
+      "file_manifest_sha256": "1b247721eb1f8fca62c2d7b5963f8b0d2258f437b436c1bb81dd24c73a65b708"
+    },
+    {
+      "path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-principles-raw-dd515581befd4dc6a868e5a311bf6f39",
+      "source_pin_sha256": "9fed8fbfcf201bbcae082138b0cf66df3e84991deae2f642523dd3e3d47cd6d5",
+      "file_manifest_sha256": "f214894412baf85781a40354f1aaa6340f7db5b1d33391d3be3fca446c66b8ce"
+    },
+    {
+      "path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-task-hook-raw-cea6bddbe3094ddc912e3da64947602f",
+      "source_pin_sha256": "716b14acc621c7d8187d64511886e68db4009326c0187726cea86eb94500fa4e",
+      "file_manifest_sha256": "39e3ac432c77999aef5a0a4f93940e3e1ac7641ac20087f7879309329d2c7dca"
+    },
+    {
+      "path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-testing-principles-raw-6f4e8bda42754bb9b06786cf35dca0b3",
+      "source_pin_sha256": "1943516f055a7b1f450d2decdbccde1d7c0b0cbd2b433cdac15289d82b648d94",
+      "file_manifest_sha256": "ee0d93ce6996016f7796855a3a26d391368ad9634efa67db3a0a6c069a0c4e8c"
+    },
+    {
+      "path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-test-method-ecosystems-raw-3971393ce546420a90f21a3fe276461a",
+      "source_pin_sha256": "6cb5b97d4dc7891acd523bcb57c7f07563250889be0d51c171bc7d98758f6508",
+      "file_manifest_sha256": "54a1c0b6a88563c4e867258a45e704054fa750829aea5dc8e79ae4558862df59"
+    }
+  ],
+  "authored_spec_hashes": {
+    "trace-spec-1.json": "3991b20a726a0bddf61b7f3a67f702c6b4830a6bdf5b40b9e225ef23f7095f26",
+    "trace-spec-2.json": "c0e8a08257a98dc27b68f908b04a7da275028a59f4fa3d05f971ff2244acaf96",
+    "trace-spec-3.json": "ff1eadeb1b5e8819b30fa253682c21ac21a9256350b8bb909829b2113f2fb265",
+    "main-supplement-spec.json": "6b1d3b069f70b42db1e37b776a4eac60e7dc4a625c6f0dbe714670b925f32e6a",
+    "review-closure-spec.json": "b6275b994e887cd947a5254bc7e553e6362025e69647fe19d9051536955ac963",
+    "complete-final-closure-spec-historical-span-corrected.json": "635a2cfc420597b41dfda61348099b1cecdef2e48862f574d4b60736d6b8a5ff"
+  },
+  "serializer_sha256": "95b859a228e7c12bc5b3367fee2a3192e5e6fa33b2be8c9239bed66974099426",
+  "output_sha256": {
+    "timing.json": "1fef12403530021d1dcb30420062983a4607107a27889b30737a2e7b7f1cfc53",
+    "check-output.json": "0e58cafb721c693abeb28a8d864e5085dd4773f8558666efce601971c5ba37c3",
+    "exposure.json": "253b7c5957ddb7835232e6ff86a6d44efce1e0b7999ed351dfec78d0eedf26ba",
+    "source-question.md": "bebc72d0b1a308bd9e714c2c7260fb814405cc1ec41a7cae2a86259c12bc1a44",
+    "trace-output.json": "7293676e72d66d92c078ecc5ab584a21107679873ff080841bd6b6a5a0b00b7f",
+    "source-packet.json": "139297fe1ae0a405ffdf44eeec603da0416953caae174d2a9d3cdc9998658835"
+  },
+  "overall_evaluation_or_runtime_approval": false,
+  "errors": [],
+  "old_frozen_output_overwritten": false
+}

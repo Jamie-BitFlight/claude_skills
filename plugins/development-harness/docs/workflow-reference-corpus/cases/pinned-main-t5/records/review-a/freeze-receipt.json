@@ -1,0 +1,19 @@
+{
+  "case": "main_e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+  "commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+  "actor": "corpus-review-A",
+  "freeze_timestamp_utc": "2026-10-12T05:47:47.209043+00:00",
+  "source_only": true,
+  "target_execution_or_import": false,
+  "not_gold_or_independent_verification": true,
+  "payload_sha256": {
+    "timing.json": "13032d8bedf9cc2e9b7d093ef8e4ade36e2ac8d9bcec15fc98730e5bd9eba5f8",
+    "check-output.json": "75a463d3d73b48427b0d2f818d7391dd9bc0fbffa2d267744e14685fc18398f4",
+    "run.json": "816320d5f5bd921d70f23246a4ae3bd411ef07298291b9afa107910e79315032",
+    "exposure.json": "16b11dfcf8efc2d7006a793c18d9f1a3a718caaf5f9efed75641b71934d65e56",
+    "source-question.md": "178d3b3e32102fdc95414e34883b2b40a1842a9b16a9c36ead4ee89fbcc48c56",
+    "trace-output.json": "2c9361d2560f81f29f92635426b0312a72fd787a427b757ce723851a5cdb3c45",
+    "source-packet.json": "dfd1f849dab24f716f8a1de60b95b234bff646c1ac118fc7d3cd42c21cce67a8"
+  },
+  "all_payloads_frozen_before_any_other_actor_comparison": true
+}

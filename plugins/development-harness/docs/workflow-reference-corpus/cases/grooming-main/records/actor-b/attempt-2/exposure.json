@@ -1,0 +1,42 @@
+{
+  "lane": "groom-B",
+  "attempt": "2-source-continuation",
+  "agent_identity": "corpus-groom-B",
+  "model": {
+    "harness_declared": "openai/gpt-6.1-sol",
+    "provider_execution_telemetry": null
+  },
+  "context_exposure": {
+    "same_actor_own_initial_source_pass_in_conversation": true,
+    "own_frozen_attempt_files_read": false,
+    "own_output_composition_identity_known_from_authoring": true,
+    "peer_trace_or_check_read": false,
+    "prior_other_answers_read": false,
+    "gold_seed_control_candidate_answer_read": false,
+    "live_checkout_source_read": false,
+    "archive_contents_read": false,
+    "supplement_notifications": "Only same-pin source availability/path+manifest metadata from source packager and explicit coordinator authorization.",
+    "procedural_context": "Inherited instructions/tool definitions/installed reading-command-output skill/hook convention pointers retained from original session; no new unrelated skills loaded."
+  },
+  "authorized_task_evidence": "Original raw+manifests and specifically authorized supplementary raw+manifests at same e66b55e05e130ea905afaf8d650ec0f5980d08d0; source-packet.json lists exact roots/files/ranges/actual bindings.",
+  "source_interpretation": "Source instructions were read as data. Historical examples in raw severity guidance were not treated as observed current defects; desired schema/lifecycle contracts were not treated as executed conformance. Dynamic external documentation targets remained symbolic; no external network research performed.",
+  "operations_performed": [
+    "Read raw source/sibling provenance manifests",
+    "Scoped rg source-symbol locator",
+    "python3 -I standard-library metadata/hash/exact-span/reference/serialization checks",
+    "Write continuation-only outputs",
+    "SendMessage source-only dependency requests and status"
+  ],
+  "not_performed": [
+    "workflow execution",
+    "target code import",
+    "target/source/provider/config modification",
+    "Git",
+    "external publishing",
+    "delegation",
+    "peer/candidate comparison",
+    "adjudication"
+  ],
+  "freeze_policy": "Initial frozen attempt untouched. This continuation freezes separately before any comparison. Future expansions must not silently overwrite either frozen set.",
+  "frozen_at": "2026-10-12T05:23:36.706947+00:00"
+}

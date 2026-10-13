@@ -1,0 +1,105 @@
+{
+  "run_id": "20261012-groom-B-independent-main-e66b55e05",
+  "agent_identity": "corpus-groom-B",
+  "role_type": "sub-agent",
+  "mode": "independent fresh source-only tracer/checker",
+  "model": {
+    "harness_declared": "openai/gpt-6.1-sol",
+    "provider_execution_telemetry": null
+  },
+  "question_file": "source-question.md",
+  "input_root": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+  "source_pin": {
+    "commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+    "branch_label": "main",
+    "source_pin_manifest": "manifests/source-pin.json",
+    "file_manifest": "manifests/file-manifest.json",
+    "initial_source_pin_manifest_sha256": "45118ba43819c7fb1a033e3207879d389023a3d2a8174e1bf6ce779b5c6fe358",
+    "initial_file_manifest_sha256": "a2fb928e9ce2c11c8e3eae257d2a1c77702929f98c49635dcb9c356bf6c36d02",
+    "archive_sha256_as_declared_in_manifest": "774119606e49dec3bcbc41623c290d18467a0141fb5a0bf55b6fd75f648ff14d",
+    "archive_read_by_this_lane": false
+  },
+  "status": "BLOCKED_MISSING_PINNED_SOURCE",
+  "stablepath": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-runs/groom-B/",
+  "outputs": [
+    "run.json",
+    "source-packet.json",
+    "source-question.md",
+    "trace-output.json",
+    "check-output.json",
+    "exposure.json",
+    "timing.json"
+  ],
+  "raw_outputs_freeze_policy": "Freeze raw outputs with exact output/source input hashes before any peer/candidate comparison or adjudication. No such comparison has occurred.",
+  "missing_dependency_requests": [
+    {
+      "kind": "direct skill ecosystems",
+      "prefix": "plugins/development-harness/skills/",
+      "names": [
+        "dh-cli-usage",
+        "discovery",
+        "planner-rt-ica",
+        "analyze-change-impact",
+        "verify-factual-claim",
+        "root-cause-tracing-process",
+        "backend-resolution",
+        "dh-meta-docs",
+        "api-state",
+        "ecosystem-research",
+        "impact-measurement",
+        "codebase-auditor",
+        "research-note"
+      ],
+      "state": "requested at same pin",
+      "evidence": ["E05", "E26", "E82", "E77", "E78", "E80", "E89", "E100", "E91", "E93"]
+    },
+    {
+      "kind": "direct governing docs",
+      "paths": [
+        "plugins/development-harness/docs/backlog-lifecycle.md",
+        "plugins/development-harness/docs/artifact-registry.md",
+        "plugins/development-harness/dh_core/artifact_registry.py"
+      ],
+      "state": "requested; schema/severity-doc actual paths to follow only after dh-meta-docs supplied",
+      "evidence": ["E10", "E100", "E121"]
+    },
+    {
+      "kind": "called implementation and serialization",
+      "paths": [
+        "plugins/development-harness/dh_core/operations.py",
+        "plugins/development-harness/backlog_core/artifact_manifest_store.py",
+        "plugins/development-harness/backlog_core/tool_responses.py",
+        "plugins/development-harness/backlog_core/disclosure_handler.py"
+      ],
+      "state": "requested at same pin",
+      "evidence": ["E113", "E114", "E115", "E116", "E95"]
+    },
+    {
+      "kind": "procedural RTK instruction only",
+      "paths": ["RTK.md"],
+      "state": "pinned raw lookup absent; global RTK procedural instructions supplied in inherited context, no target source claim depends on this file",
+      "evidence": []
+    }
+  ],
+  "input_hashes": {
+    "manifests/source-pin.json": "45118ba43819c7fb1a033e3207879d389023a3d2a8174e1bf6ce779b5c6fe358",
+    "manifests/file-manifest.json": "a2fb928e9ce2c11c8e3eae257d2a1c77702929f98c49635dcb9c356bf6c36d02"
+  },
+  "output_hashes": {
+    "source-packet.json": "1b488d3508e458d512810632ef9ec7f54895bd24798151b1c5471676d69c0fc3",
+    "source-question.md": "b10003b3c4b270c1252ceba6b385dcef19dcc9a022099f06bc791a3ed24966dd",
+    "trace-output.json": "eda5990f9842a9da4fc987b22e77935cbb259b231fc2bebde10fae7186f120ac",
+    "check-output.json": "f0ec608a7ca15217c2cf89454538cc8e3bfac923ad1a86626e308c53c74af20c",
+    "exposure.json": "c5dd934da505701085e70c7bffcf6fa8f47e9b0c261a881a223b044fed64bf72",
+    "timing.json": "236c72d3385a70d1f6dd99333c890d7bcf667c2d785d45f0f02bb9d7983fef07",
+    "run.json": null
+  },
+  "frozen_at": "2026-10-12T05:07:49.781591+00:00",
+  "runtime_observations": null,
+  "comparison_performed": false,
+  "adjudication_performed": false,
+  "consumed_raw_source_hashes": "source-packet.json sources: actual SHA256 plus Git blob SHA1",
+  "self_hash_rule": "run.json self-hash is recorded in freeze-receipt.json to avoid a self-referential hash cycle.",
+  "freeze_receipt": "freeze-receipt.json",
+  "completion_scope": "Core route, local grooming references, declared agents, immediate consumers and independent fidelity/omission challenges frozen. Deeper missing linked dependencies prevent complete transitive closure."
+}

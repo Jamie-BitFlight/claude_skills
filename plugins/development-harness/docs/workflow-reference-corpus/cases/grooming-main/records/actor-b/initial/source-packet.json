@@ -1,0 +1,1052 @@
+{
+  "lane": "groom-B",
+  "commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+  "input_root": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+  "binding_rule": "Each evidence source_id resolves to an exact repository path and actual content hash in sources. Line spans are inclusive. Quotes are exact substrings within those spans, not necessarily entire spans. Binding verification is metadata-only; semantic relationships were independently authored from Read results.",
+  "sources": {
+    "entry": {
+      "path": "plugins/development-harness/skills/work-backlog-item/SKILL.md",
+      "read": "full",
+      "sha256": "6011f4caded6f5a9f8afec4f8613ddcefba5e10e50af83ccefc99a526454ddd7",
+      "git_blob_sha1": "4c3756648164f5049c6f3d6112db795ab04284e1",
+      "bytes": 18155,
+      "manifest_match": true
+    },
+    "routes": {
+      "path": "plugins/development-harness/skills/work-backlog-item/scripts/parser/command-routes.json",
+      "read": "full",
+      "sha256": "575d3559c2ddf8f409cd3714e75e49029b4ee1d909374f19e4ae0fecce219fa9",
+      "git_blob_sha1": "595a0b8997cee40a202df5a4fa94cdf4beac1c00",
+      "bytes": 463,
+      "manifest_match": true
+    },
+    "parse": {
+      "path": "plugins/development-harness/skills/work-backlog-item/scripts/parser/parse.schema.json",
+      "read": "full",
+      "sha256": "c42a04ed8d38e6847b8aa32296058a4188413c8d1d73a069f175fc9416777bbc",
+      "git_blob_sha1": "441a10a19133544358b77160a8e58ac8022bcddc",
+      "bytes": 1385,
+      "manifest_match": true
+    },
+    "start": {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/start.md",
+      "read": "full",
+      "sha256": "a89e376c55dfa624665fcbc295bfdaba43c7aa926864915c964545c729ed7c25",
+      "git_blob_sha1": "1aa920db6ff0669e0a05bd8e63870949e8739fcc",
+      "bytes": 6101,
+      "manifest_match": true
+    },
+    "scope": {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/scope.md",
+      "read": "full",
+      "sha256": "bda5ee870841f933c323b8322a90fa801723ce225d0abe7a76b2f13093916e6c",
+      "git_blob_sha1": "880f040bd383b097e31f48b0f2d6cc73ee83bb18",
+      "bytes": 1330,
+      "manifest_match": true
+    },
+    "intake": {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/intake.md",
+      "read": "full",
+      "sha256": "dae2aa922da37898b8cbc0a50af23dffc12cce5542dfaaf575737359b773adb4",
+      "git_blob_sha1": "fbcc36c5916d2a09eb9fe98f7b1eeb3e6d07e081",
+      "bytes": 3589,
+      "manifest_match": true
+    },
+    "analyze": {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/analyze.md",
+      "read": "full",
+      "sha256": "84991a418bfa8505894ea15e760a639946e91f945abebfa6e3f60fd43421e650",
+      "git_blob_sha1": "32c057c071eb0cf43a9a386a66593258845b88c3",
+      "bytes": 5481,
+      "manifest_match": true
+    },
+    "swarm": {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/swarm.md",
+      "read": "full",
+      "sha256": "3780ba9c0b4ab05f9fdf9146ec036af5dcfa02f850317641f6484e3cbd3b0271",
+      "git_blob_sha1": "be17eb9deaca5a02ab47891745c9280a4f80b9af",
+      "bytes": 12048,
+      "manifest_match": true
+    },
+    "finalize": {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/finalize.md",
+      "read": "full",
+      "sha256": "3cbe5602667adb45369630f99b6f69e420dcd2c037718b6832dbfcacdd461438",
+      "git_blob_sha1": "8b6b6e1737a0c7a3aca617415ada663f099350d7",
+      "bytes": 20929,
+      "manifest_match": true
+    },
+    "drift": {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/groom-drift.md",
+      "read": "full",
+      "sha256": "0ddebfc2c2143855f2209ed70191ed739504999aa7049e1d48fd8d4f2053cdb4",
+      "git_blob_sha1": "bb85d4a46304a765bcfa740fcfa29f074b9ebed0",
+      "bytes": 4274,
+      "manifest_match": true
+    },
+    "error": {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/error.md",
+      "read": "full",
+      "sha256": "2c43ca1f9a933b333db56f0b97c8d1393c45260205068aa4c5d88cb659e00b7d",
+      "git_blob_sha1": "2c27d22fbbae6f9f7ee8f0fb041146fba140253d",
+      "bytes": 6117,
+      "manifest_match": true
+    },
+    "finally": {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/finally.md",
+      "read": "full",
+      "sha256": "24110bb05a7bc40b19d2dc0ddd2bd1746cd265bbf36ef0de60c9a05ae34774a3",
+      "git_blob_sha1": "6403c5fad39ba36b3bb899cfdb161f947c0d4f8c",
+      "bytes": 1471,
+      "manifest_match": true
+    },
+    "fact-result": {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/fact-check-result.md",
+      "read": "full",
+      "sha256": "05543a14e2af00010fac2fabfcd449d13dcebe6b4ea4dccc95526b7c2f260146",
+      "git_blob_sha1": "0769ee7d6f480bc0b8d7444f66a0f0d49248209a",
+      "bytes": 4315,
+      "manifest_match": true
+    },
+    "impact-result": {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/impact-radius-result.md",
+      "read": "full",
+      "sha256": "d58c7d6fb080866840b6a8fe548180b7b6004f80da0db47fb523965e03cdba08",
+      "git_blob_sha1": "b8062ca6cc1f0c91c88b3e6f94fea68c19cf0a6f",
+      "bytes": 5546,
+      "manifest_match": true
+    },
+    "impact-agent": {
+      "path": "plugins/development-harness/agents/impact-analyst.md",
+      "read": "full",
+      "sha256": "47daecad760537e290fc385192b46c915dc1de4efd80aaced0f5ada363a5d505",
+      "git_blob_sha1": "5a3081385bc58ac82a5cb578b6329da3ddba7f65",
+      "bytes": 3191,
+      "manifest_match": true
+    },
+    "fact-agent": {
+      "path": "plugins/development-harness/agents/fact-checker.md",
+      "read": "full",
+      "sha256": "14c793522cd401340c334c0d864b869a7ebe6c3f93a0f4e3e18c29b3d3e0ccbe",
+      "git_blob_sha1": "a35dba658a6522e4d078477dc92486d5b7d92337",
+      "bytes": 2537,
+      "manifest_match": true
+    },
+    "classifier": {
+      "path": "plugins/development-harness/agents/classifier.md",
+      "read": "full",
+      "sha256": "4da17c2c5ca75dcad069190d694856207469505ea3070c3198b2fc1a46402e40",
+      "git_blob_sha1": "426fc19377834f6ebf14fbabc727d38175b2fc02",
+      "bytes": 9594,
+      "manifest_match": true
+    },
+    "rtica-agent": {
+      "path": "plugins/development-harness/agents/rtica-assessor.md",
+      "read": "full",
+      "sha256": "86facc5cac28df1d20fb2260896195beb7feef9e876c8d493f4c4489f60b6f29",
+      "git_blob_sha1": "e67f1f5427d11d185e76c690a8d20f8226fa0c3a",
+      "bytes": 14862,
+      "manifest_match": true
+    },
+    "alignment": {
+      "path": "plugins/development-harness/agents/alignment-analyst.md",
+      "read": "full",
+      "sha256": "0273176762836e72d713bf4c0da951cf9406fff73dd7a7ba7ba872b74ee1ee3e",
+      "git_blob_sha1": "419a57eba20146eb7b94918c0d963813f57524fa",
+      "bytes": 16040,
+      "manifest_match": true
+    },
+    "researcher": {
+      "path": "plugins/development-harness/agents/technical-researcher.md",
+      "read": "full",
+      "sha256": "aa3b54298c3a064455e74db800cf61f64b44543c4232bbe82a297e371589a205",
+      "git_blob_sha1": "913e8200d6121f547f6c74ce4e7879b5f3f97eee",
+      "bytes": 9397,
+      "manifest_match": true
+    },
+    "groomer": {
+      "path": "plugins/development-harness/agents/backlog-item-groomer.md",
+      "read": "full",
+      "sha256": "9014262057ac14eef5fa1e39fc54b016f66a8e2ac772abec89fb9cf2472450cb",
+      "git_blob_sha1": "5bb2b4ef5da6b295ff1a6e2d44cc27ee36581f1b",
+      "bytes": 28107,
+      "manifest_match": true
+    },
+    "dispatch": {
+      "path": "plugins/development-harness/skills/dispatch-contract/SKILL.md",
+      "read": "full",
+      "sha256": "794deba2b671198f79870b120fe280919f550591efbcff5c37faba7beac650e5",
+      "git_blob_sha1": "06ec26349d37a942f4d1482c34a512a858328161",
+      "bytes": 1956,
+      "manifest_match": true
+    },
+    "subagent": {
+      "path": "plugins/development-harness/skills/subagent-contract/SKILL.md",
+      "read": "full",
+      "sha256": "d791f07637e98ced84b54829d24a54210de6a96f5f9b2859de0a4fa8eb57ca2a",
+      "git_blob_sha1": "28567aaa063cd9a7d49487de2de8fe2bb81247bb",
+      "bytes": 6093,
+      "manifest_match": true
+    },
+    "work-groom-check": {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/groom-check.md",
+      "read": "full",
+      "sha256": "76800bee1640371d9888b4ee7ab8d02acfe496bacc7614570e9493a0a130eacb",
+      "git_blob_sha1": "d1de40289a4ed9e85d90777f5baab7393ba442bc",
+      "bytes": 7660,
+      "manifest_match": true
+    },
+    "work-prepare": {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/prepare.md",
+      "read": "full",
+      "sha256": "0f7607ab012af840531efec62fb074fe311a27616184107cb94f0411c5075859",
+      "git_blob_sha1": "f6c3690a4727fbeabe44cd978fb6945134e48690",
+      "bytes": 1948,
+      "manifest_match": true
+    },
+    "work-rtica-gate": {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/rt-ica-gate.md",
+      "read": "full",
+      "sha256": "2554b1da5503ae12489171d2c8a04da31333d9e7db351825bee39cc9d0362a77",
+      "git_blob_sha1": "7e5f1f46d190ec3a00c001c62998f33ff37be646",
+      "bytes": 4067,
+      "manifest_match": true
+    },
+    "feasibility": {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/feasibility-gate.md",
+      "read": "full",
+      "sha256": "89e1cb930f2f637db63f72323cca777b5f04416e52192a0fd867c58ae3da5030",
+      "git_blob_sha1": "94a4ef12ceee41dafd4713e7bdb66bea121a6375",
+      "bytes": 8532,
+      "manifest_match": true
+    },
+    "auto-mode": {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/auto-mode.md",
+      "read": "full",
+      "sha256": "6b127296855c5a1007cafa988d3bd4d9042c3c1693a28ff0afbef48320a1b09e",
+      "git_blob_sha1": "efb9a618318002dfe27ba4ea6529fae850ec80cb",
+      "bytes": 4153,
+      "manifest_match": true
+    },
+    "create": {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/create/start.md",
+      "read": "full",
+      "sha256": "2d508a2dd8942131acc17cfd41af204fb99ae5987628bbd404678d85c288b45d",
+      "git_blob_sha1": "c656aba24ac86043c2010e80519ac519cec10ddf",
+      "bytes": 10658,
+      "manifest_match": true
+    },
+    "work-start": {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/start.md",
+      "read": "full",
+      "sha256": "3017a83876c00004ad35c70a1488090e4d27389e547509638357cb397ad81d77",
+      "git_blob_sha1": "24ebe59b53045cc8ee74b0a56a7f625a734ffaef",
+      "bytes": 6052,
+      "manifest_match": true
+    },
+    "task-worker": {
+      "path": "plugins/development-harness/agents/task-worker.md",
+      "read": "full",
+      "sha256": "05a3af180ff2ef050ab1500eea887615b60b3fc22aba865e58eda2327d890894",
+      "git_blob_sha1": "8b8cd529072211427aa3cd30c553dfdcf47a6bf4",
+      "bytes": 5971,
+      "manifest_match": true
+    },
+    "dh-agents": {
+      "path": "plugins/development-harness/AGENTS.md",
+      "read": "lines 1-360",
+      "sha256": "ceb8ed6a6e74855d00b1cfd7502410b5ced5a11936c361bc991d092ccf5ba1e7",
+      "git_blob_sha1": "f8db253be858c15af8011d980c530bbfb460b931",
+      "bytes": 22786,
+      "manifest_match": true
+    },
+    "server": {
+      "path": "plugins/development-harness/backlog_core/server.py",
+      "read": "lines 1-180,2360-2569,2878-3157,3344-3548",
+      "sha256": "c8208f620ddf36c5f1f2a481ab1417a76b15f9630bbdc16728c16c033775ec3c",
+      "git_blob_sha1": "3a85be644ba78a0c8d3b539ab299cbc5b7e0b04a",
+      "bytes": 210066,
+      "manifest_match": true
+    }
+  },
+  "evidence": [
+    {
+      "id": "E01",
+      "source_id": "entry",
+      "lines": [18, 29],
+      "quote": "Coerce <provided_arguments/> to match this schema yourself"
+    },
+    {
+      "id": "E02",
+      "source_id": "routes",
+      "lines": [2, 6],
+      "quote": "\"groom\": \"references/workflows/groom/start.md\""
+    },
+    {
+      "id": "E03",
+      "source_id": "parse",
+      "lines": [4, 9],
+      "quote": "\"required\": [\"mode\", \"route\"]"
+    },
+    {
+      "id": "E04",
+      "source_id": "entry",
+      "lines": [23, 27],
+      "quote": "Two or more item_ref discriminators"
+    },
+    {
+      "id": "E05",
+      "source_id": "entry",
+      "lines": [31, 42],
+      "quote": "Load `dh:dh-cli-usage` before resolving command tokens."
+    },
+    {
+      "id": "E06",
+      "source_id": "entry",
+      "lines": [61, 61],
+      "quote": "In `auto` mode, do not call `AskUserQuestion`."
+    },
+    {
+      "id": "E07",
+      "source_id": "entry",
+      "lines": [82, 86],
+      "quote": "GroomItemRef -->|\"No\"| GroomCreate"
+    },
+    {
+      "id": "E08",
+      "source_id": "entry",
+      "lines": [88, 98],
+      "quote": "WorkGroomCheck -->|\"No \u2014 grooming incomplete\"| WorkGroom"
+    },
+    {
+      "id": "E09",
+      "source_id": "entry",
+      "lines": [163, 174],
+      "quote": "QuickCheck -->|\"Yes\"| SQ"
+    },
+    {
+      "id": "E10",
+      "source_id": "entry",
+      "lines": [104, 109],
+      "quote": "Grooming (Step 3.1) is autonomous research"
+    },
+    {
+      "id": "E11",
+      "source_id": "start",
+      "lines": [7, 25],
+      "quote": "Start([\"groom &lt;item_ref/&gt;\"]) --> Scope[\"Read scope.md\"]"
+    },
+    {
+      "id": "E12",
+      "source_id": "start",
+      "lines": [45, 59],
+      "quote": "Wait for all agents to complete before you continue."
+    },
+    {
+      "id": "E13",
+      "source_id": "start",
+      "lines": [74, 89],
+      "quote": "Every exit path \u2014 success, block, skip, drift, or error \u2014 ends at [finally.md](./finally.md)."
+    },
+    {
+      "id": "E14",
+      "source_id": "start",
+      "lines": [99, 110],
+      "quote": "groom items in parallel, capped at 5 concurrent items."
+    },
+    {
+      "id": "E15",
+      "source_id": "scope",
+      "lines": [3, 21],
+      "quote": "Grooming is a stand-alone pre-planning step."
+    },
+    {
+      "id": "E16",
+      "source_id": "scope",
+      "lines": [23, 32],
+      "quote": "a DEEP item (Detailed, Estimated, Emergent, Prioritized)"
+    },
+    {
+      "id": "E17",
+      "source_id": "intake",
+      "lines": [5, 12],
+      "quote": "First failure \u2192 SKIP."
+    },
+    {
+      "id": "E18",
+      "source_id": "intake",
+      "lines": [14, 36],
+      "quote": "If commits or merged PRs reference this item:"
+    },
+    {
+      "id": "E19",
+      "source_id": "intake",
+      "lines": [38, 45],
+      "quote": "Substitute found: update via `backlog_groom(selector='{item_ref}', section='Suggested Location', content='{substitute}')` \u2192 continue."
+    },
+    {
+      "id": "E20",
+      "source_id": "intake",
+      "lines": [47, 59],
+      "quote": "`metadata.added` older than 90 days AND `metadata.groomed` absent"
+    },
+    {
+      "id": "E21",
+      "source_id": "intake",
+      "lines": [61, 78],
+      "quote": "Evidence found: `backlog_resolve(selector='{item_ref}', summary='...')` \u2192 **SKIP**."
+    },
+    {
+      "id": "E22",
+      "source_id": "intake",
+      "lines": [80, 85],
+      "quote": "If `groomed == today's date` AND item has required groomed sections \u2192 **DRIFT**."
+    },
+    {
+      "id": "E23",
+      "source_id": "intake",
+      "lines": [87, 116],
+      "quote": "`research_first` | body, lines starting with `**Research first**:` or `Research first:`"
+    },
+    {
+      "id": "E24",
+      "source_id": "analyze",
+      "lines": [6, 27],
+      "quote": "Item labels include `type:fix` or `type:bug`"
+    },
+    {
+      "id": "E25",
+      "source_id": "analyze",
+      "lines": [29, 54],
+      "quote": "\u2192 **Synthesize** a feature-context artifact directly from those sections instead of invoking discovery:"
+    },
+    {
+      "id": "E26",
+      "source_id": "analyze",
+      "lines": [56, 89],
+      "quote": "`count == 0` \u2192 retry ONCE:"
+    },
+    {
+      "id": "E27",
+      "source_id": "analyze",
+      "lines": [91, 131],
+      "quote": "Nothing gates on the\nsnapshot."
+    },
+    {
+      "id": "E28",
+      "source_id": "analyze",
+      "lines": [133, 149],
+      "quote": "backlog groom --selector \"{item_ref}\" --section \"RT-ICA\" --content \"{snapshot}\""
+    },
+    {
+      "id": "E29",
+      "source_id": "swarm",
+      "lines": [3, 5],
+      "quote": "an agent that must react to another's output re-reads that section rather than waiting on a message."
+    },
+    {
+      "id": "E30",
+      "source_id": "swarm",
+      "lines": [9, 38],
+      "quote": "groomer** \u2014 Produce subsections: Reproducibility, Priority, Impact, Benefits, Expected\n   Behavior, Acceptance Criteria, Files, Resources, Dependencies, Effort."
+    },
+    {
+      "id": "E31",
+      "source_id": "swarm",
+      "lines": [40, 46],
+      "quote": "Each agent is a standalone `Agent()` call \u2014 no team, no `SendMessage` between\nagents."
+    },
+    {
+      "id": "E32",
+      "source_id": "swarm",
+      "lines": [48, 65],
+      "quote": "proceed to Wave 1 without research prior context \u2014 do not halt the groom."
+    },
+    {
+      "id": "E33",
+      "source_id": "swarm",
+      "lines": [67, 95],
+      "quote": "After Wave 1: read Impact Radius and Fact-Check. If scope expanded, spawn a second fact-checker."
+    },
+    {
+      "id": "E34",
+      "source_id": "swarm",
+      "lines": [97, 114],
+      "quote": "O->>RT: spawn (item_ref)"
+    },
+    {
+      "id": "E35",
+      "source_id": "swarm",
+      "lines": [116, 140],
+      "quote": "Take the last entry in\n  `sections['RT-ICA'].entries` whose `struck` is `false`."
+    },
+    {
+      "id": "E36",
+      "source_id": "swarm",
+      "lines": [129, 140],
+      "quote": "`BLOCKED-FOR-PLANNING` | Stop. Present the MISSING conditions. Do not proceed to Wave 3."
+    },
+    {
+      "id": "E37",
+      "source_id": "swarm",
+      "lines": [146, 164],
+      "quote": "Downstream stages must treat the `### Systems Inventory` rows as the authoritative estimated\nimpact set."
+    },
+    {
+      "id": "E38",
+      "source_id": "swarm",
+      "lines": [168, 194],
+      "quote": "Q2 -->|YES| Recurring[\"recurring-pattern \u2014 6-sigma\"]"
+    },
+    {
+      "id": "E39",
+      "source_id": "swarm",
+      "lines": [196, 219],
+      "quote": "Input to groomer: `item_ref` only, per `dh:dispatch-contract`."
+    },
+    {
+      "id": "E40",
+      "source_id": "finalize",
+      "lines": [14, 41],
+      "quote": "The orchestrator (not a subagent) executes this."
+    },
+    {
+      "id": "E41",
+      "source_id": "finalize",
+      "lines": [24, 28],
+      "quote": "do not infer a verdict from delivery\nstatus or rewrite the producer's evidence."
+    },
+    {
+      "id": "E42",
+      "source_id": "finalize",
+      "lines": [30, 41],
+      "quote": "No condition changes to AVAILABLE without one."
+    },
+    {
+      "id": "E43",
+      "source_id": "finalize",
+      "lines": [59, 76],
+      "quote": "replace_section=True, reason='RT-ICA final pass supersedes the rtica-assessor entry'"
+    },
+    {
+      "id": "E44",
+      "source_id": "finalize",
+      "lines": [78, 126],
+      "quote": "`APPROVED-WITH-GAPS` does not stop the groom."
+    },
+    {
+      "id": "E45",
+      "source_id": "finalize",
+      "lines": [118, 126],
+      "quote": "Conditions with multiple options or none are recorded under Blockers and Questions for Human"
+    },
+    {
+      "id": "E46",
+      "source_id": "finalize",
+      "lines": [128, 150],
+      "quote": "The `sections_index` from Step 1 is the authoritative presence check"
+    },
+    {
+      "id": "E47",
+      "source_id": "finalize",
+      "lines": [152, 168],
+      "quote": "`Priority` | Contains `Effort:` field"
+    },
+    {
+      "id": "E48",
+      "source_id": "finalize",
+      "lines": [170, 183],
+      "quote": "The orchestrator must NOT write a required section directly unless `finalize.md` explicitly designates it as an orchestrator responsibility"
+    },
+    {
+      "id": "E49",
+      "source_id": "finalize",
+      "lines": [185, 197],
+      "quote": "Spawn groomer (same model as swarm)"
+    },
+    {
+      "id": "E50",
+      "source_id": "finalize",
+      "lines": [199, 219],
+      "quote": "Scope violations do NOT block the write. Log violations as notes:"
+    },
+    {
+      "id": "E51",
+      "source_id": "finalize",
+      "lines": [221, 249],
+      "quote": "resolve every line found,\nindependently \u2014 do not stop after the first."
+    },
+    {
+      "id": "E52",
+      "source_id": "finalize",
+      "lines": [232, 249],
+      "quote": "`VERIFIED` \u2192 `**Confirmed cause**: {original hypothesis text}"
+    },
+    {
+      "id": "E53",
+      "source_id": "finalize",
+      "lines": [251, 265],
+      "quote": "`description` updates do not sync to a remote provider on their own"
+    },
+    {
+      "id": "E54",
+      "source_id": "finalize",
+      "lines": [267, 278],
+      "quote": "This rule applies to backlog\nsections and registered artifacts; it does not apply to SAM task bodies"
+    },
+    {
+      "id": "E55",
+      "source_id": "finalize",
+      "lines": [280, 312],
+      "quote": "RT-ICA MUST be included in this batch write."
+    },
+    {
+      "id": "E56",
+      "source_id": "finalize",
+      "lines": [314, 342],
+      "quote": "If the retry also returns `mark_groomed_skipped: true`, do not retry again"
+    },
+    {
+      "id": "E57",
+      "source_id": "finalize",
+      "lines": [344, 363],
+      "quote": "Call the final status transition together with a content write in the same call."
+    },
+    {
+      "id": "E58",
+      "source_id": "finalize",
+      "lines": [365, 379],
+      "quote": "The caller\n(`work-backlog-item`) routes to the planning phase based on user request or whether <mode/> is auto."
+    },
+    {
+      "id": "E59",
+      "source_id": "drift",
+      "lines": [19, 34],
+      "quote": "Q -->|\"Yes \u2014 plan field set\"| ModeA"
+    },
+    {
+      "id": "E60",
+      "source_id": "drift",
+      "lines": [36, 55],
+      "quote": "backlog groom --selector \"{title}\" --section \"Plan Drift\" --content \"{findings}\""
+    },
+    {
+      "id": "E61",
+      "source_id": "drift",
+      "lines": [65, 85],
+      "quote": "Do not scan paths\n     in evidence, categorized views, excluded candidates, or unknown-frontier notes."
+    },
+    {
+      "id": "E62",
+      "source_id": "drift",
+      "lines": [89, 111],
+      "quote": "Do not proceed to extract, swarm, or\nany other grooming step."
+    },
+    {
+      "id": "E63",
+      "source_id": "error",
+      "lines": [11, 50],
+      "quote": "failure_type is one of: interrupted | tool_error | unknown."
+    },
+    {
+      "id": "E64",
+      "source_id": "error",
+      "lines": [44, 50],
+      "quote": "The idle notification only confirms the diagnostic agent stopped running; it does not by itself guarantee the write happened."
+    },
+    {
+      "id": "E65",
+      "source_id": "error",
+      "lines": [54, 66],
+      "quote": "Diag -->|\"unknown\"| Retry"
+    },
+    {
+      "id": "E66",
+      "source_id": "error",
+      "lines": [68, 100],
+      "quote": "backlog update --selector \"<item_ref/>\" --status blocked"
+    },
+    {
+      "id": "E67",
+      "source_id": "error",
+      "lines": [102, 131],
+      "quote": "**Persistent** (invalid selector, missing permissions, tool not available): do not retry."
+    },
+    {
+      "id": "E68",
+      "source_id": "error",
+      "lines": [133, 151],
+      "quote": "When an agent fails twice on the same task, or a system error persists after retry:"
+    },
+    {
+      "id": "E69",
+      "source_id": "finally",
+      "lines": [3, 9],
+      "quote": "Do NOT call `backlog_sync()`"
+    },
+    {
+      "id": "E70",
+      "source_id": "finally",
+      "lines": [11, 22],
+      "quote": "Control returns to the caller \u2014 either the SKILL.md router"
+    },
+    {
+      "id": "E71",
+      "source_id": "fact-result",
+      "lines": [9, 31],
+      "quote": "Emit one record per supplied claim with these literal lowercase field names."
+    },
+    {
+      "id": "E72",
+      "source_id": "fact-result",
+      "lines": [33, 45],
+      "quote": "Compare the\nwhole claim value, not a substring, position, or shared topic."
+    },
+    {
+      "id": "E73",
+      "source_id": "fact-result",
+      "lines": [47, 83],
+      "quote": "REFUTED \u2192 MISSING and INCONCLUSIVE \u2192\nDERIVABLE."
+    },
+    {
+      "id": "E74",
+      "source_id": "impact-result",
+      "lines": [5, 21],
+      "quote": "Replacing the section strikes the previous snapshot while preserving history."
+    },
+    {
+      "id": "E75",
+      "source_id": "impact-result",
+      "lines": [23, 30],
+      "quote": "When scope does not expand, use `SCOPE_EXPANSION: None.`."
+    },
+    {
+      "id": "E76",
+      "source_id": "impact-result",
+      "lines": [75, 116],
+      "quote": "include each affected system exactly once."
+    },
+    {
+      "id": "E77",
+      "source_id": "impact-agent",
+      "lines": [18, 58],
+      "quote": "The reusable skill owns causal impact analysis and MUST NOT absorb those DH persistence mechanics."
+    },
+    {
+      "id": "E78",
+      "source_id": "fact-agent",
+      "lines": [15, 35],
+      "quote": "Verify the single claim supplied by the dispatcher."
+    },
+    {
+      "id": "E79",
+      "source_id": "classifier",
+      "lines": [24, 53],
+      "quote": "Before classifying `defect`, grep the subsystem that owns the flagged behavior for `ADR-`"
+    },
+    {
+      "id": "E80",
+      "source_id": "classifier",
+      "lines": [59, 108],
+      "quote": "A count below 2 is a classification error \u2014 return to Phase 2"
+    },
+    {
+      "id": "E81",
+      "source_id": "classifier",
+      "lines": [110, 128],
+      "quote": "Re-read the item with `backlog_view` and confirm the Issue Classification section carries the type and rationale"
+    },
+    {
+      "id": "E82",
+      "source_id": "rtica-agent",
+      "lines": [23, 35],
+      "quote": "Use `dh:planner-rt-ica`, not `dh:rt-ica`."
+    },
+    {
+      "id": "E83",
+      "source_id": "rtica-agent",
+      "lines": [49, 62],
+      "quote": "Make at most 20 reads in total"
+    },
+    {
+      "id": "E84",
+      "source_id": "rtica-agent",
+      "lines": [64, 108],
+      "quote": "For each `Unknown` frontier entry, add a condition"
+    },
+    {
+      "id": "E85",
+      "source_id": "rtica-agent",
+      "lines": [110, 130],
+      "quote": "DERIVABLE conditions never move the verdict off `APPROVED-FOR-PLANNING`"
+    },
+    {
+      "id": "E86",
+      "source_id": "rtica-agent",
+      "lines": [132, 177],
+      "quote": "replace_section=True,\n    reason=\"rtica-assessor supersedes the RT-ICA snapshot\""
+    },
+    {
+      "id": "E87",
+      "source_id": "rtica-agent",
+      "lines": [179, 208],
+      "quote": "Never report `STATUS: BLOCKED` because the\ndecision came out `BLOCKED-FOR-PLANNING`"
+    },
+    {
+      "id": "E88",
+      "source_id": "alignment",
+      "lines": [29, 77],
+      "quote": "For each of those three filenames, keep the **first** one the walk finds"
+    },
+    {
+      "id": "E89",
+      "source_id": "alignment",
+      "lines": [81, 127],
+      "quote": "Read the response's `error` field before its `pull_requests` field"
+    },
+    {
+      "id": "E90",
+      "source_id": "alignment",
+      "lines": [148, 216],
+      "quote": "`MISSION_UNASSESSED` is its own token and never `MISSION_DIVERGENT`."
+    },
+    {
+      "id": "E91",
+      "source_id": "researcher",
+      "lines": [68, 88],
+      "quote": "Wait for all four angles to complete before proceeding to Step 3."
+    },
+    {
+      "id": "E92",
+      "source_id": "researcher",
+      "lines": [90, 147],
+      "quote": "Do not write to the backlog item while an unresolved conflict\nexists."
+    },
+    {
+      "id": "E93",
+      "source_id": "researcher",
+      "lines": [149, 192],
+      "quote": "section=\"Research\",\n    replace_section=True"
+    },
+    {
+      "id": "E94",
+      "source_id": "groomer",
+      "lines": [13, 29],
+      "quote": "Return the content \u2014 do not write it anywhere yourself."
+    },
+    {
+      "id": "E95",
+      "source_id": "groomer",
+      "lines": [58, 98],
+      "quote": "Do not groom against a truncated read."
+    },
+    {
+      "id": "E96",
+      "source_id": "groomer",
+      "lines": [100, 125],
+      "quote": "prefer that result over running your own pass."
+    },
+    {
+      "id": "E97",
+      "source_id": "groomer",
+      "lines": [127, 157],
+      "quote": "If the item involves creating or modifying a skill, classify the primary artifact as `Skill`."
+    },
+    {
+      "id": "E98",
+      "source_id": "groomer",
+      "lines": [159, 270],
+      "quote": "During grooming, blockers do not stop the output."
+    },
+    {
+      "id": "E99",
+      "source_id": "groomer",
+      "lines": [272, 328],
+      "quote": "Use the answers to write acceptance criteria that evaluate the domain object, not just the existence of files."
+    },
+    {
+      "id": "E100",
+      "source_id": "groomer",
+      "lines": [433, 442],
+      "quote": "Include sections that apply. Omit sections that do not."
+    },
+    {
+      "id": "E101",
+      "source_id": "groomer",
+      "lines": [472, 474],
+      "quote": "{N/10} - {rationale}"
+    },
+    {
+      "id": "E102",
+      "source_id": "dispatch",
+      "lines": [16, 42],
+      "quote": "never content pasted from the\nitem's own sections."
+    },
+    {
+      "id": "E103",
+      "source_id": "subagent",
+      "lines": [13, 47],
+      "quote": "There is no third token here."
+    },
+    {
+      "id": "E104",
+      "source_id": "subagent",
+      "lines": [51, 86],
+      "quote": "Put your result where your own agent file says."
+    },
+    {
+      "id": "E105",
+      "source_id": "work-prepare",
+      "lines": [5, 22],
+      "quote": "**Trigger:** always \u2014 runs for both groomed and ungroomed items."
+    },
+    {
+      "id": "E106",
+      "source_id": "work-groom-check",
+      "lines": [5, 18],
+      "quote": "Do not stop or wait for re-invocation."
+    },
+    {
+      "id": "E107",
+      "source_id": "work-groom-check",
+      "lines": [26, 45],
+      "quote": "Deduplicate the inventory paths before passing them to git."
+    },
+    {
+      "id": "E108",
+      "source_id": "work-groom-check",
+      "lines": [47, 86],
+      "quote": "Classification -->|\"Ambiguous output\"| FD"
+    },
+    {
+      "id": "E109",
+      "source_id": "work-rtica-gate",
+      "lines": [5, 27],
+      "quote": "Take the last entry whose struck is false"
+    },
+    {
+      "id": "E110",
+      "source_id": "work-rtica-gate",
+      "lines": [46, 56],
+      "quote": "The groom stage's approval does not clear this gate"
+    },
+    {
+      "id": "E111",
+      "source_id": "feasibility",
+      "lines": [50, 68],
+      "quote": "including non-file systems."
+    },
+    {
+      "id": "E112",
+      "source_id": "create",
+      "lines": [157, 173],
+      "quote": "`reference` is the only selector for this item until an issue\nis created for it."
+    },
+    {
+      "id": "E113",
+      "source_id": "server",
+      "lines": [2879, 2968],
+      "quote": "Reconciled immediately to the linked "
+    },
+    {
+      "id": "E114",
+      "source_id": "server",
+      "lines": [2980, 3080],
+      "quote": "status advance is skipped when the item cannot be\n    resolved again after the write"
+    },
+    {
+      "id": "E115",
+      "source_id": "server",
+      "lines": [3345, 3381],
+      "quote": "artifact_id: Annotated["
+    },
+    {
+      "id": "E116",
+      "source_id": "server",
+      "lines": [3513, 3540],
+      "quote": "Omitting ``artifact_id`` returns the most recently registered entry of the type."
+    },
+    {
+      "id": "E117",
+      "source_id": "analyze",
+      "lines": [43, 52],
+      "quote": "CLI's `--artifact-id` corresponds to MCP's `path` parameter"
+    },
+    {
+      "id": "E118",
+      "source_id": "rtica-agent",
+      "lines": [49, 52],
+      "quote": "you are spawned at the same time as `impact-analyst` and `fact-checker`"
+    },
+    {
+      "id": "E119",
+      "source_id": "rtica-agent",
+      "lines": [207, 208],
+      "quote": "the groomer agent runs after you and is responsible for the mark_groomed=True call."
+    },
+    {
+      "id": "E120",
+      "source_id": "auto-mode",
+      "lines": [3, 20],
+      "quote": "Before executing each checklist step, emit a one-line progress announcement"
+    },
+    {
+      "id": "E121",
+      "source_id": "dh-agents",
+      "lines": [71, 84],
+      "quote": "declared in [dh_core/artifact_registry.py](./dh_core/artifact_registry.py)"
+    },
+    {
+      "id": "E122",
+      "source_id": "task-worker",
+      "lines": [18, 52],
+      "quote": "Parse the plan address and task ID from your prompt."
+    },
+    {
+      "id": "E123",
+      "source_id": "entry",
+      "lines": [49, 58],
+      "quote": "STOP \u2014 ask the user to disambiguate"
+    },
+    {
+      "id": "E124",
+      "source_id": "feasibility",
+      "lines": [19, 47],
+      "quote": "Effort=FULL for P2 or Ideas item"
+    },
+    {
+      "id": "E125",
+      "source_id": "researcher",
+      "lines": [43, 66],
+      "quote": "If any required input is missing or ambiguous, stop and ask the caller before proceeding."
+    },
+    {
+      "id": "E126",
+      "source_id": "create",
+      "lines": [3, 18],
+      "quote": "If an existing backlog item reference is already available, stop and return control to the calling stage."
+    },
+    {
+      "id": "E127",
+      "source_id": "feasibility",
+      "lines": [70, 84],
+      "quote": "impact_radius_file_count == 1 AND estimated_task_count >= 4"
+    }
+  ],
+  "metadata_verification": {
+    "checked_at": "2026-10-12T04:57:32.922152+00:00",
+    "quote_failures": [],
+    "all_source_bindings_match_manifest": true,
+    "last_quote_span_check": {
+      "checked_at": "2026-10-12T05:06:25.546739+00:00",
+      "quote_span_records": 127,
+      "relationships": 117,
+      "unique_relationship_ids": 117,
+      "all_evidence_references_resolve": true,
+      "failures": [],
+      "semantic_validation": "Independently authored source-fidelity/omission challenge in this lane; mechanical validator does not prove semantic completeness."
+    }
+  },
+  "frozen_at": "2026-10-12T05:07:49.781591+00:00",
+  "dependency_closure": "Incomplete: requested linked source missing at freeze; source packet binds only actually read permitted files."
+}

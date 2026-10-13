@@ -1,0 +1,3212 @@
+{
+  "case": "sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+  "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+  "actor": "corpus-review-A",
+  "freeze_timestamp_utc": "2026-10-12T05:50:37.189784+00:00",
+  "source_only": true,
+  "target_execution_or_import": false,
+  "not_gold_or_independent_verification": true,
+  "inputs": [
+    {
+      "input_root": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+      "source_pin_path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/manifests/source-pin.json",
+      "source_pin_sha256": "842cc20d6d1300aa27dc8ea95a115151a423e52edb5017550813644f1a5ce7c2",
+      "source_pin": {
+        "archive": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-pr-stabilization/corpus-sourcecheck-source.zip",
+        "archive_provenance": "Coordinator supplied immutable git archive and identified this exact commit.",
+        "archive_sha256": "30dad549fccc82a3b98c67f5918746bb2100db64b5639dce06c803faea0530cd",
+        "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+        "matched_parent_refs": ["refs/review/review-4095-e0b6296-20261008"],
+        "missing_requested_raw_sources": [],
+        "parent": "3f329f7a544f6af799d8b2729fd006d3e509fc5d",
+        "selected_source_file_count": 111,
+        "selection": {
+          "exact": [
+            ".claude-plugin/marketplace.json",
+            "AGENTS.md",
+            "ARCHITECTURE.md",
+            "CONTRIBUTING.md",
+            "plugins/agent-orchestration/.claude-plugin/plugin.json",
+            "plugins/development-harness/.claude-plugin/plugin.json",
+            "plugins/development-harness/AGENTS.md",
+            "plugins/development-harness/ARCHITECTURE.md",
+            "plugins/development-harness/backlog_core/__init__.py",
+            "plugins/development-harness/backlog_core/server.py",
+            "pyproject.toml",
+            "rules/agent-output-contracts.md",
+            "rules/delegation.md",
+            "rules/language-conventions.md"
+          ],
+          "exclusions": [
+            "/evals/",
+            "/maintenance/",
+            "/tests/",
+            "/test/",
+            "/workflow-reference-corpus/",
+            "/workflow-extraction/",
+            "/assessment/",
+            "/checkpoint/",
+            "/research/",
+            "/reports/",
+            "/workflow_multigraph/",
+            "/workflow-multigraph/",
+            "/workflow-layers/",
+            "dh-workflow-explorer.html",
+            "dh-workflow-graph.json",
+            "workflow-result.json"
+          ],
+          "prefixes": [
+            "plugins/development-harness/agents/",
+            "plugins/development-harness/agent_profile/",
+            "plugins/development-harness/commands/",
+            "plugins/development-harness/skills/multi-perspective-review/",
+            "plugins/development-harness/skills/work-backlog-item/",
+            "plugins/development-harness/skills/implement-feature/",
+            "plugins/development-harness/skills/start-task/",
+            "plugins/development-harness/skills/execution/",
+            "plugins/development-harness/skills/dispatch-contract/",
+            "plugins/development-harness/skills/review-verdict-contract/",
+            "plugins/development-harness/skills/subagent-contract/",
+            "plugins/agent-orchestration/agents/",
+            "plugins/agent-orchestration/skills/delegate/"
+          ]
+        }
+      },
+      "file_manifest_path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/manifests/file-manifest.json",
+      "file_manifest_sha256": "5d06e2f9c4131fea9204452af4ab7c1dc57e10278cb33f97c6d83fe20ca1d276",
+      "file_manifest": [
+        {
+          "bytes": 3342,
+          "git_blob_sha1": "188043d481bc830ace5b825ade1fc0dcb3bc6468",
+          "path": ".claude-plugin/marketplace.json",
+          "sha256": "888a07bf305628a5806f8fae58d6a364497aad9e641a8f32f18363e20c5afc86",
+          "zip_crc32": "b9a2276c"
+        },
+        {
+          "bytes": 26099,
+          "git_blob_sha1": "7b59c5856f9cd5eb99f2048ce54a3956c4f9a977",
+          "path": "AGENTS.md",
+          "sha256": "c112043f4d6c1a822da510ac8ac08b98db876ffc86ca46ac232d3de20da420a3",
+          "zip_crc32": "414e72e5"
+        },
+        {
+          "bytes": 5259,
+          "git_blob_sha1": "65895a4fe9feffa5906e21167c15ba6a5f6e2878",
+          "path": "ARCHITECTURE.md",
+          "sha256": "3a038c5086b175909e936472855c6a9c70d43eaa1018b3fb2ca069789fdf1923",
+          "zip_crc32": "dd3b725f"
+        },
+        {
+          "bytes": 6210,
+          "git_blob_sha1": "2167ba16b4b8b3632b03a8bbbd36a35ae4e2b466",
+          "path": "CONTRIBUTING.md",
+          "sha256": "623a7c67a27265cdc7c3ea86ecc5711c6d4113805cfb475e0aa977c94d290696",
+          "zip_crc32": "653d0293"
+        },
+        {
+          "bytes": 498,
+          "git_blob_sha1": "03ce89808ce2d66498b759c169086c9310d1e6d8",
+          "path": "plugins/agent-orchestration/.claude-plugin/plugin.json",
+          "sha256": "fc38ad11b273833980912f512656eaa925d3309ee06302113d3e33c222b4e0f3",
+          "zip_crc32": "aa98102f"
+        },
+        {
+          "bytes": 1509,
+          "git_blob_sha1": "90933369b361045c813de6a93b257da36466dcb0",
+          "path": "plugins/agent-orchestration/skills/delegate/SKILL-GOALS.md",
+          "sha256": "d6865c9b22159020db57bad454145bfc8982facf70c17f54321e8edbb8353c42",
+          "zip_crc32": "3980c04b"
+        },
+        {
+          "bytes": 9750,
+          "git_blob_sha1": "75a644443be71074888bd5aef61a44f5796b492d",
+          "path": "plugins/agent-orchestration/skills/delegate/SKILL.md",
+          "sha256": "25da7aefccb3ec3c78c24ce72659da1a438e7b98f11ab80bafa150750d8b40b0",
+          "zip_crc32": "df246fa0"
+        },
+        {
+          "bytes": 1153,
+          "git_blob_sha1": "c7ae93fa9fd7ada7b58ff0322e9128c06b1ba72d",
+          "path": "plugins/agent-orchestration/skills/delegate/references/fix-cycle.md",
+          "sha256": "fe88d7a2e873f688f0a66848c684c6f3c6ca2ed9bc6a2a886d0c14b3b08a7cc0",
+          "zip_crc32": "4b53489c"
+        },
+        {
+          "bytes": 4041,
+          "git_blob_sha1": "91760fbe26d5a5820e3e7205f7a1fe7859c5f1cb",
+          "path": "plugins/agent-orchestration/skills/delegate/references/harness-notes/claude-code.md",
+          "sha256": "ddc6be2f0c236dd799c7c1e10568c94c1e3ee664b5cdccbed2f8e63519b0cf95",
+          "zip_crc32": "92b32d9a"
+        },
+        {
+          "bytes": 2279,
+          "git_blob_sha1": "6a77130dd26f371db630de14e07b9914ef350f3e",
+          "path": "plugins/agent-orchestration/skills/delegate/references/sub-agent-contract.md",
+          "sha256": "463d887e92fd7f4f406ffccb86f522a134991edca96dd048d2d112396fbbe40b",
+          "zip_crc32": "326f0d2c"
+        },
+        {
+          "bytes": 993,
+          "git_blob_sha1": "6448be29e3181bfa97b0bd85158cef86f3e10f4c",
+          "path": "plugins/development-harness/.claude-plugin/plugin.json",
+          "sha256": "6dde5f812d7dfafd3b0ae97d601cd345daa06ee58a7f6c62834dac97642202da",
+          "zip_crc32": "2cadda71"
+        },
+        {
+          "bytes": 22786,
+          "git_blob_sha1": "f8db253be858c15af8011d980c530bbfb460b931",
+          "path": "plugins/development-harness/AGENTS.md",
+          "sha256": "ceb8ed6a6e74855d00b1cfd7502410b5ced5a11936c361bc991d092ccf5ba1e7",
+          "zip_crc32": "92b4c60f"
+        },
+        {
+          "bytes": 42401,
+          "git_blob_sha1": "3d255713531dd705c3988d1bde8384f9539b98d0",
+          "path": "plugins/development-harness/ARCHITECTURE.md",
+          "sha256": "e3c6f4dbb1e6b0a8ab9e0313defffd32a6c1d0e6a7a6ecde0efba93e8d8998a8",
+          "zip_crc32": "afd68c4a"
+        },
+        {
+          "bytes": 522,
+          "git_blob_sha1": "e9ac46eced3df0430cdc4bde89a71ba94745cb16",
+          "path": "plugins/development-harness/agent_profile/__init__.py",
+          "sha256": "3ffbc26c794c720b2c5384f256f9bbc2f9b092ba7bbb1472c354f724b7fa22da",
+          "zip_crc32": "db8c032a"
+        },
+        {
+          "bytes": 19744,
+          "git_blob_sha1": "29fa3d75ba8490602df276ee417c34720d6e7bec",
+          "path": "plugins/development-harness/agent_profile/discovery.py",
+          "sha256": "4eef378535be86e42e97660eaa2af7d91257941e42a8c6f7582ee68423fa80f3",
+          "zip_crc32": "34a5f656"
+        },
+        {
+          "bytes": 4562,
+          "git_blob_sha1": "ade546a4eeedddc5d5322cc04e1854c1ec759887",
+          "path": "plugins/development-harness/agent_profile/models.py",
+          "sha256": "29aa0155d575c6c21d8217203fe447e0fcd9f18658ead04a29a63420da719f42",
+          "zip_crc32": "838357d1"
+        },
+        {
+          "bytes": 6223,
+          "git_blob_sha1": "94b58294699733c810695fb1bd95c501518f8f3d",
+          "path": "plugins/development-harness/agent_profile/parser.py",
+          "sha256": "e5c751e1c5e71b7f30cf13f6f1e4e8b75a4a9909cc01be19c346365ae6595a10",
+          "zip_crc32": "ae691456"
+        },
+        {
+          "bytes": 5999,
+          "git_blob_sha1": "414c5675c448c3b47fd59655936a774d7852058d",
+          "path": "plugins/development-harness/agent_profile/server.py",
+          "sha256": "e6f0bac6b4a485c31ea223eb2338da7a93eb3a0d568514bdbd24589287399a88",
+          "zip_crc32": "8acadda2"
+        },
+        {
+          "bytes": 16040,
+          "git_blob_sha1": "419a57eba20146eb7b94918c0d963813f57524fa",
+          "path": "plugins/development-harness/agents/alignment-analyst.md",
+          "sha256": "0273176762836e72d713bf4c0da951cf9406fff73dd7a7ba7ba872b74ee1ee3e",
+          "zip_crc32": "c96d2030"
+        },
+        {
+          "bytes": 28107,
+          "git_blob_sha1": "5bb2b4ef5da6b295ff1a6e2d44cc27ee36581f1b",
+          "path": "plugins/development-harness/agents/backlog-item-groomer.md",
+          "sha256": "9014262057ac14eef5fa1e39fc54b016f66a8e2ac772abec89fb9cf2472450cb",
+          "zip_crc32": "6b5e7882"
+        },
+        {
+          "bytes": 9594,
+          "git_blob_sha1": "426fc19377834f6ebf14fbabc727d38175b2fc02",
+          "path": "plugins/development-harness/agents/classifier.md",
+          "sha256": "4da17c2c5ca75dcad069190d694856207469505ea3070c3198b2fc1a46402e40",
+          "zip_crc32": "ca24e138"
+        },
+        {
+          "bytes": 14154,
+          "git_blob_sha1": "0f3353d4082b6ce11c3ccb7216a43ab92485684c",
+          "path": "plugins/development-harness/agents/code-reviewer.md",
+          "sha256": "d18fa937d6e3310abd4af31e2784831805359e0198a2e3ddd36383cc0deb813c",
+          "zip_crc32": "b76f589a"
+        },
+        {
+          "bytes": 22236,
+          "git_blob_sha1": "4b6f029d9e80da62fcfc8d3199e1e8d5fe864f6c",
+          "path": "plugins/development-harness/agents/codebase-analyzer.md",
+          "sha256": "d22ac509332882d1472ba81c295ddc6de9884efdada148f106c1d287a1b768bc",
+          "zip_crc32": "2ce930b2"
+        },
+        {
+          "bytes": 18371,
+          "git_blob_sha1": "b27234bc19070de579eae2afb27f35b2c4a62d51",
+          "path": "plugins/development-harness/agents/context-refinement.md",
+          "sha256": "d64a8d9b65882afe748bdbc5b58f805c4b19e8db8855d1764660c2171302f822",
+          "zip_crc32": "b6c2a52d"
+        },
+        {
+          "bytes": 1683,
+          "git_blob_sha1": "e7428fe5b2d5459a97803b6ab35501595ff366ab",
+          "path": "plugins/development-harness/agents/contract-verification.md",
+          "sha256": "7364c8118733593d594b05c215806800ae8711c614da29456bd7567da87a4410",
+          "zip_crc32": "04dd1670"
+        },
+        {
+          "bytes": 9768,
+          "git_blob_sha1": "607135b1ce728f7e53fe3c4f291cffa46d44ae72",
+          "path": "plugins/development-harness/agents/dh-context-gathering.md",
+          "sha256": "908bad89615fca54ffe6e99153cba669a31ecd95089add839eac1146340c06c8",
+          "zip_crc32": "3c30999e"
+        },
+        {
+          "bytes": 2124,
+          "git_blob_sha1": "e333a3c4cf66322e019f5fbb9359d66d8b195bbd",
+          "path": "plugins/development-harness/agents/doc-drift-auditor.md",
+          "sha256": "d1f24051293512fceaa9ca91d3649db6c47ccae737558cb7b4d2e338fa806b91",
+          "zip_crc32": "d648b860"
+        },
+        {
+          "bytes": 18658,
+          "git_blob_sha1": "9be0dc6a0a0c090b58df6f43be80404d5162611f",
+          "path": "plugins/development-harness/agents/ecosystem-researcher.md",
+          "sha256": "bfad923cd435da128dbaffe6eeea5be72c9b728523352a9bee20ed97008e3477",
+          "zip_crc32": "24b5fef6"
+        },
+        {
+          "bytes": 2537,
+          "git_blob_sha1": "a35dba658a6522e4d078477dc92486d5b7d92337",
+          "path": "plugins/development-harness/agents/fact-checker.md",
+          "sha256": "14c793522cd401340c334c0d864b869a7ebe6c3f93a0f4e3e18c29b3d3e0ccbe",
+          "zip_crc32": "6f83b0d8"
+        },
+        {
+          "bytes": 22947,
+          "git_blob_sha1": "63e9bcfad6cf86051b2fd5a0aea125c3af6bbbc5",
+          "path": "plugins/development-harness/agents/feature-researcher.md",
+          "sha256": "54d79913cfe004c9061e2060e4ee128f17993228ba0abeb77b93085626624010",
+          "zip_crc32": "999a45af"
+        },
+        {
+          "bytes": 1550,
+          "git_blob_sha1": "1e5524ec184f224c447db9270933a4a04272c675",
+          "path": "plugins/development-harness/agents/feature-verifier.md",
+          "sha256": "a76ef80583c2d3590c539bafb2228f03b7d21064160ba2b827d1c095139327a4",
+          "zip_crc32": "a9eea5ea"
+        },
+        {
+          "bytes": 3191,
+          "git_blob_sha1": "5a3081385bc58ac82a5cb578b6329da3ddba7f65",
+          "path": "plugins/development-harness/agents/impact-analyst.md",
+          "sha256": "47daecad760537e290fc385192b46c915dc1de4efd80aaced0f5ada363a5d505",
+          "zip_crc32": "58eeddf5"
+        },
+        {
+          "bytes": 1368,
+          "git_blob_sha1": "46c07e2c7c0391c57bcace90a2bbe22f7d552603",
+          "path": "plugins/development-harness/agents/integration-checker.md",
+          "sha256": "790753d8c4dc81882a5030587b7886e0332aaaf1581b9bb9967d7786f4aad84f",
+          "zip_crc32": "7b919bfa"
+        },
+        {
+          "bytes": 1557,
+          "git_blob_sha1": "3b241b3d8bf2d0f44ef617463217a6fe92bdfe79",
+          "path": "plugins/development-harness/agents/plan-validator.md",
+          "sha256": "0b0c1f2572a1e17ecc2dd2cee023941109263d7da61d4b551bb4f8682b4f36e1",
+          "zip_crc32": "55ad3cc4"
+        },
+        {
+          "bytes": 1183,
+          "git_blob_sha1": "03a6f26ea9d6968b16d5e03c50d74a6d5fb3d8c4",
+          "path": "plugins/development-harness/agents/review-synthesizer.md",
+          "sha256": "79ff90bd57d5b9a6d4c8d85f644ac2f45d8c5667aecc85135e969d409d0bdc17",
+          "zip_crc32": "d984a739"
+        },
+        {
+          "bytes": 1761,
+          "git_blob_sha1": "e04a317a02c8d0f06bf1158d78f51ca6290fa906",
+          "path": "plugins/development-harness/agents/reviewer-accessibility.md",
+          "sha256": "31d2957bec026797fa66299faa9cc505baf75fb66d1639fda12e7c95a76d190a",
+          "zip_crc32": "7febad6c"
+        },
+        {
+          "bytes": 1740,
+          "git_blob_sha1": "d70bd4916a5eafc70f14b9532801d44ffc982238",
+          "path": "plugins/development-harness/agents/reviewer-performance.md",
+          "sha256": "74fd154baeab2c20388e3c2968c2f27c936773cd336e18739cea2af5af1cc9a9",
+          "zip_crc32": "c4127b06"
+        },
+        {
+          "bytes": 1728,
+          "git_blob_sha1": "e3a807ec0df4e63f0bae6b8fb1ec5fb597a6f1b9",
+          "path": "plugins/development-harness/agents/reviewer-quality.md",
+          "sha256": "a7edb5f5ff04c75089f231a710cbb29b5ca7bc31977bbcdbe9b59ada250cfa34",
+          "zip_crc32": "61701612"
+        },
+        {
+          "bytes": 1718,
+          "git_blob_sha1": "c81714ddb27f92e0b24236490be16cb6f79ace9d",
+          "path": "plugins/development-harness/agents/reviewer-security.md",
+          "sha256": "7d641006d7cd0d69428e0856a9e7a77fea3f490f18f8f26af3983cdee97bab3d",
+          "zip_crc32": "ee2d8179"
+        },
+        {
+          "bytes": 14862,
+          "git_blob_sha1": "e67f1f5427d11d185e76c690a8d20f8226fa0c3a",
+          "path": "plugins/development-harness/agents/rtica-assessor.md",
+          "sha256": "86facc5cac28df1d20fb2260896195beb7feef9e876c8d493f4c4489f60b6f29",
+          "zip_crc32": "a7e2b51f"
+        },
+        {
+          "bytes": 1500,
+          "git_blob_sha1": "5cfb0ae6378555243d3e205640a40aebc315e03a",
+          "path": "plugins/development-harness/agents/service-docs-maintainer.md",
+          "sha256": "a74d79df0dd589b0f0445fff191c851f486d4b323df6b32efff490bc9d2e6cb9",
+          "zip_crc32": "d01c52d3"
+        },
+        {
+          "bytes": 32718,
+          "git_blob_sha1": "0ca91154ebc35b4ab43244d9b4445c5122170035",
+          "path": "plugins/development-harness/agents/swarm-task-planner.md",
+          "sha256": "ca59090da20f4887d849143d645b71966b64d9b1e6b4aa9af994e584c98b67cd",
+          "zip_crc32": "39045549"
+        },
+        {
+          "bytes": 1248,
+          "git_blob_sha1": "820837106e20cc8ca509fde66b7aa742bb8d7d9f",
+          "path": "plugins/development-harness/agents/t0-baseline-capture.md",
+          "sha256": "0c485fb4e8226117cdb8d6dd2ba027867e22fdf83b6fc3a626514ab24bd637fb",
+          "zip_crc32": "675ee3a1"
+        },
+        {
+          "bytes": 5971,
+          "git_blob_sha1": "8b8cd529072211427aa3cd30c553dfdcf47a6bf4",
+          "path": "plugins/development-harness/agents/task-worker.md",
+          "sha256": "05a3af180ff2ef050ab1500eea887615b60b3fc22aba865e58eda2327d890894",
+          "zip_crc32": "b7c98d97"
+        },
+        {
+          "bytes": 9397,
+          "git_blob_sha1": "913e8200d6121f547f6c74ce4e7879b5f3f97eee",
+          "path": "plugins/development-harness/agents/technical-researcher.md",
+          "sha256": "aa3b54298c3a064455e74db800cf61f64b44543c4232bbe82a297e371589a205",
+          "zip_crc32": "ad102908"
+        },
+        {
+          "bytes": 1311,
+          "git_blob_sha1": "397980f46a53efc188d53647b629d19251d90f02",
+          "path": "plugins/development-harness/agents/tn-verification-gate.md",
+          "sha256": "bfd31904b7a68a7e1756c94dabd234ceee6df36d244a7ed61d7cf35c44a6cdf9",
+          "zip_crc32": "958af54f"
+        },
+        {
+          "bytes": 4727,
+          "git_blob_sha1": "4fdc98accb859fb177b700829204136d472c900a",
+          "path": "plugins/development-harness/agents/workflow-extractor-reducer.md",
+          "sha256": "d86f4cd435db5376312ac5ddf94ad7a54a81c24cb36319893e29e3ad92045a61",
+          "zip_crc32": "e1582765"
+        },
+        {
+          "bytes": 603,
+          "git_blob_sha1": "fbb7bda3393df1c9e2ccbf07d2a8c60d4729e7d9",
+          "path": "plugins/development-harness/backlog_core/__init__.py",
+          "sha256": "3bac1d4efeac7876a146e4da00e119669c1b7ad5dc2dc94e2364cada77636ffa",
+          "zip_crc32": "1c7a77bc"
+        },
+        {
+          "bytes": 207167,
+          "git_blob_sha1": "182ee72d4f86bf5b09027f70fc7a51b064fb1cea",
+          "path": "plugins/development-harness/backlog_core/server.py",
+          "sha256": "fcf7819e79e62f3c161b047e308a9279edf926749d33fe1ca360dda596a1c4d0",
+          "zip_crc32": "fceb6cea"
+        },
+        {
+          "bytes": 1956,
+          "git_blob_sha1": "06ec26349d37a942f4d1482c34a512a858328161",
+          "path": "plugins/development-harness/skills/dispatch-contract/SKILL.md",
+          "sha256": "794deba2b671198f79870b120fe280919f550591efbcff5c37faba7beac650e5",
+          "zip_crc32": "1d9698b2"
+        },
+        {
+          "bytes": 8487,
+          "git_blob_sha1": "75df827fa3db4d50879dcc728f84b84381e2827e",
+          "path": "plugins/development-harness/skills/execution/SKILL.md",
+          "sha256": "4a46de33291b5f561305c38d5bdab3bb1a2e031d99ffb66ff6b3fcf920984b87",
+          "zip_crc32": "36e84706"
+        },
+        {
+          "bytes": 20596,
+          "git_blob_sha1": "ddb3a79b4f3f555f933dadddb9e91f508b030a7c",
+          "path": "plugins/development-harness/skills/implement-feature/SKILL.md",
+          "sha256": "045be11a5eeaf7a5466a0abe4b3ddcec69d86e2c54388bbd2ddf3683ea9c928a",
+          "zip_crc32": "39c5fcf9"
+        },
+        {
+          "bytes": 4062,
+          "git_blob_sha1": "bb1845da441242dfd2530701dd8258d91509d122",
+          "path": "plugins/development-harness/skills/implement-feature/references/agent-health-check.md",
+          "sha256": "898e85e3c1a8ddf25457f7e02fef209a98462821aac1bb5f44798c18fe3bedaf",
+          "zip_crc32": "1ac39eb4"
+        },
+        {
+          "bytes": 2756,
+          "git_blob_sha1": "58022a251f02cf9e56dc8f0787463c1cf3e99247",
+          "path": "plugins/development-harness/skills/implement-feature/references/plan-status-shapes.md",
+          "sha256": "7a54f335cb6ad247b995b34d713f681d4167b41ab96a75554ad741bbc652b513",
+          "zip_crc32": "b9475b38"
+        },
+        {
+          "bytes": 2226,
+          "git_blob_sha1": "7c8f4871fcea897f0b02f490a8c4bfe3d03a0da0",
+          "path": "plugins/development-harness/skills/multi-perspective-review/GRAPH-FRESHNESS.md",
+          "sha256": "84582a3bc5ac96aaecf2b009d75f1058a6e9308f319f963a1434f1cdd613ceef",
+          "zip_crc32": "2015ea7f"
+        },
+        {
+          "bytes": 1766,
+          "git_blob_sha1": "78590508c78a4a3640570962850973c493fa0462",
+          "path": "plugins/development-harness/skills/multi-perspective-review/MAINTENANCE.md",
+          "sha256": "d7780053f569569a519a8ba022773cf2ff8b26e8c3fddaa13bc7252d6b484c0a",
+          "zip_crc32": "6c72c98d"
+        },
+        {
+          "bytes": 1367,
+          "git_blob_sha1": "aba3f021e82b68e5ecd3f8da427a81aae64a582a",
+          "path": "plugins/development-harness/skills/multi-perspective-review/SKILL-GOALS.md",
+          "sha256": "cd0060013001cbd6429fbc354d6244215286c01595aa1423580d75ed69e5029c",
+          "zip_crc32": "3b8ef62c"
+        },
+        {
+          "bytes": 17886,
+          "git_blob_sha1": "545a2edec509d8b4576c755123a72251155a9a09",
+          "path": "plugins/development-harness/skills/multi-perspective-review/SKILL.md",
+          "sha256": "4e01effe5dd69925332055f331666b3f19f9c5c548495b426b386414ccfa7405",
+          "zip_crc32": "feb56d96"
+        },
+        {
+          "bytes": 6190,
+          "git_blob_sha1": "45e2e1ef9db1cc152bbaa5ce0ee17f02a1a39500",
+          "path": "plugins/development-harness/skills/multi-perspective-review/references/acceptance-test-guide.md",
+          "sha256": "87894db41cc6cffa2abd6fe3a9ed5339e378228766792acbb667da80efa61c78",
+          "zip_crc32": "5c2075ef"
+        },
+        {
+          "bytes": 5889,
+          "git_blob_sha1": "2bed9605a1590e4afd65f4f4887bed34374a0363",
+          "path": "plugins/development-harness/skills/multi-perspective-review/references/dispatch-flow.md",
+          "sha256": "6d207ee471d7fdd96918c2b0f3d6107e0e6fb67180b06bbb0c3181d8e1eb685d",
+          "zip_crc32": "2c62af94"
+        },
+        {
+          "bytes": 1028,
+          "git_blob_sha1": "4dbd6954ddde1d20c8220c3f2dcb9eccfdba5988",
+          "path": "plugins/development-harness/skills/multi-perspective-review/scripts/gen_run_stamp.py",
+          "sha256": "fa2b453d81ece047c34118d45598caa08889301165b0114481bed9a5c4d1898b",
+          "zip_crc32": "1eff484b"
+        },
+        {
+          "bytes": 528,
+          "git_blob_sha1": "62c422fef404f1ede6322ff8b259856c95d23ffc",
+          "path": "plugins/development-harness/skills/review-verdict-contract/SKILL.md",
+          "sha256": "cc9874a3c954a37c1152e93a364770d69fca4fc30def1989004360d681e42b70",
+          "zip_crc32": "3d6704cd"
+        },
+        {
+          "bytes": 15208,
+          "git_blob_sha1": "8fe898be22e71f8f0ba3de324a76205ce2b2a22d",
+          "path": "plugins/development-harness/skills/review-verdict-contract/references/verdict-schema.md",
+          "sha256": "d7942955e8814dc32513315dc7a9d2aea836ddc3e53a8366f784b6438536c4b2",
+          "zip_crc32": "008031dd"
+        },
+        {
+          "bytes": 10587,
+          "git_blob_sha1": "c30c6751b1fa86665217f25c9198ed5d07b55a96",
+          "path": "plugins/development-harness/skills/start-task/SKILL.md",
+          "sha256": "4f790099e26f2fac961f4390456be8fe1fd7cd657b43e31bbb4f0d48e10e3fc7",
+          "zip_crc32": "24f5c353"
+        },
+        {
+          "bytes": 6093,
+          "git_blob_sha1": "28567aaa063cd9a7d49487de2de8fe2bb81247bb",
+          "path": "plugins/development-harness/skills/subagent-contract/SKILL.md",
+          "sha256": "d791f07637e98ced84b54829d24a54210de6a96f5f9b2859de0a4fa8eb57ca2a",
+          "zip_crc32": "b7ae91bb"
+        },
+        {
+          "bytes": 1666,
+          "git_blob_sha1": "17c8a083d00645692db6c1cbbca4903c0dafca25",
+          "path": "plugins/development-harness/skills/work-backlog-item/SKILL-GOALS.md",
+          "sha256": "13a912ed12b5a09085024acc415a8f30944d0026b5848452d80f594101e99a76",
+          "zip_crc32": "f9cb4355"
+        },
+        {
+          "bytes": 18155,
+          "git_blob_sha1": "4c3756648164f5049c6f3d6112db795ab04284e1",
+          "path": "plugins/development-harness/skills/work-backlog-item/SKILL.md",
+          "sha256": "6011f4caded6f5a9f8afec4f8613ddcefba5e10e50af83ccefc99a526454ddd7",
+          "zip_crc32": "21535d64"
+        },
+        {
+          "bytes": 13863,
+          "git_blob_sha1": "5c8600b8908add408400647cc06d35598de938f0",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/close/start.md",
+          "sha256": "55c34fce3eef0f315f3696ece443306e0b792a852b8f5827f9c8a54a945d31e7",
+          "zip_crc32": "2b53d44b"
+        },
+        {
+          "bytes": 4004,
+          "git_blob_sha1": "af9caa1e7734dfc1682f5107dad98ffad2e6757f",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/create/scope.md",
+          "sha256": "1b04bf2953c91154feb5e4aa7345c040737a17ede4adacdd92a41339270f7449",
+          "zip_crc32": "8695057b"
+        },
+        {
+          "bytes": 10658,
+          "git_blob_sha1": "c656aba24ac86043c2010e80519ac519cec10ddf",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/create/start.md",
+          "sha256": "2d508a2dd8942131acc17cfd41af204fb99ae5987628bbd404678d85c288b45d",
+          "zip_crc32": "90baf952"
+        },
+        {
+          "bytes": 5481,
+          "git_blob_sha1": "32c057c071eb0cf43a9a386a66593258845b88c3",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/analyze.md",
+          "sha256": "84991a418bfa8505894ea15e760a639946e91f945abebfa6e3f60fd43421e650",
+          "zip_crc32": "f2a42683"
+        },
+        {
+          "bytes": 6117,
+          "git_blob_sha1": "2c27d22fbbae6f9f7ee8f0fb041146fba140253d",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/error.md",
+          "sha256": "2c43ca1f9a933b333db56f0b97c8d1393c45260205068aa4c5d88cb659e00b7d",
+          "zip_crc32": "79f428bf"
+        },
+        {
+          "bytes": 4315,
+          "git_blob_sha1": "0769ee7d6f480bc0b8d7444f66a0f0d49248209a",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/fact-check-result.md",
+          "sha256": "05543a14e2af00010fac2fabfcd449d13dcebe6b4ea4dccc95526b7c2f260146",
+          "zip_crc32": "29353bed"
+        },
+        {
+          "bytes": 20929,
+          "git_blob_sha1": "8b6b6e1737a0c7a3aca617415ada663f099350d7",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/finalize.md",
+          "sha256": "3cbe5602667adb45369630f99b6f69e420dcd2c037718b6832dbfcacdd461438",
+          "zip_crc32": "65d11ccf"
+        },
+        {
+          "bytes": 1471,
+          "git_blob_sha1": "6403c5fad39ba36b3bb899cfdb161f947c0d4f8c",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/finally.md",
+          "sha256": "24110bb05a7bc40b19d2dc0ddd2bd1746cd265bbf36ef0de60c9a05ae34774a3",
+          "zip_crc32": "4ad3c5ef"
+        },
+        {
+          "bytes": 4274,
+          "git_blob_sha1": "bb85d4a46304a765bcfa740fcfa29f074b9ebed0",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/groom-drift.md",
+          "sha256": "0ddebfc2c2143855f2209ed70191ed739504999aa7049e1d48fd8d4f2053cdb4",
+          "zip_crc32": "8ed1491f"
+        },
+        {
+          "bytes": 5546,
+          "git_blob_sha1": "b8062ca6cc1f0c91c88b3e6f94fea68c19cf0a6f",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/impact-radius-result.md",
+          "sha256": "d58c7d6fb080866840b6a8fe548180b7b6004f80da0db47fb523965e03cdba08",
+          "zip_crc32": "32c09b18"
+        },
+        {
+          "bytes": 3589,
+          "git_blob_sha1": "fbcc36c5916d2a09eb9fe98f7b1eeb3e6d07e081",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/intake.md",
+          "sha256": "dae2aa922da37898b8cbc0a50af23dffc12cce5542dfaaf575737359b773adb4",
+          "zip_crc32": "cb74dd93"
+        },
+        {
+          "bytes": 1330,
+          "git_blob_sha1": "880f040bd383b097e31f48b0f2d6cc73ee83bb18",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/scope.md",
+          "sha256": "bda5ee870841f933c323b8322a90fa801723ce225d0abe7a76b2f13093916e6c",
+          "zip_crc32": "cab3854c"
+        },
+        {
+          "bytes": 6101,
+          "git_blob_sha1": "1aa920db6ff0669e0a05bd8e63870949e8739fcc",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/start.md",
+          "sha256": "a89e376c55dfa624665fcbc295bfdaba43c7aa926864915c964545c729ed7c25",
+          "zip_crc32": "f93fecce"
+        },
+        {
+          "bytes": 12048,
+          "git_blob_sha1": "be17eb9deaca5a02ab47891745c9280a4f80b9af",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/swarm.md",
+          "sha256": "3780ba9c0b4ab05f9fdf9146ec036af5dcfa02f850317641f6484e3cbd3b0271",
+          "zip_crc32": "693c7e6d"
+        },
+        {
+          "bytes": 1305,
+          "git_blob_sha1": "692a70c29fcc6c1ea3142838d4d8d8a16c0ae983",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/progress/start.md",
+          "sha256": "782a7ef8ac4da8e189b0eb7ea7907a35f96f26cb5da177fd55c147e1096037a6",
+          "zip_crc32": "a174e151"
+        },
+        {
+          "bytes": 9272,
+          "git_blob_sha1": "ab5712d3a9c802dca337df73bf9720089c535d0d",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/quick/start.md",
+          "sha256": "fc370b0f250a526660638b346d3a1e5278622b33367bbbca87ebd6efcbc535b5",
+          "zip_crc32": "8d84c491"
+        },
+        {
+          "bytes": 1566,
+          "git_blob_sha1": "7a10a8663ad620687fcca72a65e81b0780ec3b9e",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/resume/start.md",
+          "sha256": "a7f6d83e9f7c9c79bc452303bcf6763e65ec8f73aab3cc7b147a61e1e8ec0ad2",
+          "zip_crc32": "5dfb0827"
+        },
+        {
+          "bytes": 1328,
+          "git_blob_sha1": "f9fdb7b468433c5511a600232bce370994319bc3",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/setup-github/start.md",
+          "sha256": "3afadab1436c2a03dc988ebba2d00dc5b19aa71a6f70d604ad8972255622d7ec",
+          "zip_crc32": "a86e11e6"
+        },
+        {
+          "bytes": 953,
+          "git_blob_sha1": "315870c446af61b3b6540759340ef56c47dbf4cb",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/already-implemented.md",
+          "sha256": "383380047366a429261fba0187a2457c55796d93ebc22b9170b071310260ebba",
+          "zip_crc32": "f328811b"
+        },
+        {
+          "bytes": 4153,
+          "git_blob_sha1": "efb9a618318002dfe27ba4ea6529fae850ec80cb",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/auto-mode.md",
+          "sha256": "6b127296855c5a1007cafa988d3bd4d9042c3c1693a28ff0afbef48320a1b09e",
+          "zip_crc32": "264953cb"
+        },
+        {
+          "bytes": 1820,
+          "git_blob_sha1": "c8f386250574a389e858880f0f49fe02ffdbb94c",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/error-handling.md",
+          "sha256": "8ca74039269ae0f7b84a13a1ec6e149a7e9ff045928c11e1b2517ee424dcdf95",
+          "zip_crc32": "d1e4b243"
+        },
+        {
+          "bytes": 8532,
+          "git_blob_sha1": "94a4ef12ceee41dafd4713e7bdb66bea121a6375",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/feasibility-gate.md",
+          "sha256": "89e1cb930f2f637db63f72323cca777b5f04416e52192a0fd867c58ae3da5030",
+          "zip_crc32": "aa65e189"
+        },
+        {
+          "bytes": 1793,
+          "git_blob_sha1": "e356fb526c341717689fff14284a339357666779",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/feature-request.md",
+          "sha256": "16ff2fb7f625d605b17664a3e541e0875a39c11f76e442634a48c1a5e7ef0038",
+          "zip_crc32": "209fc825"
+        },
+        {
+          "bytes": 4430,
+          "git_blob_sha1": "1abe8b86d9d815f902d0bb5269616a5ac7a1f5f8",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/find-item.md",
+          "sha256": "338bdab5264e3a29a4891298112a3107561cdd3179b2e61a16b7e934638972b9",
+          "zip_crc32": "95174b3f"
+        },
+        {
+          "bytes": 7660,
+          "git_blob_sha1": "d1de40289a4ed9e85d90777f5baab7393ba442bc",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/groom-check.md",
+          "sha256": "76800bee1640371d9888b4ee7ab8d02acfe496bacc7614570e9493a0a130eacb",
+          "zip_crc32": "f3665d19"
+        },
+        {
+          "bytes": 2616,
+          "git_blob_sha1": "8b83eae20e7925b093ebb1ebbe271595eaaf6d97",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/interactive-browser.md",
+          "sha256": "d93af19cd7428a168519c3abfc367baef3179f0cfc029f13eaabec6c7ab59b2b",
+          "zip_crc32": "e69a6373"
+        },
+        {
+          "bytes": 2956,
+          "git_blob_sha1": "323aa9f9818df24704130c238eef8714326a6f12",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/issue-first.md",
+          "sha256": "19f8878b7b714c79f1074f463dce34f51e4d0104ef97877b13f1cd92b98c8156",
+          "zip_crc32": "ad94f4ac"
+        },
+        {
+          "bytes": 1813,
+          "git_blob_sha1": "bc4df1d742d4654ce58ed86aa650cb46409ae969",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/issue-sync.md",
+          "sha256": "2507876ac0d66a491c68e39a30251e8967a06dcb0afe4012d59eb239d07b336e",
+          "zip_crc32": "b5a9a152"
+        },
+        {
+          "bytes": 3539,
+          "git_blob_sha1": "96c794edc2f023af200cf0af92fbce16b9b2a076",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/locate.md",
+          "sha256": "19ea36e5dc3175371385e122ff8b28edd6bb7c430c36d04597d7b207b77a1a04",
+          "zip_crc32": "8863224c"
+        },
+        {
+          "bytes": 5750,
+          "git_blob_sha1": "e428a5ad76cf2c52f56b1199ff56125f75619eee",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/plan.md",
+          "sha256": "69920f5067a3157cc5730a4db519d55bf7e04fb47aacb0f79a08b67c89d96e8d",
+          "zip_crc32": "24c61eff"
+        },
+        {
+          "bytes": 2042,
+          "git_blob_sha1": "104fd7bf182928c0f294a88c52239a641189a4e4",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/post-planning.md",
+          "sha256": "a73942f23b5940cc8072b18aef5f1c43d5a1ae5614fd28de03ba2d472683a78d",
+          "zip_crc32": "c62efbb9"
+        },
+        {
+          "bytes": 1948,
+          "git_blob_sha1": "f6c3690a4727fbeabe44cd978fb6945134e48690",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/prepare.md",
+          "sha256": "0f7607ab012af840531efec62fb074fe311a27616184107cb94f0411c5075859",
+          "zip_crc32": "a0f80af4"
+        },
+        {
+          "bytes": 4067,
+          "git_blob_sha1": "7e5f1f46d190ec3a00c001c62998f33ff37be646",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/rt-ica-gate.md",
+          "sha256": "2554b1da5503ae12489171d2c8a04da31333d9e7db351825bee39cc9d0362a77",
+          "zip_crc32": "8bf1e06f"
+        },
+        {
+          "bytes": 5188,
+          "git_blob_sha1": "4014937b9e4e3766aec56d1dcbc78917b076c994",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/sam-definition.md",
+          "sha256": "93ccf067e4a8985ef35ee362b5f5cacd97bfa4ad2d8df1247e64053e56996145",
+          "zip_crc32": "e609ffd0"
+        },
+        {
+          "bytes": 1271,
+          "git_blob_sha1": "3574c4ae0ede79612fc4b942805a19330d0a70c0",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/scope.md",
+          "sha256": "b54ee299667c90b9a9ff6c70898d9ab31f085aef8c368c0d1415821056ef609f",
+          "zip_crc32": "56da7a27"
+        },
+        {
+          "bytes": 6052,
+          "git_blob_sha1": "24ebe59b53045cc8ee74b0a56a7f625a734ffaef",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/start.md",
+          "sha256": "3017a83876c00004ad35c70a1488090e4d27389e547509638357cb397ad81d77",
+          "zip_crc32": "c4e00a09"
+        },
+        {
+          "bytes": 3605,
+          "git_blob_sha1": "0bd95cec5ae59579f70d491dfbb5c9494ac32c0a",
+          "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/validate.md",
+          "sha256": "b59523fb306bceb1af17c2a387fddb7ca3dff3db4cceae4c27c48c5d4a0196e6",
+          "zip_crc32": "1241097b"
+        },
+        {
+          "bytes": 463,
+          "git_blob_sha1": "595a0b8997cee40a202df5a4fa94cdf4beac1c00",
+          "path": "plugins/development-harness/skills/work-backlog-item/scripts/parser/command-routes.json",
+          "sha256": "575d3559c2ddf8f409cd3714e75e49029b4ee1d909374f19e4ae0fecce219fa9",
+          "zip_crc32": "f6931203"
+        },
+        {
+          "bytes": 445,
+          "git_blob_sha1": "5f5297dc113dbda4d312e553f1e720bc416c8cbf",
+          "path": "plugins/development-harness/skills/work-backlog-item/scripts/parser/command-routes.schema.json",
+          "sha256": "6ade5b4f00ef59cc46564b762684b7c962e557ea9afabbc67e0749b4a1d0a3ec",
+          "zip_crc32": "2a2748b9"
+        },
+        {
+          "bytes": 1385,
+          "git_blob_sha1": "441a10a19133544358b77160a8e58ac8022bcddc",
+          "path": "plugins/development-harness/skills/work-backlog-item/scripts/parser/parse.schema.json",
+          "sha256": "c42a04ed8d38e6847b8aa32296058a4188413c8d1d73a069f175fc9416777bbc",
+          "zip_crc32": "c9d68c4f"
+        },
+        {
+          "bytes": 28017,
+          "git_blob_sha1": "2c969976cacb036bf7cd658930a6520f20a9eb40",
+          "path": "pyproject.toml",
+          "sha256": "0426be3975d67fc26141bd720d8fb089c5877dfeb3b508401f511abe35eefd08",
+          "zip_crc32": "599459e9"
+        },
+        {
+          "bytes": 1438,
+          "git_blob_sha1": "e7489d16d46ee54265deb971977f7b13ea4592f1",
+          "path": "rules/agent-output-contracts.md",
+          "sha256": "a89dece22bb8d371f82a6e5cae25bf1088e8df4c4970e0aa18a05bcc16765fd0",
+          "zip_crc32": "ae64eee6"
+        },
+        {
+          "bytes": 405,
+          "git_blob_sha1": "752bd1c24961e3592bd6e6029495d9002d97b896",
+          "path": "rules/delegation.md",
+          "sha256": "baf8c44b960c3a00cab484a7fa5db74bb54c1dc94ff45df1f50e9675d62bebda",
+          "zip_crc32": "b606731e"
+        },
+        {
+          "bytes": 2177,
+          "git_blob_sha1": "b86494dcf26232a11c232956020db31f2ef42bcb",
+          "path": "rules/language-conventions.md",
+          "sha256": "55947b629d5ad6a6c96d130361ea86f73723e3ef4cb201b5df698f4b6b28d6f2",
+          "zip_crc32": "8890370f"
+        }
+      ]
+    },
+    {
+      "input_root": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1",
+      "source_pin_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/manifests/source-pin.json",
+      "source_pin_sha256": "21196eb0f07e706b67d4efcd06ef4c9c2f791aa22dfff5029b760b449b7aa41b",
+      "source_pin": {
+        "absent_at_pin": [],
+        "archive": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-pr-stabilization/corpus-sourcecheck-source.zip",
+        "archive_commit_comment": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+        "archive_sha256": "30dad549fccc82a3b98c67f5918746bb2100db64b5639dce06c803faea0530cd",
+        "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+        "forbidden_components": [
+          "assessment",
+          "assessments",
+          "checkpoint",
+          "checkpoints",
+          "controls",
+          "eval",
+          "evals",
+          "evaluation",
+          "evaluations",
+          "fixtures",
+          "gold",
+          "maintenance",
+          "reports",
+          "research",
+          "seeds",
+          "test",
+          "tests",
+          "tests_backlog",
+          "tests_sam",
+          "workflow-extraction",
+          "workflow-layers",
+          "workflow-multigraph",
+          "workflow-reference-corpus",
+          "workflow_multigraph"
+        ],
+        "original_packet": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+        "original_packet_inventory_sha256": "fa97ba56f0ae83025b26c4fddaac59fe81a98d0e8e519d9571d6bbd3936cc542",
+        "original_packet_unmodified": true,
+        "requested_paths": [
+          "plugins/development-harness/docs/review-methods.md",
+          "plugins/development-harness/skills/review-security-change/",
+          "plugins/development-harness/skills/review-performance-change/",
+          "plugins/development-harness/skills/review-quality-change/",
+          "plugins/development-harness/skills/review-accessibility-change/",
+          "plugins/development-harness/skills/synthesize-review-findings/",
+          "plugins/development-harness/skills/file-classification/",
+          "plugins/development-harness/docs/backend-providers.md",
+          "plugins/development-harness/scripts/dh_mcp_preinit.py",
+          "plugins/development-harness/scripts/run_bounded.py",
+          "plugins/development-harness/dh_config.py",
+          "plugins/development-harness/dh_paths.py",
+          "plugins/development-harness/skills/dh-cli-usage/",
+          "plugins/development-harness/docs/work-ledger/runner-contract.md",
+          "plugins/development-harness/docs/plan-artifact-lifecycle.md",
+          "plugins/development-harness/scripts/run_sam_server.py",
+          "plugins/development-harness/scripts/run_backlog_server.py",
+          "plugins/development-harness/scripts/run_sam_cli.py",
+          "plugins/development-harness/scripts/cli_output.py",
+          "plugins/development-harness/sam_schema/",
+          "plugins/development-harness/dh_core/",
+          "plugins/development-harness/backlog_core/",
+          "plugins/development-harness/skills/test-designer/",
+          "plugins/development-harness/skills/test-reviewer/",
+          ".claude/settings.json",
+          "plugins/development-harness/hooks/"
+        ],
+        "source_execution_or_import": false
+      },
+      "file_manifest_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/manifests/file-manifest.json",
+      "file_manifest_sha256": "1b247721eb1f8fca62c2d7b5963f8b0d2258f437b436c1bb81dd24c73a65b708",
+      "file_manifest": [
+        {
+          "bytes": 2930,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "135a9a95e6c33ac586146d6e38aa690ba4a480dc",
+          "path": ".claude/settings.json",
+          "sha256": "0c060d0e8a7ce5cf4cc669ce899733c63fee805ca025dbbb5168967648051b0d",
+          "zip_crc32": "60a742ef"
+        },
+        {
+          "bytes": 82233,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "76271d8b86607da27555420bc9e8180816b9b8a3",
+          "path": "plugins/development-harness/backlog_core/ARCHITECTURE.md",
+          "sha256": "77c77e3a7ece5d05a27d6b98440e11debca55e194b93fdbd7340983d2c29ec75",
+          "zip_crc32": "9f2312e0"
+        },
+        {
+          "bytes": 603,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "fbb7bda3393df1c9e2ccbf07d2a8c60d4729e7d9",
+          "path": "plugins/development-harness/backlog_core/__init__.py",
+          "sha256": "3bac1d4efeac7876a146e4da00e119669c1b7ad5dc2dc94e2364cada77636ffa",
+          "zip_crc32": "1c7a77bc"
+        },
+        {
+          "bytes": 4670,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "6dcae2779523d3db3a4de642f1e038f4be3d2c8f",
+          "path": "plugins/development-harness/backlog_core/_branch_delegates.py",
+          "sha256": "c1c7aba360254641312458e2db79667a56bfa5201f4e13a79875eff3b9e5d31b",
+          "zip_crc32": "c1cf82dd"
+        },
+        {
+          "bytes": 6561,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "d4539ea25d5d09fa720be8ea165d21580bf67936",
+          "path": "plugins/development-harness/backlog_core/_capability_gates.py",
+          "sha256": "25230e7afc261a7ad11cd445e59a3dc2b3638c086b34bd05237b221d99b6293b",
+          "zip_crc32": "3678a0fe"
+        },
+        {
+          "bytes": 4940,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "ae432d66415b6c8e50d98246d55352dffb5e94af",
+          "path": "plugins/development-harness/backlog_core/artifact_manifest_store.py",
+          "sha256": "6f4af091ae10b9063b4636b4bc98c1d26459680998249fe641a829c9b5f0e807",
+          "zip_crc32": "0d0b63ba"
+        },
+        {
+          "bytes": 20083,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "3dce66602b92c0b68bc1defcd6c234a5ab5dcc4c",
+          "path": "plugins/development-harness/backlog_core/artifact_migration.py",
+          "sha256": "effd9c071318cec1cdbbc8374b064fb332439ef3ad972d56d6046d4cd51e7ab7",
+          "zip_crc32": "b542526f"
+        },
+        {
+          "bytes": 54399,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "c59438e81e8dabed78e2cfa48cb208d66c29c341",
+          "path": "plugins/development-harness/backlog_core/artifact_provider.py",
+          "sha256": "094ec023940f678e581e5ad076ac291f7a090713c910db065f9f1736206be2a9",
+          "zip_crc32": "1ebc826b"
+        },
+        {
+          "bytes": 13345,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "eb2ead5442e83dc8aa5512cbbcada0ae66d91fc3",
+          "path": "plugins/development-harness/backlog_core/artifact_provider_local.py",
+          "sha256": "2de3d80c907dc171a59f031ae38276b3aaf4f6e837d71f781aa8cd1089af234b",
+          "zip_crc32": "9306ec37"
+        },
+        {
+          "bytes": 13095,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "770995f24ce4677d0705ad41b575b6b590e23b2f",
+          "path": "plugins/development-harness/backlog_core/artifact_registry.py",
+          "sha256": "350573e727fe2dda2cfde2b24e45b130d399718b021e1da5cdfb5afcac89f277",
+          "zip_crc32": "8eb8a4b5"
+        },
+        {
+          "bytes": 6805,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "9ac2b06a94f37e4c1230d7f840166b7202516ab9",
+          "path": "plugins/development-harness/backlog_core/backend_protocol.py",
+          "sha256": "aab670437c0177081d7cb3aab45ce418b125f8d0993b234e1c92c49db30dc762",
+          "zip_crc32": "4387c794"
+        },
+        {
+          "bytes": 26619,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "7054110d6722b90998618ecdfdfa6bea0848e2c8",
+          "path": "plugins/development-harness/backlog_core/backend_types.py",
+          "sha256": "22979269d08782b9a04a855c25af1e9441a222a0d131047949a488f8d6e625b6",
+          "zip_crc32": "2ce538ef"
+        },
+        {
+          "bytes": 48,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "5bd49a3e226397c468a172bd88c1b64664dc2135",
+          "path": "plugins/development-harness/backlog_core/backends/__init__.py",
+          "sha256": "15bc0325ba19977c1e24871dd538484684dac8b8d943aa57f4261633cfa5eb3e",
+          "zip_crc32": "9bb78779"
+        },
+        {
+          "bytes": 6578,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "36f3ee5b34d649d5650d9b80549c89a4dd7db055",
+          "path": "plugins/development-harness/backlog_core/backends/_github_work_item_versions.py",
+          "sha256": "3d401ccc6e4317c8d016e239feb0b7122fb36e91d7e0b330bf236ef272c97d86",
+          "zip_crc32": "cb05e9aa"
+        },
+        {
+          "bytes": 16525,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "aa0ef97a62e9c140b7bbf21d404d33f92678bc47",
+          "path": "plugins/development-harness/backlog_core/backends/bd_runner.py",
+          "sha256": "a77643c6c6cb1fc51b43db21ee7c275c2c0444c980835c4b5e2ef147c7a27dd6",
+          "zip_crc32": "a186136d"
+        },
+        {
+          "bytes": 25218,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "60d3a5280148a70b3bf13089289164d83ded5f49",
+          "path": "plugins/development-harness/backlog_core/backends/beads_artifact_provider.py",
+          "sha256": "2d94ad0fc9d76e69d6981123ead1261622ae7f1350c95701938a6add07221071",
+          "zip_crc32": "0e63b889"
+        },
+        {
+          "bytes": 45190,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "fa580e78d5f69a2eb3cd53640c7d0e5a7d1fe700",
+          "path": "plugins/development-harness/backlog_core/backends/beads_backend.py",
+          "sha256": "579d0a430174b18d578a49bb4c6e5140788f61a536a115776d5f26dfdf0ef3d9",
+          "zip_crc32": "dc746a5c"
+        },
+        {
+          "bytes": 13059,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "b19b002c2d2fa7002a499c9bfef02484edfb87b8",
+          "path": "plugins/development-harness/backlog_core/backends/beads_models.py",
+          "sha256": "a9f901abbb174dce5144ed607f9192ac570106cdc686bde867ed55f3bf6133e6",
+          "zip_crc32": "1fe2628b"
+        },
+        {
+          "bytes": 47891,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "7c407c9b7654ee973f26debf22c0e13aa84a152d",
+          "path": "plugins/development-harness/backlog_core/backends/github_backend.py",
+          "sha256": "6742a9d7f211327b6807e77122b6f310f117588025397cd72308bd4362441929",
+          "zip_crc32": "faf063e5"
+        },
+        {
+          "bytes": 21389,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "759af6c6408757fb87a8bf218b0b3d2563fa456f",
+          "path": "plugins/development-harness/backlog_core/backends/github_content_migration.py",
+          "sha256": "c518e36cd4248ecc8ee96796c38f04a311f88553242e62d016334a26faee7616",
+          "zip_crc32": "6b431d0b"
+        },
+        {
+          "bytes": 13779,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "5a62914a924e8be4146faf179dd0a173d1a1400e",
+          "path": "plugins/development-harness/backlog_core/backends/github_content_stores.py",
+          "sha256": "aef5fd7c1b382c6d9493186f3f4d91f18bfcf291135943333876c3c0675df894",
+          "zip_crc32": "3b416aa1"
+        },
+        {
+          "bytes": 19613,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "db8b4c1edbecc77f2e18798979770418b12b04aa",
+          "path": "plugins/development-harness/backlog_core/backends/github_contents.py",
+          "sha256": "b56ad96ef556e498c418f1f3ac2a818a1ed1926c55ec6e4941fc4f5f71774934",
+          "zip_crc32": "a901b503"
+        },
+        {
+          "bytes": 63310,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "6ff780911f7b1aa7153fdcc00ca7ab1b07656c23",
+          "path": "plugins/development-harness/backlog_core/backends/github_work_items.py",
+          "sha256": "554f32c7f27b8b179c6a12238968297a4dfa5451f8bdb7f38f6538c5618dd26e",
+          "zip_crc32": "ed3b9843"
+        },
+        {
+          "bytes": 35384,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "3cb1e3f475af021b60cfec1c91495183bb6012d1",
+          "path": "plugins/development-harness/backlog_core/backends/memory_backend.py",
+          "sha256": "5c3f0b64a5a7839fb348412c9ec5e93493afa07e352208b3c3fce99e0955f049",
+          "zip_crc32": "709cd1b7"
+        },
+        {
+          "bytes": 59718,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "e09edabd7a3baa92f5f29a91579d36e6fc64c5ad",
+          "path": "plugins/development-harness/backlog_core/backends/sqlite_backend.py",
+          "sha256": "f4b2eca53c02208303bb2395f35a533c2c08942011c6b7b27fd688bfdc887f8f",
+          "zip_crc32": "df9a92f4"
+        },
+        {
+          "bytes": 9690,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "8daa8d5372e78eec366813027bcbc2d71aaef4d5",
+          "path": "plugins/development-harness/backlog_core/content_normalizer.py",
+          "sha256": "75978cf64ac32651f7a7daf0e149a43f30725cbe040651e86aae3e8b8dc85ea7",
+          "zip_crc32": "9f813fd0"
+        },
+        {
+          "bytes": 27593,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "0a2a9a752724cd603cf93bc61f3e0ae201e66995",
+          "path": "plugins/development-harness/backlog_core/disclosure_handler.py",
+          "sha256": "7ac042a32371eb4b3524f040dde525a7a28e8e98803e094a048239b078b8ad6c",
+          "zip_crc32": "a7bca038"
+        },
+        {
+          "bytes": 11796,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "f5cf420fc9ae1685572284e4d4cb59f5214e16c9",
+          "path": "plugins/development-harness/backlog_core/disclosure_types.py",
+          "sha256": "12e345040fe2e3fc0ad2ded5738eccdf63e79127ddfcd8cc42b5e756f5be78dc",
+          "zip_crc32": "03865506"
+        },
+        {
+          "bytes": 28174,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "2d03cceff17ead584fa1d8906b67c71c83c97256",
+          "path": "plugins/development-harness/backlog_core/dispatch_state.py",
+          "sha256": "55e924175267e41f748b8f9e751a597c173fe3db4919f8340497e42e709ea768",
+          "zip_crc32": "be5d4f14"
+        },
+        {
+          "bytes": 29389,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "322935f198a8a260c80cb6efcba6db770b445d64",
+          "path": "plugins/development-harness/backlog_core/entry_blocks.py",
+          "sha256": "1f6c1a4db31f39ae5e264cda79ff5991e240dee2a47138547c5fca9ffeb54e9d",
+          "zip_crc32": "4d089131"
+        },
+        {
+          "bytes": 35104,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "e0dfc1bcce453814ddc7bcfb940b6f1234ad657f",
+          "path": "plugins/development-harness/backlog_core/file_cache.py",
+          "sha256": "e634ca777ba5c4f6fd9ce379200fefec3b3a06b4a7cc451a5c01914a6096a245",
+          "zip_crc32": "615fec7f"
+        },
+        {
+          "bytes": 47970,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "866e8da09c97ce6fa001ff69b7d28b3baec8b174",
+          "path": "plugins/development-harness/backlog_core/file_cache_state.py",
+          "sha256": "f4bc3013050c951438435ba0b3ef5df9b98b7f173e8c28cebe1ebbff17d5b20c",
+          "zip_crc32": "ddc6e68d"
+        },
+        {
+          "bytes": 123706,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "72f8862cc5f7ce6124e1890eb5cf52678579d604",
+          "path": "plugins/development-harness/backlog_core/gh_client.py",
+          "sha256": "2b68a90d7c97f71abbeda34bc9c01c9b22dbff6fd604d88543bf41e36d403129",
+          "zip_crc32": "79d4c2f0"
+        },
+        {
+          "bytes": 11867,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "afb6cafb52704325662c1b705aad160872e6aa62",
+          "path": "plugins/development-harness/backlog_core/github_branches.py",
+          "sha256": "aed0da18e13022b6aee061dddfa9e971c006c96b104eb20e6cf402d96a4a1a86",
+          "zip_crc32": "eb0eba64"
+        },
+        {
+          "bytes": 45875,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "2ce2d16f992094c123c0d1c2047a8a1384496e61",
+          "path": "plugins/development-harness/backlog_core/github_client.py",
+          "sha256": "2ea453f24ada55df79d829f8f17e46709d93ca3f7f27332f8645769e5ccd75d6",
+          "zip_crc32": "58947cba"
+        },
+        {
+          "bytes": 22698,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "8c1bc03ac292a5df80ee292185c9f0d67e02f3f0",
+          "path": "plugins/development-harness/backlog_core/github_sync.py",
+          "sha256": "1062cb8c0df60a24db24539f4040c4b38f8856669dab8854e0b3339e6759d431",
+          "zip_crc32": "ceb7329a"
+        },
+        {
+          "bytes": 7686,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "5fb4ec9c3e925b03362ac3b4f24964555dc51a8e",
+          "path": "plugins/development-harness/backlog_core/gitlab_client.py",
+          "sha256": "478794fdadf91b3505fdc433bb3ef41741bd916512ed9b7ec7ccb914b50e3ec8",
+          "zip_crc32": "4f41b31e"
+        },
+        {
+          "bytes": 2310,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "7e393d0d60bf56e79056d8a59bff68c048dca69c",
+          "path": "plugins/development-harness/backlog_core/jsonl_utils.py",
+          "sha256": "97c55dadddc2a9b87b29befc6a7fcd6474187fed07c7adbd1661195c72f58586",
+          "zip_crc32": "baf998fe"
+        },
+        {
+          "bytes": 8052,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "fc5688806881e7e9e2513b3f36a5f2435049e902",
+          "path": "plugins/development-harness/backlog_core/linear_client.py",
+          "sha256": "31d687f2a75a15bc2569542ab1a1bb21bb005dc5f6576fe13c345a0591d8ca04",
+          "zip_crc32": "5d2a3c96"
+        },
+        {
+          "bytes": 88217,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "7d02c4ba679c09c0d9d44fb647b712b66e2df7a2",
+          "path": "plugins/development-harness/backlog_core/models.py",
+          "sha256": "8c0e9c42a06f867cc23162f7dbd3135176f8decc50433cc0974b78fab88c4ff0",
+          "zip_crc32": "cfe9c562"
+        },
+        {
+          "bytes": 295798,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "96dc05bdfd378e3ba2690fcc7296041d066ee17b",
+          "path": "plugins/development-harness/backlog_core/operations.py",
+          "sha256": "b66d92c7a3bfb2ea5a08164db7c1d5018a9b66e0011cf05c0923fd450594a39d",
+          "zip_crc32": "db57b576"
+        },
+        {
+          "bytes": 62233,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "8f88f16e3ab85dbfe79d644276bc6385132f5c25",
+          "path": "plugins/development-harness/backlog_core/parsing.py",
+          "sha256": "b8b8bdf3f685948ab6334a5588d60a4e76e5ba90044f2cdd12daa3c773a77689",
+          "zip_crc32": "786d24a8"
+        },
+        {
+          "bytes": 23709,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "764123aa2c60a0c1191505ecc72d46c4a051badc",
+          "path": "plugins/development-harness/backlog_core/reconciliation.py",
+          "sha256": "5bad7519bf5248d937323e89dd2c8783ff1c9219532c3d2a8e0dd48870bf02f7",
+          "zip_crc32": "0a21eee6"
+        },
+        {
+          "bytes": 18533,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "3675ffeea15d3f39688c17102bdae527ffbd56c4",
+          "path": "plugins/development-harness/backlog_core/rendering.py",
+          "sha256": "89375f35677c4b8197b3577b216536d97bdd0e839c917ccdca0f6346bb47f561",
+          "zip_crc32": "3842b063"
+        },
+        {
+          "bytes": 24347,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "4bdc10521af8a9b5503878166fbcf5fb35f1a687",
+          "path": "plugins/development-harness/backlog_core/search.py",
+          "sha256": "5f663802292ce7c6e8880978895025fc0dc74b74bf05d552d92f7735a4710c67",
+          "zip_crc32": "c1296604"
+        },
+        {
+          "bytes": 11558,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "902a7957572d9e38cb80ed9d2d484db0def48c5f",
+          "path": "plugins/development-harness/backlog_core/section_registry.py",
+          "sha256": "cff0a622153a55a3debab4112f03551e40f700524cbc89bf459c5229c62d7f33",
+          "zip_crc32": "5a32f476"
+        },
+        {
+          "bytes": 207167,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "182ee72d4f86bf5b09027f70fc7a51b064fb1cea",
+          "path": "plugins/development-harness/backlog_core/server.py",
+          "sha256": "fcf7819e79e62f3c161b047e308a9279edf926749d33fe1ca360dda596a1c4d0",
+          "zip_crc32": "fceb6cea"
+        },
+        {
+          "bytes": 2973,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "45a7d2f931f127eaccd594b4da8fe5a65d7be7e4",
+          "path": "plugins/development-harness/backlog_core/status_registry.py",
+          "sha256": "c777fa9be2bd12ab3392ce73a0181e2ed5da81d90c6f78f8ff9981e1d3f965ea",
+          "zip_crc32": "a2ffef8d"
+        },
+        {
+          "bytes": 11299,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "65cf8f07ac18a92b5c355c248c86d711237a040a",
+          "path": "plugins/development-harness/backlog_core/sync_engine.py",
+          "sha256": "ffa369f5332b8e3d354abc726735170e1e7f72f9edc590e9e212764443661bbb",
+          "zip_crc32": "45bf97c8"
+        },
+        {
+          "bytes": 25577,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "0ceea7b382d06c4a242ab5dfb4a5be3c8778c1cd",
+          "path": "plugins/development-harness/backlog_core/sync_state.py",
+          "sha256": "9a0eb59bdfb8f830e459be7fbc012d17b132f108c95c849e707dcf3fb4afb12c",
+          "zip_crc32": "0b3f44db"
+        },
+        {
+          "bytes": 913,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "af094277da8a8d4c0c67ab373c62e07e0e0c449d",
+          "path": "plugins/development-harness/backlog_core/timestamps.py",
+          "sha256": "98820bce542fb6fe9c3e40a2e147c376fafa1f896859a3b3a07072308dafff9e",
+          "zip_crc32": "d1dcbdec"
+        },
+        {
+          "bytes": 51901,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "ac89bcd5230dfbb03dbe16885ba81dc9959e60d7",
+          "path": "plugins/development-harness/backlog_core/tool_responses.py",
+          "sha256": "61ba64917cc928b495efe167a7f509058be9573f90c5ff6d652c3bf90a898e78",
+          "zip_crc32": "0d297bbe"
+        },
+        {
+          "bytes": 2263,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "67927b96032446c2a6ccaaaa0c3acac41e71b9a2",
+          "path": "plugins/development-harness/backlog_core/transcript_reader.py",
+          "sha256": "f90ace2e8d6d4efcb7cf4dd40bd676b4a51b9d57ac0abb3ad2524036c9c0c729",
+          "zip_crc32": "05963d89"
+        },
+        {
+          "bytes": 22032,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "d1fbe100c19c7a04de254f715b39a918a41af6fe",
+          "path": "plugins/development-harness/backlog_core/work_item_decisions.py",
+          "sha256": "7d9c1d3143d9b4dce3063029df8c7c35ccb1c1cd367258583d5e6682385591a9",
+          "zip_crc32": "639caa5b"
+        },
+        {
+          "bytes": 5139,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "ebc2d57642ac5ce379b1c5d7bd129ac5bd469817",
+          "path": "plugins/development-harness/backlog_core/yaml_io.py",
+          "sha256": "cbcead5e4c57ff6d569f792b895a8d22bc7e51dce6218dcf3a01309b65845d27",
+          "zip_crc32": "ea890d1d"
+        },
+        {
+          "bytes": 6845,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "d7853c1f139cb2d160bc03a49b43c345b4c5327b",
+          "path": "plugins/development-harness/dh_config.py",
+          "sha256": "519d4c11690aa93e99f56737cbc1e0783f93b66c0634b4c11326c82d934a79ab",
+          "zip_crc32": "7047d351"
+        },
+        {
+          "bytes": 761,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "1db833e0dea074f3e1f09b1ec73e36e76d8055e4",
+          "path": "plugins/development-harness/dh_core/__init__.py",
+          "sha256": "6fcd2c47e1e830228c4152d9367dbd25aa60ecad955aa3553e539e4515f01886",
+          "zip_crc32": "6bea1981"
+        },
+        {
+          "bytes": 10162,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "a2e18317e3e63b4e4dd02aa4ecf5690527903d56",
+          "path": "plugins/development-harness/dh_core/artifact_registry.py",
+          "sha256": "f5f33c6d3e7d640435f63c9b3e83e0eabfb9cbaca88997cb8edeba9c172622ae",
+          "zip_crc32": "8ea837c3"
+        },
+        {
+          "bytes": 28270,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "c0208d631b39298e7aa6d84f2182de00a0961f5d",
+          "path": "plugins/development-harness/dh_core/known_failure_types.py",
+          "sha256": "5311c0f3ed7adfe09a982ff9127e5bc2821a470e3fd2a130bc5b4a089693bbdf",
+          "zip_crc32": "cdc59c3e"
+        },
+        {
+          "bytes": 4517,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "6a9e98f53cb699bb92a88883e5ea6e8e466b32b8",
+          "path": "plugins/development-harness/dh_core/ledger/__init__.py",
+          "sha256": "08b4390dd5adab6f02c81a2c9ae715f8fc2c9e47c1190921ee9b919aaf827850",
+          "zip_crc32": "7231f521"
+        },
+        {
+          "bytes": 2570,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "76413ca6804f32ee1333d07f63569d928d88ca24",
+          "path": "plugins/development-harness/dh_core/ledger/commands.py",
+          "sha256": "2cb9acc77f99e519a95ffc53d4fe6853ac8893a6133a85a70a0fab8691218386",
+          "zip_crc32": "cd08b100"
+        },
+        {
+          "bytes": 14219,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "5aad23b2777e2a0d6db6211896cd37bd4e2819d8",
+          "path": "plugins/development-harness/dh_core/ledger/derive.py",
+          "sha256": "d076d847fe9aea1a07da7c457ecaf3a398980251bc007a3e2e625f2b7eb906aa",
+          "zip_crc32": "a47f9f7f"
+        },
+        {
+          "bytes": 49778,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "5e58457a0090e13804e77244acb4a7f44470a9a7",
+          "path": "plugins/development-harness/dh_core/ledger/port.py",
+          "sha256": "a1abe5568e41dc9c7679ba7b85edabefc5cb092155f05bf57bd36f25f6a8b434",
+          "zip_crc32": "b8527fab"
+        },
+        {
+          "bytes": 7580,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "8f9843d72be6a2054fa6237dbc1e1bfe9b301588",
+          "path": "plugins/development-harness/dh_core/ledger/queries.py",
+          "sha256": "c6936c17b97c2fdb57d7825ff35590d8f4a62a3be0da65aed23e2194f1db3d4d",
+          "zip_crc32": "3c219c01"
+        },
+        {
+          "bytes": 50549,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "36c3cb9a0e4f1e7489b4d435b5815e2042b9feaf",
+          "path": "plugins/development-harness/dh_core/ledger/store.py",
+          "sha256": "71c757cbc91e27e9f1c46255c74df4e7b6455d99cd6cbd33859cf5b0abedb8ae",
+          "zip_crc32": "5fe99af8"
+        },
+        {
+          "bytes": 75809,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "e3bf935daa70d53cb588e7a98013301d18c3ca30",
+          "path": "plugins/development-harness/dh_core/ledger/transitions.py",
+          "sha256": "8758a96d1c1131cf515d5d792c778fe7ef8548907ea475d8664aa0494d8cce4e",
+          "zip_crc32": "aa71a589"
+        },
+        {
+          "bytes": 50759,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "ced5641ea2dd960a4fdf17c813f10a6bed6de538",
+          "path": "plugins/development-harness/dh_core/ledger_spec.py",
+          "sha256": "8e947ac0f0e247affa97457a7d84a70b4870483c21141d998bdbf5219e772d66",
+          "zip_crc32": "9adb6c37"
+        },
+        {
+          "bytes": 92120,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "ef803762207ffc2151ed24dedb2d7bd4e1cc5373",
+          "path": "plugins/development-harness/dh_core/operations.py",
+          "sha256": "626fc91943ba0124bc8f18c8c2709b566eebf2e39a8b4dae29fbd99258b2d7f7",
+          "zip_crc32": "3f013c30"
+        },
+        {
+          "bytes": 952,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "6ad683d721ca1ec0ea4246f3ccaea9137256c5a5",
+          "path": "plugins/development-harness/dh_core/protocols.py",
+          "sha256": "89258a30d2b02c63d1676eed56adc2528c345c3a5bcd567eb067a2dd79e980dc",
+          "zip_crc32": "12de13bc"
+        },
+        {
+          "bytes": 22245,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "06e779d97d1589f3821155419252ae215a9a4a9c",
+          "path": "plugins/development-harness/dh_paths.py",
+          "sha256": "0c1da37b460b9cc2b2375cca920042dc4d33251ed31bf92a51773dd71ba3de3f",
+          "zip_crc32": "2db8ffb3"
+        },
+        {
+          "bytes": 29319,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "e6818952140c6df18c1e314389c902a4c615509f",
+          "path": "plugins/development-harness/docs/backend-providers.md",
+          "sha256": "e0b9de02bf69fd08801a3eb3dcb33cb75f06e4832c8f6ed008603534c49fec58",
+          "zip_crc32": "c60cc1ba"
+        },
+        {
+          "bytes": 11213,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "da1a3f2b78a51ec6c921a49499d6651fdcb90360",
+          "path": "plugins/development-harness/docs/plan-artifact-lifecycle.md",
+          "sha256": "9b4f565a7fc425a31bd0847dd0c2b2085aec8a03d2ea8bd52cec29fb406846b9",
+          "zip_crc32": "c6cc3e91"
+        },
+        {
+          "bytes": 6563,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "ecd6db7e1b42802716d1c6d4c5d691384699a6bd",
+          "path": "plugins/development-harness/docs/review-methods.md",
+          "sha256": "f80b98e7c0e28c5f096e784530e57992373aee28e721ffa691927ebe4871150e",
+          "zip_crc32": "b9f183fb"
+        },
+        {
+          "bytes": 4539,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "d5ee852cbeab8861ee58672ab58320347dcaf008",
+          "path": "plugins/development-harness/docs/work-ledger/runner-contract.md",
+          "sha256": "b9548130076fcce7f6e330eedb0bcaf908faa78a245d11a34839661631125da0",
+          "zip_crc32": "2c4b45c9"
+        },
+        {
+          "bytes": 1980,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "95cce480db89c663201efe4f68bffde5fb99f8f5",
+          "path": "plugins/development-harness/hooks/hooks.json",
+          "sha256": "bc1cf1f793de2b34ac7595d93627a8bac9c2a8e95ca87729f216c1a307806dc3",
+          "zip_crc32": "c6630cbc"
+        },
+        {
+          "bytes": 1366,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "479c7c5c6c0ab71ff249e41a552d44e04b96df70",
+          "path": "plugins/development-harness/hooks/inject-style-guide.cjs",
+          "sha256": "39e113bd0f24c6cb77a3e72c273f264af948b41046d24584a67ad9b665a3fc04",
+          "zip_crc32": "7c040f6c"
+        },
+        {
+          "bytes": 3470,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "219bf354fca380e913a9da47507694b9d409792c",
+          "path": "plugins/development-harness/hooks/session-end-kage-bunshin-child-notify.cjs",
+          "sha256": "d8d6fef0a4e491b41cf3a8a1fffe8389e88f429054aa4b1c6d3606bdc262da1e",
+          "zip_crc32": "a844114d"
+        },
+        {
+          "bytes": 3857,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "c58b676e41d2c592102e69aee4312a206bdb5e1a",
+          "path": "plugins/development-harness/hooks/session-end-kage-bunshin-cleanup.cjs",
+          "sha256": "b07563004194ca0828dcd5146d25f177caafa87de977f0fedbbc2ea0ce453ee9",
+          "zip_crc32": "daca5ea6"
+        },
+        {
+          "bytes": 2387,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "e14dede17ca3aae5b4fab834b1d55bc84569e4f9",
+          "path": "plugins/development-harness/hooks/session-start-session-id.cjs",
+          "sha256": "bdd017588f453796d51593e691b9135ff98e5432bb303413bcbeebf7cb33b214",
+          "zip_crc32": "70dca037"
+        },
+        {
+          "bytes": 3526,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "0a9ba79e3c6f220e898f807c950070f80c76fb2b",
+          "path": "plugins/development-harness/hooks/stop-kage-bunshin-child-notify.cjs",
+          "sha256": "67705b1154fb9e2fa6730fd0ced2d087e0edba2cb395a8b432beb118e126f3b4",
+          "zip_crc32": "445a60f9"
+        },
+        {
+          "bytes": 10082,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "e0ec1c419925cd2dae19c362873f7abc5761b548",
+          "path": "plugins/development-harness/hooks/stop-kage-bunshin-idle-check.cjs",
+          "sha256": "903dbdca25ddbd37c10bf336308d158ef54e6a1f285f74e12b995772b9ee935d",
+          "zip_crc32": "6064051a"
+        },
+        {
+          "bytes": 5221,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "972d3e9041e53b98d4b90d58fc56c5b77cd676fe",
+          "path": "plugins/development-harness/hooks/task-completed-kage-bunshin-reminder.cjs",
+          "sha256": "fba2c7002e024ae06e458638957be35b5862756202d533820bbee3dfc533ab1a",
+          "zip_crc32": "c3f6f6c2"
+        },
+        {
+          "bytes": 1979,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "0e8af6c3be8903a90160d2c9c77485ad6d994787",
+          "path": "plugins/development-harness/sam_schema/__init__.py",
+          "sha256": "1a8648a5af64b9b748b91a10f7f1016b49bdb4375f4edbeb12888d8c8921918e",
+          "zip_crc32": "12b258b8"
+        },
+        {
+          "bytes": 310,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "862a9de09b9c1746375d08941508a3d36dfa75b9",
+          "path": "plugins/development-harness/sam_schema/__main__.py",
+          "sha256": "eb4507655271c62f8962904d89346daf215bebe455753b47681b54ee4ac2740d",
+          "zip_crc32": "e03c0c76"
+        },
+        {
+          "bytes": 2563,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "de883110da14d4a747d256bcb94bc5d57a7c059c",
+          "path": "plugins/development-harness/sam_schema/artifacts.py",
+          "sha256": "d7b6ee4ca93e8749316a67f70d3b7d407a3f29cb489b1e9b0c07abc8767b0acc",
+          "zip_crc32": "ddc38989"
+        },
+        {
+          "bytes": 24992,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "cb671af4177c93745f611a4020fd11126ff4ec7e",
+          "path": "plugins/development-harness/sam_schema/backlog.py",
+          "sha256": "2bdc5dcd9c8198679e2e53319cd239f381e917a44f1a1c4efc73868cc2d660d0",
+          "zip_crc32": "2532e5d3"
+        },
+        {
+          "bytes": 3570,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "46c2ed3cc42cbb4503ad7e71cd5a64e6f3ab431d",
+          "path": "plugins/development-harness/sam_schema/cli.py",
+          "sha256": "6389e4c802d1aa99e6294b54cd4ab0d6bc482c3bc52a4ee1326e3a75d49ed2d7",
+          "zip_crc32": "5f087cf5"
+        },
+        {
+          "bytes": 7567,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "aa1cc090de1e12ccdd4bdfbb1a1bd438299b5aa9",
+          "path": "plugins/development-harness/sam_schema/cli_active_task.py",
+          "sha256": "e4424e4f8e8939eb54e5040a945279268c8b1cff28dd7fa869da3d75e07e2473",
+          "zip_crc32": "35966fc7"
+        },
+        {
+          "bytes": 11061,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "d2a9ae314ac14177b2b50c7094bb0cb2e8593cd5",
+          "path": "plugins/development-harness/sam_schema/cli_inputs.py",
+          "sha256": "69cb451dc57478d05e73b0bbbf76a9665f7e2e7553a2639d1fb079bdfe80f02c",
+          "zip_crc32": "8c488c73"
+        },
+        {
+          "bytes": 1953,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "4915eaa0daa700a12545d524821d088727c247a2",
+          "path": "plugins/development-harness/sam_schema/cli_known_failure_types.py",
+          "sha256": "c76ceffbb123dcba07db492388c2f49adf030ae0eddbf746d897fdc25cbedd56",
+          "zip_crc32": "5dbe7108"
+        },
+        {
+          "bytes": 5830,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "fbd8a298d2fe370ddd23beee7b9492e96d0fe91c",
+          "path": "plugins/development-harness/sam_schema/cli_output.py",
+          "sha256": "d90d690a2ac3752f2fd4bae58fd08194ff27ee7262f97f9572bd6e86e0c68501",
+          "zip_crc32": "15db3229"
+        },
+        {
+          "bytes": 69,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "932cbb52525ce804fb19b05b700869c023da26d2",
+          "path": "plugins/development-harness/sam_schema/core/__init__.py",
+          "sha256": "d4946e95abb052bc51805a0e113f117184c322bb59ef38e07cb925af941c5ba4",
+          "zip_crc32": "7129761d"
+        },
+        {
+          "bytes": 21778,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "0f8b76460456d9042daf5268df3c90b1252ad4cb",
+          "path": "plugins/development-harness/sam_schema/core/action_models.py",
+          "sha256": "2d7e989589b1570fab8a0c9ab4f57e20272aa78f7a094c4c42da9d1d53ac7275",
+          "zip_crc32": "14a9c528"
+        },
+        {
+          "bytes": 15843,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "203ecbe976c6da5f77afcc954e50c5f010068f00",
+          "path": "plugins/development-harness/sam_schema/core/addressing.py",
+          "sha256": "378442f7814351ba8e70a9586ca046b7e8d66e3361637c05f5cf55406e746a84",
+          "zip_crc32": "3d200806"
+        },
+        {
+          "bytes": 14859,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "68b66cde4af23fe04307fdca0828ba15213feb03",
+          "path": "plugins/development-harness/sam_schema/core/artifact_registry_client.py",
+          "sha256": "44b003b8287a9f498fd9b843fa93da644a2b97cc575bea0aae8626d1fa6de1c5",
+          "zip_crc32": "5de5fa78"
+        },
+        {
+          "bytes": 47,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "2196c069c2c69f002a1d5174c72fe862462d84bf",
+          "path": "plugins/development-harness/sam_schema/core/backends/__init__.py",
+          "sha256": "8672c89fd541101c8c92588952bf91815066a2cdc168ebfe6cedbead78bad242",
+          "zip_crc32": "f6ff2976"
+        },
+        {
+          "bytes": 1305,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "6cbf829f6774a0283211549c17c96fb0634cf033",
+          "path": "plugins/development-harness/sam_schema/core/backends/_utils.py",
+          "sha256": "69d9b4491c4318bd34ba6db89b06e8c4e6a5bd6e7bbc7350f05f194f8f62f865",
+          "zip_crc32": "8e6b1812"
+        },
+        {
+          "bytes": 56674,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "99d13470e81bcca085f3a6e187ec3b8d2302d799",
+          "path": "plugins/development-harness/sam_schema/core/backends/beads.py",
+          "sha256": "0692f897af0940a63b4ac65652dce05dc3ce9fa555585530625833f1ee288da5",
+          "zip_crc32": "40f8e269"
+        },
+        {
+          "bytes": 8696,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "c69bd88e5f54553476116e5cd10222b0071eb024",
+          "path": "plugins/development-harness/sam_schema/core/backends/content.py",
+          "sha256": "158aa1c16e337588f85df881674b0aa6b7499d35d22302830de8646b2ffdc7d7",
+          "zip_crc32": "1985593d"
+        },
+        {
+          "bytes": 12856,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "bad3230d32c45ccec2405e430cde01e2b2ad096a",
+          "path": "plugins/development-harness/sam_schema/core/backends/github_context_backend.py",
+          "sha256": "e932b3d69471fdd386e0c280a0de86263b28048ef896817359d19aa1ae42ce86",
+          "zip_crc32": "ee8f001d"
+        },
+        {
+          "bytes": 25956,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "21674040b969b85b0df742c94403a8ae59aa8c3f",
+          "path": "plugins/development-harness/sam_schema/core/backends/github_task.py",
+          "sha256": "49e2a3a86e4068ec7e1e4fc98ffe141e0369b346a58e6d0ba6c17fb13b8c96ad",
+          "zip_crc32": "7144fc38"
+        },
+        {
+          "bytes": 5470,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "98b758563727e64e844d266ea606d13d35ff54cf",
+          "path": "plugins/development-harness/sam_schema/core/backends/local_context_backend.py",
+          "sha256": "ab1ad3e1f964805ec0e55bced3caa31260ca90955f8afcc553d7dd31caa4fafa",
+          "zip_crc32": "d90d346b"
+        },
+        {
+          "bytes": 34891,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "3f49dda5bb707d24914755eceb23e90c64142535",
+          "path": "plugins/development-harness/sam_schema/core/backends/local_yaml.py",
+          "sha256": "d09d56fdeb09a72d4fcd8b54dafac9d6c2c5ff70ca3a64dfa3195b23b2337592",
+          "zip_crc32": "386b9b5c"
+        },
+        {
+          "bytes": 26696,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "b37b47075f861b9079ebf2610fee11eea932a74e",
+          "path": "plugins/development-harness/sam_schema/core/backends/memory.py",
+          "sha256": "74113f1aabd5c91c433793976057945e336330116cca62c16dd6852fce464dab",
+          "zip_crc32": "0b80efcb"
+        },
+        {
+          "bytes": 2949,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "e3e1c6f98ca6440de2ef55b8d53dd8950527d514",
+          "path": "plugins/development-harness/sam_schema/core/backends/memory_context_backend.py",
+          "sha256": "c8a9da1ec8ac9d80f864ca7019892afbeb8ee8b5acb0dd73af3b9943f7376f19",
+          "zip_crc32": "b563804f"
+        },
+        {
+          "bytes": 2966,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "3dad693e622475b8a3962582e50e3adcd7086daf",
+          "path": "plugins/development-harness/sam_schema/core/context_backend.py",
+          "sha256": "f571937c381d0b8088d6c5cf75efb8004918a8268b46f83efc118ca0f5048e33",
+          "zip_crc32": "8bcfc2cc"
+        },
+        {
+          "bytes": 5510,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "07c68886d74785c282876363eb32da38b9372c2f",
+          "path": "plugins/development-harness/sam_schema/core/context_config.py",
+          "sha256": "614160847bf2d039452af7514771e0793b91447f826cfeba2c6af612fdc46e3a",
+          "zip_crc32": "b77d84bb"
+        },
+        {
+          "bytes": 17308,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "761f4bba400bd07fcae955b4c922ce40331ea48e",
+          "path": "plugins/development-harness/sam_schema/core/dependencies.py",
+          "sha256": "9483827712faaa323f456a6756e8df3ac68b0a4b9361ba7aefb476d16b91f00d",
+          "zip_crc32": "efe48029"
+        },
+        {
+          "bytes": 6601,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "9bb7b1a87d4161f6bf9f2a2202374309600e4275",
+          "path": "plugins/development-harness/sam_schema/core/exceptions.py",
+          "sha256": "647c2305cea8c39dfbeac07536c531a22f3cd8713859c1edfd09ac7c35ef3204",
+          "zip_crc32": "4c1d3bf0"
+        },
+        {
+          "bytes": 54862,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "b90c0fc55b579ac401fd06feaf9cdbf64ca2debc",
+          "path": "plugins/development-harness/sam_schema/core/gist_task_layer.py",
+          "sha256": "38d2aa48574eb57308e49101a0e55570cbad361ca3274e19a93ba995ca71db35",
+          "zip_crc32": "c8d8e8bf"
+        },
+        {
+          "bytes": 33301,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "a6693af04c8e5cb46665810510eba23911f78e7a",
+          "path": "plugins/development-harness/sam_schema/core/models.py",
+          "sha256": "1b34de8d3dd7228d0af84f9db2eec6e49b3b15f74ba672f033f3456cce03bd34",
+          "zip_crc32": "41034db1"
+        },
+        {
+          "bytes": 15387,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "70180199fc2dd75a33666b13d6d81e654c18a564",
+          "path": "plugins/development-harness/sam_schema/core/plan_id_index.py",
+          "sha256": "601e89d1c9d86b933554a826f484e32ec613827bfe08a0cc44dcf6488fd21727",
+          "zip_crc32": "cdda216d"
+        },
+        {
+          "bytes": 17407,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "a8dd624885cb783a7216e512d451f5aaff437b71",
+          "path": "plugins/development-harness/sam_schema/core/query.py",
+          "sha256": "bddf43e2342a8772433510a7e87a9f577f6f465317bb8d7ee22d057510fd80a3",
+          "zip_crc32": "f17f88fc"
+        },
+        {
+          "bytes": 16316,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "2992786b9eb73474af7f8781f68357cb202a5741",
+          "path": "plugins/development-harness/sam_schema/core/task_backend.py",
+          "sha256": "efec7dc56d2473cedcd9360d80885a670df8b483182c377bb3278135059f74ec",
+          "zip_crc32": "6898802d"
+        },
+        {
+          "bytes": 8092,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "2c2af5519d25935da0daf561a2d0158b0fc00fbc",
+          "path": "plugins/development-harness/sam_schema/core/task_backend_types.py",
+          "sha256": "c63776912183c81a8bb8562f63e69356ad06afd709e826dc5c270cdf6ba6c806",
+          "zip_crc32": "41f520e3"
+        },
+        {
+          "bytes": 8643,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "5b8db461508de196ec7592d7457bd7911e778d5b",
+          "path": "plugins/development-harness/sam_schema/core/task_config.py",
+          "sha256": "8d5c6f54a6294a42fccdb0ce543bd3e89d341d4a7e269f3a058865948343954c",
+          "zip_crc32": "02558bfa"
+        },
+        {
+          "bytes": 13663,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "837f7daa97d8a7f8076701d287ea19e8a0039037",
+          "path": "plugins/development-harness/sam_schema/dispatch.py",
+          "sha256": "b2c399119a22288daf4950ca9c792d8d07e199f4de2a4dda28abeaee804046cf",
+          "zip_crc32": "f49936b0"
+        },
+        {
+          "bytes": 304,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "e8cacdacdd6b23638d85fb9cad7fbd61f152425a",
+          "path": "plugins/development-harness/sam_schema/readers/__init__.py",
+          "sha256": "26d240734865d8aa09d620b0e9dd4b0276ee62fd6b0b3e9dd34801f2b1eee4ae",
+          "zip_crc32": "887a0fac"
+        },
+        {
+          "bytes": 5880,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "4c7f01c206076a0ab632c6c373285b8956a0f868",
+          "path": "plugins/development-harness/sam_schema/readers/_yaml_utils.py",
+          "sha256": "530fac11160eda868d561ce0101f51701293573ba15ab5a0d4d8d2e36726988a",
+          "zip_crc32": "c64647e1"
+        },
+        {
+          "bytes": 7213,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "fa77c8190d1e9db0b2838cd536553e12ae57e53a",
+          "path": "plugins/development-harness/sam_schema/readers/detect.py",
+          "sha256": "42d9506ecca0c4aa5f67ddf486a4888827f3cc3883c751cd5938f69f99234e15",
+          "zip_crc32": "653b94fa"
+        },
+        {
+          "bytes": 12702,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "891e02de79562b37a4a04ec7ca5ac43e3796f279",
+          "path": "plugins/development-harness/sam_schema/readers/frontmatter_reader.py",
+          "sha256": "368b91747ee5259e2932ec719b1465c425ffb228c2f67a1eb4468c5ef3006f5e",
+          "zip_crc32": "ba67ca88"
+        },
+        {
+          "bytes": 26679,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "63199843c948bed53a7148b5cef70732156c33d5",
+          "path": "plugins/development-harness/sam_schema/readers/manifest_reader.py",
+          "sha256": "8e87b52a33b01609bb8c359eec665099faec0520be11867282fe9df737ed3748",
+          "zip_crc32": "9d30fe5a"
+        },
+        {
+          "bytes": 14909,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "4460690af97ac239b529011aa8b716844813e6d0",
+          "path": "plugins/development-harness/sam_schema/readers/normalize.py",
+          "sha256": "8ef9bb518b0b5a9ed8365fc6c5420bd7d9a089aa1bfb14d06e0573305ae560af",
+          "zip_crc32": "3a3c2cdd"
+        },
+        {
+          "bytes": 4090,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "8954dd3f83c5f5abfe238849cc543c57faee5595",
+          "path": "plugins/development-harness/sam_schema/readers/yaml_reader.py",
+          "sha256": "4297d04602171d1ec326f9388fb91bbba392a3f64cb47daca344fc4b6082ea6c",
+          "zip_crc32": "9b1286cb"
+        },
+        {
+          "bytes": 83287,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "3d871c3ae2df2f0c595985298bffe0e18a19a94e",
+          "path": "plugins/development-harness/sam_schema/sam_plan.py",
+          "sha256": "64bd2117bbb4897d135a3ee40b14aad8c1b8176a443b284073f8d9d8802fa67b",
+          "zip_crc32": "703c3ec7"
+        },
+        {
+          "bytes": 9270,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "90450ae676d522820dbcdab138558082f2670c66",
+          "path": "plugins/development-harness/sam_schema/server.py",
+          "sha256": "03ee41c68eb71b6b41ea54e25416c1bbb81289ee040a542fdb0ba1abf23249be",
+          "zip_crc32": "a9f54bab"
+        },
+        {
+          "bytes": 3975,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "981e33f53f682cc139c171b2faf44aeb6663132e",
+          "path": "plugins/development-harness/sam_schema/server_active_task.py",
+          "sha256": "f5b610e64966fb2657a370fa55ff0ee6c7ddfcfbc4f2fc3a043f3d1189d68f1b",
+          "zip_crc32": "fa75e50c"
+        },
+        {
+          "bytes": 3522,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "f1ffed439084cf0d4cf79364ddcd6617fd015eae",
+          "path": "plugins/development-harness/sam_schema/server_backend.py",
+          "sha256": "e1106ce075745797987c5588d8864ef5f9e9ca8f87cad8e4984155a58dbe2fe7",
+          "zip_crc32": "0d5e8824"
+        },
+        {
+          "bytes": 4310,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "bfe63e78c46dd1f1309ad100cb718cd25c313fab",
+          "path": "plugins/development-harness/sam_schema/server_ledger_routing.py",
+          "sha256": "2c9054da90585b36f40cc985acf62a9401833093dcf267078e1eef2e5f6fef78",
+          "zip_crc32": "31fa754c"
+        },
+        {
+          "bytes": 20439,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "7f0f6ceef9c33d4f8879ab139e2cd49ff35a5ea7",
+          "path": "plugins/development-harness/sam_schema/server_plan_ops.py",
+          "sha256": "9ced2288e1694da29798b4d32015fafa2f791c43ac831faf5a69c41309725c42",
+          "zip_crc32": "3fc308e7"
+        },
+        {
+          "bytes": 6895,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "236676319660855485d121be8fec643dcf015da4",
+          "path": "plugins/development-harness/sam_schema/server_task_ops.py",
+          "sha256": "8a2be0b93f0744464c4c940835777544200ca75c4b69871c8b6146bec8ae97bf",
+          "zip_crc32": "9cea8552"
+        },
+        {
+          "bytes": 1535,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "de4f8536c59c88b7534e4c01148723c067916b40",
+          "path": "plugins/development-harness/sam_schema/task_format.py",
+          "sha256": "cc0aa032deb09ba5cc00db1468874ff424ec1a188f9a00a038170dd744d83e40",
+          "zip_crc32": "cd789f6a"
+        },
+        {
+          "bytes": 231,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "cb96bbac72fce0603fc86a7ebf255da2f9ac1688",
+          "path": "plugins/development-harness/sam_schema/writers/__init__.py",
+          "sha256": "b381cb2161066ed922325d9b12f34fdbfd5aa05195f57b277faa2c261f102c41",
+          "zip_crc32": "ff626d6b"
+        },
+        {
+          "bytes": 24375,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "10033ed9a9d679670be40831ace51ab60fba4886",
+          "path": "plugins/development-harness/sam_schema/writers/yaml_writer.py",
+          "sha256": "af3dfe34983102eaf2c07270f04901cc75dce6b0ed0c3040fba0c223146f5813",
+          "zip_crc32": "e98cdd53"
+        },
+        {
+          "bytes": 3059,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "e826ea5864b18ae4dc649a2b8420021480792cc1",
+          "path": "plugins/development-harness/scripts/cli_output.py",
+          "sha256": "d918e68292638910f655f4d8fd665a58c0581fe7101b84002e6b6496d89eb8ac",
+          "zip_crc32": "f590d7fd"
+        },
+        {
+          "bytes": 1477,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "c5f061be9d891fc56ad01840a1a933a215f70662",
+          "path": "plugins/development-harness/scripts/dh_mcp_preinit.py",
+          "sha256": "c00e86f118526b2c4280b0b751fe43f02ff710d6ef8bf3bb3ec970648a1a1c27",
+          "zip_crc32": "ca5e0aba"
+        },
+        {
+          "bytes": 2760,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "e7daef4469864dc3c60d16ab02537a498140ab1f",
+          "path": "plugins/development-harness/scripts/run_backlog_server.py",
+          "sha256": "852cf0808c557f172cd58c162e1d3549ad2075069da05fe20730b8086478a6d9",
+          "zip_crc32": "ff94a6a2"
+        },
+        {
+          "bytes": 4435,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "60f9fa3f5ab58262cf5e34a32537fe9c84ce992a",
+          "path": "plugins/development-harness/scripts/run_bounded.py",
+          "sha256": "58bfa4354ea02749bfd25cd436f8a905bf137a95dd5f7606fe90171179600a95",
+          "zip_crc32": "7e974337"
+        },
+        {
+          "bytes": 1466,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "60240f2aca5fad7b613def7c15df92b24eb51808",
+          "path": "plugins/development-harness/scripts/run_sam_cli.py",
+          "sha256": "5aaccab38f44a8bfe59d87224f83101cb816a8521630a0bf03cf4235242b6807",
+          "zip_crc32": "5155ada5"
+        },
+        {
+          "bytes": 831,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "6cad5d19e06c917f8188d9644613b4d7da2b06de",
+          "path": "plugins/development-harness/scripts/run_sam_server.py",
+          "sha256": "4892552c6236347e09b53714de116455fb5cfb11c1ab427afd20834f5b85d9b5",
+          "zip_crc32": "c2bec9d5"
+        },
+        {
+          "bytes": 685,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "806a8fc6099b9332489d0f6d2292edc6c6fa07b2",
+          "path": "plugins/development-harness/skills/dh-cli-usage/SKILL-GOALS.md",
+          "sha256": "617e6455c7c1a39c7dd5c08f7bb6c439c65a322ebeb8437bc8175df0faec9994",
+          "zip_crc32": "c803b7bc"
+        },
+        {
+          "bytes": 2417,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "d3fcb531b8941f39c07acb3e32ce4afd0e88c0c7",
+          "path": "plugins/development-harness/skills/dh-cli-usage/SKILL.md",
+          "sha256": "832159c59c8fe29de2abbad1cae9321cd604803af2fa1ca31d8563c769b2437c",
+          "zip_crc32": "8d8029ef"
+        },
+        {
+          "bytes": 3349,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "401bc97e2621409e9e252e6403eac600c77c2a1e",
+          "path": "plugins/development-harness/skills/dh-cli-usage/references/command-reference.md",
+          "sha256": "7ec2a3a4f28fad5a6353a93edb0c372bd9ec021cda4a7d867052a8a80e4ed9f4",
+          "zip_crc32": "491caf50"
+        },
+        {
+          "bytes": 1797,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "0ae319886c7c54273ba17664f8268fba56a45853",
+          "path": "plugins/development-harness/skills/dh-cli-usage/references/mcp-connection-check.md",
+          "sha256": "f1d8465d53e3a9287787592d161bc8f586816952334e33c4e8197c7ba6a44900",
+          "zip_crc32": "07cafdd6"
+        },
+        {
+          "bytes": 181,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "a5a212d21b54df397c56813e0709378be80ea8b9",
+          "path": "plugins/development-harness/skills/file-classification/SKILL-GOALS.md",
+          "sha256": "d5d770d17a702a1ee789d4ff411527b215de9b9d302f2a58043b86ac678ee190",
+          "zip_crc32": "58b3c118"
+        },
+        {
+          "bytes": 350,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "389d18f907b5a1a77f250e70cb9d782310e34a6a",
+          "path": "plugins/development-harness/skills/file-classification/SKILL.md",
+          "sha256": "34cab0ec306eebedc9303d4293281155c073a12f94f7e89045e6cfd29a1e98cf",
+          "zip_crc32": "c782db1b"
+        },
+        {
+          "bytes": 302,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "d13080d854961064319fc90de5e85e0375005906",
+          "path": "plugins/development-harness/skills/review-accessibility-change/SKILL-GOALS.md",
+          "sha256": "f072bb4085fbab951529b31516738822819271b1e80be547771333c81d2af432",
+          "zip_crc32": "e1f7fce8"
+        },
+        {
+          "bytes": 1072,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "9effc3c7efcc41d7487d49e2b544319e9ed1d1a8",
+          "path": "plugins/development-harness/skills/review-accessibility-change/SKILL.md",
+          "sha256": "c19ff738962a840782cb184849a93b8819bf42fed6964538132d7ffa521aa07d",
+          "zip_crc32": "7445f7d6"
+        },
+        {
+          "bytes": 287,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "0c6cbd687f23792346855b543d8e100defa2a5a3",
+          "path": "plugins/development-harness/skills/review-performance-change/SKILL-GOALS.md",
+          "sha256": "bc26dcc01a34f868c73ba936123a49e60589e747a3df434eb15bc39137d2ffbe",
+          "zip_crc32": "77b35f6a"
+        },
+        {
+          "bytes": 1067,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "efef3b21d828122b78789ab679682cb43035287a",
+          "path": "plugins/development-harness/skills/review-performance-change/SKILL.md",
+          "sha256": "0a615bef87620e0f79df8236cc7294be5f36321740c3b32bbb2c321b4d89e3ee",
+          "zip_crc32": "beeb962b"
+        },
+        {
+          "bytes": 318,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "8d30d6a19462ac8eb33baba2e876e3607072263a",
+          "path": "plugins/development-harness/skills/review-quality-change/SKILL-GOALS.md",
+          "sha256": "50f3dec20eff254980d4d406f3d1bcba115e200f2d403652dec8dac5d2fee250",
+          "zip_crc32": "e0777c2a"
+        },
+        {
+          "bytes": 1061,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "2e1dfb2995c1bb8c1175292f237b8e47be5acd4a",
+          "path": "plugins/development-harness/skills/review-quality-change/SKILL.md",
+          "sha256": "92cc42d7847a19db8b70391967d515e1863ee76feb9c78417852c80555b807c2",
+          "zip_crc32": "f64ba973"
+        },
+        {
+          "bytes": 281,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "b5e98be6e20940d4578bcb5356ac36db4e54760f",
+          "path": "plugins/development-harness/skills/review-security-change/SKILL-GOALS.md",
+          "sha256": "79485771c43ef31b3910683b71bf3958fe3c798cfa3c0bd61971d07f59a34852",
+          "zip_crc32": "53c440e4"
+        },
+        {
+          "bytes": 1211,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "6cc7ea32b3e5a1c3684a8139daba8de9251b6ce9",
+          "path": "plugins/development-harness/skills/review-security-change/SKILL.md",
+          "sha256": "73225d29c4d0dd8a78e4c7ba5dd55794454c38122ea40135af5b62ca98f0d1ac",
+          "zip_crc32": "cd64e59d"
+        },
+        {
+          "bytes": 235,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "2207828e9d35b93f045769302be285bf22e30436",
+          "path": "plugins/development-harness/skills/synthesize-review-findings/SKILL-GOALS.md",
+          "sha256": "1d85568805f9a3132bfdf1f5ae3084148fa9a1cd3009d7209f3eaf2d3281220b",
+          "zip_crc32": "0460001c"
+        },
+        {
+          "bytes": 960,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "7a302b18c26b23f939f5e0653ffa024991b94aad",
+          "path": "plugins/development-harness/skills/synthesize-review-findings/SKILL.md",
+          "sha256": "21377cd93337f22027919f6b19d4255e76e08f362198e4e9e24465bd9a4ea0ad",
+          "zip_crc32": "5b352fa0"
+        },
+        {
+          "bytes": 689,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "06cafc75c345ee7a6d2ad69548fac5d6e33f4260",
+          "path": "plugins/development-harness/skills/test-designer/SKILL-GOALS.md",
+          "sha256": "d8da09955d838e41dbb8046b28bad0d85dab745ded2712b2b9dc17d9db29e6dc",
+          "zip_crc32": "350ccba6"
+        },
+        {
+          "bytes": 4341,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "293cb542c77b43ccacaf6d5d2a7b1250b9bd671f",
+          "path": "plugins/development-harness/skills/test-designer/SKILL.md",
+          "sha256": "3d55d51aa3ffd79f6ab4c8e9733646d853d3e66db9de874008045053431da5fa",
+          "zip_crc32": "312df72a"
+        },
+        {
+          "bytes": 3038,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "07fa7d8bc404af217d8c2a7f1bb445a8a64c54b3",
+          "path": "plugins/development-harness/skills/test-designer/references/interaction-coverage.md",
+          "sha256": "4a745232a8cd77a177e7ab1e45868baec0b3c34f4fae615c2cda9c81991fbf4d",
+          "zip_crc32": "daf891b9"
+        },
+        {
+          "bytes": 477,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "b66e425de85f467e37e3d2268c2102f79e480a5f",
+          "path": "plugins/development-harness/skills/test-reviewer/SKILL-GOALS.md",
+          "sha256": "227d0b7c864fac374cb46a74e30d7972d306db0bc407da7fdac8f85b2a4ffd8c",
+          "zip_crc32": "092d5e82"
+        },
+        {
+          "bytes": 6878,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "c70894beb6432e938e29da4b7e50d9135bc86fb7",
+          "path": "plugins/development-harness/skills/test-reviewer/SKILL.md",
+          "sha256": "e2405fddd8af023531b6a0ac82a607868ad4189adc4a81bab0b39013854446a5",
+          "zip_crc32": "9dfd4f32"
+        }
+      ]
+    },
+    {
+      "input_root": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-principles-raw-dd515581befd4dc6a868e5a311bf6f39",
+      "source_pin_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-principles-raw-dd515581befd4dc6a868e5a311bf6f39/manifests/source-pin.json",
+      "source_pin_sha256": "9fed8fbfcf201bbcae082138b0cf66df3e84991deae2f642523dd3e3d47cd6d5",
+      "source_pin": {
+        "absent_at_pin": [],
+        "archive": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-pr-stabilization/corpus-sourcecheck-source.zip",
+        "archive_commit_comment": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+        "archive_sha256": "30dad549fccc82a3b98c67f5918746bb2100db64b5639dce06c803faea0530cd",
+        "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+        "forbidden_components": [
+          "assessment",
+          "assessments",
+          "checkpoint",
+          "checkpoints",
+          "controls",
+          "eval",
+          "evals",
+          "evaluation",
+          "evaluations",
+          "fixtures",
+          "gold",
+          "maintenance",
+          "reports",
+          "research",
+          "seeds",
+          "test",
+          "tests",
+          "tests_backlog",
+          "tests_sam",
+          "workflow-extraction",
+          "workflow-layers",
+          "workflow-multigraph",
+          "workflow-reference-corpus",
+          "workflow_multigraph"
+        ],
+        "original_packet": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+        "original_packet_inventory_sha256": "fa97ba56f0ae83025b26c4fddaac59fe81a98d0e8e519d9571d6bbd3936cc542",
+        "original_packet_unmodified": true,
+        "requested_paths": [
+          "plugins/development-harness/docs/review-principles.md",
+          "plugins/development-harness/docs/impact-analysis-principals.md",
+          "plugins/development-harness/docs/impact-analysis-gap-supplement.md",
+          "plugins/development-harness/skills/analyze-change-impact/",
+          "plugins/development-harness/skills/root-cause-tracing-process/"
+        ],
+        "source_execution_or_import": false
+      },
+      "file_manifest_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-principles-raw-dd515581befd4dc6a868e5a311bf6f39/manifests/file-manifest.json",
+      "file_manifest_sha256": "f214894412baf85781a40354f1aaa6340f7db5b1d33391d3be3fca446c66b8ce",
+      "file_manifest": [
+        {
+          "bytes": 7983,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "d4df1e97d0870f6d4e4ea3b5537ed4615d6cb2d4",
+          "path": "plugins/development-harness/docs/impact-analysis-gap-supplement.md",
+          "sha256": "06d9190943c4dee71adfcd02e77b312daefddda36ec39077e0379c1053f8c588",
+          "zip_crc32": "c6357b2d"
+        },
+        {
+          "bytes": 21095,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "0e7412056a9e98f7a6bc9cc63e6d19bb7db63cc6",
+          "path": "plugins/development-harness/docs/impact-analysis-principals.md",
+          "sha256": "56c3108e02875d5a463d5613066480e689906a755472c95c4e95413a085fe512",
+          "zip_crc32": "6f298568"
+        },
+        {
+          "bytes": 4602,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "2424222cff2e9f996ce9c13216916b4decab11c9",
+          "path": "plugins/development-harness/docs/review-principles.md",
+          "sha256": "69e12462ae7cda5735a59a118e7cb14f05221e8cc5e4c74f5d36bdd90c3bb3ec",
+          "zip_crc32": "8a5d619b"
+        },
+        {
+          "bytes": 295,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "41cb90f51af1af5e095e51772b77f444f1cba62f",
+          "path": "plugins/development-harness/skills/analyze-change-impact/SKILL-GOALS.md",
+          "sha256": "d5bfeabeb0c708f8e78bda8110fc5c66d99a54b745c3f9c84ca585156f731db1",
+          "zip_crc32": "c6c8855c"
+        },
+        {
+          "bytes": 1950,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "b38afe037163d50106497dccf37140d22d071522",
+          "path": "plugins/development-harness/skills/analyze-change-impact/SKILL.md",
+          "sha256": "c0b6db68307fb2c523c6072f33a1aae4afd713ec770e4c688f0e7b3af6302867",
+          "zip_crc32": "160545ca"
+        },
+        {
+          "bytes": 570,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "889cbf0ec4658b73300cc9655d0c6c0eb2b6a246",
+          "path": "plugins/development-harness/skills/root-cause-tracing-process/SKILL-GOALS.md",
+          "sha256": "ae96d2cc931d53e33902e104ac82ed130948a7ff3cbee2311b63def60c45a487",
+          "zip_crc32": "97ee1542"
+        },
+        {
+          "bytes": 13702,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "932d3c1ab2c944682389cd5d6af505dcb63cc5e1",
+          "path": "plugins/development-harness/skills/root-cause-tracing-process/SKILL.md",
+          "sha256": "57b61b31ca47184ecabb89a24fd29e78190b260ecd7c30916325cf88aa7b9aa7",
+          "zip_crc32": "691f6dd0"
+        }
+      ]
+    },
+    {
+      "input_root": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-task-hook-raw-cea6bddbe3094ddc912e3da64947602f",
+      "source_pin_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-task-hook-raw-cea6bddbe3094ddc912e3da64947602f/manifests/source-pin.json",
+      "source_pin_sha256": "716b14acc621c7d8187d64511886e68db4009326c0187726cea86eb94500fa4e",
+      "source_pin": {
+        "absent_at_pin": [],
+        "archive": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-pr-stabilization/corpus-sourcecheck-source.zip",
+        "archive_commit_comment": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+        "archive_sha256": "30dad549fccc82a3b98c67f5918746bb2100db64b5639dce06c803faea0530cd",
+        "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+        "forbidden_components": [
+          "assessment",
+          "assessments",
+          "checkpoint",
+          "checkpoints",
+          "controls",
+          "eval",
+          "evals",
+          "evaluation",
+          "evaluations",
+          "fixtures",
+          "gold",
+          "maintenance",
+          "reports",
+          "research",
+          "seeds",
+          "test",
+          "tests",
+          "tests_backlog",
+          "tests_sam",
+          "workflow-extraction",
+          "workflow-layers",
+          "workflow-multigraph",
+          "workflow-reference-corpus",
+          "workflow_multigraph"
+        ],
+        "original_packet": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+        "original_packet_inventory_sha256": "fa97ba56f0ae83025b26c4fddaac59fe81a98d0e8e519d9571d6bbd3936cc542",
+        "original_packet_unmodified": true,
+        "requested_paths": [
+          "plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py",
+          "plugins/development-harness/scripts/run_bounded.py"
+        ],
+        "source_execution_or_import": false
+      },
+      "file_manifest_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-task-hook-raw-cea6bddbe3094ddc912e3da64947602f/manifests/file-manifest.json",
+      "file_manifest_sha256": "39e3ac432c77999aef5a0a4f93940e3e1ac7641ac20087f7879309329d2c7dca",
+      "file_manifest": [
+        {
+          "bytes": 4435,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "60f9fa3f5ab58262cf5e34a32537fe9c84ce992a",
+          "path": "plugins/development-harness/scripts/run_bounded.py",
+          "sha256": "58bfa4354ea02749bfd25cd436f8a905bf137a95dd5f7606fe90171179600a95",
+          "zip_crc32": "7e974337"
+        },
+        {
+          "bytes": 30162,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "cbeb529f80977644fd795f5e180342762f8c5f38",
+          "path": "plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py",
+          "sha256": "c91d3ce5ca34e94e0e2a74c89f03c4ecd18867eecd2f6255c42ff5da44b2a74e",
+          "zip_crc32": "fe512d1c"
+        }
+      ]
+    },
+    {
+      "input_root": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-testing-principles-raw-6f4e8bda42754bb9b06786cf35dca0b3",
+      "source_pin_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-testing-principles-raw-6f4e8bda42754bb9b06786cf35dca0b3/manifests/source-pin.json",
+      "source_pin_sha256": "1943516f055a7b1f450d2decdbccde1d7c0b0cbd2b433cdac15289d82b648d94",
+      "source_pin": {
+        "absent_at_pin": [],
+        "archive": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-pr-stabilization/corpus-sourcecheck-source.zip",
+        "archive_commit_comment": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+        "archive_sha256": "30dad549fccc82a3b98c67f5918746bb2100db64b5639dce06c803faea0530cd",
+        "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+        "forbidden_components": [
+          "assessment",
+          "assessments",
+          "checkpoint",
+          "checkpoints",
+          "controls",
+          "eval",
+          "evals",
+          "evaluation",
+          "evaluations",
+          "fixtures",
+          "gold",
+          "maintenance",
+          "reports",
+          "research",
+          "seeds",
+          "test",
+          "tests",
+          "tests_backlog",
+          "tests_sam",
+          "workflow-extraction",
+          "workflow-layers",
+          "workflow-multigraph",
+          "workflow-reference-corpus",
+          "workflow_multigraph"
+        ],
+        "original_packet": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+        "original_packet_inventory_sha256": "fa97ba56f0ae83025b26c4fddaac59fe81a98d0e8e519d9571d6bbd3936cc542",
+        "original_packet_unmodified": true,
+        "requested_paths": ["plugins/development-harness/docs/testing-principles.md"],
+        "source_execution_or_import": false
+      },
+      "file_manifest_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-testing-principles-raw-6f4e8bda42754bb9b06786cf35dca0b3/manifests/file-manifest.json",
+      "file_manifest_sha256": "ee0d93ce6996016f7796855a3a26d391368ad9634efa67db3a0a6c069a0c4e8c",
+      "file_manifest": [
+        {
+          "bytes": 25260,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "1d5eaadbdf915eb3c43e51ecd3f81b27fe9b2ca2",
+          "path": "plugins/development-harness/docs/testing-principles.md",
+          "sha256": "109ec55cc72ba8fa44c59dc92c936a9f0229cf2253ed1e7b501399a0eb3ec53c",
+          "zip_crc32": "105163ae"
+        }
+      ]
+    },
+    {
+      "input_root": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-test-method-ecosystems-raw-3971393ce546420a90f21a3fe276461a",
+      "source_pin_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-test-method-ecosystems-raw-3971393ce546420a90f21a3fe276461a/manifests/source-pin.json",
+      "source_pin_sha256": "6cb5b97d4dc7891acd523bcb57c7f07563250889be0d51c171bc7d98758f6508",
+      "source_pin": {
+        "absent_at_pin": [],
+        "archive": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-pr-stabilization/corpus-sourcecheck-source.zip",
+        "archive_commit_comment": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+        "archive_sha256": "30dad549fccc82a3b98c67f5918746bb2100db64b5639dce06c803faea0530cd",
+        "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+        "forbidden_components": [
+          "assessment",
+          "assessments",
+          "checkpoint",
+          "checkpoints",
+          "controls",
+          "eval",
+          "evals",
+          "evaluation",
+          "evaluations",
+          "fixtures",
+          "gold",
+          "maintenance",
+          "reports",
+          "research",
+          "seeds",
+          "test",
+          "tests",
+          "tests_backlog",
+          "tests_sam",
+          "workflow-extraction",
+          "workflow-layers",
+          "workflow-multigraph",
+          "workflow-reference-corpus",
+          "workflow_multigraph"
+        ],
+        "original_packet": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+        "original_packet_inventory_sha256": "fa97ba56f0ae83025b26c4fddaac59fe81a98d0e8e519d9571d6bbd3936cc542",
+        "original_packet_unmodified": true,
+        "requested_paths": [
+          "plugins/development-harness/skills/test-failure-mindset/",
+          "plugins/development-harness/skills/comprehensive-test-review/"
+        ],
+        "source_execution_or_import": false
+      },
+      "file_manifest_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-test-method-ecosystems-raw-3971393ce546420a90f21a3fe276461a/manifests/file-manifest.json",
+      "file_manifest_sha256": "54a1c0b6a88563c4e867258a45e704054fa750829aea5dc8e79ae4558862df59",
+      "file_manifest": [
+        {
+          "bytes": 983,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "c32b11a70f2235ca5eb1e5d8b2778309f7d0d39a",
+          "path": "plugins/development-harness/skills/comprehensive-test-review/SKILL.md",
+          "sha256": "196a4139c2be6ee9bfa5d56c61612d3c526b7d8553285b64c21f1e05cb13f5f2",
+          "zip_crc32": "fb7b31cd"
+        },
+        {
+          "bytes": 4769,
+          "commit": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+          "git_blob_sha1": "512321c95e26ee90af674e62de711c551955a84b",
+          "path": "plugins/development-harness/skills/test-failure-mindset/SKILL.md",
+          "sha256": "ee94b662388f4f4e3ecb54110de1396751a8616fe6e59ccd72d14e7165873283",
+          "zip_crc32": "18fc3c4e"
+        }
+      ]
+    }
+  ],
+  "cited_sources": [
+    {
+      "path": ".claude/settings.json",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/.claude/settings.json",
+      "bytes": 2930,
+      "sha256": "0c060d0e8a7ce5cf4cc669ce899733c63fee805ca025dbbb5168967648051b0d",
+      "git_blob_sha1": "135a9a95e6c33ac586146d6e38aa690ba4a480dc"
+    },
+    {
+      "path": "plugins/development-harness/.claude-plugin/plugin.json",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/raw/plugins/development-harness/.claude-plugin/plugin.json",
+      "bytes": 993,
+      "sha256": "6dde5f812d7dfafd3b0ae97d601cd345daa06ee58a7f6c62834dac97642202da",
+      "git_blob_sha1": "6448be29e3181bfa97b0bd85158cef86f3e10f4c"
+    },
+    {
+      "path": "plugins/development-harness/agent_profile/discovery.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/raw/plugins/development-harness/agent_profile/discovery.py",
+      "bytes": 19744,
+      "sha256": "4eef378535be86e42e97660eaa2af7d91257941e42a8c6f7582ee68423fa80f3",
+      "git_blob_sha1": "29fa3d75ba8490602df276ee417c34720d6e7bec"
+    },
+    {
+      "path": "plugins/development-harness/agent_profile/models.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/raw/plugins/development-harness/agent_profile/models.py",
+      "bytes": 4562,
+      "sha256": "29aa0155d575c6c21d8217203fe447e0fcd9f18658ead04a29a63420da719f42",
+      "git_blob_sha1": "ade546a4eeedddc5d5322cc04e1854c1ec759887"
+    },
+    {
+      "path": "plugins/development-harness/agent_profile/parser.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/raw/plugins/development-harness/agent_profile/parser.py",
+      "bytes": 6223,
+      "sha256": "e5c751e1c5e71b7f30cf13f6f1e4e8b75a4a9909cc01be19c346365ae6595a10",
+      "git_blob_sha1": "94b58294699733c810695fb1bd95c501518f8f3d"
+    },
+    {
+      "path": "plugins/development-harness/agent_profile/server.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/raw/plugins/development-harness/agent_profile/server.py",
+      "bytes": 5999,
+      "sha256": "e6f0bac6b4a485c31ea223eb2338da7a93eb3a0d568514bdbd24589287399a88",
+      "git_blob_sha1": "414c5675c448c3b47fd59655936a774d7852058d"
+    },
+    {
+      "path": "plugins/development-harness/agents/review-synthesizer.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/raw/plugins/development-harness/agents/review-synthesizer.md",
+      "bytes": 1183,
+      "sha256": "79ff90bd57d5b9a6d4c8d85f644ac2f45d8c5667aecc85135e969d409d0bdc17",
+      "git_blob_sha1": "03a6f26ea9d6968b16d5e03c50d74a6d5fb3d8c4"
+    },
+    {
+      "path": "plugins/development-harness/agents/reviewer-accessibility.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/raw/plugins/development-harness/agents/reviewer-accessibility.md",
+      "bytes": 1761,
+      "sha256": "31d2957bec026797fa66299faa9cc505baf75fb66d1639fda12e7c95a76d190a",
+      "git_blob_sha1": "e04a317a02c8d0f06bf1158d78f51ca6290fa906"
+    },
+    {
+      "path": "plugins/development-harness/agents/reviewer-performance.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/raw/plugins/development-harness/agents/reviewer-performance.md",
+      "bytes": 1740,
+      "sha256": "74fd154baeab2c20388e3c2968c2f27c936773cd336e18739cea2af5af1cc9a9",
+      "git_blob_sha1": "d70bd4916a5eafc70f14b9532801d44ffc982238"
+    },
+    {
+      "path": "plugins/development-harness/agents/reviewer-quality.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/raw/plugins/development-harness/agents/reviewer-quality.md",
+      "bytes": 1728,
+      "sha256": "a7edb5f5ff04c75089f231a710cbb29b5ca7bc31977bbcdbe9b59ada250cfa34",
+      "git_blob_sha1": "e3a807ec0df4e63f0bae6b8fb1ec5fb597a6f1b9"
+    },
+    {
+      "path": "plugins/development-harness/agents/reviewer-security.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/raw/plugins/development-harness/agents/reviewer-security.md",
+      "bytes": 1718,
+      "sha256": "7d641006d7cd0d69428e0856a9e7a77fea3f490f18f8f26af3983cdee97bab3d",
+      "git_blob_sha1": "c81714ddb27f92e0b24236490be16cb6f79ace9d"
+    },
+    {
+      "path": "plugins/development-harness/agents/task-worker.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/raw/plugins/development-harness/agents/task-worker.md",
+      "bytes": 5971,
+      "sha256": "05a3af180ff2ef050ab1500eea887615b60b3fc22aba865e58eda2327d890894",
+      "git_blob_sha1": "8b8cd529072211427aa3cd30c553dfdcf47a6bf4"
+    },
+    {
+      "path": "plugins/development-harness/backlog_core/backend_protocol.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/backlog_core/backend_protocol.py",
+      "bytes": 6805,
+      "sha256": "aab670437c0177081d7cb3aab45ce418b125f8d0993b234e1c92c49db30dc762",
+      "git_blob_sha1": "9ac2b06a94f37e4c1230d7f840166b7202516ab9"
+    },
+    {
+      "path": "plugins/development-harness/backlog_core/backends/github_content_migration.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/backlog_core/backends/github_content_migration.py",
+      "bytes": 21389,
+      "sha256": "c518e36cd4248ecc8ee96796c38f04a311f88553242e62d016334a26faee7616",
+      "git_blob_sha1": "759af6c6408757fb87a8bf218b0b3d2563fa456f"
+    },
+    {
+      "path": "plugins/development-harness/backlog_core/backends/memory_backend.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/backlog_core/backends/memory_backend.py",
+      "bytes": 35384,
+      "sha256": "5c3f0b64a5a7839fb348412c9ec5e93493afa07e352208b3c3fce99e0955f049",
+      "git_blob_sha1": "3cb1e3f475af021b60cfec1c91495183bb6012d1"
+    },
+    {
+      "path": "plugins/development-harness/backlog_core/server.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/raw/plugins/development-harness/backlog_core/server.py",
+      "bytes": 207167,
+      "sha256": "fcf7819e79e62f3c161b047e308a9279edf926749d33fe1ca360dda596a1c4d0",
+      "git_blob_sha1": "182ee72d4f86bf5b09027f70fc7a51b064fb1cea"
+    },
+    {
+      "path": "plugins/development-harness/dh_config.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/dh_config.py",
+      "bytes": 6845,
+      "sha256": "519d4c11690aa93e99f56737cbc1e0783f93b66c0634b4c11326c82d934a79ab",
+      "git_blob_sha1": "d7853c1f139cb2d160bc03a49b43c345b4c5327b"
+    },
+    {
+      "path": "plugins/development-harness/dh_core/operations.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/dh_core/operations.py",
+      "bytes": 92120,
+      "sha256": "626fc91943ba0124bc8f18c8c2709b566eebf2e39a8b4dae29fbd99258b2d7f7",
+      "git_blob_sha1": "ef803762207ffc2151ed24dedb2d7bd4e1cc5373"
+    },
+    {
+      "path": "plugins/development-harness/dh_paths.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/dh_paths.py",
+      "bytes": 22245,
+      "sha256": "0c1da37b460b9cc2b2375cca920042dc4d33251ed31bf92a51773dd71ba3de3f",
+      "git_blob_sha1": "06e779d97d1589f3821155419252ae215a9a4a9c"
+    },
+    {
+      "path": "plugins/development-harness/docs/backend-providers.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/docs/backend-providers.md",
+      "bytes": 29319,
+      "sha256": "e0b9de02bf69fd08801a3eb3dcb33cb75f06e4832c8f6ed008603534c49fec58",
+      "git_blob_sha1": "e6818952140c6df18c1e314389c902a4c615509f"
+    },
+    {
+      "path": "plugins/development-harness/docs/impact-analysis-gap-supplement.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-principles-raw-dd515581befd4dc6a868e5a311bf6f39/raw/plugins/development-harness/docs/impact-analysis-gap-supplement.md",
+      "bytes": 7983,
+      "sha256": "06d9190943c4dee71adfcd02e77b312daefddda36ec39077e0379c1053f8c588",
+      "git_blob_sha1": "d4df1e97d0870f6d4e4ea3b5537ed4615d6cb2d4"
+    },
+    {
+      "path": "plugins/development-harness/docs/impact-analysis-principals.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-principles-raw-dd515581befd4dc6a868e5a311bf6f39/raw/plugins/development-harness/docs/impact-analysis-principals.md",
+      "bytes": 21095,
+      "sha256": "56c3108e02875d5a463d5613066480e689906a755472c95c4e95413a085fe512",
+      "git_blob_sha1": "0e7412056a9e98f7a6bc9cc63e6d19bb7db63cc6"
+    },
+    {
+      "path": "plugins/development-harness/docs/plan-artifact-lifecycle.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/docs/plan-artifact-lifecycle.md",
+      "bytes": 11213,
+      "sha256": "9b4f565a7fc425a31bd0847dd0c2b2085aec8a03d2ea8bd52cec29fb406846b9",
+      "git_blob_sha1": "da1a3f2b78a51ec6c921a49499d6651fdcb90360"
+    },
+    {
+      "path": "plugins/development-harness/docs/review-methods.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/docs/review-methods.md",
+      "bytes": 6563,
+      "sha256": "f80b98e7c0e28c5f096e784530e57992373aee28e721ffa691927ebe4871150e",
+      "git_blob_sha1": "ecd6db7e1b42802716d1c6d4c5d691384699a6bd"
+    },
+    {
+      "path": "plugins/development-harness/docs/review-principles.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-principles-raw-dd515581befd4dc6a868e5a311bf6f39/raw/plugins/development-harness/docs/review-principles.md",
+      "bytes": 4602,
+      "sha256": "69e12462ae7cda5735a59a118e7cb14f05221e8cc5e4c74f5d36bdd90c3bb3ec",
+      "git_blob_sha1": "2424222cff2e9f996ce9c13216916b4decab11c9"
+    },
+    {
+      "path": "plugins/development-harness/docs/testing-principles.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-testing-principles-raw-6f4e8bda42754bb9b06786cf35dca0b3/raw/plugins/development-harness/docs/testing-principles.md",
+      "bytes": 25260,
+      "sha256": "109ec55cc72ba8fa44c59dc92c936a9f0229cf2253ed1e7b501399a0eb3ec53c",
+      "git_blob_sha1": "1d5eaadbdf915eb3c43e51ecd3f81b27fe9b2ca2"
+    },
+    {
+      "path": "plugins/development-harness/docs/work-ledger/runner-contract.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/docs/work-ledger/runner-contract.md",
+      "bytes": 4539,
+      "sha256": "b9548130076fcce7f6e330eedb0bcaf908faa78a245d11a34839661631125da0",
+      "git_blob_sha1": "d5ee852cbeab8861ee58672ab58320347dcaf008"
+    },
+    {
+      "path": "plugins/development-harness/hooks/hooks.json",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/hooks/hooks.json",
+      "bytes": 1980,
+      "sha256": "bc1cf1f793de2b34ac7595d93627a8bac9c2a8e95ca87729f216c1a307806dc3",
+      "git_blob_sha1": "95cce480db89c663201efe4f68bffde5fb99f8f5"
+    },
+    {
+      "path": "plugins/development-harness/hooks/session-start-session-id.cjs",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/hooks/session-start-session-id.cjs",
+      "bytes": 2387,
+      "sha256": "bdd017588f453796d51593e691b9135ff98e5432bb303413bcbeebf7cb33b214",
+      "git_blob_sha1": "e14dede17ca3aae5b4fab834b1d55bc84569e4f9"
+    },
+    {
+      "path": "plugins/development-harness/sam_schema/artifacts.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/sam_schema/artifacts.py",
+      "bytes": 2563,
+      "sha256": "d7b6ee4ca93e8749316a67f70d3b7d407a3f29cb489b1e9b0c07abc8767b0acc",
+      "git_blob_sha1": "de883110da14d4a747d256bcb94bc5d57a7c059c"
+    },
+    {
+      "path": "plugins/development-harness/sam_schema/cli.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/sam_schema/cli.py",
+      "bytes": 3570,
+      "sha256": "6389e4c802d1aa99e6294b54cd4ab0d6bc482c3bc52a4ee1326e3a75d49ed2d7",
+      "git_blob_sha1": "46c2ed3cc42cbb4503ad7e71cd5a64e6f3ab431d"
+    },
+    {
+      "path": "plugins/development-harness/sam_schema/cli_active_task.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/sam_schema/cli_active_task.py",
+      "bytes": 7567,
+      "sha256": "e4424e4f8e8939eb54e5040a945279268c8b1cff28dd7fa869da3d75e07e2473",
+      "git_blob_sha1": "aa1cc090de1e12ccdd4bdfbb1a1bd438299b5aa9"
+    },
+    {
+      "path": "plugins/development-harness/sam_schema/core/action_models.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/sam_schema/core/action_models.py",
+      "bytes": 21778,
+      "sha256": "2d7e989589b1570fab8a0c9ab4f57e20272aa78f7a094c4c42da9d1d53ac7275",
+      "git_blob_sha1": "0f8b76460456d9042daf5268df3c90b1252ad4cb"
+    },
+    {
+      "path": "plugins/development-harness/sam_schema/core/addressing.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/sam_schema/core/addressing.py",
+      "bytes": 15843,
+      "sha256": "378442f7814351ba8e70a9586ca046b7e8d66e3361637c05f5cf55406e746a84",
+      "git_blob_sha1": "203ecbe976c6da5f77afcc954e50c5f010068f00"
+    },
+    {
+      "path": "plugins/development-harness/sam_schema/core/backends/content.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/sam_schema/core/backends/content.py",
+      "bytes": 8696,
+      "sha256": "158aa1c16e337588f85df881674b0aa6b7499d35d22302830de8646b2ffdc7d7",
+      "git_blob_sha1": "c69bd88e5f54553476116e5cd10222b0071eb024"
+    },
+    {
+      "path": "plugins/development-harness/sam_schema/core/backends/memory.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/sam_schema/core/backends/memory.py",
+      "bytes": 26696,
+      "sha256": "74113f1aabd5c91c433793976057945e336330116cca62c16dd6852fce464dab",
+      "git_blob_sha1": "b37b47075f861b9079ebf2610fee11eea932a74e"
+    },
+    {
+      "path": "plugins/development-harness/sam_schema/core/context_config.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/sam_schema/core/context_config.py",
+      "bytes": 5510,
+      "sha256": "614160847bf2d039452af7514771e0793b91447f826cfeba2c6af612fdc46e3a",
+      "git_blob_sha1": "07c68886d74785c282876363eb32da38b9372c2f"
+    },
+    {
+      "path": "plugins/development-harness/sam_schema/core/dependencies.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/sam_schema/core/dependencies.py",
+      "bytes": 17308,
+      "sha256": "9483827712faaa323f456a6756e8df3ac68b0a4b9361ba7aefb476d16b91f00d",
+      "git_blob_sha1": "761f4bba400bd07fcae955b4c922ce40331ea48e"
+    },
+    {
+      "path": "plugins/development-harness/sam_schema/core/models.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/sam_schema/core/models.py",
+      "bytes": 33301,
+      "sha256": "1b34de8d3dd7228d0af84f9db2eec6e49b3b15f74ba672f033f3456cce03bd34",
+      "git_blob_sha1": "a6693af04c8e5cb46665810510eba23911f78e7a"
+    },
+    {
+      "path": "plugins/development-harness/sam_schema/sam_plan.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/sam_schema/sam_plan.py",
+      "bytes": 83287,
+      "sha256": "64bd2117bbb4897d135a3ee40b14aad8c1b8176a443b284073f8d9d8802fa67b",
+      "git_blob_sha1": "3d871c3ae2df2f0c595985298bffe0e18a19a94e"
+    },
+    {
+      "path": "plugins/development-harness/sam_schema/server.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/sam_schema/server.py",
+      "bytes": 9270,
+      "sha256": "03ee41c68eb71b6b41ea54e25416c1bbb81289ee040a542fdb0ba1abf23249be",
+      "git_blob_sha1": "90450ae676d522820dbcdab138558082f2670c66"
+    },
+    {
+      "path": "plugins/development-harness/sam_schema/server_backend.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/sam_schema/server_backend.py",
+      "bytes": 3522,
+      "sha256": "e1106ce075745797987c5588d8864ef5f9e9ca8f87cad8e4984155a58dbe2fe7",
+      "git_blob_sha1": "f1ffed439084cf0d4cf79364ddcd6617fd015eae"
+    },
+    {
+      "path": "plugins/development-harness/sam_schema/server_ledger_routing.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/sam_schema/server_ledger_routing.py",
+      "bytes": 4310,
+      "sha256": "2c9054da90585b36f40cc985acf62a9401833093dcf267078e1eef2e5f6fef78",
+      "git_blob_sha1": "bfe63e78c46dd1f1309ad100cb718cd25c313fab"
+    },
+    {
+      "path": "plugins/development-harness/sam_schema/server_plan_ops.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/sam_schema/server_plan_ops.py",
+      "bytes": 20439,
+      "sha256": "9ced2288e1694da29798b4d32015fafa2f791c43ac831faf5a69c41309725c42",
+      "git_blob_sha1": "7f0f6ceef9c33d4f8879ab139e2cd49ff35a5ea7"
+    },
+    {
+      "path": "plugins/development-harness/sam_schema/server_task_ops.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/sam_schema/server_task_ops.py",
+      "bytes": 6895,
+      "sha256": "8a2be0b93f0744464c4c940835777544200ca75c4b69871c8b6146bec8ae97bf",
+      "git_blob_sha1": "236676319660855485d121be8fec643dcf015da4"
+    },
+    {
+      "path": "plugins/development-harness/scripts/dh_mcp_preinit.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/scripts/dh_mcp_preinit.py",
+      "bytes": 1477,
+      "sha256": "c00e86f118526b2c4280b0b751fe43f02ff710d6ef8bf3bb3ec970648a1a1c27",
+      "git_blob_sha1": "c5f061be9d891fc56ad01840a1a933a215f70662"
+    },
+    {
+      "path": "plugins/development-harness/scripts/run_backlog_server.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/scripts/run_backlog_server.py",
+      "bytes": 2760,
+      "sha256": "852cf0808c557f172cd58c162e1d3549ad2075069da05fe20730b8086478a6d9",
+      "git_blob_sha1": "e7daef4469864dc3c60d16ab02537a498140ab1f"
+    },
+    {
+      "path": "plugins/development-harness/scripts/run_bounded.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/scripts/run_bounded.py",
+      "bytes": 4435,
+      "sha256": "58bfa4354ea02749bfd25cd436f8a905bf137a95dd5f7606fe90171179600a95",
+      "git_blob_sha1": "60f9fa3f5ab58262cf5e34a32537fe9c84ce992a"
+    },
+    {
+      "path": "plugins/development-harness/scripts/run_sam_server.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/scripts/run_sam_server.py",
+      "bytes": 831,
+      "sha256": "4892552c6236347e09b53714de116455fb5cfb11c1ab427afd20834f5b85d9b5",
+      "git_blob_sha1": "6cad5d19e06c917f8188d9644613b4d7da2b06de"
+    },
+    {
+      "path": "plugins/development-harness/skills/analyze-change-impact/SKILL.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-principles-raw-dd515581befd4dc6a868e5a311bf6f39/raw/plugins/development-harness/skills/analyze-change-impact/SKILL.md",
+      "bytes": 1950,
+      "sha256": "c0b6db68307fb2c523c6072f33a1aae4afd713ec770e4c688f0e7b3af6302867",
+      "git_blob_sha1": "b38afe037163d50106497dccf37140d22d071522"
+    },
+    {
+      "path": "plugins/development-harness/skills/comprehensive-test-review/SKILL.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-test-method-ecosystems-raw-3971393ce546420a90f21a3fe276461a/raw/plugins/development-harness/skills/comprehensive-test-review/SKILL.md",
+      "bytes": 983,
+      "sha256": "196a4139c2be6ee9bfa5d56c61612d3c526b7d8553285b64c21f1e05cb13f5f2",
+      "git_blob_sha1": "c32b11a70f2235ca5eb1e5d8b2778309f7d0d39a"
+    },
+    {
+      "path": "plugins/development-harness/skills/dh-cli-usage/SKILL.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/skills/dh-cli-usage/SKILL.md",
+      "bytes": 2417,
+      "sha256": "832159c59c8fe29de2abbad1cae9321cd604803af2fa1ca31d8563c769b2437c",
+      "git_blob_sha1": "d3fcb531b8941f39c07acb3e32ce4afd0e88c0c7"
+    },
+    {
+      "path": "plugins/development-harness/skills/dh-cli-usage/references/mcp-connection-check.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/skills/dh-cli-usage/references/mcp-connection-check.md",
+      "bytes": 1797,
+      "sha256": "f1d8465d53e3a9287787592d161bc8f586816952334e33c4e8197c7ba6a44900",
+      "git_blob_sha1": "0ae319886c7c54273ba17664f8268fba56a45853"
+    },
+    {
+      "path": "plugins/development-harness/skills/dispatch-contract/SKILL.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/raw/plugins/development-harness/skills/dispatch-contract/SKILL.md",
+      "bytes": 1956,
+      "sha256": "794deba2b671198f79870b120fe280919f550591efbcff5c37faba7beac650e5",
+      "git_blob_sha1": "06ec26349d37a942f4d1482c34a512a858328161"
+    },
+    {
+      "path": "plugins/development-harness/skills/file-classification/SKILL.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/skills/file-classification/SKILL.md",
+      "bytes": 350,
+      "sha256": "34cab0ec306eebedc9303d4293281155c073a12f94f7e89045e6cfd29a1e98cf",
+      "git_blob_sha1": "389d18f907b5a1a77f250e70cb9d782310e34a6a"
+    },
+    {
+      "path": "plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-task-hook-raw-cea6bddbe3094ddc912e3da64947602f/raw/plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py",
+      "bytes": 30162,
+      "sha256": "c91d3ce5ca34e94e0e2a74c89f03c4ecd18867eecd2f6255c42ff5da44b2a74e",
+      "git_blob_sha1": "cbeb529f80977644fd795f5e180342762f8c5f38"
+    },
+    {
+      "path": "plugins/development-harness/skills/multi-perspective-review/SKILL.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/raw/plugins/development-harness/skills/multi-perspective-review/SKILL.md",
+      "bytes": 17886,
+      "sha256": "4e01effe5dd69925332055f331666b3f19f9c5c548495b426b386414ccfa7405",
+      "git_blob_sha1": "545a2edec509d8b4576c755123a72251155a9a09"
+    },
+    {
+      "path": "plugins/development-harness/skills/multi-perspective-review/references/dispatch-flow.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/raw/plugins/development-harness/skills/multi-perspective-review/references/dispatch-flow.md",
+      "bytes": 5889,
+      "sha256": "6d207ee471d7fdd96918c2b0f3d6107e0e6fb67180b06bbb0c3181d8e1eb685d",
+      "git_blob_sha1": "2bed9605a1590e4afd65f4f4887bed34374a0363"
+    },
+    {
+      "path": "plugins/development-harness/skills/multi-perspective-review/scripts/gen_run_stamp.py",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/raw/plugins/development-harness/skills/multi-perspective-review/scripts/gen_run_stamp.py",
+      "bytes": 1028,
+      "sha256": "fa2b453d81ece047c34118d45598caa08889301165b0114481bed9a5c4d1898b",
+      "git_blob_sha1": "4dbd6954ddde1d20c8220c3f2dcb9eccfdba5988"
+    },
+    {
+      "path": "plugins/development-harness/skills/review-accessibility-change/SKILL.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/skills/review-accessibility-change/SKILL.md",
+      "bytes": 1072,
+      "sha256": "c19ff738962a840782cb184849a93b8819bf42fed6964538132d7ffa521aa07d",
+      "git_blob_sha1": "9effc3c7efcc41d7487d49e2b544319e9ed1d1a8"
+    },
+    {
+      "path": "plugins/development-harness/skills/review-performance-change/SKILL.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/skills/review-performance-change/SKILL.md",
+      "bytes": 1067,
+      "sha256": "0a615bef87620e0f79df8236cc7294be5f36321740c3b32bbb2c321b4d89e3ee",
+      "git_blob_sha1": "efef3b21d828122b78789ab679682cb43035287a"
+    },
+    {
+      "path": "plugins/development-harness/skills/review-quality-change/SKILL.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/skills/review-quality-change/SKILL.md",
+      "bytes": 1061,
+      "sha256": "92cc42d7847a19db8b70391967d515e1863ee76feb9c78417852c80555b807c2",
+      "git_blob_sha1": "2e1dfb2995c1bb8c1175292f237b8e47be5acd4a"
+    },
+    {
+      "path": "plugins/development-harness/skills/review-security-change/SKILL.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/skills/review-security-change/SKILL.md",
+      "bytes": 1211,
+      "sha256": "73225d29c4d0dd8a78e4c7ba5dd55794454c38122ea40135af5b62ca98f0d1ac",
+      "git_blob_sha1": "6cc7ea32b3e5a1c3684a8139daba8de9251b6ce9"
+    },
+    {
+      "path": "plugins/development-harness/skills/review-verdict-contract/SKILL.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/raw/plugins/development-harness/skills/review-verdict-contract/SKILL.md",
+      "bytes": 528,
+      "sha256": "cc9874a3c954a37c1152e93a364770d69fca4fc30def1989004360d681e42b70",
+      "git_blob_sha1": "62c422fef404f1ede6322ff8b259856c95d23ffc"
+    },
+    {
+      "path": "plugins/development-harness/skills/review-verdict-contract/references/verdict-schema.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/raw/plugins/development-harness/skills/review-verdict-contract/references/verdict-schema.md",
+      "bytes": 15208,
+      "sha256": "d7942955e8814dc32513315dc7a9d2aea836ddc3e53a8366f784b6438536c4b2",
+      "git_blob_sha1": "8fe898be22e71f8f0ba3de324a76205ce2b2a22d"
+    },
+    {
+      "path": "plugins/development-harness/skills/root-cause-tracing-process/SKILL.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-principles-raw-dd515581befd4dc6a868e5a311bf6f39/raw/plugins/development-harness/skills/root-cause-tracing-process/SKILL.md",
+      "bytes": 13702,
+      "sha256": "57b61b31ca47184ecabb89a24fd29e78190b260ecd7c30916325cf88aa7b9aa7",
+      "git_blob_sha1": "932d3c1ab2c944682389cd5d6af505dcb63cc5e1"
+    },
+    {
+      "path": "plugins/development-harness/skills/start-task/SKILL.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/raw/plugins/development-harness/skills/start-task/SKILL.md",
+      "bytes": 10587,
+      "sha256": "4f790099e26f2fac961f4390456be8fe1fd7cd657b43e31bbb4f0d48e10e3fc7",
+      "git_blob_sha1": "c30c6751b1fa86665217f25c9198ed5d07b55a96"
+    },
+    {
+      "path": "plugins/development-harness/skills/subagent-contract/SKILL.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/raw/plugins/development-harness/skills/subagent-contract/SKILL.md",
+      "bytes": 6093,
+      "sha256": "d791f07637e98ced84b54829d24a54210de6a96f5f9b2859de0a4fa8eb57ca2a",
+      "git_blob_sha1": "28567aaa063cd9a7d49487de2de8fe2bb81247bb"
+    },
+    {
+      "path": "plugins/development-harness/skills/synthesize-review-findings/SKILL.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/skills/synthesize-review-findings/SKILL.md",
+      "bytes": 960,
+      "sha256": "21377cd93337f22027919f6b19d4255e76e08f362198e4e9e24465bd9a4ea0ad",
+      "git_blob_sha1": "7a302b18c26b23f939f5e0653ffa024991b94aad"
+    },
+    {
+      "path": "plugins/development-harness/skills/test-designer/SKILL.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/skills/test-designer/SKILL.md",
+      "bytes": 4341,
+      "sha256": "3d55d51aa3ffd79f6ab4c8e9733646d853d3e66db9de874008045053431da5fa",
+      "git_blob_sha1": "293cb542c77b43ccacaf6d5d2a7b1250b9bd671f"
+    },
+    {
+      "path": "plugins/development-harness/skills/test-designer/references/interaction-coverage.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/skills/test-designer/references/interaction-coverage.md",
+      "bytes": 3038,
+      "sha256": "4a745232a8cd77a177e7ab1e45868baec0b3c34f4fae615c2cda9c81991fbf4d",
+      "git_blob_sha1": "07fa7d8bc404af217d8c2a7f1bb445a8a64c54b3"
+    },
+    {
+      "path": "plugins/development-harness/skills/test-failure-mindset/SKILL.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-test-method-ecosystems-raw-3971393ce546420a90f21a3fe276461a/raw/plugins/development-harness/skills/test-failure-mindset/SKILL.md",
+      "bytes": 4769,
+      "sha256": "ee94b662388f4f4e3ecb54110de1396751a8616fe6e59ccd72d14e7165873283",
+      "git_blob_sha1": "512321c95e26ee90af674e62de711c551955a84b"
+    },
+    {
+      "path": "plugins/development-harness/skills/test-reviewer/SKILL.md",
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/skills/test-reviewer/SKILL.md",
+      "bytes": 6878,
+      "sha256": "e2405fddd8af023531b6a0ac82a607868ad4189adc4a81bab0b39013854446a5",
+      "git_blob_sha1": "c70894beb6432e938e29da4b7e50d9135bc86fb7"
+    }
+  ],
+  "byte_span_convention": "UTF8 zero-based start-inclusive/end-exclusive; lines one-based end-inclusive; quotes preserve original bytes/newlines",
+  "required_source_closure": [
+    {
+      "path": "plugins/development-harness/dh_config.py",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/dh_config.py"
+    },
+    {
+      "path": "plugins/development-harness/dh_paths.py",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/dh_paths.py"
+    },
+    {
+      "path": "plugins/development-harness/docs/backend-providers.md",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/docs/backend-providers.md"
+    },
+    {
+      "path": "plugins/development-harness/docs/impact-analysis-gap-supplement.md",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-principles-raw-dd515581befd4dc6a868e5a311bf6f39/raw/plugins/development-harness/docs/impact-analysis-gap-supplement.md"
+    },
+    {
+      "path": "plugins/development-harness/docs/impact-analysis-principals.md",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-principles-raw-dd515581befd4dc6a868e5a311bf6f39/raw/plugins/development-harness/docs/impact-analysis-principals.md"
+    },
+    {
+      "path": "plugins/development-harness/docs/plan-artifact-lifecycle.md",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/docs/plan-artifact-lifecycle.md"
+    },
+    {
+      "path": "plugins/development-harness/docs/review-methods.md",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/docs/review-methods.md"
+    },
+    {
+      "path": "plugins/development-harness/docs/review-principles.md",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-principles-raw-dd515581befd4dc6a868e5a311bf6f39/raw/plugins/development-harness/docs/review-principles.md"
+    },
+    {
+      "path": "plugins/development-harness/docs/testing-principles.md",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-testing-principles-raw-6f4e8bda42754bb9b06786cf35dca0b3/raw/plugins/development-harness/docs/testing-principles.md"
+    },
+    {
+      "path": "plugins/development-harness/docs/work-ledger/runner-contract.md",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/docs/work-ledger/runner-contract.md"
+    },
+    {
+      "path": "plugins/development-harness/hooks/session-start-session-id.cjs",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/hooks/session-start-session-id.cjs"
+    },
+    {
+      "path": "plugins/development-harness/scripts/dh_mcp_preinit.py",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/scripts/dh_mcp_preinit.py"
+    },
+    {
+      "path": "plugins/development-harness/scripts/run_backlog_server.py",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/scripts/run_backlog_server.py"
+    },
+    {
+      "path": "plugins/development-harness/scripts/run_bounded.py",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/scripts/run_bounded.py"
+    },
+    {
+      "path": "plugins/development-harness/scripts/run_sam_server.py",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/scripts/run_sam_server.py"
+    },
+    {
+      "path": "plugins/development-harness/skills/analyze-change-impact/SKILL.md",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-principles-raw-dd515581befd4dc6a868e5a311bf6f39/raw/plugins/development-harness/skills/analyze-change-impact/SKILL.md"
+    },
+    {
+      "path": "plugins/development-harness/skills/comprehensive-test-review/SKILL.md",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-test-method-ecosystems-raw-3971393ce546420a90f21a3fe276461a/raw/plugins/development-harness/skills/comprehensive-test-review/SKILL.md"
+    },
+    {
+      "path": "plugins/development-harness/skills/dh-cli-usage/SKILL.md",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/skills/dh-cli-usage/SKILL.md"
+    },
+    {
+      "path": "plugins/development-harness/skills/file-classification/SKILL.md",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/skills/file-classification/SKILL.md"
+    },
+    {
+      "path": "plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-task-hook-raw-cea6bddbe3094ddc912e3da64947602f/raw/plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py"
+    },
+    {
+      "path": "plugins/development-harness/skills/review-accessibility-change/SKILL.md",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/skills/review-accessibility-change/SKILL.md"
+    },
+    {
+      "path": "plugins/development-harness/skills/review-performance-change/SKILL.md",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/skills/review-performance-change/SKILL.md"
+    },
+    {
+      "path": "plugins/development-harness/skills/review-quality-change/SKILL.md",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/skills/review-quality-change/SKILL.md"
+    },
+    {
+      "path": "plugins/development-harness/skills/review-security-change/SKILL.md",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/skills/review-security-change/SKILL.md"
+    },
+    {
+      "path": "plugins/development-harness/skills/root-cause-tracing-process/SKILL.md",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-principles-raw-dd515581befd4dc6a868e5a311bf6f39/raw/plugins/development-harness/skills/root-cause-tracing-process/SKILL.md"
+    },
+    {
+      "path": "plugins/development-harness/skills/synthesize-review-findings/SKILL.md",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/skills/synthesize-review-findings/SKILL.md"
+    },
+    {
+      "path": "plugins/development-harness/skills/test-designer/SKILL.md",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/skills/test-designer/SKILL.md"
+    },
+    {
+      "path": "plugins/development-harness/skills/test-designer/references/interaction-coverage.md",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/skills/test-designer/references/interaction-coverage.md"
+    },
+    {
+      "path": "plugins/development-harness/skills/test-failure-mindset/SKILL.md",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-test-method-ecosystems-raw-3971393ce546420a90f21a3fe276461a/raw/plugins/development-harness/skills/test-failure-mindset/SKILL.md"
+    },
+    {
+      "path": "plugins/development-harness/skills/test-reviewer/SKILL.md",
+      "present_at_this_pin_in_raw_inputs": true,
+      "actual_same_pin_absence_evidenced": false,
+      "raw_path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/20261012-review-raw-7fa1c1a7f1b141e989333734086795b1/raw/plugins/development-harness/skills/test-reviewer/SKILL.md"
+    }
+  ]
+}

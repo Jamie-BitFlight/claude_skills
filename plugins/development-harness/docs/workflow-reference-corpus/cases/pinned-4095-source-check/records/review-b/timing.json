@@ -1,0 +1,13 @@
+{
+  "started_unix": 1791782216.769964,
+  "finished_unix": 1791782736.520137,
+  "elapsed_wall_seconds": 519.7501730918884,
+  "measurement": "Shared continuation wall-clock from both-pin inventory; per-case-exclusive time unavailable",
+  "per_case_exclusive_elapsed_seconds": null,
+  "input_tokens": null,
+  "output_tokens": null,
+  "total_tokens": null,
+  "tool_calls": null,
+  "model": "openai/gpt-6.1-sol",
+  "harness": "Claude Agent SDK team session"
+}

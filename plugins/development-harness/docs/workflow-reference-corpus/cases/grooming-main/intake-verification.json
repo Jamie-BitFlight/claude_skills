@@ -1,0 +1,756 @@
+{
+  "status": "PASS_MECHANICAL_INTAKE_ONLY",
+  "source_revision": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+  "archive_sha256": "774119606e49dec3bcbc41623c290d18467a0141fb5a0bf55b6fd75f648ff14d",
+  "runs": [
+    {
+      "id": "actor-a/final",
+      "original_path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-runs/groom-A/attempt2-20261012T050559Z",
+      "package_path": "./records/actor-a/final/run.json",
+      "run_sha256": "6bf057d575158742d3d327cb6f398708084b94e6bf7cfd705896c7e2d3047c2e",
+      "freeze": "2026-10-12T06:00:40.681042+00:00",
+      "verified_files": [
+        {
+          "path": "source-question.md",
+          "sha256": "184c23f3d99266dc347cd5eba52e77941b40aeb00e7fb848cbcbb2c53bc5540f",
+          "bytes": 870
+        },
+        {
+          "path": "source-packet.json",
+          "sha256": "addd49d696f49ac1104c72867e8257abdec3d0d537c73731eb6f4d7666ac38be",
+          "bytes": 1023519
+        },
+        {
+          "path": "trace-output.json",
+          "sha256": "80dfbcda81298733cb5bd2e3ef8cdc76f88e4601fb5d0feed082fc0716febbda",
+          "bytes": 930958
+        },
+        {
+          "path": "check-output.json",
+          "sha256": "49d8d0db1c809b3f7bfa315e9e2c072d45f93aa58456ec19d52d008dcba0fb86",
+          "bytes": 344381
+        },
+        {
+          "path": "exposure.json",
+          "sha256": "c10202bff1076f7c0646670db72ec09b077c77c6049a5c349a7d0e23548cb24c",
+          "bytes": 80669
+        },
+        {
+          "path": "timing.json",
+          "sha256": "97d206b5f8e69de512966a5a120cbd79f7d4c8d79996fc1e88b5ead1e4af7d0d",
+          "bytes": 642
+        },
+        {
+          "path": "metadata_builder.py",
+          "sha256": "fd4123fe2eec70db21d6dd144958603dd6dec9c8b415e8d1d5c6653897fa1278",
+          "bytes": 27014
+        },
+        {
+          "path": "metadata_nested.py",
+          "sha256": "46928e61c78827479aa9b127bb56a76ede83bb3903b979121417a006e5359950",
+          "bytes": 21378
+        },
+        {
+          "path": "metadata_checks.py",
+          "sha256": "02b2867ca5483f92980bcf4170fe7b94c3139d820e3f5b76d75f8d378a118785",
+          "bytes": 22124
+        },
+        {
+          "path": "metadata_finalize.py",
+          "sha256": "afe16b427382ca9cf20f4e168ea8e93a6d1f54af58916d3417edae629e7e835a",
+          "bytes": 22669
+        },
+        {
+          "path": "continue_builder.py",
+          "sha256": "ecb380e155ef699630d1df298e93ea29eb39ae80ff439b0475f62bba1fc0e82e",
+          "bytes": 7429
+        },
+        {
+          "path": "expanded_sources.py",
+          "sha256": "103b0d1bde6b26093723a380044f2ef56ae535423a90041f5c2de07bcbb234f6",
+          "bytes": 43146
+        },
+        {
+          "path": "expanded_more.py",
+          "sha256": "d0d281e6486f3c7aad7fa2d3ae3e83356107e28479431d47923a9d08eb0a3fbe",
+          "bytes": 7216
+        },
+        {
+          "path": "raw_tail.py",
+          "sha256": "32a926a14a328e226382179545dac3ee6f5f11d274c4bda73c2881167d7f1f4a",
+          "bytes": 1582
+        },
+        {
+          "path": "linked_closure.py",
+          "sha256": "59eb307f9237ec980359540cf9548d456b0b80237182215c2dbb7e22def19ea6",
+          "bytes": 14283
+        },
+        {
+          "path": "final_closure.py",
+          "sha256": "b864fb68133937159cbeeff6435eb2a7e8513294c630d7129b0bb2b24c79a905",
+          "bytes": 16221
+        },
+        {
+          "path": "extra_raw_bindings.json",
+          "sha256": "35a55e550f15427eae3145b1900dcd168942bf024a90e8fc3313188ad2e20b8f",
+          "bytes": 1030
+        }
+      ]
+    },
+    {
+      "id": "actor-b/initial",
+      "original_path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-runs/groom-B",
+      "package_path": "./records/actor-b/initial/run.json",
+      "run_sha256": "6a2deb84deeb278b5fb82701470dfcc3276daf50ea386444e28e1f05801f1607",
+      "freeze": "2026-10-12T05:07:49.781591+00:00",
+      "verified_files": [
+        {
+          "path": "source-packet.json",
+          "sha256": "1b488d3508e458d512810632ef9ec7f54895bd24798151b1c5471676d69c0fc3",
+          "bytes": 37635
+        },
+        {
+          "path": "source-question.md",
+          "sha256": "b10003b3c4b270c1252ceba6b385dcef19dcc9a022099f06bc791a3ed24966dd",
+          "bytes": 2035
+        },
+        {
+          "path": "trace-output.json",
+          "sha256": "eda5990f9842a9da4fc987b22e77935cbb259b231fc2bebde10fae7186f120ac",
+          "bytes": 70718
+        },
+        {
+          "path": "check-output.json",
+          "sha256": "f0ec608a7ca15217c2cf89454538cc8e3bfac923ad1a86626e308c53c74af20c",
+          "bytes": 19341
+        },
+        {
+          "path": "exposure.json",
+          "sha256": "c5dd934da505701085e70c7bffcf6fa8f47e9b0c261a881a223b044fed64bf72",
+          "bytes": 3573
+        },
+        {
+          "path": "timing.json",
+          "sha256": "236c72d3385a70d1f6dd99333c890d7bcf667c2d785d45f0f02bb9d7983fef07",
+          "bytes": 2561
+        }
+      ]
+    },
+    {
+      "id": "actor-b/attempt-2",
+      "original_path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-runs/groom-B/attempt-2",
+      "package_path": "./records/actor-b/attempt-2/run.json",
+      "run_sha256": "f409cf69a1faf0b694797c171616f2024975bfc542a6371cdc610f51db833102",
+      "freeze": "2026-10-12T05:23:36.706947+00:00",
+      "verified_files": [
+        {
+          "path": "source-packet.json",
+          "sha256": "2f89e5e2c4fd221b26d3c43af3e982b8e9158946169f912708e818eaf9411b90",
+          "bytes": 28209
+        },
+        {
+          "path": "source-question.md",
+          "sha256": "969031fb8256175b3a566ebcc344ec3401740c0874f0aa3e028043a38116c81b",
+          "bytes": 1846
+        },
+        {
+          "path": "trace-output.json",
+          "sha256": "e9476097fc9b5871026e398e939bb2dd7fff1f547d55569039cc740c2b37ddcf",
+          "bytes": 35049
+        },
+        {
+          "path": "check-output.json",
+          "sha256": "90d1a4be476a9106256a9709ae0a833f2ebbfec32075452ef04d3a601d666748",
+          "bytes": 13664
+        },
+        {
+          "path": "exposure.json",
+          "sha256": "59d23468a509008f26c43de4b48b901c6dca7197060df434efd3b31933f3f286",
+          "bytes": 2312
+        },
+        {
+          "path": "timing.json",
+          "sha256": "abfd7b5246d8ea85268f2937b026e667d2c91354e95f140b9677ab7e308c6f29",
+          "bytes": 1982
+        }
+      ]
+    },
+    {
+      "id": "actor-b/attempt-3",
+      "original_path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-runs/groom-B/attempt-3",
+      "package_path": "./records/actor-b/attempt-3/run.json",
+      "run_sha256": "7151f71b0ffdfafab1093c7761838e242eafe3cbab63e960e5289eae78d2d461",
+      "freeze": "2026-10-12T05:33:20.196635+00:00",
+      "verified_files": [
+        {
+          "path": "source-packet.json",
+          "sha256": "8fc2d35779372f959b4cc4c24f5800fa33990ba3974ceff887013950b4d4f35c",
+          "bytes": 14947
+        },
+        {
+          "path": "source-question.md",
+          "sha256": "df182db2ce0f435a8205efc8ab87bb2e0f954405558caf87ed60940c1f9d2e0a",
+          "bytes": 1627
+        },
+        {
+          "path": "trace-output.json",
+          "sha256": "0527eb6024c46b162f0cda91e118c71edc8a4b66c2faf38794b163a36949ca2e",
+          "bytes": 19482
+        },
+        {
+          "path": "check-output.json",
+          "sha256": "7a45d12d6844ae40a8cb801db4928aba297e3767552d974845395e545cb4cf1a",
+          "bytes": 9483
+        },
+        {
+          "path": "exposure.json",
+          "sha256": "98bafe9e658357bc4895e38709862cca7949da11a1a627f22063a41e848d77db",
+          "bytes": 2176
+        },
+        {
+          "path": "timing.json",
+          "sha256": "84deb4e9089daee6362c007222cea3ccbffbcbad974c2aa68cacb7167672d6fb",
+          "bytes": 1201
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "path": "plugins/development-harness/AGENTS.md",
+      "bytes": 22786,
+      "sha256": "ceb8ed6a6e74855d00b1cfd7502410b5ced5a11936c361bc991d092ccf5ba1e7",
+      "git_blob_sha1": "f8db253be858c15af8011d980c530bbfb460b931"
+    },
+    {
+      "path": "plugins/development-harness/agents/alignment-analyst.md",
+      "bytes": 16040,
+      "sha256": "0273176762836e72d713bf4c0da951cf9406fff73dd7a7ba7ba872b74ee1ee3e",
+      "git_blob_sha1": "419a57eba20146eb7b94918c0d963813f57524fa"
+    },
+    {
+      "path": "plugins/development-harness/agents/backlog-item-groomer.md",
+      "bytes": 28107,
+      "sha256": "9014262057ac14eef5fa1e39fc54b016f66a8e2ac772abec89fb9cf2472450cb",
+      "git_blob_sha1": "5bb2b4ef5da6b295ff1a6e2d44cc27ee36581f1b"
+    },
+    {
+      "path": "plugins/development-harness/agents/classifier.md",
+      "bytes": 9594,
+      "sha256": "4da17c2c5ca75dcad069190d694856207469505ea3070c3198b2fc1a46402e40",
+      "git_blob_sha1": "426fc19377834f6ebf14fbabc727d38175b2fc02"
+    },
+    {
+      "path": "plugins/development-harness/agents/fact-checker.md",
+      "bytes": 2537,
+      "sha256": "14c793522cd401340c334c0d864b869a7ebe6c3f93a0f4e3e18c29b3d3e0ccbe",
+      "git_blob_sha1": "a35dba658a6522e4d078477dc92486d5b7d92337"
+    },
+    {
+      "path": "plugins/development-harness/agents/impact-analyst.md",
+      "bytes": 3191,
+      "sha256": "47daecad760537e290fc385192b46c915dc1de4efd80aaced0f5ada363a5d505",
+      "git_blob_sha1": "5a3081385bc58ac82a5cb578b6329da3ddba7f65"
+    },
+    {
+      "path": "plugins/development-harness/agents/rtica-assessor.md",
+      "bytes": 14862,
+      "sha256": "86facc5cac28df1d20fb2260896195beb7feef9e876c8d493f4c4489f60b6f29",
+      "git_blob_sha1": "e67f1f5427d11d185e76c690a8d20f8226fa0c3a"
+    },
+    {
+      "path": "plugins/development-harness/agents/task-worker.md",
+      "bytes": 5971,
+      "sha256": "05a3af180ff2ef050ab1500eea887615b60b3fc22aba865e58eda2327d890894",
+      "git_blob_sha1": "8b8cd529072211427aa3cd30c553dfdcf47a6bf4"
+    },
+    {
+      "path": "plugins/development-harness/agents/technical-researcher.md",
+      "bytes": 9397,
+      "sha256": "aa3b54298c3a064455e74db800cf61f64b44543c4232bbe82a297e371589a205",
+      "git_blob_sha1": "913e8200d6121f547f6c74ce4e7879b5f3f97eee"
+    },
+    {
+      "path": "plugins/development-harness/backlog_core/artifact_manifest_store.py",
+      "bytes": 4940,
+      "sha256": "6f4af091ae10b9063b4636b4bc98c1d26459680998249fe641a829c9b5f0e807",
+      "git_blob_sha1": "ae432d66415b6c8e50d98246d55352dffb5e94af"
+    },
+    {
+      "path": "plugins/development-harness/backlog_core/artifact_registry.py",
+      "bytes": 13095,
+      "sha256": "350573e727fe2dda2cfde2b24e45b130d399718b021e1da5cdfb5afcac89f277",
+      "git_blob_sha1": "770995f24ce4677d0705ad41b575b6b590e23b2f"
+    },
+    {
+      "path": "plugins/development-harness/backlog_core/backend_protocol.py",
+      "bytes": 7409,
+      "sha256": "16858d80867250d2fd0a53dfe96e69aeb8e21e7fcf04dbbb922983a91d01d45c",
+      "git_blob_sha1": "bfc86abf3915ae2554b5c2596fb39213bd64daab"
+    },
+    {
+      "path": "plugins/development-harness/backlog_core/backends/beads_backend.py",
+      "bytes": 45190,
+      "sha256": "579d0a430174b18d578a49bb4c6e5140788f61a536a115776d5f26dfdf0ef3d9",
+      "git_blob_sha1": "fa580e78d5f69a2eb3cd53640c7d0e5a7d1fe700"
+    },
+    {
+      "path": "plugins/development-harness/backlog_core/backends/github_backend.py",
+      "bytes": 47975,
+      "sha256": "5638c28461c22da25735068da55cab3c4a41c410e7780e2cd80c27a01a99e902",
+      "git_blob_sha1": "5a524e527582a11594a979fbceb908ff542778b8"
+    },
+    {
+      "path": "plugins/development-harness/backlog_core/backends/github_content_migration.py",
+      "bytes": 21389,
+      "sha256": "c518e36cd4248ecc8ee96796c38f04a311f88553242e62d016334a26faee7616",
+      "git_blob_sha1": "759af6c6408757fb87a8bf218b0b3d2563fa456f"
+    },
+    {
+      "path": "plugins/development-harness/backlog_core/backends/github_work_items.py",
+      "bytes": 63888,
+      "sha256": "d0f66e4e8034a5b9798bc626eb7ce832dbba8f24fa4615a5bc2f7b90cb1be31a",
+      "git_blob_sha1": "dd56b924a5ee2d29a9b047e1753362d560ae6ae7"
+    },
+    {
+      "path": "plugins/development-harness/backlog_core/backends/memory_backend.py",
+      "bytes": 35384,
+      "sha256": "5c3f0b64a5a7839fb348412c9ec5e93493afa07e352208b3c3fce99e0955f049",
+      "git_blob_sha1": "3cb1e3f475af021b60cfec1c91495183bb6012d1"
+    },
+    {
+      "path": "plugins/development-harness/backlog_core/backends/sqlite_backend.py",
+      "bytes": 59718,
+      "sha256": "f4b2eca53c02208303bb2395f35a533c2c08942011c6b7b27fd688bfdc887f8f",
+      "git_blob_sha1": "e09edabd7a3baa92f5f29a91579d36e6fc64c5ad"
+    },
+    {
+      "path": "plugins/development-harness/backlog_core/disclosure_handler.py",
+      "bytes": 27593,
+      "sha256": "7ac042a32371eb4b3524f040dde525a7a28e8e98803e094a048239b078b8ad6c",
+      "git_blob_sha1": "0a2a9a752724cd603cf93bc61f3e0ae201e66995"
+    },
+    {
+      "path": "plugins/development-harness/backlog_core/models.py",
+      "bytes": 90200,
+      "sha256": "9250a35c28b2d1da68fb98ecd467e779b3c1025289eaf4ea3e1ebda746be657f",
+      "git_blob_sha1": "ac49aa67ecde1671c7d1668b2527da5bd43c8453"
+    },
+    {
+      "path": "plugins/development-harness/backlog_core/operations.py",
+      "bytes": 299450,
+      "sha256": "b02ef66b1f47fd468f96afcf0d6b8fd12ff3c53609dd67c30e593ee766658d32",
+      "git_blob_sha1": "37c8b0d598471a278227774b0c7cbe2873bb5ec4"
+    },
+    {
+      "path": "plugins/development-harness/backlog_core/server.py",
+      "bytes": 210066,
+      "sha256": "c8208f620ddf36c5f1f2a481ab1417a76b15f9630bbdc16728c16c033775ec3c",
+      "git_blob_sha1": "3a85be644ba78a0c8d3b539ab299cbc5b7e0b04a"
+    },
+    {
+      "path": "plugins/development-harness/backlog_core/work_item_decisions.py",
+      "bytes": 22032,
+      "sha256": "7d9c1d3143d9b4dce3063029df8c7c35ccb1c1cd367258583d5e6682385591a9",
+      "git_blob_sha1": "d1fbe100c19c7a04de254f715b39a918a41af6fe"
+    },
+    {
+      "path": "plugins/development-harness/dh_config.py",
+      "bytes": 6845,
+      "sha256": "519d4c11690aa93e99f56737cbc1e0783f93b66c0634b4c11326c82d934a79ab",
+      "git_blob_sha1": "d7853c1f139cb2d160bc03a49b43c345b4c5327b"
+    },
+    {
+      "path": "plugins/development-harness/dh_core/artifact_registry.py",
+      "bytes": 10162,
+      "sha256": "f5f33c6d3e7d640435f63c9b3e83e0eabfb9cbaca88997cb8edeba9c172622ae",
+      "git_blob_sha1": "a2e18317e3e63b4e4dd02aa4ecf5690527903d56"
+    },
+    {
+      "path": "plugins/development-harness/dh_core/operations.py",
+      "bytes": 92171,
+      "sha256": "8a2c65a99f75d905f0d9df513a8976c823e9b56bbf041459e2ad9379f041afdf",
+      "git_blob_sha1": "c0a4b7c7ead82e3db825068aa1315c7a8a973825"
+    },
+    {
+      "path": "plugins/development-harness/dh_paths.py",
+      "bytes": 22245,
+      "sha256": "0c1da37b460b9cc2b2375cca920042dc4d33251ed31bf92a51773dd71ba3de3f",
+      "git_blob_sha1": "06e779d97d1589f3821155419252ae215a9a4a9c"
+    },
+    {
+      "path": "plugins/development-harness/docs/artifact-registry.md",
+      "bytes": 5787,
+      "sha256": "268bd66cce8008ab767b7eb19bfca770a445cc2e5251a0c54e582fafa3159884",
+      "git_blob_sha1": "2dfbd884903a8cff9a8deb8e536196b757bc4efe"
+    },
+    {
+      "path": "plugins/development-harness/docs/backend-providers.md",
+      "bytes": 29319,
+      "sha256": "e0b9de02bf69fd08801a3eb3dcb33cb75f06e4832c8f6ed008603534c49fec58",
+      "git_blob_sha1": "e6818952140c6df18c1e314389c902a4c615509f"
+    },
+    {
+      "path": "plugins/development-harness/docs/backlog-item-groomed-schema.md",
+      "bytes": 8861,
+      "sha256": "9e983372b6793ff5d228f3de9f2f1556c4c90003a43677fd7c421bbefe5bc60a",
+      "git_blob_sha1": "fff7463588f1ee56a68c8ae280359914088a7c31"
+    },
+    {
+      "path": "plugins/development-harness/docs/backlog-lifecycle.md",
+      "bytes": 22248,
+      "sha256": "4a774a82b98128f8bf07b9f8ad06847054975f6dd1cf531c268a1db4453be62a",
+      "git_blob_sha1": "e566153b8e8cba4b0c50c50745f45e24182ccd3b"
+    },
+    {
+      "path": "plugins/development-harness/docs/plugin-deployment-model.md",
+      "bytes": 3545,
+      "sha256": "cd8c480d2d6732112b66501b70c698779f7dd37bb9e45b0a2c2bb9473382e6ed",
+      "git_blob_sha1": "ea200bb6a52209b732946e75d9813d8dabaef74b"
+    },
+    {
+      "path": "plugins/development-harness/docs/severity-workflow-continuity-lens.md",
+      "bytes": 6105,
+      "sha256": "0791d242bb496a2b646839fa8c80727c2d395213695e81372cfbc1f33ab26ac8",
+      "git_blob_sha1": "6f57d3c5efe687836447559d5e7a2eb38d88a723"
+    },
+    {
+      "path": "plugins/development-harness/docs/testing-principles.md",
+      "bytes": 25260,
+      "sha256": "109ec55cc72ba8fa44c59dc92c936a9f0229cf2253ed1e7b501399a0eb3ec53c",
+      "git_blob_sha1": "1d5eaadbdf915eb3c43e51ecd3f81b27fe9b2ca2"
+    },
+    {
+      "path": "plugins/development-harness/scripts/dh_mcp_preinit.py",
+      "bytes": 1477,
+      "sha256": "c00e86f118526b2c4280b0b751fe43f02ff710d6ef8bf3bb3ec970648a1a1c27",
+      "git_blob_sha1": "c5f061be9d891fc56ad01840a1a933a215f70662"
+    },
+    {
+      "path": "plugins/development-harness/scripts/run_backlog_server.py",
+      "bytes": 2863,
+      "sha256": "04a18fa7c6d10e4240799128fdf0a7fa09ff3f880f010db0e1d60d6fb02675a4",
+      "git_blob_sha1": "c0d01450fb2136ad211279dce3e2f4952d416d2b"
+    },
+    {
+      "path": "plugins/development-harness/scripts/run_bounded.py",
+      "bytes": 4435,
+      "sha256": "58bfa4354ea02749bfd25cd436f8a905bf137a95dd5f7606fe90171179600a95",
+      "git_blob_sha1": "60f9fa3f5ab58262cf5e34a32537fe9c84ce992a"
+    },
+    {
+      "path": "plugins/development-harness/scripts/run_sam_cli.py",
+      "bytes": 1497,
+      "sha256": "2e49d4b7e226061c250c06546470044d72f8f307eaa56116b6b5538755c1e360",
+      "git_blob_sha1": "5df8295ceeb840d64b95b55f92126233b6391c2a"
+    },
+    {
+      "path": "plugins/development-harness/scripts/run_sam_server.py",
+      "bytes": 831,
+      "sha256": "0286cfb28b13894ed1b7c15b077e2acf027c964ef603d2ae3b95ed9c3153f964",
+      "git_blob_sha1": "b86eaa50077ba2641f376b7ed4abec0d52fd2d25"
+    },
+    {
+      "path": "plugins/development-harness/skills/analyze-change-impact/SKILL.md",
+      "bytes": 1950,
+      "sha256": "c0b6db68307fb2c523c6072f33a1aae4afd713ec770e4c688f0e7b3af6302867",
+      "git_blob_sha1": "b38afe037163d50106497dccf37140d22d071522"
+    },
+    {
+      "path": "plugins/development-harness/skills/api-state/SKILL.md",
+      "bytes": 4287,
+      "sha256": "643660179422c9d6c750c2837f07373989e4b2304d76a35c22da0c5b2a93f163",
+      "git_blob_sha1": "220e483164518ce3529942ff4db34bf865862eb9"
+    },
+    {
+      "path": "plugins/development-harness/skills/backend-resolution/SKILL.md",
+      "bytes": 4312,
+      "sha256": "08e75ff8b110c2d1d83bf29938440ff49a167ba192ee436ab45fbcf30b37742e",
+      "git_blob_sha1": "fd511aec00f6bc693d6a8989172a7a9163ecd8a7"
+    },
+    {
+      "path": "plugins/development-harness/skills/codebase-auditor/SKILL.md",
+      "bytes": 8379,
+      "sha256": "3479799780051738d4c5fe9955567849706040ddeed6974d708cd5988afe1a2b",
+      "git_blob_sha1": "6c357cfc06c7bbe1b2fdd7870ece04d5486abfd9"
+    },
+    {
+      "path": "plugins/development-harness/skills/comprehensive-test-review/SKILL.md",
+      "bytes": 983,
+      "sha256": "196a4139c2be6ee9bfa5d56c61612d3c526b7d8553285b64c21f1e05cb13f5f2",
+      "git_blob_sha1": "c32b11a70f2235ca5eb1e5d8b2778309f7d0d39a"
+    },
+    {
+      "path": "plugins/development-harness/skills/create-artifact/SKILL.md",
+      "bytes": 5779,
+      "sha256": "77c7803ca6d6f61937e2db37a3461394aa241c3767f92e36fdbefeafe63f8af0",
+      "git_blob_sha1": "bee71834d126949637fdb633398be867a16ab4d2"
+    },
+    {
+      "path": "plugins/development-harness/skills/dh-cli-usage/SKILL.md",
+      "bytes": 2417,
+      "sha256": "832159c59c8fe29de2abbad1cae9321cd604803af2fa1ca31d8563c769b2437c",
+      "git_blob_sha1": "d3fcb531b8941f39c07acb3e32ce4afd0e88c0c7"
+    },
+    {
+      "path": "plugins/development-harness/skills/dh-cli-usage/references/command-reference.md",
+      "bytes": 3349,
+      "sha256": "7ec2a3a4f28fad5a6353a93edb0c372bd9ec021cda4a7d867052a8a80e4ed9f4",
+      "git_blob_sha1": "401bc97e2621409e9e252e6403eac600c77c2a1e"
+    },
+    {
+      "path": "plugins/development-harness/skills/dh-cli-usage/references/mcp-connection-check.md",
+      "bytes": 1797,
+      "sha256": "f1d8465d53e3a9287787592d161bc8f586816952334e33c4e8197c7ba6a44900",
+      "git_blob_sha1": "0ae319886c7c54273ba17664f8268fba56a45853"
+    },
+    {
+      "path": "plugins/development-harness/skills/dh-meta-docs/SKILL.md",
+      "bytes": 2285,
+      "sha256": "e8d93d637c1e22a607453f70bce9630f7a8f3dc69da479e39e2fa7ca6cce7856",
+      "git_blob_sha1": "97a889bb24626afd5a4a88c3f71c5010a6e3b88c"
+    },
+    {
+      "path": "plugins/development-harness/skills/discovery/SKILL.md",
+      "bytes": 8279,
+      "sha256": "8123d2786cdea6a480453715f671965f2272a45a478c399d0e0d6f9be87dd6a4",
+      "git_blob_sha1": "38715e6954e9bcbe1d8064ffa1b8a6863b334d43"
+    },
+    {
+      "path": "plugins/development-harness/skills/dispatch-contract/SKILL.md",
+      "bytes": 1956,
+      "sha256": "794deba2b671198f79870b120fe280919f550591efbcff5c37faba7beac650e5",
+      "git_blob_sha1": "06ec26349d37a942f4d1482c34a512a858328161"
+    },
+    {
+      "path": "plugins/development-harness/skills/ecosystem-research/SKILL.md",
+      "bytes": 4871,
+      "sha256": "c6664887c99f435484681581cd886e8cc0aa027a3360a4c3e55f3e86acf41c1d",
+      "git_blob_sha1": "d2852d02379c7f3ba9d1c9336e0cb0d3f2261e56"
+    },
+    {
+      "path": "plugins/development-harness/skills/impact-measurement/SKILL.md",
+      "bytes": 5291,
+      "sha256": "09439ee9423c225c0749a390bb7ad18e91833af101c16b941e94c8001b8f9398",
+      "git_blob_sha1": "84bcdaae1fd80edfe9c9d6e237b88d00cee8e982"
+    },
+    {
+      "path": "plugins/development-harness/skills/planner-rt-ica/SKILL.md",
+      "bytes": 26690,
+      "sha256": "01400778963028bb9e743b6bf45eb296ac5ec419e52927d03c4407b7f5dd3e9c",
+      "git_blob_sha1": "8b7b25960c506153418a5c0136c0edaebee3b087"
+    },
+    {
+      "path": "plugins/development-harness/skills/research-note/SKILL.md",
+      "bytes": 4628,
+      "sha256": "7922791f4569a7446124fd0607953b619b41baab154bb395585f16d8892b3cce",
+      "git_blob_sha1": "de79de44233eba8db148e61d5e0b91d286ad5530"
+    },
+    {
+      "path": "plugins/development-harness/skills/root-cause-tracing-process/SKILL.md",
+      "bytes": 13702,
+      "sha256": "57b61b31ca47184ecabb89a24fd29e78190b260ecd7c30916325cf88aa7b9aa7",
+      "git_blob_sha1": "932d3c1ab2c944682389cd5d6af505dcb63cc5e1"
+    },
+    {
+      "path": "plugins/development-harness/skills/subagent-contract/SKILL.md",
+      "bytes": 6093,
+      "sha256": "d791f07637e98ced84b54829d24a54210de6a96f5f9b2859de0a4fa8eb57ca2a",
+      "git_blob_sha1": "28567aaa063cd9a7d49487de2de8fe2bb81247bb"
+    },
+    {
+      "path": "plugins/development-harness/skills/test-designer/SKILL.md",
+      "bytes": 4341,
+      "sha256": "3d55d51aa3ffd79f6ab4c8e9733646d853d3e66db9de874008045053431da5fa",
+      "git_blob_sha1": "293cb542c77b43ccacaf6d5d2a7b1250b9bd671f"
+    },
+    {
+      "path": "plugins/development-harness/skills/test-designer/references/interaction-coverage.md",
+      "bytes": 3038,
+      "sha256": "4a745232a8cd77a177e7ab1e45868baec0b3c34f4fae615c2cda9c81991fbf4d",
+      "git_blob_sha1": "07fa7d8bc404af217d8c2a7f1bb445a8a64c54b3"
+    },
+    {
+      "path": "plugins/development-harness/skills/test-failure-mindset/SKILL.md",
+      "bytes": 4769,
+      "sha256": "ee94b662388f4f4e3ecb54110de1396751a8616fe6e59ccd72d14e7165873283",
+      "git_blob_sha1": "512321c95e26ee90af674e62de711c551955a84b"
+    },
+    {
+      "path": "plugins/development-harness/skills/test-reviewer/SKILL.md",
+      "bytes": 6878,
+      "sha256": "e2405fddd8af023531b6a0ac82a607868ad4189adc4a81bab0b39013854446a5",
+      "git_blob_sha1": "c70894beb6432e938e29da4b7e50d9135bc86fb7"
+    },
+    {
+      "path": "plugins/development-harness/skills/verify-factual-claim/SKILL.md",
+      "bytes": 1459,
+      "sha256": "0a9a2650829c865440c3cc5bcde200d6fa1506ce5cff4cb69ef6be60c72fbab8",
+      "git_blob_sha1": "1a0df2201478f16a751f705c3ae7bd4c99f0697f"
+    },
+    {
+      "path": "plugins/development-harness/skills/work-backlog-item/SKILL.md",
+      "bytes": 18155,
+      "sha256": "6011f4caded6f5a9f8afec4f8613ddcefba5e10e50af83ccefc99a526454ddd7",
+      "git_blob_sha1": "4c3756648164f5049c6f3d6112db795ab04284e1"
+    },
+    {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/create/scope.md",
+      "bytes": 4004,
+      "sha256": "1b04bf2953c91154feb5e4aa7345c040737a17ede4adacdd92a41339270f7449",
+      "git_blob_sha1": "af9caa1e7734dfc1682f5107dad98ffad2e6757f"
+    },
+    {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/create/start.md",
+      "bytes": 10658,
+      "sha256": "2d508a2dd8942131acc17cfd41af204fb99ae5987628bbd404678d85c288b45d",
+      "git_blob_sha1": "c656aba24ac86043c2010e80519ac519cec10ddf"
+    },
+    {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/analyze.md",
+      "bytes": 5481,
+      "sha256": "84991a418bfa8505894ea15e760a639946e91f945abebfa6e3f60fd43421e650",
+      "git_blob_sha1": "32c057c071eb0cf43a9a386a66593258845b88c3"
+    },
+    {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/error.md",
+      "bytes": 6117,
+      "sha256": "2c43ca1f9a933b333db56f0b97c8d1393c45260205068aa4c5d88cb659e00b7d",
+      "git_blob_sha1": "2c27d22fbbae6f9f7ee8f0fb041146fba140253d"
+    },
+    {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/fact-check-result.md",
+      "bytes": 4315,
+      "sha256": "05543a14e2af00010fac2fabfcd449d13dcebe6b4ea4dccc95526b7c2f260146",
+      "git_blob_sha1": "0769ee7d6f480bc0b8d7444f66a0f0d49248209a"
+    },
+    {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/finalize.md",
+      "bytes": 20929,
+      "sha256": "3cbe5602667adb45369630f99b6f69e420dcd2c037718b6832dbfcacdd461438",
+      "git_blob_sha1": "8b6b6e1737a0c7a3aca617415ada663f099350d7"
+    },
+    {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/finally.md",
+      "bytes": 1471,
+      "sha256": "24110bb05a7bc40b19d2dc0ddd2bd1746cd265bbf36ef0de60c9a05ae34774a3",
+      "git_blob_sha1": "6403c5fad39ba36b3bb899cfdb161f947c0d4f8c"
+    },
+    {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/groom-drift.md",
+      "bytes": 4274,
+      "sha256": "0ddebfc2c2143855f2209ed70191ed739504999aa7049e1d48fd8d4f2053cdb4",
+      "git_blob_sha1": "bb85d4a46304a765bcfa740fcfa29f074b9ebed0"
+    },
+    {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/impact-radius-result.md",
+      "bytes": 5546,
+      "sha256": "d58c7d6fb080866840b6a8fe548180b7b6004f80da0db47fb523965e03cdba08",
+      "git_blob_sha1": "b8062ca6cc1f0c91c88b3e6f94fea68c19cf0a6f"
+    },
+    {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/intake.md",
+      "bytes": 3589,
+      "sha256": "dae2aa922da37898b8cbc0a50af23dffc12cce5542dfaaf575737359b773adb4",
+      "git_blob_sha1": "fbcc36c5916d2a09eb9fe98f7b1eeb3e6d07e081"
+    },
+    {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/scope.md",
+      "bytes": 1330,
+      "sha256": "bda5ee870841f933c323b8322a90fa801723ce225d0abe7a76b2f13093916e6c",
+      "git_blob_sha1": "880f040bd383b097e31f48b0f2d6cc73ee83bb18"
+    },
+    {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/start.md",
+      "bytes": 6101,
+      "sha256": "a89e376c55dfa624665fcbc295bfdaba43c7aa926864915c964545c729ed7c25",
+      "git_blob_sha1": "1aa920db6ff0669e0a05bd8e63870949e8739fcc"
+    },
+    {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/groom/swarm.md",
+      "bytes": 12048,
+      "sha256": "3780ba9c0b4ab05f9fdf9146ec036af5dcfa02f850317641f6484e3cbd3b0271",
+      "git_blob_sha1": "be17eb9deaca5a02ab47891745c9280a4f80b9af"
+    },
+    {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/auto-mode.md",
+      "bytes": 4153,
+      "sha256": "6b127296855c5a1007cafa988d3bd4d9042c3c1693a28ff0afbef48320a1b09e",
+      "git_blob_sha1": "efb9a618318002dfe27ba4ea6529fae850ec80cb"
+    },
+    {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/groom-check.md",
+      "bytes": 7660,
+      "sha256": "76800bee1640371d9888b4ee7ab8d02acfe496bacc7614570e9493a0a130eacb",
+      "git_blob_sha1": "d1de40289a4ed9e85d90777f5baab7393ba442bc"
+    },
+    {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/prepare.md",
+      "bytes": 1948,
+      "sha256": "0f7607ab012af840531efec62fb074fe311a27616184107cb94f0411c5075859",
+      "git_blob_sha1": "f6c3690a4727fbeabe44cd978fb6945134e48690"
+    },
+    {
+      "path": "plugins/development-harness/skills/work-backlog-item/scripts/parser/command-routes.json",
+      "bytes": 463,
+      "sha256": "575d3559c2ddf8f409cd3714e75e49029b4ee1d909374f19e4ae0fecce219fa9",
+      "git_blob_sha1": "595a0b8997cee40a202df5a4fa94cdf4beac1c00"
+    },
+    {
+      "path": "plugins/process-siren/skills/improve-processes/SKILL.md",
+      "bytes": 22692,
+      "sha256": "03c5da7dbf792a57a170fe40c3798599c9bfc7760171dc52365f2c2398b98c0e",
+      "git_blob_sha1": "20f17a0cf2623b353ae5f8b6cf46ee1a8cc23c5e"
+    },
+    {
+      "path": "plugins/process-siren/skills/improve-processes/references/baseline-agent-behavior-eval.md",
+      "bytes": 5074,
+      "sha256": "22de1140eb1470e9317919f4bc8fc1dd8783d9ec3e9d0937aa60bb82ed072a25",
+      "git_blob_sha1": "337035dc5ad023ab492af6bd5e8a5c51d824c8cf"
+    },
+    {
+      "path": "plugins/process-siren/skills/improve-processes/references/material-change-lifecycle.md",
+      "bytes": 4261,
+      "sha256": "22543a6481ac6aa0fe3f6e92455825e8d12a17dd536b1afe4a3a1d387dbcc0f5",
+      "git_blob_sha1": "c02b62e602b1c056b6b03f19039dc305708f558a"
+    },
+    {
+      "path": "plugins/development-harness/skills/work-backlog-item/scripts/parser/parse.schema.json",
+      "bytes": 1385,
+      "sha256": "c42a04ed8d38e6847b8aa32296058a4188413c8d1d73a069f175fc9416777bbc",
+      "git_blob_sha1": "441a10a19133544358b77160a8e58ac8022bcddc"
+    },
+    {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/rt-ica-gate.md",
+      "bytes": 4067,
+      "sha256": "2554b1da5503ae12489171d2c8a04da31333d9e7db351825bee39cc9d0362a77",
+      "git_blob_sha1": "7e5f1f46d190ec3a00c001c62998f33ff37be646"
+    },
+    {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/feasibility-gate.md",
+      "bytes": 8532,
+      "sha256": "89e1cb930f2f637db63f72323cca777b5f04416e52192a0fd867c58ae3da5030",
+      "git_blob_sha1": "94a4ef12ceee41dafd4713e7bdb66bea121a6375"
+    },
+    {
+      "path": "plugins/development-harness/skills/work-backlog-item/references/workflows/work/start.md",
+      "bytes": 6052,
+      "sha256": "3017a83876c00004ad35c70a1488090e4d27389e547509638357cb397ad81d77",
+      "git_blob_sha1": "24ebe59b53045cc8ee74b0a56a7f625a734ffaef"
+    },
+    {
+      "path": "plugins/development-harness/backlog_core/tool_responses.py",
+      "bytes": 51901,
+      "sha256": "61ba64917cc928b495efe167a7f509058be9573f90c5ff6d652c3bf90a898e78",
+      "git_blob_sha1": "ac89bcd5230dfbb03dbe16885ba81dc9959e60d7"
+    },
+    {
+      "path": "plugins/development-harness/agents/feature-researcher.md",
+      "bytes": 22947,
+      "sha256": "54d79913cfe004c9061e2060e4ee128f17993228ba0abeb77b93085626624010",
+      "git_blob_sha1": "63e9bcfad6cf86051b2fd5a0aea125c3af6bbbc5"
+    }
+  ],
+  "source_or_runtime_execution": false,
+  "semantic_adjudication": "not established by mechanical intake"
+}

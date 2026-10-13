@@ -1,0 +1,236 @@
+{
+  "lane": "groom-B",
+  "check_kind": "Independent source-fidelity and omission challenge before freeze; not peer review, candidate comparison, execution validation, or gold adjudication",
+  "commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+  "source_fidelity_challenges": [
+    {
+      "id": "C01",
+      "kind": "producer/destination contradictory prescriptions",
+      "observation": "swarm.md says each agent writes named sections and explicitly says groomer writes each subsection; backlog-item-groomer.md says return content and do not write anywhere, orchestrator stores. Subagent-contract allows a dispatch to override agent destination, but item-ref-only invocation plus subsection list does not itself show an explicit direct-write override.",
+      "evidence": ["E29", "E30", "E39", "E94", "E104"],
+      "effect": "Whether backend sections exist before finalizer validation depends on unresolved handoff; not claimed as observed missing sections.",
+      "falsifier": "A governing same-pin dispatch contract or actual prescribed prompt explicitly overrides return-only to direct backlog persistence, or a prescribed orchestrator store before output validation is found.",
+      "disposition": "Keep both relationships and uncertainty, do not select a convenient writer."
+    },
+    {
+      "id": "C02",
+      "kind": "producer/validation representation mismatch",
+      "observation": "finalize minimum content requires Effort: in Priority. Groomer Priority output template is only score/rationale, with Effort in its own separate section.",
+      "evidence": ["E47", "E101", "E100"],
+      "effect": "A source-shaped template can fail required Priority check even when Effort section exists; no actual agent output was run.",
+      "falsifier": "Same-pin schema or producer instruction requires Effort: inside Priority, or consumer formally accepts separate Effort section.",
+      "disposition": "Preserve section-name and field-level obligation independently."
+    },
+    {
+      "id": "C03",
+      "kind": "nested procedure inconsistent fan-out cardinality",
+      "observation": "technical-researcher lists four named angles and waits all four, but Step2/Step3/synthesis/guardrail text repeatedly says all three, three calls or three outputs.",
+      "evidence": ["E91", "E92", "E93"],
+      "effect": "Must preserve named fourth codebase angle and inconsistent instructions, not silently flatten to a three-angle pipeline.",
+      "falsifier": "A precedence rule at same pin explicitly supersedes three-angle passages with four and defines synthesis input set.",
+      "disposition": "Trace four named actors plus source contradiction, no invented resolution."
+    },
+    {
+      "id": "C04",
+      "kind": "wave scheduling inconsistency",
+      "observation": "swarm dispatch puts rtica-assessor in Wave2 after Wave1; rtica-assessor Phase2 says spawned at same time as impact/fact. Its own Input and later phase say Wave2, and it carries a waiting recovery path.",
+      "evidence": ["E34", "E118", "E83", "E86"],
+      "effect": "Authoritative orchestrator path retained as sequential waves, while nested concurrent-start statement and20read recovery remain recorded.",
+      "falsifier": "Explicit same-pin scheduling precedence names Phase2's concurrent-start sentence as superseded.",
+      "disposition": "Do not omit waiting branch just because ordered waves should satisfy dependency."
+    },
+    {
+      "id": "C05",
+      "kind": "status-transition actor inconsistency",
+      "observation": "finalizer is orchestrator and writes mark_groomed; rtica-assessor says groomer is responsible for mark_groomed; groomer is return-only.",
+      "evidence": ["E40", "E55", "E119", "E94"],
+      "effect": "Actor ownership of lifecycle transition differs across producer instructions; not reported as actual wrong status transition.",
+      "falsifier": "Explicit same-pin dispatch override/design ownership resolves all three declarations.",
+      "disposition": "Keep finalizer described call and flag nested ownership contradiction."
+    },
+    {
+      "id": "C06",
+      "kind": "MCP parameter naming mismatch",
+      "observation": "analyze says CLI artifact-id corresponds to MCP path; supplied server artifact_register exposes artifact_id and no path parameter.",
+      "evidence": ["E117", "E115"],
+      "effect": "Logical-identifier meaning intact but literal MCP naming instruction contradicted by callable signature.",
+      "falsifier": "Same-pin adapter provides a path alias specifically for this MCP operation.",
+      "disposition": "Exact signature prevents perpetuating unsupported parameter name."
+    },
+    {
+      "id": "C07",
+      "kind": "remote-sync declaration mismatch",
+      "observation": "finalizer says description update alone does not sync remote and relies on later content reconciliation; server description parameter says reconciled immediately to linked issue audit-trail comment.",
+      "evidence": ["E53", "E57", "E113"],
+      "effect": "Need operation implementation to distinguish field documentation from executable effect; finalizer write ordering retained even if rationale stale.",
+      "falsifier": "Same-pin operations.update_item code resolves whether immediate description reconciliation occurs; provider capabilities remain runtime conditional.",
+      "disposition": "Requested pinned operations.py rather than importing live provider or guessing."
+    },
+    {
+      "id": "C08",
+      "kind": "intake uncovered condition",
+      "observation": "CheckE returns DRIFT for same-day+required-sections and PROCEED for absent/empty/not-today. Same-day but incomplete required sections has no explicit outcome.",
+      "evidence": ["E22", "E17"],
+      "effect": "Must not invent PROCEED/DRIFT/SKIP for uncovered combination.",
+      "falsifier": "A same-pin pre-groom branch explicitly handles today's incomplete grooming, or an invariant proves such state impossible.",
+      "disposition": "Record symbolic uncovered branch and missing continuation."
+    },
+    {
+      "id": "C09",
+      "kind": "postwrite terminal ambiguity",
+      "observation": "repeated mark_groomed_skipped says report possible rename/removal and do not retry; terminal table still defines Groomed by passed validation plus call, not confirmed status advance.",
+      "evidence": ["E56", "E58", "E114"],
+      "effect": "Cannot assert item actually groomed from attempted call alone; no explicit BLOCKED/error terminal chosen for repeated skipped response.",
+      "falsifier": "Same-pin terminal rule expressly routes repeated skipped status to blocked/error or confirmed groomed lifecycle.",
+      "disposition": "Separate attempted content write, response status, transition and completion claim."
+    },
+    {
+      "id": "C10",
+      "kind": "retry ownership/mode tension",
+      "observation": "diagnostic gate says rerun appropriate producer for absent/zero sections and malformed fact-check uses fact-checker; generic retry diagram only spawns groomer for missing sections, with first/second/third attempts and surrounding up-to-three-attempt phrasing.",
+      "evidence": ["E41", "E48", "E49", "E12"],
+      "effect": "Do not silently assign all section repair to groomer or invent a universal retry count; source third-failure terminal and same-model constraint retained.",
+      "falsifier": "Same-pin recovery rule defines exact producer selection and whether initial attempt counts toward three.",
+      "disposition": "Trace both specialized and generic recovery, retain source attempt-accounting ambiguity."
+    },
+    {
+      "id": "C11",
+      "kind": "stored selector vs identifier convention",
+      "observation": "groom start requires canonical #N/int issue_number while entry/create support stored item without issue and reference-only fallback; analyze explicitly allows no issue_number and skips discovery.",
+      "evidence": ["E14", "E112", "E24", "E23"],
+      "effect": "Canonical numeric assumption is not universal backend guarantee; reference fallback/current runtime are unknown.",
+      "falsifier": "Same-pin entry normalization defines a nonnumeric reference path through intake without int extraction.",
+      "disposition": "Retain no-issue discovery skip and request backend/CLI skill instead of dropping it."
+    },
+    {
+      "id": "C12",
+      "kind": "drift diagnostic agent input ambiguity",
+      "observation": "drift and agent-failure diagnostic dispatch dh:task-worker without ledger address/task id. Task-worker Step1 expects task address parsed from prompt; subagent contract permits no-ledger caller-directed work but worker default sequence does not describe it here.",
+      "evidence": ["E60", "E61", "E63", "E122", "E103"],
+      "effect": "Cannot assume a real worker can satisfy diagnostic/drift prompt through ledger-only default; prescribed role override could make it valid.",
+      "falsifier": "Same-pin worker no-ledger exception or explicit dispatch override defines direct diagnostic execution.",
+      "disposition": "Record nested input-contract tension, not failed observed dispatch."
+    },
+    {
+      "id": "C13",
+      "kind": "history empty branch coverage ambiguity",
+      "observation": "alignment PR query succeeds count0 branch says no matching PRs; explicit Git branch activation says backend no PR support or query error, but empty-history table includes PR-count0 plus empty Git branch.",
+      "evidence": ["E89"],
+      "effect": "Successful empty PR result has no clearly stated transition that supplies Git result/table condition.",
+      "falsifier": "Same-pin procedure explicitly sends successful empty PR result into Git fallback or directly unassessed with empty reason.",
+      "disposition": "Keep empty success distinct from unavailable query; no fabricated history."
+    },
+    {
+      "id": "C14",
+      "kind": "unsupported recovery action under unavailable backend",
+      "observation": "persistent unreachable/missing-permission system error asks same backlog create route to record failure; source does not define durable fallback if this also fails.",
+      "evidence": ["E67", "E68"],
+      "effect": "A required failure item cannot be presumed created when backend remains unavailable.",
+      "falsifier": "Same-pin backend or error-handler fallback records issue elsewhere and preserves reference.",
+      "disposition": "Trace creation obligation, report inability if unmet; no runtime success claim."
+    },
+    {
+      "id": "C15",
+      "kind": "claim cardinality adapter ambiguity",
+      "observation": "fact-checker agent calls its input a single supplied claim while swarm dispatch says item claims and each hypothesis; fact-result owns one record per supplied claim.",
+      "evidence": ["E78", "E33", "E71", "E72"],
+      "effect": "Do not collapse hypotheses or assume one claim covers all; single-agent multi-claim vs per-claim dispatch fan-out not fully specified.",
+      "falsifier": "Same-pin dispatch defines per-claim invocations or explicitly adapts agent single-claim contract to complete claim list.",
+      "disposition": "Retain exact per-claim records and shared dispatch ambiguity."
+    },
+    {
+      "id": "C16",
+      "kind": "post-clarification persistence handoff gap",
+      "observation": "Finalizer Step5 persists/retains rt_ica_final_content before Step6 clarification. Answers-given branch marks AVAILABLE and recomputes Decision looping within gate, but names no rewrite of stored final report or retained content before batch sends same content again. Postwrite validation expects same computed Decision.",
+      "evidence": ["E43", "E44", "E55", "E56"],
+      "effect": "Cannot assume re-computed in-memory conditions/Decision reach canonical final content without an explicit handoff; no stale runtime report observed.",
+      "falsifier": "Same-pin clarification or final-write procedure explicitly rebuilds and re-persists rt_ica_final_content after user/AUTO answers.",
+      "disposition": "Preserve clarification loop and separately record missing canonical-content refresh instruction."
+    },
+    {
+      "id": "C17",
+      "kind": "malformed decision error/category distinction",
+      "observation": "swarm and finalizer say unrecognized token is error, not block. start.md Error Routing maps absent/unrecognized Decision to Workflow Block, naming token.",
+      "evidence": ["E13", "E36", "E44"],
+      "effect": "Central Workflow Block procedure sets blocked while upstream explicitly distinguishes malformed producer verdict from genuine planning block; category ownership inconsistent.",
+      "falsifier": "Same-pin central handler defines a separate malformed-verdict error path without misreporting a planning decision.",
+      "disposition": "Keep malformed token separate from BLOCKED-FOR-PLANNING and expose routing tension."
+    }
+  ],
+  "omission_challenges": [
+    {
+      "question": "Did entry routing get replaced with only the groom start diagram?",
+      "result": "No. Argument coercion, registry mapping, quick priority, creation prerequisite, work prerequisite and standalone stop traced separately.",
+      "evidence": ["E01", "E02", "E07", "E08", "E09"]
+    },
+    {
+      "question": "Did unknown runtime values remove known branches?",
+      "result": "No. Selector/mode/labels/issue-number/capabilities/today/section-state/decision/agent status/user choice all symbolic, both conditions and uncovered states retained.",
+      "evidence": ["E14", "E18", "E20", "E22", "E24", "E32", "E44", "E45", "E56"]
+    },
+    {
+      "question": "Did checklist authority hide nested producer/consumer contradictions?",
+      "result": "No. Producer return-only vs direct persistence, Priority Effort representation, four/three research count, timing, status ownership and literal parameter names independently challenged.",
+      "evidence": ["E94", "E30", "E47", "E101", "E91", "E118", "E119", "E115", "E117"]
+    },
+    {
+      "question": "Were approval, delivery and persistence conflated?",
+      "result": "No. STATUS, Decision, active entry/strikes, backend write, mark_groomed attempt/skipped and final report are distinct relationships.",
+      "evidence": ["E35", "E43", "E56", "E73", "E87", "E103"]
+    },
+    {
+      "question": "Were scope rows confused with lexical hits, file paths or future verification completion?",
+      "result": "No. Canonical all-system inventory, affected repository path projections, categorized/excluded/unknown frontier, optional lexical counts and owned post-change checks kept separate.",
+      "evidence": ["E37", "E76", "E84", "E88", "E107", "E111"]
+    },
+    {
+      "question": "Were source-specific numeric rules promoted into invented extraction caps?",
+      "result": "No. Five-item batch concurrency, source research/discovery skips, source20reads/30s wait,90/30day age windows, source retry budget and downstream7day freshness/coordination policies are quoted obligations of their own route only.",
+      "evidence": ["E14", "E20", "E26", "E49", "E83", "E109", "E111"]
+    },
+    {
+      "question": "Were separate drift procedures merged?",
+      "result": "No. Same-day informational Plan/Groom Drift halts; work staleness taxonomy can regroom/close/use cache; both have separate consumers.",
+      "evidence": ["E59", "E62", "E108"]
+    },
+    {
+      "question": "Were multiple hypotheses collapsed under one RCA or shared topic?",
+      "result": "No. Each exact supplied HYPOTHESIS record maps independently; single-hypothesis-only RCA priority and unchanged unmatched/inconclusive lines retained.",
+      "evidence": ["E51", "E52", "E72"]
+    },
+    {
+      "question": "Were optional research failure, strict implementation gates and with-gaps grooming confused?",
+      "result": "No. Research all-gap BLOCKED allows Wave1, planner WITH-GAPS allows groom completion, hard planning block halts, work WITH-GAPS reruns implementation rt-ica.",
+      "evidence": ["E32", "E36", "E44", "E110"]
+    },
+    {
+      "question": "Did large-item transport lead to lost current content or consumed struck history?",
+      "result": "No. Groomer per-section then recursive leaf EXTRACT pagination, active-entry rules and no-truncated-read obligation retained.",
+      "evidence": ["E95", "E35", "E73", "E109"]
+    },
+    {
+      "question": "Did failure handler completion get mistaken for recovered workflow?",
+      "result": "No. Diagnostic idle\u2192readback\u2192parse, interrupted continuation, toolerror recovery, repeated escalation, persistent-error backlog issue and finally outcomes distinguished.",
+      "evidence": ["E63", "E64", "E65", "E67", "E68", "E70"]
+    }
+  ],
+  "coverage": {
+    "actual_entry": "entry\u2192parse schema+command registry\u2192route dispatch/pipeline\u2192groom/start",
+    "groom_local_references": "All source-declared groom stage/result files read fully and traced.",
+    "named_agents": "technical-researcher, impact-analyst, fact-checker, classifier, rtica-assessor, alignment-analyst, backlog-item-groomer read fully; diagnostic/drift task-worker read fully.",
+    "immediate_consumers": "work prepare/groom-check/rt-ica-gate/feasibility/auto-mode and backlog server selected signatures/adapter effects read; not entire work implementation.",
+    "deeper_dependencies": "BLOCKED: requested same-pin nested skill ecosystems/docs/implementation sources not provided at freeze. Known linked obligations traced to named boundary, not substituted or inferred; full transitive source closure not claimed.",
+    "runtime_testing": "Not performed; source-only task forbids workflow execution and target imports.",
+    "comparison": "None; no peer/candidate/seed/gold/control/generated answer material read."
+  },
+  "metadata_checks": {
+    "checked_at": "2026-10-12T05:06:25.546739+00:00",
+    "quote_span_records": 127,
+    "relationships": 117,
+    "unique_relationship_ids": 117,
+    "all_evidence_references_resolve": true,
+    "failures": [],
+    "semantic_validation": "Independently authored source-fidelity/omission challenge in this lane; mechanical validator does not prove semantic completeness."
+  },
+  "frozen_at": "2026-10-12T05:07:49.781591+00:00"
+}

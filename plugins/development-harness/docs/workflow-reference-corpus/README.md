@@ -1,16 +1,18 @@
-# Workflow reference corpus — candidate trace
+# Workflow reference corpus
 
-This PR begins #4102 with a **source-linked candidate**, not an independently verified gold set. Do not use this trace as evaluation ground truth until a second reviewer traces the pinned sources without seeing `candidate-trace.json`, and discrepancies are adjudicated.
+This directory is the bounded #4102 source-reference corpus. Its primary data is the [case manifest](./corpus-manifest.json), [lane-boundary adjudications](./case-adjudications.json), [fresh-verifier input manifest](./verifier-input-manifest.json), and [grading contract](./grading-contract.json); this document does not duplicate their records.
 
-The source revision and exact Git blob identities are in `manifest.json`. `candidate-trace.json` captures ten consequential relationships from the review entry point, including failure exits, parallel dispatch, T5 synthesis, and the punch-list gate. Its scope deliberately excludes the full `dh:start-task` implementation and downstream consumers, so it is **not a complete execution trace**.
+The existing [candidate manifest](./manifest.json) and [candidate trace](./candidate-trace.json) remain observed seed material. They are not gold, do not establish complete workflow coverage, and stay outside blind trace/check executor input.
 
-## Promotion requirements
+## Record flow
 
-1. Independent reviewer receives the manifest's source revision, source paths and required outcome, **not** the candidate trace or its expected relationships.
-2. Record the independent result separately with evidence and unresolved cases.
-3. Compare both traces; adjudicate each difference against source, including missing branches and profile-mediated handoffs.
-4. Add the grooming and prose-heavy reference workflows with the same process.
-5. Freeze a new versioned corpus and grading contract; keep gold answers out of candidate extractor inputs.
-6. Evaluate correctness, omissions, uncertainty, terminal/actor fidelity and cost only after independent labels exist.
+1. A case source packet pins the declared revision, blobs, byte passages, and source question.
+2. Independent source-only trace and check records freeze before comparison and record their actual exposure boundary.
+3. Source adjudication retains the raw observations, records lane-level source boundaries, and preserves shared omissions and disagreements without treating actor self-checks as independent verification.
+4. Independent grading replays the cited source and runs separate correct and defective controls under the grading contract.
 
-Related: #3223, #4102, #4103, #4104 and research PR #4110.
+No completion is asserted beyond the case manifest's bounded acceptance boundary. This corpus makes no general-completeness, runtime, production-ontology, publication, #4103, #4104, or #4105 claim.
+
+## Bounded acceptance
+
+The declared claim projection and its controls have passed the independent receipts indexed by [evidence/receipts/manifest.json](./evidence/receipts/manifest.json). This is acceptance of the revision-bound, declared claim projection only. It does not promote the corpus to a general workflow-completeness claim, establish runtime behavior, or close #3223.

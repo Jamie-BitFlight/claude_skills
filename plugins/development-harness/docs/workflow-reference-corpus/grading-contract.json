@@ -1,0 +1,106 @@
+{
+  "schema_version": 2,
+  "status": "independent-control-grading-complete-for-current-controls",
+  "scope": "Replayable grading contract for the bounded #4102 proposed reference. It evaluates revision-bound source-trace records only; it does not evaluate live runtime behavior, general workflow completeness, semantic production truth, or future architecture choices.",
+  "case_manifest": "./corpus-manifest.json",
+  "verifier_input_manifest": "./verifier-input-manifest.json",
+  "controls": "./controls/negative-controls.json",
+  "deterministic_grader": {
+    "script": "./scripts/grade_controls.py",
+    "candidates": "./controls/control-candidates.json",
+    "invocation": "uv run --script plugins/development-harness/docs/workflow-reference-corpus/scripts/grade_controls.py --corpus-manifest plugins/development-harness/docs/workflow-reference-corpus/corpus-manifest.json --controls plugins/development-harness/docs/workflow-reference-corpus/controls/negative-controls.json --candidates plugins/development-harness/docs/workflow-reference-corpus/controls/control-candidates.json --output <run-directory>/grading.json",
+    "self_check_invocation": "uv run --script plugins/development-harness/docs/workflow-reference-corpus/scripts/grade_controls.py --self-check",
+    "boundary": "The grader uses candidate field values and pinned case metadata; it does not branch on control identifiers or input filenames. The controls and candidates remain grader-only material. The executable does not assert who invoked it or whether that invocation was independent."
+  },
+  "independence_receipts": {
+    "authority": "Independence is an external process fact recorded by a separately authored receipt, never by deterministic grader output.",
+    "required_fields": [
+      "receipt_identity",
+      "receipt_sha256",
+      "declared_input_boundary",
+      "executor relationship to corpus author",
+      "command results"
+    ],
+    "preserved_receipts": [
+      {
+        "path": "./evidence/receipts/20261013-independent-control-grade.json.blob",
+        "sha256": "54368c487603c2a8f06a543dc82f6608237e4de4d5d4e17d3abb53ed3e048ff8",
+        "status": "current-independent-control-grade",
+        "reason": "A separate grader execution against the corrected controls passed the correct replay and every declared negative control; repeated grading outputs were byte-identical."
+      }
+    ]
+  },
+  "run_layout": {
+    "root": "./evidence/runs/<run-id>/",
+    "required_files": {
+      "record": "run.json",
+      "source_packet": "source-packet.json",
+      "source_question": "source-question.md",
+      "trace_output": "trace-output.json",
+      "check_output": "check-output.json",
+      "exposure": "exposure.json",
+      "timing": "timing.json",
+      "grading": "grading.json"
+    },
+    "timing_fields": {
+      "total_duration_seconds": "Measured duration for the declared observation boundary, or null when unavailable.",
+      "total_tokens": "Observed tokens for the declared observation boundary, or null when unavailable.",
+      "model": "Actual model identity when exposed; otherwise null.",
+      "tools": "Actual tool identities when exposed; otherwise an empty list with unavailable reason in run.json."
+    }
+  },
+  "source_replay": {
+    "method": "Resolve each source path at the case revision from Git, compare the declared blob identity, and check every cited passage against the exact blob before grading.",
+    "rejection_conditions": [
+      "source revision differs from the case manifest",
+      "declared blob does not match the Git object",
+      "passage byte range is invalid or does not match its digest",
+      "record uses a source packet not declared by the case"
+    ]
+  },
+  "grading_dimensions": [
+    "supported relation present",
+    "unsupported relation absent",
+    "source-supported branch and terminal fidelity",
+    "actor fidelity, including executor versus loaded-profile distinction",
+    "artifact and affected-consumer fidelity",
+    "nested reference and nested-return fidelity",
+    "equivalent multi-anchor support",
+    "distinct relations sharing a span",
+    "stale or mixed-revision evidence detection",
+    "known source uncertainty and contradiction labeling",
+    "changed and unchanged consumer accounting"
+  ],
+  "procedure": [
+    "Freeze the source packet, source-question packet, verifier-input manifest, control revision, grader rubric, and executor environment before execution.",
+    "Run two fresh source-only verifier contexts per case with only the declared verifier inputs and preserve their raw outputs before comparison.",
+    "Verify source identities and cited passages by source replay.",
+    "Adjudicate every material disagreement and shared omission against source; retain raw records and mark verified, refuted, or unresolved.",
+    "Run the independent grader on correct and defective controls after outputs freeze; write observed grades beside the matching run timing.",
+    "Report unavailable telemetry as null or an explicit unavailable field. Do not estimate tokens, model, cost, or duration.",
+    "Bind any acceptance statement to the final corpus revision and the complete record inventory."
+  ],
+  "observed_control_grades": [
+    {
+      "receipt": "./evidence/receipts/20261013-independent-control-grade.json.blob",
+      "receipt_sha256": "54368c487603c2a8f06a543dc82f6608237e4de4d5d4e17d3abb53ed3e048ff8",
+      "correct_control": {
+        "id": "correct-source-replay",
+        "verdict": "pass",
+        "reason": "all_required_source_boundaries_hold"
+      },
+      "negative_control_outcomes": "all five declared controls rejected for their intended reason",
+      "reproducibility": {
+        "run_1_and_run_2_byte_identical": true,
+        "sha256": "4b27cba0c8ec8e6d75b0f5407eb515aca0865f8a2d4dd01dc7d2af6fe1ca0986"
+      }
+    }
+  ],
+  "acceptance_threshold": null,
+  "future_work_not_graded": [
+    "#4103 comparative architecture evaluation",
+    "#4104 typed relationship design",
+    "#4105 duplicate-finding migration",
+    "runtime or publication behavior"
+  ]
+}

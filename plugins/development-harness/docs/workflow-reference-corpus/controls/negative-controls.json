@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "status": "frozen-ungraded-negative-control-specification",
+  "isolation": "This file is withheld from trace/check executors and supplied only to an independent grader after verifier outputs freeze.",
+  "candidates": "./control-candidates.json",
+  "controls": [
+    {
+      "id": "correct-source-replay",
+      "class": "correct source trace",
+      "defect": null,
+      "purpose": "Confirm that the grader can accept a fully revision- and passage-bound trace before evaluating defects."
+    },
+    {
+      "id": "mixed-revision-sourcecheck",
+      "class": "stale or mixed-revision evidence",
+      "defect": "Substitute a main-pin anchor for an e0b629 historical SourceCheck claim."
+    },
+    {
+      "id": "profile-is-child",
+      "class": "wrong actor or terminal",
+      "defect": "Treat the task-worker's loaded specialist profile as a spawned child executor."
+    },
+    {
+      "id": "nested-return-loss",
+      "class": "lost nested return",
+      "defect": "Drop a source-supported nested reference return while retaining its caller."
+    },
+    {
+      "id": "same-span-collapse",
+      "class": "incorrectly merged same-span relation",
+      "defect": "Merge distinct relations that cite one source span."
+    },
+    {
+      "id": "activity-stamping-overclaim",
+      "class": "unsupported relation",
+      "defect": "Treat the cited registries' lack of the specific activity-stamping consumer as absence of PostToolUse handlers or runtime activation."
+    }
+  ],
+  "observed_grades": [],
+  "expected_outcomes": "withheld until grading"
+}

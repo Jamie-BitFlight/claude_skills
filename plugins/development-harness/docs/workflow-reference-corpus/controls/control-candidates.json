@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "status": "grader-only-synthetic-control-candidates",
+  "controls": [
+    {
+      "id": "correct-source-replay",
+      "candidate": {
+        "case_id": "pinned-main-t5",
+        "source_revision": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+        "profile_spawned_child": false,
+        "nested_reference_return_count": 2,
+        "same_span_relation_ids": ["executor-loads-profile", "profile-defines-procedure"],
+        "expected_distinct_same_span_relations": 2,
+        "activity_stamping_specific_consumer": "unobserved"
+      },
+      "expected": { "verdict": "pass", "reason": "all_required_source_boundaries_hold" }
+    },
+    {
+      "id": "mixed-revision-sourcecheck",
+      "candidate": {
+        "case_id": "pinned-4095-source-check",
+        "source_revision": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+        "profile_spawned_child": false,
+        "nested_reference_return_count": 2,
+        "same_span_relation_ids": ["historical-source-check", "historical-consumer"],
+        "expected_distinct_same_span_relations": 2,
+        "activity_stamping_specific_consumer": "unobserved"
+      },
+      "expected": { "verdict": "fail", "reason": "source_revision_mismatch" }
+    },
+    {
+      "id": "profile-is-child",
+      "candidate": {
+        "case_id": "prose-task-profile-start-task",
+        "source_revision": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+        "profile_spawned_child": true,
+        "nested_reference_return_count": 2,
+        "same_span_relation_ids": ["task-worker-executes", "profile-loads"],
+        "expected_distinct_same_span_relations": 2,
+        "activity_stamping_specific_consumer": "unobserved"
+      },
+      "expected": { "verdict": "fail", "reason": "loaded_profile_is_not_spawned_child" }
+    },
+    {
+      "id": "nested-return-loss",
+      "candidate": {
+        "case_id": "grooming-nested-references",
+        "source_revision": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+        "profile_spawned_child": false,
+        "nested_reference_return_count": 0,
+        "same_span_relation_ids": ["grooming-return", "consumer-return"],
+        "expected_distinct_same_span_relations": 2,
+        "activity_stamping_specific_consumer": "unobserved"
+      },
+      "expected": { "verdict": "fail", "reason": "nested_return_missing" }
+    },
+    {
+      "id": "same-span-collapse",
+      "candidate": {
+        "case_id": "pinned-main-t5",
+        "source_revision": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+        "profile_spawned_child": false,
+        "nested_reference_return_count": 2,
+        "same_span_relation_ids": ["collapsed", "collapsed"],
+        "expected_distinct_same_span_relations": 2,
+        "activity_stamping_specific_consumer": "unobserved"
+      },
+      "expected": { "verdict": "fail", "reason": "same_span_relations_collapsed" }
+    },
+    {
+      "id": "activity-stamping-overclaim",
+      "candidate": {
+        "case_id": "prose-task-profile-start-task",
+        "source_revision": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+        "profile_spawned_child": false,
+        "nested_reference_return_count": 2,
+        "same_span_relation_ids": ["declared-post-tool-use", "unknown-global-activation"],
+        "expected_distinct_same_span_relations": 2,
+        "activity_stamping_specific_consumer": "absent"
+      },
+      "expected": { "verdict": "fail", "reason": "activity_stamping_consumer_overclaim" }
+    }
+  ]
+}

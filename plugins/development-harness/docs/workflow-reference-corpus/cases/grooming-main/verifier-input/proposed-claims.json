@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "case_id": "grooming-nested-references",
+  "source_revision": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+  "records": [
+    {
+      "record_id": "PREF-GROOM-001",
+      "claim": "The backlog-item groomer returns groomed content for the orchestrator to store through backlog_groom rather than writing the output itself.",
+      "citations": [
+        {
+          "repository_path": "plugins/development-harness/agents/backlog-item-groomer.md",
+          "raw_path": "raw/e66b55e05e130ea905afaf8d650ec0f5980d08d0/plugins/development-harness/agents/backlog-item-groomer.blob",
+          "git_blob_sha": "5bb2b4ef5da6b295ff1a6e2d44cc27ee36581f1b",
+          "sha256": "9014262057ac14eef5fa1e39fc54b016f66a8e2ac772abec89fb9cf2472450cb",
+          "line_start": 13,
+          "line_end": 15
+        }
+      ]
+    }
+  ],
+  "boundary": "The paired source records retain contradictions and unknowns; this one claim does not merge those records or assert runtime conformance."
+}

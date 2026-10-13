@@ -1,0 +1,62 @@
+{
+  "agent_identity": "corpus-groom-B",
+  "attempt": "2-source-continuation",
+  "commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+  "status": "BLOCKED_ADDITIONAL_LITERAL_SOURCE",
+  "frozen_at": "2026-10-12T05:23:36.706947+00:00",
+  "output_hashes": {
+    "run.json": {
+      "sha256": "f409cf69a1faf0b694797c171616f2024975bfc542a6371cdc610f51db833102",
+      "bytes": 4890
+    },
+    "source-packet.json": {
+      "sha256": "2f89e5e2c4fd221b26d3c43af3e982b8e9158946169f912708e818eaf9411b90",
+      "bytes": 28209
+    },
+    "source-question.md": {
+      "sha256": "969031fb8256175b3a566ebcc344ec3401740c0874f0aa3e028043a38116c81b",
+      "bytes": 1846
+    },
+    "trace-output.json": {
+      "sha256": "e9476097fc9b5871026e398e939bb2dd7fff1f547d55569039cc740c2b37ddcf",
+      "bytes": 35049
+    },
+    "check-output.json": {
+      "sha256": "90d1a4be476a9106256a9709ae0a833f2ebbfec32075452ef04d3a601d666748",
+      "bytes": 13664
+    },
+    "exposure.json": {
+      "sha256": "59d23468a509008f26c43de4b48b901c6dca7197060df434efd3b31933f3f286",
+      "bytes": 2312
+    },
+    "timing.json": {
+      "sha256": "abfd7b5246d8ea85268f2937b026e667d2c91354e95f140b9677ab7e308c6f29",
+      "bytes": 1982
+    }
+  },
+  "input_manifest_hashes": {
+    "original": {
+      "file_manifest_sha256": "a2fb928e9ce2c11c8e3eae257d2a1c77702929f98c49635dcb9c356bf6c36d02",
+      "source_pin_sha256": "45118ba43819c7fb1a033e3207879d389023a3d2a8174e1bf6ce779b5c6fe358",
+      "declared_commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0"
+    },
+    "main-supplement": {
+      "file_manifest_sha256": "43bbd2905e2266eb012770eea1cd2f850c18b2c8d54e4fcf07aad58b9f4406e0",
+      "source_pin_sha256": "d8d7aead9cef3dea5f4b9fbef10bc2e273b43b57f0baaaa4a1f43f546ea41901",
+      "declared_commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0"
+    },
+    "meta-supplement": {
+      "file_manifest_sha256": "008e76107e795dcd15fc0d78e921a8d14394b38668a05a87f581d1dd7b0665d8",
+      "source_pin_sha256": "f065dd10252a63ad09d15913d52b28ec43742dfed828328e52ba0e799dec6850",
+      "declared_commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0"
+    },
+    "procedural-supplement": {
+      "file_manifest_sha256": "a4a300c5e31544dfff602253d9350bc690be642ba9c3d5746a303f08f52df0b9",
+      "source_pin_sha256": "bea429f3d48610f9557fc1ac1ecaca27a5956961aaafc8044361017743f04406",
+      "declared_commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0"
+    }
+  },
+  "no_comparison_before_freeze": true,
+  "initial_frozen_trace_current_sha256": "eda5990f9842a9da4fc987b22e77935cbb259b231fc2bebde10fae7186f120ac",
+  "future_change_rule": "Preserve both frozenattempts; later rawsource expansion or comparison must use a newseparate revision directory."
+}

@@ -1,0 +1,97 @@
+{
+  "run_id": "20261012-groom-B-literal-source-closure-attempt-3",
+  "agent_identity": "corpus-groom-B",
+  "role_type": "sub-agent",
+  "model": {
+    "harness_declared": "openai/gpt-6.1-sol",
+    "provider_execution_telemetry": null
+  },
+  "commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+  "status": "DONE_SOURCE_RECOVERY",
+  "stablepath": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-runs/groom-B/attempt-3/",
+  "composition": {
+    "trace_parts": [
+      {
+        "path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-runs/groom-B/trace-output.json",
+        "sha256": "eda5990f9842a9da4fc987b22e77935cbb259b231fc2bebde10fae7186f120ac"
+      },
+      {
+        "path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-runs/groom-B/attempt-2/trace-output.json",
+        "sha256": "e9476097fc9b5871026e398e939bb2dd7fff1f547d55569039cc740c2b37ddcf"
+      },
+      {
+        "path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-runs/groom-B/attempt-3/trace-output.json",
+        "sha256": "0527eb6024c46b162f0cda91e118c71edc8a4b66c2faf38794b163a36949ca2e"
+      }
+    ],
+    "relationship_ids": "Sequential non-overlapping IDs across parts; attempt-2 explicit amendments qualify earlier unresolved effects; all sourcechecks remain separate, not adjudicated against a peer/candidate."
+  },
+  "outputs": [
+    "run.json",
+    "source-packet.json",
+    "source-question.md",
+    "trace-output.json",
+    "check-output.json",
+    "exposure.json",
+    "timing.json"
+  ],
+  "missing_dependency_requests": [],
+  "closed_dependency_requests": [
+    "plugin-deployment-model.md",
+    "create-artifact ecosystem",
+    "plugin-local scripts/run_bounded.py"
+  ],
+  "completion_scope": "Recovered grooming start, nested declared routes/methods, immediate persistence/artifact/consumer boundaries and guarded RCA method continuations with sourcecontradictions/unknownruntime values preserved. No claim of executed targetconformance or exhaustive unrelated later design/execution internals.",
+  "input_hashes": {
+    "original": {
+      "file_manifest_sha256": "a2fb928e9ce2c11c8e3eae257d2a1c77702929f98c49635dcb9c356bf6c36d02",
+      "source_pin_sha256": "45118ba43819c7fb1a033e3207879d389023a3d2a8174e1bf6ce779b5c6fe358",
+      "declared_commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0"
+    },
+    "main": {
+      "file_manifest_sha256": "43bbd2905e2266eb012770eea1cd2f850c18b2c8d54e4fcf07aad58b9f4406e0",
+      "source_pin_sha256": "d8d7aead9cef3dea5f4b9fbef10bc2e273b43b57f0baaaa4a1f43f546ea41901",
+      "declared_commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0"
+    },
+    "procedural": {
+      "file_manifest_sha256": "a4a300c5e31544dfff602253d9350bc690be642ba9c3d5746a303f08f52df0b9",
+      "source_pin_sha256": "bea429f3d48610f9557fc1ac1ecaca27a5956961aaafc8044361017743f04406",
+      "declared_commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0"
+    },
+    "linked": {
+      "file_manifest_sha256": "85a4f02d025cd31436ce37e7cd97adea2d2dcb5d88d3b2ab50d3ae19d03e0db3",
+      "source_pin_sha256": "e54d2be6f11589ca4e67df8f8ecba5beaa74e5d17ea7255985cf1978cce6f923",
+      "declared_commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0"
+    },
+    "registration": {
+      "file_manifest_sha256": "0c50e7f41d2bd6d0fcbb05b8179005e3b3a32a7868d1291ec363e20a7e15a2d4",
+      "source_pin_sha256": "f98cff8c52ecd2f6bb55c66cd602efd280f86bde252a66ff2372d695ae5e7aa5",
+      "declared_commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0"
+    }
+  },
+  "output_hashes": {
+    "source-packet.json": "8fc2d35779372f959b4cc4c24f5800fa33990ba3974ceff887013950b4d4f35c",
+    "source-question.md": "df182db2ce0f435a8205efc8ab87bb2e0f954405558caf87ed60940c1f9d2e0a",
+    "trace-output.json": "0527eb6024c46b162f0cda91e118c71edc8a4b66c2faf38794b163a36949ca2e",
+    "check-output.json": "7a45d12d6844ae40a8cb801db4928aba297e3767552d974845395e545cb4cf1a",
+    "exposure.json": "98bafe9e658357bc4895e38709862cca7949da11a1a627f22063a41e848d77db",
+    "timing.json": "84deb4e9089daee6362c007222cea3ccbffbcbad974c2aa68cacb7167672d6fb",
+    "run.json": null
+  },
+  "frozen_at": "2026-10-12T05:33:20.196635+00:00",
+  "comparison_performed": false,
+  "adjudication_performed": false,
+  "runtime_observations": null,
+  "prior_frozen_trace_hash_checks": {
+    "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-runs/groom-B/trace-output.json": {
+      "sha256": "eda5990f9842a9da4fc987b22e77935cbb259b231fc2bebde10fae7186f120ac",
+      "unchanged": true
+    },
+    "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-runs/groom-B/attempt-2/trace-output.json": {
+      "sha256": "e9476097fc9b5871026e398e939bb2dd7fff1f547d55569039cc740c2b37ddcf",
+      "unchanged": true
+    }
+  },
+  "self_hash_rule": "run.json selfhash recorded in freeze-receipt.json",
+  "freeze_receipt": "freeze-receipt.json"
+}

@@ -1,0 +1,380 @@
+{
+  "lane": "groom-B",
+  "attempt": "3-literal-source-closure",
+  "commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+  "roots": {
+    "original": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+    "main": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e66b55e05e130ea905afaf8d650ec0f5980d08d0/20261012-main-raw-closure-7637791fb04649e2bea8f826eeb30253",
+    "procedural": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e66b55e05e130ea905afaf8d650ec0f5980d08d0/20261012-procedural-raw-ad550fd241894c4b8d3724972121755a",
+    "linked": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e66b55e05e130ea905afaf8d650ec0f5980d08d0/20261012-groom-linked-raw-ca3e8c60d2cf479ea403801816a29ae3",
+    "registration": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e66b55e05e130ea905afaf8d650ec0f5980d08d0/20261012-artifact-registration-raw-0b746d14213345f6ab74b7221d0136de"
+  },
+  "sources": {
+    "deployment": {
+      "root": "linked",
+      "path": "plugins/development-harness/docs/plugin-deployment-model.md",
+      "read": "full",
+      "sha256": "cd8c480d2d6732112b66501b70c698779f7dd37bb9e45b0a2c2bb9473382e6ed",
+      "git_blob_sha1": "ea200bb6a52209b732946e75d9813d8dabaef74b",
+      "bytes": 3545,
+      "manifest_match": true
+    },
+    "create-artifact": {
+      "root": "registration",
+      "path": "plugins/development-harness/skills/create-artifact/SKILL.md",
+      "read": "full; ecosystem inventory contains only this file",
+      "sha256": "77c7803ca6d6f61937e2db37a3461394aa241c3767f92e36fdbefeafe63f8af0",
+      "git_blob_sha1": "bee71834d126949637fdb633398be867a16ab4d2",
+      "bytes": 5779,
+      "manifest_match": true
+    },
+    "bounded": {
+      "root": "registration",
+      "path": "plugins/development-harness/scripts/run_bounded.py",
+      "read": "full; source not executed or imported",
+      "sha256": "58bfa4354ea02749bfd25cd436f8a905bf137a95dd5f7606fe90171179600a95",
+      "git_blob_sha1": "60f9fa3f5ab58262cf5e34a32537fe9c84ce992a",
+      "bytes": 4435,
+      "manifest_match": true
+    },
+    "process": {
+      "root": "linked",
+      "path": "plugins/process-siren/skills/improve-processes/SKILL.md",
+      "read": "full",
+      "sha256": "03c5da7dbf792a57a170fe40c3798599c9bfc7760171dc52365f2c2398b98c0e",
+      "git_blob_sha1": "20f17a0cf2623b353ae5f8b6cf46ee1a8cc23c5e",
+      "bytes": 22692,
+      "manifest_match": true
+    },
+    "material": {
+      "root": "linked",
+      "path": "plugins/process-siren/skills/improve-processes/references/material-change-lifecycle.md",
+      "read": "full",
+      "sha256": "22543a6481ac6aa0fe3f6e92455825e8d12a17dd536b1afe4a3a1d387dbcc0f5",
+      "git_blob_sha1": "c02b62e602b1c056b6b03f19039dc305708f558a",
+      "bytes": 4261,
+      "manifest_match": true
+    },
+    "baseline": {
+      "root": "linked",
+      "path": "plugins/process-siren/skills/improve-processes/references/baseline-agent-behavior-eval.md",
+      "read": "full as procedure source, no evaluations/answers/samples executed or read",
+      "sha256": "22de1140eb1470e9317919f4bc8fc1dd8783d9ec3e9d0937aa60bb82ed072a25",
+      "git_blob_sha1": "337035dc5ad023ab492af6bd5e8a5c51d824c8cf",
+      "bytes": 5074,
+      "manifest_match": true
+    },
+    "test-entry": {
+      "root": "linked",
+      "path": "plugins/development-harness/skills/comprehensive-test-review/SKILL.md",
+      "read": "full",
+      "sha256": "196a4139c2be6ee9bfa5d56c61612d3c526b7d8553285b64c21f1e05cb13f5f2",
+      "git_blob_sha1": "c32b11a70f2235ca5eb1e5d8b2778309f7d0d39a",
+      "bytes": 983,
+      "manifest_match": true
+    },
+    "test-reviewer": {
+      "root": "main",
+      "path": "plugins/development-harness/skills/test-reviewer/SKILL.md",
+      "read": "full",
+      "sha256": "e2405fddd8af023531b6a0ac82a607868ad4189adc4a81bab0b39013854446a5",
+      "git_blob_sha1": "c70894beb6432e938e29da4b7e50d9135bc86fb7",
+      "bytes": 6878,
+      "manifest_match": true
+    },
+    "test-principles": {
+      "root": "procedural",
+      "path": "plugins/development-harness/docs/testing-principles.md",
+      "read": "full as procedure source, no target test/gold/control material read",
+      "sha256": "109ec55cc72ba8fa44c59dc92c936a9f0229cf2253ed1e7b501399a0eb3ec53c",
+      "git_blob_sha1": "1d5eaadbdf915eb3c43e51ecd3f81b27fe9b2ca2",
+      "bytes": 25260,
+      "manifest_match": true
+    },
+    "feature-writer": {
+      "root": "original",
+      "path": "plugins/development-harness/agents/feature-researcher.md",
+      "read": "lines331-378 for declared second writer identity and result contract",
+      "sha256": "54d79913cfe004c9061e2060e4ee128f17993228ba0abeb77b93085626624010",
+      "git_blob_sha1": "63e9bcfad6cf86051b2fd5a0aea125c3af6bbbc5",
+      "bytes": 22947,
+      "manifest_match": true
+    },
+    "discovery": {
+      "root": "main",
+      "path": "plugins/development-harness/skills/discovery/SKILL.md",
+      "read": "full in previous raw-source continuation; exact identity excerpt reused from source context",
+      "sha256": "8123d2786cdea6a480453715f671965f2272a45a478c399d0e0d6f9be87dd6a4",
+      "git_blob_sha1": "38715e6954e9bcbe1d8064ffa1b8a6863b334d43",
+      "bytes": 8279,
+      "manifest_match": true
+    },
+    "registry": {
+      "root": "main",
+      "path": "plugins/development-harness/dh_core/artifact_registry.py",
+      "read": "full in previous raw-source continuation",
+      "sha256": "f5f33c6d3e7d640435f63c9b3e83e0eabfb9cbaca88997cb8edeba9c172622ae",
+      "git_blob_sha1": "a2e18317e3e63b4e4dd02aa4ecf5690527903d56",
+      "bytes": 10162,
+      "manifest_match": true
+    },
+    "planner": {
+      "root": "main",
+      "path": "plugins/development-harness/skills/planner-rt-ica/SKILL.md",
+      "read": "full in previous raw-source continuation",
+      "sha256": "01400778963028bb9e743b6bf45eb296ac5ec419e52927d03c4407b7f5dd3e9c",
+      "git_blob_sha1": "8b7b25960c506153418a5c0136c0edaebee3b087",
+      "bytes": 26690,
+      "manifest_match": true
+    }
+  },
+  "evidence": [
+    {
+      "id": "T01",
+      "source_id": "deployment",
+      "lines": [3, 23],
+      "quote": "If the answer is no, the design is wrong for a distributed plugin."
+    },
+    {
+      "id": "T02",
+      "source_id": "deployment",
+      "lines": [25, 43],
+      "quote": "Scripts in `.claude/skills/*/scripts/` and `.claude/utilities/` run in the user's home directory"
+    },
+    {
+      "id": "T03",
+      "source_id": "deployment",
+      "lines": [45, 51],
+      "quote": "The item must be re-scoped before planning proceeds."
+    },
+    {
+      "id": "T04",
+      "source_id": "create-artifact",
+      "lines": [10, 20],
+      "quote": "return only its logical ID."
+    },
+    {
+      "id": "T05",
+      "source_id": "create-artifact",
+      "lines": [22, 80],
+      "quote": "Non-empty full artifact content \u2014 REQUIRED"
+    },
+    {
+      "id": "T06",
+      "source_id": "create-artifact",
+      "lines": [128, 137],
+      "quote": "never\nthrough `artifact_register` or `artifact_read`."
+    },
+    {
+      "id": "T07",
+      "source_id": "create-artifact",
+      "lines": [151, 160],
+      "quote": "ARTIFACT: type={artifact_type}, action={action}, content_stored={content_stored}, chars={len(content)}"
+    },
+    {
+      "id": "T08",
+      "source_id": "bounded",
+      "lines": [5, 26],
+      "quote": "Vendored copy of ``scripts/run_bounded.py`` at the repository root."
+    },
+    {
+      "id": "T09",
+      "source_id": "bounded",
+      "lines": [29, 43],
+      "quote": "default=5.0"
+    },
+    {
+      "id": "T10",
+      "source_id": "bounded",
+      "lines": [46, 96],
+      "quote": "Probe the group itself rather than trusting the leader's status."
+    },
+    {
+      "id": "T11",
+      "source_id": "bounded",
+      "lines": [99, 139],
+      "quote": "return TIMEOUT_EXIT_CODE"
+    },
+    {
+      "id": "T12",
+      "source_id": "process",
+      "lines": [26, 60],
+      "quote": "Task completion and process assessment are separate."
+    },
+    {
+      "id": "T13",
+      "source_id": "process",
+      "lines": [62, 78],
+      "quote": "do not revisit an unchanged target unless new evidence or a process change invalidated prior results."
+    },
+    {
+      "id": "T14",
+      "source_id": "process",
+      "lines": [86, 108],
+      "quote": "Only apply a correction when authoritative evidence determines it"
+    },
+    {
+      "id": "T15",
+      "source_id": "process",
+      "lines": [110, 149],
+      "quote": "material behavior change \u2192 predeclared change contract + baseline + before/after comparison"
+    },
+    {
+      "id": "T16",
+      "source_id": "process",
+      "lines": [151, 180],
+      "quote": "A diagram is an as-is description or proposal unless applicable authority establishes it as an approved procedure"
+    },
+    {
+      "id": "T17",
+      "source_id": "process",
+      "lines": [182, 221],
+      "quote": "TLA+ and Lean are not mandatory escalation stages."
+    },
+    {
+      "id": "T18",
+      "source_id": "process",
+      "lines": [223, 252],
+      "quote": "Reject a material improvement with a required `LOST` meaning."
+    },
+    {
+      "id": "T19",
+      "source_id": "material",
+      "lines": [5, 17],
+      "quote": "a digest binds bytes but does not establish authority or correctness."
+    },
+    {
+      "id": "T20",
+      "source_id": "material",
+      "lines": [19, 33],
+      "quote": "A check followed by an unguarded write does not close a concurrent-write race."
+    },
+    {
+      "id": "T21",
+      "source_id": "baseline",
+      "lines": [3, 20],
+      "quote": "Consensus is evidence of likely inference, never correctness or safety."
+    },
+    {
+      "id": "T22",
+      "source_id": "baseline",
+      "lines": [39, 77],
+      "quote": "Preserve raw responses before interpretation."
+    },
+    {
+      "id": "T23",
+      "source_id": "test-entry",
+      "lines": [10, 16],
+      "quote": "Review is read-only;\nany subsequent correction needs its own authorization and validation."
+    },
+    {
+      "id": "T24",
+      "source_id": "test-reviewer",
+      "lines": [8, 29],
+      "quote": "A request to review is not permission to execute destructive probes or update snapshots."
+    },
+    {
+      "id": "T25",
+      "source_id": "test-reviewer",
+      "lines": [30, 64],
+      "quote": "Do not infer importance from names, test counts, or covered lines."
+    },
+    {
+      "id": "T26",
+      "source_id": "test-reviewer",
+      "lines": [66, 92],
+      "quote": "Completion of a review never means every test passed"
+    },
+    {
+      "id": "T27",
+      "source_id": "test-principles",
+      "lines": [31, 75],
+      "quote": "return `NO NEW TEST JUSTIFIED`."
+    },
+    {
+      "id": "T28",
+      "source_id": "test-principles",
+      "lines": [77, 151],
+      "quote": "High cost never justifies\ndropping a required guarantee without a surviving carrier."
+    },
+    {
+      "id": "T29",
+      "source_id": "test-principles",
+      "lines": [153, 265],
+      "quote": "Do not calculate expected values with the\nsame production helper or copy its algorithm into the assertion."
+    },
+    {
+      "id": "T30",
+      "source_id": "test-principles",
+      "lines": [267, 338],
+      "quote": "The reviewer never changes the original target."
+    },
+    {
+      "id": "T31",
+      "source_id": "test-principles",
+      "lines": [340, 371],
+      "quote": "A family is an analysis convenience, not evidence of redundancy."
+    },
+    {
+      "id": "T32",
+      "source_id": "feature-writer",
+      "lines": [343, 367],
+      "quote": "artifact_id=\"feature-context-{slug}\""
+    },
+    {
+      "id": "T33",
+      "source_id": "discovery",
+      "lines": [118, 127],
+      "quote": "artifact_id=\"plan/feature-context-{slug}.md\""
+    },
+    {
+      "id": "T34",
+      "source_id": "registry",
+      "lines": [87, 105],
+      "quote": "Each producer re-registers the same `artifact_id`"
+    },
+    {
+      "id": "T35",
+      "source_id": "planner",
+      "lines": [231, 267],
+      "quote": "At least one condition is `PARTIAL` or `MISSING`, and planning signal exists."
+    }
+  ],
+  "metadata_verification": {
+    "checked_at": "2026-10-12T05:31:42.924921+00:00",
+    "source_bindings": 13,
+    "exact_quote_spans": 35,
+    "relationships": 24,
+    "unique_relationship_ids": 24,
+    "failures": [],
+    "root_manifest_hashes": {
+      "original": {
+        "file_manifest_sha256": "a2fb928e9ce2c11c8e3eae257d2a1c77702929f98c49635dcb9c356bf6c36d02",
+        "source_pin_sha256": "45118ba43819c7fb1a033e3207879d389023a3d2a8174e1bf6ce779b5c6fe358",
+        "declared_commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0"
+      },
+      "main": {
+        "file_manifest_sha256": "43bbd2905e2266eb012770eea1cd2f850c18b2c8d54e4fcf07aad58b9f4406e0",
+        "source_pin_sha256": "d8d7aead9cef3dea5f4b9fbef10bc2e273b43b57f0baaaa4a1f43f546ea41901",
+        "declared_commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0"
+      },
+      "procedural": {
+        "file_manifest_sha256": "a4a300c5e31544dfff602253d9350bc690be642ba9c3d5746a303f08f52df0b9",
+        "source_pin_sha256": "bea429f3d48610f9557fc1ac1ecaca27a5956961aaafc8044361017743f04406",
+        "declared_commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0"
+      },
+      "linked": {
+        "file_manifest_sha256": "85a4f02d025cd31436ce37e7cd97adea2d2dcb5d88d3b2ab50d3ae19d03e0db3",
+        "source_pin_sha256": "e54d2be6f11589ca4e67df8f8ecba5beaa74e5d17ea7255985cf1978cce6f923",
+        "declared_commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0"
+      },
+      "registration": {
+        "file_manifest_sha256": "0c50e7f41d2bd6d0fcbb05b8179005e3b3a32a7868d1291ec363e20a7e15a2d4",
+        "source_pin_sha256": "f98cff8c52ecd2f6bb55c66cd602efd280f86bde252a66ff2372d695ae5e7aa5",
+        "declared_commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0"
+      }
+    },
+    "semantic_limit": "Mechanical bindings validate quote/path/hash metadata, not runtime conformance or a gold answer."
+  },
+  "frozen_at": "2026-10-12T05:33:20.196635+00:00"
+}

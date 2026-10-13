@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "status": "frozen-input-boundary-for-fresh-verifiers",
+  "consumer": "A fresh source-only verifier receives exactly one declared case bundle, its proposed claim projection, and only the pinned revision/blob material those claims cite. It receives no prior trace/check/adjudication/control/grading output.",
+  "excluded": [
+    "candidate-trace.json",
+    "case-adjudications.json",
+    "controls/negative-controls.json",
+    "controls/control-candidates.json",
+    "grading-contract.json",
+    "scripts/grade_controls.py",
+    "cases/**/records/**"
+  ],
+  "case_bundles": [
+    {
+      "case_id": "pinned-main-t5",
+      "source_revision": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+      "record_ids": ["PREF-MAIN-001"],
+      "files": [
+        {
+          "path": "cases/pinned-main-t5/verifier-input/source-packet.json",
+          "sha256": "dfd1f849dab24f716f8a1de60b95b234bff646c1ac118fc7d3cd42c21cce67a8"
+        },
+        {
+          "path": "cases/pinned-main-t5/verifier-input/source-question.md",
+          "sha256": "178d3b3e32102fdc95414e34883b2b40a1842a9b16a9c36ead4ee89fbcc48c56"
+        },
+        {
+          "path": "cases/pinned-main-t5/verifier-input/proposed-claims.json",
+          "sha256": "ea592fc46a34172fddbac6321d57d6311613626d25b108fd413499dce3479465"
+        }
+      ]
+    },
+    {
+      "case_id": "pinned-4095-source-check",
+      "source_revision": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+      "record_ids": ["PREF-4095-001"],
+      "files": [
+        {
+          "path": "cases/pinned-4095-source-check/verifier-input/source-packet.json",
+          "sha256": "139297fe1ae0a405ffdf44eeec603da0416953caae174d2a9d3cdc9998658835"
+        },
+        {
+          "path": "cases/pinned-4095-source-check/verifier-input/source-question.md",
+          "sha256": "bebc72d0b1a308bd9e714c2c7260fb814405cc1ec41a7cae2a86259c12bc1a44"
+        },
+        {
+          "path": "cases/pinned-4095-source-check/verifier-input/proposed-claims.json",
+          "sha256": "16c5588d8fcbd9c0b34876797f68226853f0a646d19d97a9f80ad046d1b4eb20"
+        }
+      ]
+    },
+    {
+      "case_id": "grooming-nested-references",
+      "source_revision": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+      "record_ids": ["PREF-GROOM-001"],
+      "files": [
+        {
+          "path": "cases/grooming-main/verifier-input/source-packet.json",
+          "sha256": "addd49d696f49ac1104c72867e8257abdec3d0d537c73731eb6f4d7666ac38be"
+        },
+        {
+          "path": "cases/grooming-main/verifier-input/source-question.md",
+          "sha256": "184c23f3d99266dc347cd5eba52e77941b40aeb00e7fb848cbcbb2c53bc5540f"
+        },
+        {
+          "path": "cases/grooming-main/verifier-input/proposed-claims.json",
+          "sha256": "b113cf862fe0ba69223448317c02985e28badf897bfc0692c14cd50b976f16c4"
+        }
+      ]
+    },
+    {
+      "case_id": "prose-task-profile-start-task",
+      "source_revision": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+      "record_ids": ["PREF-PROSE-001", "PREF-PROSE-002", "PREF-PROSE-003"],
+      "files": [
+        {
+          "path": "cases/prose-task-profile-start-task/verifier-input/source-packet.json",
+          "sha256": "b0810c1efe79a8ebed766b4a0933848c041796ea4cd5781e6d296e2d2dc3e9d1"
+        },
+        {
+          "path": "cases/prose-task-profile-start-task/verifier-input/source-question.md",
+          "sha256": "756c20621ae218bc0369a69143deedb24285ea950e8a533f178d4cf141887da1"
+        },
+        {
+          "path": "cases/prose-task-profile-start-task/verifier-input/handoff-a-source-packet.json",
+          "sha256": "19cd27785fc416e170ae25c98932c9ee823360b6ca4ca0a2dcd0a6c2e64d52bf"
+        },
+        {
+          "path": "cases/prose-task-profile-start-task/verifier-input/handoff-a-source-question.md",
+          "sha256": "1dfcfe0254aba2eedc696a99e5a8eb8fc35a395b16fbd9959e8e1cc41ef90d5b"
+        },
+        {
+          "path": "cases/prose-task-profile-start-task/verifier-input/proposed-claims.json",
+          "sha256": "bc073581b3165def72dfc23c90bd0cd2df5d1b1403c408d24d6e98fffce28a0f"
+        }
+      ]
+    }
+  ],
+  "fresh_verifier_requirement": "Use a new context that has not read cases/**/records, case-adjudications.json, candidate-trace.json, controls, or grading results."
+}

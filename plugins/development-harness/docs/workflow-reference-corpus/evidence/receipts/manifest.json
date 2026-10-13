@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "status": "immutable-independent-receipts-for-bounded-claim-projection",
+  "format": "Receipt files are byte-identical JSON reports stored with a .blob suffix so repository format hooks do not rewrite their evidence bytes.",
+  "receipts": [
+    {
+      "id": "verify-pr4111-a",
+      "path": "./20261013-verify-pr4111-a.json.blob",
+      "sha256": "319ff225646cd6d7d1b515b715ffa1310861aaf95453240f3a6ebe6bdc5681e0",
+      "status": "pass",
+      "scope": "Source binding and fidelity for all six declared projected claims."
+    },
+    {
+      "id": "verify-pr4111-b",
+      "path": "./20261013-verify-pr4111-b.json.blob",
+      "sha256": "b97589b637e053ea1fda2a7416157b78f4101d18d604bbaa71c212ddb01467e9",
+      "status": "pass",
+      "scope": "Independent final replay of the declared frozen projection."
+    },
+    {
+      "id": "independent-control-grade-current",
+      "path": "./20261013-independent-control-grade.json.blob",
+      "sha256": "54368c487603c2a8f06a543dc82f6608237e4de4d5d4e17d3abb53ed3e048ff8",
+      "status": "done",
+      "scope": "Correct replay plus every declared negative control; repeated grader outputs are byte-identical."
+    }
+  ],
+  "excluded_claims": [
+    "general workflow completeness",
+    "runtime execution or provider behavior",
+    "#4103 architecture selection",
+    "#4104 production relationship design",
+    "#3223 publication closure"
+  ]
+}
