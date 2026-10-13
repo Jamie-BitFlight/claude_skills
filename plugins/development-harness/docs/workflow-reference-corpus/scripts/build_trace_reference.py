@@ -11,10 +11,14 @@ import argparse
 import hashlib
 import json
 import operator
+import re
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
+LINE_RANGE_LENGTH = 2
 CASE_RECORDS = {
     "pinned-main-t5": (
         "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
@@ -57,39 +61,177 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def write_control_candidates(path: Path, controls: dict[str, Any]) -> None:
+    """Write control candidates in the repository's canonical JSON format.
+
+    Args:
+        path: Target control-candidate document.
+        controls: Deterministic control payload to serialize.
+
+    """
+    encoded = json.dumps(controls, indent=2, sort_keys=True)
+    encoded = re.sub(r"\[\n(?P<indent>\s+)(?P<value>\"(?:[^\"\\\\]|\\\\.)*\")\n\s+\]", r"[\g<value>]", encoded)
+    path.write_text(encoded + "\n", encoding="utf-8")
+
+
 def as_list(value: Any) -> list[Any]:
     if value is None:
         return []
     return value if isinstance(value, list) else [value]
 
 
-def evidence_spans(value: Any, record_id: str, relation_id: str) -> list[dict[str, Any]]:
+def source_bytes(revision: str, path: str) -> bytes:
+    """Read one immutable source blob for source-span normalization.
+
+    Returns:
+        Source bytes at the requested revision and repository path.
+    """
+    git = shutil.which("git")
+    if git is None:
+        raise ValueError("git executable unavailable")
+    result = subprocess.run([git, "show", f"{revision}:{path}"], cwd=ROOT, capture_output=True, check=False)
+    if result.returncode:
+        raise ValueError(result.stderr.decode(errors="replace").strip())
+    return result.stdout
+
+
+def byte_offset_for_line(content: bytes, line_number: int) -> int:
+    """Return the UTF-8 byte offset where a one-based source line starts."""
+    if line_number < 1:
+        raise ValueError("line numbers are one-based")
+    if line_number == 1:
+        return 0
+    offset = 0
+    for _ in range(1, line_number):
+        newline = content.find(b"\n", offset)
+        if newline < 0:
+            raise ValueError("line outside source")
+        offset = newline + 1
+    return offset
+
+
+def catalog(source_packet_path: Path) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+    """Load source metadata and compact evidence identifiers for one raw lane.
+
+    Returns:
+        Source metadata and evidence entries keyed by their raw identifiers.
+    """
+    packet = load(source_packet_path)
+    sources = packet.get("sources", {})
+    source_by_id: dict[str, dict[str, Any]] = {}
+    if isinstance(sources, dict):
+        source_by_id = {key: value for key, value in sources.items() if isinstance(value, dict)}
+    elif isinstance(sources, list):
+        source_by_id = {
+            str(item["id"]): item for item in sources if isinstance(item, dict) and isinstance(item.get("id"), str)
+        }
+    evidence_by_id = {
+        str(item["id"]): item
+        for item in as_list(packet.get("evidence"))
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    }
+    return source_by_id, evidence_by_id
+
+
+def source_span(
+    evidence: dict[str, Any],
+    record_id: str,
+    relation_id: str,
+    index: int,
+    revision: str,
+    sources: dict[str, dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Resolve one raw evidence object to an exact revision-bound source span.
+
+    Returns:
+        A normalized span, or None when the raw evidence cannot be replayed exactly.
+    """
+    source = sources.get(str(evidence.get("source_id")), evidence)
+    path = evidence.get("source_path", evidence.get("path", source.get("path")))
+    quote = evidence.get("quote")
+    lines = evidence.get("lines")
+    line_start = evidence.get(
+        "line_start",
+        lines[0]
+        if isinstance(lines, list) and len(lines) == LINE_RANGE_LENGTH
+        else lines.get("start")
+        if isinstance(lines, dict)
+        else None,
+    )
+    line_end = evidence.get(
+        "line_end",
+        lines[1]
+        if isinstance(lines, list) and len(lines) == LINE_RANGE_LENGTH
+        else lines.get("end_inclusive")
+        if isinstance(lines, dict)
+        else None,
+    )
+    declared_sha256 = evidence.get(
+        "source_sha256",
+        evidence.get("raw_sha256", evidence.get("sha256", source.get("sha256", source.get("raw_sha256")))),
+    )
+    if (
+        not isinstance(path, str)
+        or not isinstance(quote, str)
+        or not isinstance(line_start, int)
+        or not isinstance(line_end, int)
+    ):
+        return None
+    try:
+        content = source_bytes(revision, path)
+        if declared_sha256 and hashlib.sha256(content).hexdigest() != declared_sha256:
+            return None
+        bytes_range = evidence.get("utf8_bytes")
+        byte_start = evidence.get(
+            "utf8_byte_start", bytes_range.get("start_inclusive") if isinstance(bytes_range, dict) else None
+        )
+        byte_end = evidence.get(
+            "utf8_byte_end_exclusive", bytes_range.get("end_exclusive") if isinstance(bytes_range, dict) else None
+        )
+        quote_bytes = quote.encode()
+        if isinstance(byte_start, int) and isinstance(byte_end, int) and content[byte_start:byte_end] == quote_bytes:
+            pass
+        else:
+            range_start = byte_offset_for_line(content, line_start)
+            range_end = (
+                byte_offset_for_line(content, line_end + 1) if line_end < content.count(b"\n") + 1 else len(content)
+            )
+            byte_start = content.find(quote_bytes, range_start, range_end)
+            byte_end = byte_start + len(quote_bytes)
+            if byte_start < 0:
+                return None
+    except ValueError:
+        return None
+    return {
+        "id": f"{record_id}/{relation_id}/span-{index}",
+        "repository_path": path,
+        "git_blob_sha1": evidence.get("git_blob_sha1", source.get("git_blob_sha1")),
+        "source_sha256": hashlib.sha256(content).hexdigest(),
+        "line_start": line_start,
+        "line_end": line_end,
+        "byte_start": byte_start,
+        "byte_end_exclusive": byte_start + len(quote_bytes),
+        "quote": quote,
+        "quote_sha256": hashlib.sha256(quote_bytes).hexdigest(),
+    }
+
+
+def evidence_spans(
+    value: Any,
+    record_id: str,
+    relation_id: str,
+    revision: str,
+    sources: dict[str, dict[str, Any]],
+    evidence_by_id: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
     spans: list[dict[str, Any]] = []
-    for index, evidence in enumerate(as_list(value)):
+    for index, item in enumerate(as_list(value)):
+        evidence = evidence_by_id.get(item) if isinstance(item, str) else item
         if not isinstance(evidence, dict):
             continue
-        path = evidence.get("source_path", evidence.get("path"))
-        quote = evidence.get("quote")
-        lines = evidence.get("lines")
-        line_start = evidence.get("line_start", lines.get("start") if isinstance(lines, dict) else None)
-        line_end = evidence.get("line_end", lines.get("end_inclusive") if isinstance(lines, dict) else None)
-        byte_start = evidence.get("utf8_byte_start")
-        byte_end = evidence.get("utf8_byte_end_exclusive")
-        if byte_start is None and isinstance(evidence.get("utf8_bytes"), dict):
-            byte_start = evidence["utf8_bytes"].get("start_inclusive")
-            byte_end = evidence["utf8_bytes"].get("end_exclusive")
-        spans.append({
-            "id": f"{record_id}/{relation_id}/span-{index}",
-            "repository_path": path,
-            "git_blob_sha1": evidence.get("git_blob_sha1"),
-            "source_sha256": evidence.get("source_sha256", evidence.get("raw_sha256")),
-            "line_start": line_start,
-            "line_end": line_end,
-            "byte_start": byte_start,
-            "byte_end_exclusive": byte_end,
-            "quote": quote,
-            "quote_sha256": hashlib.sha256(quote.encode()).hexdigest() if isinstance(quote, str) else None,
-        })
+        span = source_span(evidence, record_id, relation_id, index, revision, sources)
+        if span is not None:
+            spans.append(span)
     return spans
 
 
@@ -116,10 +258,19 @@ def normalized_consumers(raw: dict[str, Any], span_ids: list[str]) -> list[dict[
     return normalized
 
 
-def relation_from_raw(case_id: str, record_id: str, raw: dict[str, Any], index: int) -> dict[str, Any]:
+def relation_from_raw(
+    case_id: str,
+    record_id: str,
+    raw: dict[str, Any],
+    index: int,
+    revision: str,
+    sources: dict[str, dict[str, Any]],
+    evidence_by_id: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
     source_id = str(raw.get("id", f"relation-{index}"))
     relation_id = f"{record_id}/{source_id}"
-    spans = evidence_spans(raw.get("evidence"), record_id, source_id)
+    raw_evidence = as_list(raw.get("evidence"))
+    spans = evidence_spans(raw_evidence, record_id, source_id, revision, sources, evidence_by_id)
     span_ids = [span["id"] for span in spans]
     artifact = raw.get("artifacts", raw.get("artifact"))
     artifacts = as_list(artifact)
@@ -138,6 +289,7 @@ def relation_from_raw(case_id: str, record_id: str, raw: dict[str, Any], index: 
         "contradiction_ids": [],
         "evidence_span_ids": span_ids,
         "source_spans": spans,
+        "evidence_complete": bool(spans) and len(spans) == len(raw_evidence),
         "adjudication": "unresolved",
         "source_relation": raw,
     }
@@ -170,18 +322,32 @@ def bind_relation_annotations(case: dict[str, Any]) -> None:
             relation[f"{raw_key}_ids"] = links
 
 
-def collect_relations(case_id: str, record_id: str, trace: dict[str, Any]) -> list[dict[str, Any]]:
+def collect_relations(
+    case_id: str,
+    record_id: str,
+    trace: dict[str, Any],
+    revision: str,
+    sources: dict[str, dict[str, Any]],
+    evidence_by_id: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
     raw_relations = trace.get("relationships", trace.get("steps", trace.get("records", [])))
     if not isinstance(raw_relations, list):
         return []
     return [
-        relation_from_raw(case_id, record_id, relation, index)
+        relation_from_raw(case_id, record_id, relation, index, revision, sources, evidence_by_id)
         for index, relation in enumerate(raw_relations)
         if isinstance(relation, dict)
     ]
 
 
-def collect_annotations(trace: dict[str, Any], record_id: str, key: str) -> list[dict[str, Any]]:
+def collect_annotations(
+    trace: dict[str, Any],
+    record_id: str,
+    key: str,
+    revision: str,
+    sources: dict[str, dict[str, Any]],
+    evidence_by_id: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
     annotations: list[dict[str, Any]] = []
     for index, annotation in enumerate(as_list(trace.get(key))):
         if not isinstance(annotation, dict):
@@ -191,7 +357,9 @@ def collect_annotations(trace: dict[str, Any], record_id: str, key: str) -> list
             "id": f"{record_id}/{annotation_id}",
             "source_records": [record_id],
             "statement": annotation.get("statement", annotation.get("condition", annotation)),
-            "source_spans": evidence_spans(annotation.get("evidence"), record_id, annotation_id),
+            "source_spans": evidence_spans(
+                annotation.get("evidence"), record_id, annotation_id, revision, sources, evidence_by_id
+            ),
             "source_annotation": annotation,
         })
     return annotations
@@ -202,38 +370,74 @@ def build_reference() -> dict[str, Any]:
     for case_id, (revision, records) in CASE_RECORDS.items():
         inventory: list[dict[str, Any]] = []
         relations: list[dict[str, Any]] = []
+        rejected_relations: list[dict[str, Any]] = []
+        rejected_annotations: list[dict[str, Any]] = []
         unknowns: list[dict[str, Any]] = []
         contradictions: list[dict[str, Any]] = []
         for label, trace_path in records:
             path = ROOT / trace_path
             trace = load(path)
             record_id = f"{case_id}/{label}"
+            source_packet_path = path.with_name("source-packet.json")
+            sources, evidence_by_id = catalog(source_packet_path)
             inventory.append({
                 "record_id": record_id,
                 "trace_path": trace_path,
                 "raw_trace_sha256": sha256(path),
                 "authority": "raw-source-only-lane; retained without relation-level lane selection",
             })
-            relations.extend(collect_relations(case_id, record_id, trace))
-            unknowns.extend(collect_annotations(trace, record_id, "unknowns"))
-            contradictions.extend(collect_annotations(trace, record_id, "contradictions"))
+            for relation in collect_relations(case_id, record_id, trace, revision, sources, evidence_by_id):
+                if relation["evidence_complete"]:
+                    relations.append(relation)
+                else:
+                    rejected_relations.append({
+                        "id": relation["id"],
+                        "source_records": relation["source_records"],
+                        "reason": "no_exact_replayable_source_span_in_retained_raw_evidence",
+                        "raw_evidence": relation["source_relation"].get("evidence"),
+                    })
+            for annotation in collect_annotations(trace, record_id, "unknowns", revision, sources, evidence_by_id):
+                if annotation["source_spans"]:
+                    unknowns.append(annotation)
+                else:
+                    rejected_annotations.append({
+                        "id": annotation["id"],
+                        "collection": "unknowns",
+                        "reason": "no_exact_replayable_source_span_in_retained_raw_evidence",
+                        "raw_evidence": annotation["source_annotation"].get("evidence"),
+                    })
+            for annotation in collect_annotations(
+                trace, record_id, "contradictions", revision, sources, evidence_by_id
+            ):
+                if annotation["source_spans"]:
+                    contradictions.append(annotation)
+                else:
+                    rejected_annotations.append({
+                        "id": annotation["id"],
+                        "collection": "contradictions",
+                        "reason": "no_exact_replayable_source_span_in_retained_raw_evidence",
+                        "raw_evidence": annotation["source_annotation"].get("evidence"),
+                    })
         case = {
             "id": case_id,
             "source_revision": revision,
             "raw_record_inventory": inventory,
             "relations": relations,
+            "rejected_relations": rejected_relations,
+            "rejected_annotations": rejected_annotations,
             "unknowns": unknowns,
             "contradictions": contradictions,
-            "reference_status": "source-only-unresolved-lane-normalization",
-            "boundary": "Relations are canonical references to every retained raw lane record, not an independent verification, runtime observation, or architecture selection.",
+            "reference_status": "source-only-replayable-lane-normalization",
+            "boundary": "Accepted relations have exact replayable source spans. Retained raw relations without exact source spans are explicitly rejected; neither category is an independent verification, runtime observation, or architecture selection.",
         }
         bind_relation_annotations(case)
         cases.append(case)
     return {
         "schema_version": 1,
-        "reference_status": "adjudicated-source-only-awaiting-independent-complete-trace-receipts",
+        "reference_status": "replayable-source-only-awaiting-independent-complete-trace-receipts",
         "normalization": {
-            "relation_identity": "record_id plus immutable raw relation id; identical spans never merge relations",
+            "relation_identity": "record_id plus immutable raw relation id; identical spans never merge accepted relations",
+            "rejection_rule": "A relation is accepted only with at least one exact revision-bound source span. Otherwise it remains in rejected_relations with its retained raw evidence identifiers.",
             "consumer_status": "unresolved unless the raw lane supplies a source-supported comparison status",
             "terminal_rule": "null terminals retain the raw lane boundary and are not inferred as success or failure",
             "authority": "This file normalizes frozen source-only records for grading; it does not upgrade raw observations or claim-projection receipts to complete-trace verification.",
@@ -319,6 +523,23 @@ def build_controls(reference: dict[str, Any]) -> dict[str, Any]:
         (
             "same-span-collapse",
             [{"op": "remove_relation", "case_id": continuation_case, "relation_id": continuation_relation}],
+            "fail",
+        ),
+        (
+            "removed-source-span",
+            [{"op": "remove_source_spans", "case_id": actor_case, "relation_id": actor_relation}],
+            "fail",
+        ),
+        (
+            "corrupted-source-quote",
+            [
+                {
+                    "op": "corrupt_source_quote",
+                    "case_id": actor_case,
+                    "relation_id": actor_relation,
+                    "value": "unsupported source quote",
+                }
+            ],
             "fail",
         ),
         (
@@ -465,7 +686,7 @@ def build_controls(reference: dict[str, Any]) -> dict[str, Any]:
         ("duplicate-case-id", [{"op": "append_duplicate_case", "case_id": "pinned-main-t5"}], "fail"),
     ]
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "status": "grader-only-complete-trace-control-candidates",
         "candidate_shape": "Each fixture hydrates the frozen complete trace reference, then applies transparent trace mutations. The grader receives the resulting full trace, not scalar assertions.",
         "controls": [
@@ -487,7 +708,7 @@ def main() -> None:
     controls = build_controls(reference)
     if arguments.write:
         (ROOT / "trace-reference.json").write_text(json.dumps(reference, indent=2) + "\n")
-        (ROOT / "controls/control-candidates.json").write_text(json.dumps(controls, indent=2) + "\n")
+        write_control_candidates(ROOT / "controls/control-candidates.json", controls)
     else:
         print(
             json.dumps(

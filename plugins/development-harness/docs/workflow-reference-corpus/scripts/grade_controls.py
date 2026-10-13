@@ -101,19 +101,31 @@ def structural_failures(reference: dict[str, Any], candidate: dict[str, Any]) ->
             continue
         reference_case = reference_by_id[case_id]
         case_failures = failures.setdefault(case_id, [])
-        required = ("source_revision", "raw_record_inventory", "relations", "unknowns", "contradictions")
+        required = (
+            "source_revision",
+            "raw_record_inventory",
+            "relations",
+            "rejected_relations",
+            "rejected_annotations",
+            "unknowns",
+            "contradictions",
+        )
         for field in required:
             if field not in candidate_case:
                 case_failures.append(f"missing_field:{field}")
         if candidate_case.get("raw_record_inventory") != reference_case["raw_record_inventory"]:
             case_failures.append("raw_record_inventory_mismatch")
-        for collection in ("relations", "unknowns", "contradictions"):
+        for collection in ("relations", "rejected_relations", "rejected_annotations", "unknowns", "contradictions"):
             items = candidate_case.get(collection)
             if not isinstance(items, list) or not all(isinstance(item, dict) for item in items):
                 case_failures.append(f"invalid_collection:{collection}")
                 continue
             for duplicate_id in duplicate_ids(items):
                 case_failures.append(f"duplicate_{collection}_id:{duplicate_id}")
+        if candidate_case.get("rejected_relations") != reference_case.get("rejected_relations"):
+            case_failures.append("rejected_relations_mismatch")
+        if candidate_case.get("rejected_annotations") != reference_case.get("rejected_annotations"):
+            case_failures.append("rejected_annotations_mismatch")
         unknown_ids = {
             item["id"]
             for item in candidate_case.get("unknowns", [])
@@ -127,6 +139,8 @@ def structural_failures(reference: dict[str, Any], candidate: dict[str, Any]) ->
         for relation in candidate_case.get("relations", []):
             if not isinstance(relation, dict):
                 continue
+            if not relation.get("source_spans"):
+                case_failures.append(f"relation_missing_replayable_source_span:{relation.get('id')}")
             for field, valid_ids in (("unknown_ids", unknown_ids), ("contradiction_ids", contradiction_ids)):
                 links = relation.get(field)
                 if not isinstance(links, list) or not all(isinstance(link, str) for link in links):
@@ -135,6 +149,10 @@ def structural_failures(reference: dict[str, Any], candidate: dict[str, Any]) ->
                 for link in links:
                     if link not in valid_ids:
                         case_failures.append(f"invalid_{field}_link:{relation.get('id')}:{link}")
+        for collection in ("unknowns", "contradictions"):
+            for item in candidate_case.get(collection, []):
+                if isinstance(item, dict) and not item.get("source_spans"):
+                    case_failures.append(f"{collection}_missing_replayable_source_span:{item.get('id')}")
         if not case_failures:
             failures.pop(case_id, None)
     return failures
@@ -187,6 +205,11 @@ def apply_mutation(trace: dict[str, Any], mutation: dict[str, Any]) -> None:
         if not relation["consumers"]:
             raise ValueError("consumer mutation target has no consumer")
         relation["consumers"][0]["comparison_status"] = mutation["value"]
+    elif operation == "remove_source_spans":
+        relation["source_spans"] = []
+        relation["evidence_span_ids"] = []
+    elif operation == "corrupt_source_quote":
+        relation["source_spans"][0]["quote"] = mutation["value"]
     elif operation == "append_duplicate_relation":
         case["relations"].append(copy.deepcopy(relation))
     else:
@@ -226,7 +249,7 @@ def source_bytes(revision: str, path: str, cache: dict[tuple[str, str], bytes]) 
 
 
 def replay_case(case: dict[str, Any]) -> list[dict[str, str]]:
-    """Validate every replayable source span in a candidate case.
+    """Validate every required source span in a candidate case.
 
     Returns:
         Source replay failures.
@@ -235,9 +258,17 @@ def replay_case(case: dict[str, Any]) -> list[dict[str, str]]:
     cache: dict[tuple[str, str], bytes] = {}
     trace_items = [*case["relations"], *case.get("unknowns", []), *case.get("contradictions", [])]
     for item in trace_items:
-        for span in item.get("source_spans", []):
+        spans = item.get("source_spans")
+        if not isinstance(spans, list) or not spans:
+            failures.append({"id": str(item.get("id")), "reason": "missing_replayable_source_span"})
+            continue
+        for span in spans:
+            if not isinstance(span, dict):
+                failures.append({"id": str(item.get("id")), "reason": "invalid_source_span"})
+                continue
             path = span.get("repository_path")
-            if not path or span.get("quote") is None:
+            if not isinstance(path, str) or not isinstance(span.get("quote"), str):
+                failures.append({"id": str(span.get("id", item.get("id"))), "reason": "incomplete_source_span"})
                 continue
             try:
                 content = source_bytes(case["source_revision"], path, cache)

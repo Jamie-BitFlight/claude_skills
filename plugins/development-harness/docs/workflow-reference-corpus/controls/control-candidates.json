@@ -1,147 +1,177 @@
 {
-  "schema_version": 2,
-  "status": "grader-only-complete-trace-control-candidates",
   "candidate_shape": "Each fixture hydrates the frozen complete trace reference, then applies transparent trace mutations. The grader receives the resulting full trace, not scalar assertions.",
   "controls": [
     {
-      "id": "correct-source-replay",
       "candidate": {
         "base_reference": "../trace-reference.json",
         "mutations": []
       },
       "expected": {
         "verdict": "pass"
-      }
+      },
+      "id": "correct-source-replay"
     },
     {
-      "id": "mixed-revision-sourcecheck",
       "candidate": {
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "op": "set_case_revision",
             "case_id": "pinned-4095-source-check",
+            "op": "set_case_revision",
             "value": "e66b55e05e130ea905afaf8d650ec0f5980d08d0"
           }
         ]
       },
       "expected": {
         "verdict": "fail"
-      }
+      },
+      "id": "mixed-revision-sourcecheck"
     },
     {
-      "id": "profile-is-child",
       "candidate": {
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "op": "set_relation_field",
             "case_id": "pinned-main-t5",
-            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation",
             "field": "actor",
+            "op": "set_relation_field",
+            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation",
             "value": "loaded profile as spawned child"
           }
         ]
       },
       "expected": {
         "verdict": "fail"
-      }
+      },
+      "id": "profile-is-child"
     },
     {
-      "id": "nested-return-loss",
       "candidate": {
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "op": "set_relation_field",
             "case_id": "pinned-main-t5",
-            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation",
             "field": "continuations",
+            "op": "set_relation_field",
+            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation",
             "value": []
           }
         ]
       },
       "expected": {
         "verdict": "fail"
-      }
+      },
+      "id": "nested-return-loss"
     },
     {
-      "id": "same-span-collapse",
       "candidate": {
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "op": "remove_relation",
             "case_id": "pinned-main-t5",
+            "op": "remove_relation",
             "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation"
           }
         ]
       },
       "expected": {
         "verdict": "fail"
-      }
+      },
+      "id": "same-span-collapse"
     },
     {
-      "id": "activity-stamping-overclaim",
       "candidate": {
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "op": "append_false_relation",
-            "case_id": "prose-task-profile-start-task",
-            "id": "unsupported-activity-stamping",
-            "actor": "configuration",
-            "condition": "registry entry",
-            "action": "claim runtime activation",
-            "effect": "specific consumer exists",
-            "terminal": null,
-            "artifacts": [],
-            "consumers": [
-              {
-                "name": "activity-stamping",
-                "comparison_status": "unchanged",
-                "comparison_evidence_span_ids": []
-              }
-            ],
-            "unknown_ids": [],
-            "contradiction_ids": [],
-            "evidence_span_ids": [],
-            "source_spans": []
+            "case_id": "pinned-main-t5",
+            "op": "remove_source_spans",
+            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation"
           }
         ]
       },
       "expected": {
         "verdict": "fail"
-      }
+      },
+      "id": "removed-source-span"
     },
     {
-      "id": "missed-terminal",
       "candidate": {
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "op": "set_relation_field",
             "case_id": "pinned-main-t5",
-            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/missing-diff",
+            "op": "corrupt_source_quote",
+            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation",
+            "value": "unsupported source quote"
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "fail"
+      },
+      "id": "corrupted-source-quote"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "action": "claim runtime activation",
+            "actor": "configuration",
+            "artifacts": [],
+            "case_id": "prose-task-profile-start-task",
+            "condition": "registry entry",
+            "consumers": [
+              {
+                "comparison_evidence_span_ids": [],
+                "comparison_status": "unchanged",
+                "name": "activity-stamping"
+              }
+            ],
+            "contradiction_ids": [],
+            "effect": "specific consumer exists",
+            "evidence_span_ids": [],
+            "id": "unsupported-activity-stamping",
+            "op": "append_false_relation",
+            "source_spans": [],
+            "terminal": null,
+            "unknown_ids": []
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "fail"
+      },
+      "id": "activity-stamping-overclaim"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "pinned-main-t5",
             "field": "terminal",
+            "op": "set_relation_field",
+            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/missing-diff",
             "value": null
           }
         ]
       },
       "expected": {
         "verdict": "fail"
-      }
+      },
+      "id": "missed-terminal"
     },
     {
-      "id": "false-terminal",
       "candidate": {
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "op": "set_relation_field",
             "case_id": "pinned-main-t5",
-            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/missing-diff",
             "field": "terminal",
+            "op": "set_relation_field",
+            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/missing-diff",
             "value": {
               "kind": "invented",
               "outcome": "unsupported"
@@ -151,41 +181,41 @@
       },
       "expected": {
         "verdict": "fail"
-      }
+      },
+      "id": "false-terminal"
     },
     {
-      "id": "missed-artifact-consumer",
       "candidate": {
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "op": "set_relation_field",
             "case_id": "pinned-main-t5",
-            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation",
             "field": "artifacts",
+            "op": "set_relation_field",
+            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation",
             "value": []
           },
           {
-            "op": "set_relation_field",
             "case_id": "pinned-main-t5",
-            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation",
             "field": "consumers",
+            "op": "set_relation_field",
+            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation",
             "value": []
           }
         ]
       },
       "expected": {
         "verdict": "fail"
-      }
+      },
+      "id": "missed-artifact-consumer"
     },
     {
-      "id": "consumer-change-misclassification",
       "candidate": {
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "op": "set_consumer_status",
             "case_id": "pinned-main-t5",
+            "op": "set_consumer_status",
             "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/run-stamp",
             "value": "changed"
           }
@@ -193,127 +223,130 @@
       },
       "expected": {
         "verdict": "fail"
-      }
+      },
+      "id": "consumer-change-misclassification"
     },
     {
-      "id": "dropped-unknown",
       "candidate": {
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "op": "remove_annotation",
             "case_id": "grooming-nested-references",
             "collection": "unknowns",
-            "id": "grooming-nested-references/actor-a-final/unknown-intake-E"
+            "id": "grooming-nested-references/actor-a-final/unknown-intake-E",
+            "op": "remove_annotation"
           }
         ]
       },
       "expected": {
         "verdict": "fail"
-      }
+      },
+      "id": "dropped-unknown"
     },
     {
-      "id": "invented-contradiction",
       "candidate": {
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "op": "append_annotation",
             "case_id": "pinned-main-t5",
             "collection": "contradictions",
             "id": "invented-contradiction",
-            "statement": "unsupported",
-            "source_spans": []
+            "op": "append_annotation",
+            "source_spans": [],
+            "statement": "unsupported"
           }
         ]
       },
       "expected": {
         "verdict": "fail"
-      }
+      },
+      "id": "invented-contradiction"
     },
     {
-      "id": "dropped-unknown-link",
       "candidate": {
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "op": "set_relation_field",
             "case_id": "grooming-nested-references",
-            "relation_id": "grooming-nested-references/actor-a-final/unknown-research-investigation",
             "field": "unknown_ids",
+            "op": "set_relation_field",
+            "relation_id": "grooming-nested-references/actor-a-final/unknown-research-investigation",
             "value": []
           }
         ]
       },
       "expected": {
         "verdict": "fail"
-      }
+      },
+      "id": "dropped-unknown-link"
     },
     {
-      "id": "invented-contradiction-link",
       "candidate": {
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "op": "set_relation_field",
             "case_id": "pinned-main-t5",
-            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/content-store-boundary",
             "field": "contradiction_ids",
+            "op": "set_relation_field",
+            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/content-store-boundary",
             "value": ["invented-contradiction-link"]
           }
         ]
       },
       "expected": {
         "verdict": "fail"
-      }
+      },
+      "id": "invented-contradiction-link"
     },
     {
-      "id": "incomplete-raw-record-inventory",
       "candidate": {
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "op": "set_case_field",
             "case_id": "pinned-main-t5",
             "field": "raw_record_inventory",
+            "op": "set_case_field",
             "value": []
           }
         ]
       },
       "expected": {
         "verdict": "fail"
-      }
+      },
+      "id": "incomplete-raw-record-inventory"
     },
     {
-      "id": "duplicate-relation-id",
       "candidate": {
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "op": "append_duplicate_relation",
             "case_id": "pinned-main-t5",
+            "op": "append_duplicate_relation",
             "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation"
           }
         ]
       },
       "expected": {
         "verdict": "fail"
-      }
+      },
+      "id": "duplicate-relation-id"
     },
     {
-      "id": "duplicate-case-id",
       "candidate": {
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "op": "append_duplicate_case",
-            "case_id": "pinned-main-t5"
+            "case_id": "pinned-main-t5",
+            "op": "append_duplicate_case"
           }
         ]
       },
       "expected": {
         "verdict": "fail"
-      }
+      },
+      "id": "duplicate-case-id"
     }
-  ]
+  ],
+  "schema_version": 3,
+  "status": "grader-only-complete-trace-control-candidates"
 }

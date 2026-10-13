@@ -1,6 +1,6 @@
 # Workflow reference corpus
 
-This directory is the bounded #4102 source-reference corpus. [trace-reference.json](./trace-reference.json) normalizes every retained primary record for all four required cases without selecting a raw lane, inferring runtime behavior, or selecting #4103/#4104 architecture.
+This directory is the bounded #4102 source-reference corpus. [trace-reference.json](./trace-reference.json) accepts only relations with exact replayable source spans and explicitly retains rejected raw relations for all four required cases without selecting a raw lane, inferring runtime behavior, or selecting #4103/#4104 architecture.
 
 ## Roles
 
@@ -12,4 +12,4 @@ This directory is the bounded #4102 source-reference corpus. [trace-reference.js
 
 The corpus contains a source-only complete-trace reference and deterministic full-trace controls. It is **not accepted or independently verified as a complete trace** until separately authored valid receipts bind a blind candidate, source replay, and final tracked-byte integrity.
 
-The immutable historical receipts cover six bounded claim projections, not seven. Their wording is retained as historical evidence and does not establish complete traces. The corpus makes no general-completeness, runtime, production-ontology, publication, #4103, #4104, or #4105 claim.
+The immutable historical receipts cover six bounded claim projections, not seven. Their wording is retained as historical evidence and does not establish complete traces. The historical scalar-control receipt is invalid because it invokes removed grader options; it is retained only as an invocation record. [complete-trace-verifier-input.json](./complete-trace-verifier-input.json) prepares the fresh verifier boundary. The corpus makes no general-completeness, runtime, production-ontology, publication, #4103, #4104, or #4105 claim.

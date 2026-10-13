@@ -21,8 +21,8 @@
       "id": "independent-control-grade-current",
       "path": "./20261013-independent-control-grade.json.blob",
       "sha256": "54368c487603c2a8f06a543dc82f6608237e4de4d5d4e17d3abb53ed3e048ff8",
-      "status": "done",
-      "scope": "Historical scalar-control replay only; superseded by the complete-trace controls and not complete-trace verification."
+      "status": "invalidated",
+      "scope": "Historical scalar-control replay only. Its retained command passes removed --corpus-manifest and --controls options that the current grader does not accept, so its PASS result is invalid and cannot support any complete-trace claim."
     }
   ],
   "excluded_claims": [

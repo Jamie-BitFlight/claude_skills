@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "status": "complete-trace-grading-contract-awaiting-independent-receipt",
   "scope": "The grader compares source-only complete traces for the four bounded #4102 cases. It never establishes runtime behavior, production truth, general completeness, or #4103/#4104 architecture.",
   "reference": "./trace-reference.json",
@@ -11,6 +11,8 @@
       "source_revision",
       "raw_record_inventory",
       "relations",
+      "rejected_relations",
+      "rejected_annotations",
       "unknowns",
       "contradictions"
     ],
@@ -29,7 +31,9 @@
     "validation": [
       "candidate case ids exactly match the four reference cases with no duplicates",
       "each candidate raw_record_inventory exactly matches its reference case",
+      "each candidate rejected_relations and rejected_annotations exactly match the frozen reference",
       "relation, unknown, and contradiction ids are unique within each case",
+      "every accepted relation, unknown, and contradiction has at least one complete revision-bound source span",
       "each relation unknown_ids and contradiction_ids value is a list of existing case-local annotation ids",
       "extra relations score false and duplicate identifiers reject the candidate"
     ],
@@ -68,7 +72,8 @@
       "candidate source revision differs from the canonical case revision",
       "source object cannot be resolved",
       "source SHA-256 differs",
-      "quoted byte span differs"
+      "quoted byte span differs",
+      "a relation or annotation has no complete replayable source span"
     ]
   },
   "acceptance_threshold": {

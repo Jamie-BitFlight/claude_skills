@@ -88,11 +88,12 @@
     "controls": "./controls/negative-controls.json",
     "grading_contract": "./grading-contract.json",
     "receipt_manifest": "./evidence/receipts/manifest.json",
-    "record_integrity": "./record-integrity.json"
+    "record_integrity": "./record-integrity.json",
+    "complete_trace_verifier_input": "./complete-trace-verifier-input.json"
   },
   "acceptance_boundary": {
     "current_state": "The complete source-only reference and deterministic controls are present, but no valid independent complete-trace receipt is committed.",
-    "historical_projection_receipts": "Six bounded claim projections, not seven and not complete traces, remain immutable historical evidence only.",
+    "historical_projection_receipts": "Six bounded claim projections, not seven and not complete traces, remain immutable historical evidence only. The retained scalar-control receipt is invalid because its recorded command uses removed grader options.",
     "excluded": [
       "general workflow completeness",
       "runtime execution or persistent ontology claims",

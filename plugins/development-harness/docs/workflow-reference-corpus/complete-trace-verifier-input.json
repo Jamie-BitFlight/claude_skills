@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "status": "prepared-unexecuted",
+  "role": "fresh complete-trace verifier",
+  "purpose": "Independently replay a frozen complete-trace candidate against the frozen source-only reference without consulting historical lane outputs or receipts.",
+  "inputs": {
+    "reference": {
+      "path": "./trace-reference.json",
+      "sha256": "3ffbd7d4e29ed685b39685fc5e4aa6eecf994606cd21752e61665ac08a176966"
+    },
+    "contract": {
+      "path": "./grading-contract.json",
+      "sha256": "866e7751ccd1242bfb400bb4e9a1b62dbf0cf401771d76f5ac341eb149af06f0"
+    },
+    "grader": {
+      "path": "./scripts/grade_controls.py",
+      "sha256": "fe915c3531f4e5983ea14b9f2a7b435b028b65e3aeda7eade62d8bd655e8784c"
+    },
+    "candidate": "A separately frozen complete-trace candidate supplied after the verifier starts. It must declare the same four case ids and source revisions."
+  },
+  "exclusions": [
+    "cases/**/records/**",
+    "case-adjudications.json",
+    "candidate-trace.json",
+    "evidence/receipts/**",
+    "historical claim-projection receipts"
+  ],
+  "required_checks": [
+    "Verify each declared input digest before grading.",
+    "Run the grader against the supplied candidate; require zero missed, false, and source replay failures in every row.",
+    "Run the grader self-check; it must reject the tracked removed-span and corrupted-quote controls.",
+    "Run record-integrity validation after the final package bytes are fixed and bind its package_root_sha256 in the verifier receipt."
+  ],
+  "receipt_requirements": [
+    "Identify the fresh verifier context and candidate digest.",
+    "Record exact command, stdout, stderr, and exit status for candidate grade, control self-check, and integrity validation.",
+    "State only the source-only complete-trace result; do not claim runtime behavior, architecture selection, or publication closure."
+  ]
+}
