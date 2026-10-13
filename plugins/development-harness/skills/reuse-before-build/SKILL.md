@@ -56,8 +56,10 @@ matrix or report for every helper.
 Defer only the affected implementation choice while it is UNRESOLVED. Continue
 independent design, verification, review or other tasks. Missing discovery does not
 authorize a custom build. Ask for help only when the missing decision blocks the
-next consequential step. In planning, make discovery a predecessor only of the
-dependent implementation task; do not block unrelated tasks.
+next consequential step. In plan-level decomposition, make discovery a predecessor
+only of the dependent implementation task; do not block unrelated tasks. A caller
+generating one task cannot create that predecessor: preserve the UNRESOLVED decision
+and its cheapest check in that task, and do not invent a dependency or task ID.
 
 ## Decision evidence
 

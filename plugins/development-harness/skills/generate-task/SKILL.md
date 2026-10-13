@@ -16,7 +16,7 @@ You MUST follow the existing canonical task writing standard and structure:
 
 - CLEAR ordering (Context, Objective, Inputs, Requirements, Constraints, Expected Outputs, Acceptance Criteria, Verification Steps, CoVe Checks only if needed, Handoff).
 - Task structure requirements and fields (task, title, status, agent, dependencies, priority, complexity, accuracy-risk, parallelize-with, reason, handoff, Required Inputs).
-- When selecting the implementation approach, activate `/dh:reuse-before-build` in planning mode. Place its applicable decision and evidence in the existing Context/Requirements/Verification sections and encode any resulting predecessor in `dependencies`.
+- When selecting the implementation approach, activate `/dh:reuse-before-build` in planning mode. Place its applicable decision and evidence in the existing Context/Requirements/Verification sections. This one-task generator may encode a supplied predecessor in `dependencies`, but cannot create one: when the decision is UNRESOLVED, record its cheapest check and block custom implementation without inventing a dependency or task ID.
 
 Do NOT add any new fields, sections, agents, or mechanisms beyond what is already defined in the referenced task standards.
 
