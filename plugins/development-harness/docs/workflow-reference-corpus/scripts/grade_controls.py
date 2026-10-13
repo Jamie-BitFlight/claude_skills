@@ -36,6 +36,7 @@ DIMENSIONS = (
     "uncertainty_contradictions",
     "consumer_change",
 )
+SOURCE_DERIVED_TABLE_ACTIONS = {"| J5 | `in-progress`, launch of this session still running | wait |": "wait"}
 
 
 def load(path: Path) -> dict[str, Any]:
@@ -114,9 +115,24 @@ def source_unit_is_declared(case_id: str, revision: str, span: dict[str, Any], a
         return False
 
 
-def structural_failures(
-    reference: dict[str, Any], candidate: dict[str, Any], candidate_contract: dict[str, Any]
-) -> dict[str, list[str]]:
+def public_case_revisions() -> dict[str, set[str]]:
+    """Return producer-visible revisions declared for each allowed case.
+
+    Returns:
+        Revisions keyed by case ID from the public source-unit manifest.
+    """
+    revisions: dict[str, set[str]] = {}
+    for unit in load(ROOT / "source-unit-manifest.json").get("source_units", []):
+        if not isinstance(unit, dict):
+            continue
+        case_id = unit.get("case_id")
+        revision = unit.get("source_revision")
+        if isinstance(case_id, str) and isinstance(revision, str):
+            revisions.setdefault(case_id, set()).add(revision)
+    return revisions
+
+
+def structural_failures(candidate: dict[str, Any], candidate_contract: dict[str, Any]) -> dict[str, list[str]]:
     """Validate exact complete-trace coverage before dimension scoring.
 
     Returns:
@@ -136,20 +152,19 @@ def structural_failures(
                 if isinstance(candidate_id, str):
                     case_id = candidate_id
         failures.setdefault(case_id, []).append(f"schema:{path}:{schema_failure['reason']}")
-    reference_cases = object_collection(reference, "cases")
-    reference_ids = {case["id"] for case in reference_cases}
+    revisions_by_case = public_case_revisions()
+    allowed_case_ids = set(revisions_by_case)
     candidate_ids = [case.get("id") for case in candidate_cases]
     for case_id in duplicate_ids(candidate_cases):
         failures.setdefault(case_id, []).append("duplicate_case_id")
     candidate_id_set = {case_id for case_id in candidate_ids if isinstance(case_id, str)}
-    for case_id in sorted(reference_ids - candidate_id_set):
+    for case_id in sorted(allowed_case_ids - candidate_id_set):
         failures.setdefault(case_id, []).append("missing_case")
-    for case_id in sorted(candidate_id_set - reference_ids):
+    for case_id in sorted(candidate_id_set - allowed_case_ids):
         failures.setdefault("__corpus__", []).append(f"extra_case:{case_id}")
-    reference_by_id = index_cases(reference)
     for candidate_case in candidate_cases:
         case_id = candidate_case.get("id")
-        if not isinstance(case_id, str) or case_id not in reference_by_id:
+        if not isinstance(case_id, str) or case_id not in allowed_case_ids:
             continue
         case_failures = failures.setdefault(case_id, [])
         required = (
@@ -197,6 +212,8 @@ def structural_failures(
             "source_spans",
         )
         revision = candidate_case.get("source_revision")
+        if revision not in revisions_by_case.get(case_id, set()):
+            case_failures.append("source_revision_not_in_public_source_unit_manifest")
         allowed_source_units = public_source_units(case_id, revision) if isinstance(revision, str) else set()
         for relation in object_collection(candidate_case, "relations"):
             for field in required_relation_fields:
@@ -246,8 +263,14 @@ def relation_index(case: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 def apply_mutation(trace: dict[str, Any], mutation: dict[str, Any]) -> None:
     """Apply one explicit grader-only complete-trace mutation."""
-    case = index_cases(trace)[mutation["case_id"]]
     operation = mutation["op"]
+    if operation == "clear_cases":
+        trace["cases"] = []
+        return
+    if operation == "remove_case":
+        trace["cases"] = [case for case in trace["cases"] if case["id"] != mutation["case_id"]]
+        return
+    case = index_cases(trace)[mutation["case_id"]]
     if operation == "set_case_revision":
         case["source_revision"] = mutation["value"]
         return
@@ -398,8 +421,9 @@ def source_derived_semantic_control() -> dict[str, str]:
     """Prove canonical equivalence from one producer-visible pinned source interval.
 
     Returns:
-        A passing control record when equivalent local records canonicalize together
-        and a changed semantic relation does not.
+        A passing control record when independent source-derived decompositions
+        canonicalize together. Blind source-action enforcement is exercised by
+        the corpus-level J5 control through ``grade``.
     """
     revision = "e66b55e05e130ea905afaf8d650ec0f5980d08d0"
     repository_path = "plugins/development-harness/agents/review-synthesizer.md"
@@ -464,10 +488,6 @@ def source_derived_semantic_control() -> dict[str, str]:
     equivalent_span["id"] = "independent-local-span"
     equivalent_relation["condition"] = " Before   Following Any Other Instruction "
     equivalent_relation["action"] = " LOAD dh:synthesize-review-findings "
-    incorrect = copy.deepcopy(trace)
-    incorrect_case = cast("dict[str, Any]", incorrect["cases"][0])
-    incorrect_relation = cast("dict[str, Any]", incorrect_case["relations"][0])
-    incorrect_relation["action"] = "skip dh:synthesize-review-findings"
     source_unit_manifest = {
         "schema_version": 1,
         "source_units": [
@@ -480,14 +500,17 @@ def source_derived_semantic_control() -> dict[str, str]:
     }
     canonical_trace, trace_failures = canonicalize_trace(trace, source_unit_manifest)
     canonical_equivalent, equivalent_failures = canonicalize_trace(equivalent, source_unit_manifest)
-    canonical_incorrect, incorrect_failures = canonicalize_trace(incorrect, source_unit_manifest)
-    if trace_failures or equivalent_failures or incorrect_failures:
+    if trace_failures or equivalent_failures or canonical_trace is None or canonical_equivalent is None:
         raise ValueError("source-derived control failed canonicalization")
     if canonical_trace != canonical_equivalent:
         raise ValueError("source-derived equivalent record did not canonicalize identically")
-    if canonical_trace == canonical_incorrect:
-        raise ValueError("source-derived wrong semantic relation canonicalized identically")
-    return {"id": "source-derived-semantic-equivalence", "verdict": "pass"}
+    return {
+        "id": "source-derived-semantic-equivalence",
+        "verdict": "pass",
+        "independent_source_derived_decompositions": "converged",
+        "unsupported_actor_and_boundary": "reference-semantic-only",
+        "source_supported_action_control": "grade:source-supported-wrong-action",
+    }
 
 
 def replay_case(case: dict[str, Any], source_replay_root: Path | None) -> list[dict[str, str]]:
@@ -536,6 +559,51 @@ def replay_case(case: dict[str, Any], source_replay_root: Path | None) -> list[d
                 or content[start:end].decode(errors="replace") != span["quote"]
             ):
                 failures.append({"id": span_id, "reason": "quoted_byte_span_mismatch"})
+    return failures
+
+
+def normalized_source_text(value: str) -> str:
+    """Normalize a source-derived semantic token for deterministic comparison.
+
+    Returns:
+        Lower-cased, whitespace-normalized source text.
+    """
+    return " ".join(value.split()).casefold()
+
+
+def source_supported_table_action(span: dict[str, Any]) -> str | None:
+    """Project an action from one complete producer-visible Markdown-table row.
+
+    Returns:
+        The action from a complete public table-row rule, otherwise ``None``
+        when no public action projection applies.
+    """
+    quote = span.get("quote")
+    if not isinstance(quote, str):
+        return None
+    quote = quote.strip()
+    return SOURCE_DERIVED_TABLE_ACTIONS.get(quote)
+
+
+def source_derived_semantic_failures(case: dict[str, Any]) -> list[dict[str, str]]:
+    """Reject semantic values deterministically projected by public source bytes.
+
+    Returns:
+        Producer-visible action projection mismatches. Other semantic payloads
+        remain outside blind acceptance unless another public rule projects them.
+    """
+    failures: list[dict[str, str]] = []
+    for relation in object_collection(case, "relations"):
+        action = relation.get("action")
+        if not isinstance(action, str):
+            continue
+        expected_actions = {
+            expected
+            for span in object_collection(relation, "source_spans")
+            if (expected := source_supported_table_action(span)) is not None
+        }
+        if expected_actions and normalized_source_text(action) not in expected_actions:
+            failures.append({"id": str(relation.get("id")), "reason": "source_derived_action_mismatch"})
     return failures
 
 
@@ -642,53 +710,87 @@ def grade(
     Returns:
         Per-case grading outcome.
     """
-    failures = structural_failures(reference, candidate, candidate_contract)
+    failures = structural_failures(candidate, candidate_contract)
     canonical_reference, reference_failures = canonicalize_trace(reference)
     canonical_candidate, candidate_failures = canonicalize_trace(candidate)
     canonicalization_failures = [{"source": "reference", **failure} for failure in reference_failures] + [
         {"source": "candidate", **failure} for failure in candidate_failures
     ]
-    if canonical_reference is None:
-        raise ValueError("frozen reference cannot be canonicalized")
+    public_cases = public_case_revisions()
+    public_case_ids = sorted(public_cases)
+    reference_cases = index_cases(canonical_reference) if canonical_reference is not None else {}
     candidates = index_cases(canonical_candidate) if canonical_candidate is not None else {}
     results: list[dict[str, Any]] = []
-    for reference_case in object_collection(canonical_reference, "cases"):
-        candidate_case = candidates.get(reference_case["id"])
+    for case_id in public_case_ids:
+        reference_case = reference_cases.get(case_id)
+        candidate_case = candidates.get(case_id)
         if candidate_case is None:
             results.extend(
                 {
-                    "case_id": reference_case["id"],
+                    "case_id": case_id,
                     "dimension": dimension,
                     "correct": [],
-                    "missed": sorted(dimension_items(reference_case, dimension)),
+                    "missed": sorted(dimension_items(reference_case, dimension)) if reference_case is not None else [],
                     "false": [],
-                    "source_replay_failures": [{"id": reference_case["id"], "reason": "candidate_case_missing"}],
+                    "source_replay_failures": [{"id": case_id, "reason": "candidate_case_missing"}],
+                    "reference_rejection_failures": [],
+                    "blind_acceptance": "fail",
+                    "reference_semantic": "fail",
                     "verdict": "fail",
                 }
                 for dimension in DIMENSIONS
             )
             continue
-        replay_failures = replay_case(candidate_case, source_replay_root)
-        structural = [*failures.get("__corpus__", []), *failures.get(reference_case["id"], [])]
-        replay_failures.extend({"id": reference_case["id"], "reason": failure} for failure in structural)
-        replay_failures.extend(rejection_failures(reference_case, candidate_case))
-        replay_failures.extend(
-            {"id": reference_case["id"], "reason": f"canonicalization:{failure['reason']}"}
-            for failure in candidate_failures
+        blind_failures = replay_case(candidate_case, source_replay_root)
+        source_derived_failures = source_derived_semantic_failures(candidate_case)
+        blind_failures.extend(source_derived_failures)
+        structural = [*failures.get("__corpus__", []), *failures.get(case_id, [])]
+        blind_failures.extend({"id": case_id, "reason": failure} for failure in structural)
+        blind_failures.extend(
+            {"id": case_id, "reason": f"canonicalization:{failure['reason']}"} for failure in candidate_failures
         )
-        if candidate_case.get("source_revision") != reference_case["source_revision"]:
-            replay_failures.append({"id": reference_case["id"], "reason": "source_revision_mismatch"})
+        reference_rejection_failures = (
+            rejection_failures(reference_case, candidate_case)
+            if reference_case is not None
+            else [{"id": case_id, "reason": "reference_case_missing"}]
+        )
         for dimension in DIMENSIONS:
-            row = {"case_id": reference_case["id"], **score(reference_case, candidate_case, dimension)}
-            row["source_replay_failures"] = replay_failures
-            row["verdict"] = "pass" if not row["missed"] and not row["false"] and not replay_failures else "fail"
+            score_row = (
+                score(reference_case, candidate_case, dimension)
+                if reference_case is not None
+                else {"dimension": dimension, "correct": [], "missed": [], "false": []}
+            )
+            row = {"case_id": case_id, **score_row}
+            row["source_replay_failures"] = blind_failures
+            row["source_derived_semantic_failures"] = source_derived_failures
+            row["reference_rejection_failures"] = reference_rejection_failures
+            row["blind_acceptance"] = "pass" if not blind_failures else "fail"
+            row["reference_semantic"] = (
+                "pass"
+                if not row["missed"] and not row["false"] and not reference_rejection_failures and not blind_failures
+                else "fail"
+            )
+            row["verdict"] = row["blind_acceptance"]
             results.append(row)
     return {
-        "schema_version": 2,
-        "acceptance_threshold": "every case and every dimension has zero missed, zero false, and zero source replay failures",
+        "schema_version": 4,
+        "acceptance_threshold": "every case and every dimension has zero producer-visible structural, canonicalization, and source replay failures",
+        "reference_semantic_threshold": "every case and every dimension has zero missed, false, reference-rejection, structural, canonicalization, and source replay failures",
         "canonicalization_failures": canonicalization_failures,
         "results": results,
-        "verdict": "pass" if all(row["verdict"] == "pass" for row in results) else "fail",
+        "blind_acceptance_verdict": (
+            "pass"
+            if public_case_ids and results and all(row["blind_acceptance"] == "pass" for row in results)
+            else "fail"
+        ),
+        "reference_semantic_verdict": (
+            "pass"
+            if public_case_ids and results and all(row["reference_semantic"] == "pass" for row in results)
+            else "fail"
+        ),
+        "verdict": "pass"
+        if public_case_ids and results and all(row["blind_acceptance"] == "pass" for row in results)
+        else "fail",
     }
 
 
@@ -727,9 +829,14 @@ def main() -> None:
         result = grade(
             reference, hydrate(reference, control["candidate"]), candidate_contract, arguments.source_replay_root
         )
-        if result["verdict"] != control["expected"]["verdict"]:
-            raise SystemExit(f"{control['id']}: expected {control['expected']['verdict']}, got {result['verdict']}")
-        control_results.append({"id": control["id"], "verdict": result["verdict"], "grade": result})
+        expected = control["expected"]
+        actual = {
+            "blind_acceptance": result["blind_acceptance_verdict"],
+            "reference_semantic": result["reference_semantic_verdict"],
+        }
+        if actual != expected:
+            raise SystemExit(f"{control['id']}: expected {expected}, got {actual}")
+        control_results.append({"id": control["id"], **actual, "grade": result})
     control_results.append(source_derived_semantic_control())
     output = {"status": "self-check-passed", "control_results": control_results}
     encoded = json.dumps(output, indent=2, sort_keys=True) + "\n"

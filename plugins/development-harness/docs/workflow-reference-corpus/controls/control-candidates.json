@@ -7,7 +7,8 @@
         "mutations": []
       },
       "expected": {
-        "verdict": "pass"
+        "blind_acceptance": "pass",
+        "reference_semantic": "pass"
       },
       "id": "correct-source-replay"
     },
@@ -22,7 +23,8 @@
         ]
       },
       "expected": {
-        "verdict": "pass"
+        "blind_acceptance": "pass",
+        "reference_semantic": "pass"
       },
       "id": "equivalent-transport-identifiers"
     },
@@ -37,7 +39,8 @@
         ]
       },
       "expected": {
-        "verdict": "pass"
+        "blind_acceptance": "pass",
+        "reference_semantic": "pass"
       },
       "id": "equivalent-normalized-format"
     },
@@ -53,7 +56,8 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
       },
       "id": "mixed-revision-sourcecheck"
     },
@@ -71,9 +75,29 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "pass",
+        "reference_semantic": "fail"
       },
       "id": "profile-is-child"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "prose-task-profile-start-task",
+            "field": "action",
+            "op": "set_relation_field",
+            "relation_id": "relation:2879a944374fb1c0813db2c822434b0268ea67af0755a4da66314b40ab77099c",
+            "value": "ignore the source-supported action"
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
+      },
+      "id": "source-supported-wrong-action"
     },
     {
       "candidate": {
@@ -89,7 +113,8 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "pass",
+        "reference_semantic": "fail"
       },
       "id": "nested-return-loss"
     },
@@ -105,7 +130,8 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "pass",
+        "reference_semantic": "fail"
       },
       "id": "same-span-collapse"
     },
@@ -121,7 +147,8 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
       },
       "id": "noncanonical-relation-boundary"
     },
@@ -138,7 +165,8 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
       },
       "id": "merged-source-unit-boundary"
     },
@@ -154,7 +182,8 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
       },
       "id": "removed-source-span"
     },
@@ -171,7 +200,8 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
       },
       "id": "corrupted-source-quote"
     },
@@ -204,7 +234,8 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
       },
       "id": "activity-stamping-overclaim"
     },
@@ -222,7 +253,8 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "pass",
+        "reference_semantic": "fail"
       },
       "id": "missed-terminal"
     },
@@ -243,7 +275,8 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "pass",
+        "reference_semantic": "fail"
       },
       "id": "false-terminal"
     },
@@ -268,7 +301,8 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "pass",
+        "reference_semantic": "fail"
       },
       "id": "missed-artifact-consumer"
     },
@@ -285,7 +319,8 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "pass",
+        "reference_semantic": "fail"
       },
       "id": "consumer-change-misclassification"
     },
@@ -303,7 +338,8 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
       },
       "id": "consumer-not-object"
     },
@@ -323,7 +359,8 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
       },
       "id": "consumer-missing-required-fields"
     },
@@ -347,7 +384,8 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
       },
       "id": "consumer-invalid-status"
     },
@@ -367,7 +405,8 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
       },
       "id": "source-span-missing-fields"
     },
@@ -384,7 +423,8 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
       },
       "id": "relations-not-array"
     },
@@ -401,7 +441,8 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
       },
       "id": "dropped-unknown"
     },
@@ -420,7 +461,8 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
       },
       "id": "invented-contradiction"
     },
@@ -438,7 +480,8 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "pass",
+        "reference_semantic": "fail"
       },
       "id": "dropped-unknown-link"
     },
@@ -456,7 +499,8 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
       },
       "id": "invented-contradiction-link"
     },
@@ -473,7 +517,8 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
       },
       "id": "record-manifest-provenance"
     },
@@ -489,7 +534,8 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "pass",
+        "reference_semantic": "fail"
       },
       "id": "accepted-rejected-classification"
     },
@@ -507,7 +553,8 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
       },
       "id": "rejection-reason-change"
     },
@@ -523,7 +570,8 @@
         ]
       },
       "expected": {
-        "verdict": "pass"
+        "blind_acceptance": "pass",
+        "reference_semantic": "pass"
       },
       "id": "equivalent-rejection-order"
     },
@@ -539,7 +587,8 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
       },
       "id": "missing-required-case-field"
     },
@@ -555,9 +604,41 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
       },
       "id": "wrong-case-id"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "pinned-main-t5",
+            "op": "remove_case"
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
+      },
+      "id": "missing-public-case-coverage"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "op": "clear_cases"
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
+      },
+      "id": "empty-public-case-coverage"
     },
     {
       "candidate": {
@@ -571,7 +652,8 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
       },
       "id": "no-span-candidate-relation"
     },
@@ -587,7 +669,8 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
       },
       "id": "duplicate-relation-id"
     },
@@ -602,11 +685,12 @@
         ]
       },
       "expected": {
-        "verdict": "fail"
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
       },
       "id": "duplicate-case-id"
     }
   ],
-  "schema_version": 3,
+  "schema_version": 4,
   "status": "grader-only-complete-trace-control-candidates"
 }

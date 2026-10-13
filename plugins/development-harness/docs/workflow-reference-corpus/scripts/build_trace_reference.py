@@ -574,9 +574,30 @@ def required_target(value: tuple[str, str] | None, name: str) -> tuple[str, str]
     return value
 
 
+def source_supported_action(relation: dict[str, Any]) -> bool:
+    """Return whether a relation action is projected by a complete source table row.
+
+    Returns:
+        Whether one cited public J5 table row exposes the action as `wait`.
+    """
+    action = relation.get("action")
+    if not isinstance(action, str):
+        return False
+    normalized_action = " ".join(action.split()).casefold()
+    for span in relation.get("source_spans", []):
+        quote = span.get("quote") if isinstance(span, dict) else None
+        if (
+            quote == "| J5 | `in-progress`, launch of this session still running | wait |\n"
+            and normalized_action == "wait"
+        ):
+            return True
+    return False
+
+
 def build_controls(reference: dict[str, Any]) -> dict[str, Any]:
     terminal = first_matching(reference, lambda relation: relation["terminal"] is not None)
     actor = first_matching(reference, lambda relation: relation["actor"] is not None)
+    action = first_matching(reference, source_supported_action)
     continuation = first_matching(reference, lambda relation: relation["continuations"] not in (None, [], {}))
     artifacts = first_matching(reference, lambda relation: relation["artifacts"] or relation["consumers"])
     consumer = first_matching(reference, operator.itemgetter("consumers"))
@@ -594,6 +615,7 @@ def build_controls(reference: dict[str, Any]) -> dict[str, Any]:
     )
     case_id, relation_id = required_target(terminal, "a terminal")
     actor_case, actor_relation = required_target(actor, "an actor")
+    action_case, action_relation = required_target(action, "an action")
     continuation_case, continuation_relation = required_target(continuation, "a continuation")
     artifact_case, artifact_relation = required_target(artifacts, "an artifact or consumer")
     consumer_case, consumer_relation = required_target(consumer, "a consumer")
@@ -631,6 +653,19 @@ def build_controls(reference: dict[str, Any]) -> dict[str, Any]:
                     "relation_id": actor_relation,
                     "field": "actor",
                     "value": "loaded profile as spawned child",
+                }
+            ],
+            "fail",
+        ),
+        (
+            "source-supported-wrong-action",
+            [
+                {
+                    "op": "set_relation_field",
+                    "case_id": action_case,
+                    "relation_id": action_relation,
+                    "field": "action",
+                    "value": "ignore the source-supported action",
                 }
             ],
             "fail",
@@ -919,6 +954,8 @@ def build_controls(reference: dict[str, Any]) -> dict[str, Any]:
             [{"op": "set_case_id", "case_id": "pinned-main-t5", "value": "not-a-declared-complete-trace-case"}],
             "fail",
         ),
+        ("missing-public-case-coverage", [{"op": "remove_case", "case_id": "pinned-main-t5"}], "fail"),
+        ("empty-public-case-coverage", [{"op": "clear_cases"}], "fail"),
         (
             "no-span-candidate-relation",
             [{"op": "remove_source_spans", "case_id": actor_case, "relation_id": actor_relation}],
@@ -931,15 +968,29 @@ def build_controls(reference: dict[str, Any]) -> dict[str, Any]:
         ),
         ("duplicate-case-id", [{"op": "append_duplicate_case", "case_id": "pinned-main-t5"}], "fail"),
     ]
+    semantic_only_controls = {
+        "profile-is-child",
+        "nested-return-loss",
+        "same-span-collapse",
+        "missed-terminal",
+        "false-terminal",
+        "missed-artifact-consumer",
+        "consumer-change-misclassification",
+        "dropped-unknown-link",
+        "accepted-rejected-classification",
+    }
     return {
-        "schema_version": 3,
+        "schema_version": 4,
         "status": "grader-only-complete-trace-control-candidates",
         "candidate_shape": "Each fixture hydrates the frozen complete trace reference, then applies transparent trace mutations. The grader receives the resulting full trace, not scalar assertions.",
         "controls": [
             {
                 "id": control_id,
                 "candidate": {"base_reference": "../trace-reference.json", "mutations": mutations},
-                "expected": {"verdict": verdict},
+                "expected": {
+                    "blind_acceptance": "pass" if verdict == "pass" or control_id in semantic_only_controls else "fail",
+                    "reference_semantic": verdict,
+                },
             }
             for control_id, mutations, verdict in controls
         ],

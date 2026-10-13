@@ -20,7 +20,7 @@
   ],
   "candidate_contract": {
     "path": "blind-candidate-contract.json",
-    "sha256": "0a351cbf9ce99679e9cc9680b228faa3dd88d8a05a36a5099c97c9fd45706cb7",
+    "sha256": "3065855de21970deb3c8274899d2b7f9df1fa97fd244b28cf7a3a9d5abb2d9b0",
     "purpose": "Non-gold output schema for a fresh blind extractor. It defines required fields and public canonicalization references without disclosing canonical relations or annotations."
   },
   "producer_public_files": [

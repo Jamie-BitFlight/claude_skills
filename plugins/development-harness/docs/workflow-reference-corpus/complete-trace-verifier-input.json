@@ -1,5 +1,5 @@
 {
-  "schema_version": 5,
+  "schema_version": 6,
   "status": "awaiting-fresh-blind-candidate",
   "role": "independent complete-trace adjudicator",
   "purpose": "Grade a separately produced blind-extractor candidate against the frozen source-only reference after the candidate is materialized into an isolated adjudicator bundle.",
@@ -10,7 +10,7 @@
     },
     "contract": {
       "path": "./grading-contract.json",
-      "sha256": "92597c6dcf08d151b2dd536d511e9e830fea38935c607010263e6bb80fad687e"
+      "sha256": "99f70a5c2d7c447b8293d1b8381923bcfcdb7d9511af75fcfcf1f54f3f97ff7c"
     },
     "canonical_source_ir": {
       "path": "./canonical-source-ir.json",
@@ -28,7 +28,7 @@
     "portable_packet_projection": "Materialization copies verifier source packets as deterministic JSON projections. Canonical relative source identities and source digests remain bound in adjudicator-packet-projection-manifest.json; every absolute POSIX or Windows host-local path string is replaced with <host-local-path-redacted>.",
     "grader": {
       "path": "./scripts/grade_controls.py",
-      "sha256": "e89d2e6c7b678cceb66eb82d726a3268a9df471f901ef064eabb8d1d60a0f557"
+      "sha256": "c9e787f39a87dcd3dcfcd72fbe0fe2df0b1ce3be7565b3da0c1090806d5cfb0f"
     },
     "controls": {
       "path": "./controls/control-candidates.json",
@@ -50,8 +50,8 @@
   ],
   "required_checks": [
     "Run the commands declared in bundle-commands.json, or the materializer --check command; both validate the emitted closed inventory, each declared dependency, and the bundle-relative commands.",
-    "Run the candidate-grade command against candidate.json with source-replay; require zero canonicalization failures, missed, false, and source replay failures in every row before claiming acceptance.",
-    "Run the control-self-check command; it must reject every tracked negative control, including missing field, wrong case id, and no-span candidates.",
+    "Run the candidate-grade command against candidate.json with source-replay; require blind_acceptance_verdict pass with zero producer-visible structural, canonicalization, and source replay failures before claiming blind acceptance. Record reference_semantic_verdict separately; it is a strict diagnostic for frozen payloads that are not necessarily producer-derivable.",
+    "Run the control-self-check command; it must reject every producer-visible structural negative control, distinguish source-supported semantic falsifiers from withheld inferred payloads, and retain strict diagnostics for every frozen-reference semantic mismatch.",
     "Run record-integrity validation after final corpus package bytes are fixed and bind its package_root_sha256 in a separately authored verifier receipt."
   ],
   "receipt_requirements": [

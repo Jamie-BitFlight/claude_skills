@@ -1,5 +1,5 @@
 {
-  "schema_version": 7,
+  "schema_version": 9,
   "status": "complete-trace-grading-contract-awaiting-independent-receipt",
   "scope": "The grader compares source-only complete traces for the four bounded #4102 cases. It never establishes runtime behavior, production truth, general completeness, or #4103/#4104 architecture.",
   "reference": "./trace-reference.json",
@@ -29,9 +29,9 @@
       "source_spans"
     ],
     "validation": [
-      "candidate case ids exactly match the four reference cases with no duplicates",
+      "candidate case ids exactly match the nonempty public source-unit-manifest case vocabulary with no duplicates",
       "each candidate record_manifest exactly matches the public record-manifest projection for its case",
-      "canonicalization deterministically classifies and compares rejected_relations and rejected_annotations without collection ordering",
+      "canonicalization deterministically validates producer-visible relation boundaries, annotation links, and rejection form without collection ordering",
       "transport relation, unknown, contradiction, and span ids are rewritten from the public canonical source-to-IR contract before comparison",
       "every accepted relation, unknown, and contradiction has at least one complete revision-bound source span",
       "each relation unknown_ids and contradiction_ids value is a list of existing case-local annotation ids",
@@ -53,6 +53,9 @@
         "missed",
         "false",
         "source_replay_failures",
+        "reference_rejection_failures",
+        "blind_acceptance",
+        "reference_semantic",
         "canonicalization_failures",
         "verdict"
       ],
@@ -66,7 +69,7 @@
       ]
     },
     "self_check_invocation": "uv run --script scripts/grade_controls.py --reference trace-reference.json --candidates controls/control-candidates.json --source-replay-root source-replay --self-check",
-    "boundary": "The adjudicator bundle receives a frozen canonical reference and a frozen candidate only after blind extraction. It applies canonical-source-ir.json to both sides before replay or dimension scoring, reports canonicalization failures separately, and compares semantic keys rather than producer labels. It contains only the exact revision-bound source bytes required for span replay; it does not use raw-lane records, adjudications, historical receipts, or a control identifier as an independent verification oracle."
+    "boundary": "The adjudicator bundle receives a frozen canonical reference and a frozen candidate only after blind extraction. It derives blind case coverage from the nonempty public source-unit-manifest vocabulary, applies canonical-source-ir.json to the candidate for blind structural validation, and uses the frozen reference only for reference-semantic diagnostics. Blind acceptance may use only the public source-unit vocabulary, public record projection, canonical representation rules, and byte replay, including the public exact-J5-table action projection. A field, grouping, or rejection classification not deterministically derived from those producer-visible inputs is reported only by reference_semantic. It contains only the exact revision-bound source bytes required for span replay; it does not use raw-lane records, adjudications, historical receipts, or a control identifier as an independent verification oracle."
   },
   "source_replay": {
     "method": "For every quoted source span, resolve repository_path under source-replay/<candidate case source_revision>/ in the adjudicator bundle; compare source SHA-256 and exact UTF-8 byte slice before scoring. The source bundle materializer obtains each byte-identical file with git show at the declared revision and rejects a digest mismatch before delivery.",
@@ -81,10 +84,15 @@
   "acceptance_threshold": {
     "all_cases": true,
     "all_dimensions": true,
+    "producer_visible_only": true,
+    "maximum_source_replay_failures": 0,
+    "receipt_requirement": "A separately authored receipt must identify the SHA-256-bound candidate emitted by a fresh blind extractor, its blind_acceptance result, source-replay result, and complete record-integrity digest. Only that separately produced candidate can support an independent extraction or blind-acceptance claim."
+  },
+  "reference_semantic_diagnostic": {
     "maximum_missed": 0,
     "maximum_false": 0,
-    "maximum_source_replay_failures": 0,
-    "receipt_requirement": "A separately authored receipt must identify the frozen reference, the SHA-256-bound candidate emitted by a fresh blind extractor, source-replay result, and complete record-integrity digest. Only that separately produced candidate can support an independent extraction or acceptance claim."
+    "maximum_reference_rejection_failures": 0,
+    "meaning": "This strict frozen-reference comparison remains an adjudicator diagnostic. It is not a blind-extractor acceptance condition unless the compared payload is supplied by a public deterministic source/context/rule projection."
   },
   "historical_receipts": {
     "status": "limited-claim-projection-evidence-only",

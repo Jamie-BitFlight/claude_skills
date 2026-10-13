@@ -1,7 +1,7 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "role": "blind complete-trace extractor",
-  "purpose": "Define a non-gold complete-trace candidate. The public canonical source-to-IR contract fixes representation and identity without disclosing accepted relation or annotation instances.",
+  "purpose": "Define a non-gold complete-trace candidate. The public canonical source-to-IR contract fixes representation, identity, and source-derived invariants without disclosing accepted relation or annotation instances.",
   "canonical_source_ir": {
     "path": "canonical-source-ir.json",
     "schema_version": 1,
@@ -73,6 +73,7 @@
     "Follow canonical-source-ir.json for source-unit boundaries, field normalization, source spans, annotation links, rejection classification, ordering, and identity derivation.",
     "Transport IDs may be local while constructing the trace. The validator canonicalizes them from content; a local annotation link must still identify an emitted annotation source unit.",
     "Give every accepted relation, unknown, and contradiction exactly one complete revision-bound source span declared in this case's source-unit-manifest.json. Place a source unit without an exact span in the corresponding rejected collection with its canonical reason code and normalized source-unit payload.",
+    "Preserve a semantic field, relation boundary, or rejection classification only when it is deterministically derived from producer-visible source bytes, public context, and public canonical rules. The exact public `J5` Markdown-table source row (`in-progress`, launched session still running, `wait`) deterministically projects the normalized action `wait`. Normalize an unsupported inferred payload to its public invariant form; do not reconstruct a withheld reference interpretation.",
     "Do not infer runtime behavior or select an architecture."
   ],
   "prohibited_inputs": [
@@ -84,5 +85,5 @@
     "historical claim-projection receipts"
   ],
   "validation": "Run `uv run --script scripts/validate_candidate.py --candidate <candidate.json> --contract blind-candidate-contract.json` from a materialized producer bundle before handoff. The validator applies the public canonicalization algorithm and rejects malformed or noncanonical semantic units.",
-  "handoff": "Freeze the emitted candidate and provide its path and SHA-256 to the separate adjudicator. A schema-valid candidate is not an acceptance receipt."
+  "handoff": "Freeze the emitted candidate and provide its path and SHA-256 to the separate adjudicator. A schema-valid candidate is not an acceptance receipt; blind acceptance excludes frozen-reference semantic equality that the producer bundle does not deterministically project."
 }
