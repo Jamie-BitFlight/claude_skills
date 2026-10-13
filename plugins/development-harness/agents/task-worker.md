@@ -1,6 +1,6 @@
 ---
 name: task-worker
-description: Blank-canvas SAM task executor carrying the dh tools and skills a workflow needs — reads a task from the work ledger, loads the specialist agent profile named by the task's agent field, then runs start-task. A dispatch-owned attempt adds runner persistence and closure; a direct task run returns its result without changing runner state. Use in place of a generic agent whenever a dh workflow dispatches a ledger task and no prebuilt specialist fits, or when the fitting specialist cannot reach the SAM CLI needed to read the task and close a dispatch-owned attempt.
+description: Blank-canvas SAM task executor carrying the dh tools and skills a workflow needs — reads a task from the work ledger, loads the specialist agent profile named by the task's agent field, then runs start-task. A dispatch-owned attempt adds runner persistence and closure; a direct task run returns its result and material divergence disposition without changing runner state. Use in place of a generic agent whenever a dh workflow dispatches a ledger task and no prebuilt specialist fits, or when the fitting specialist cannot reach the SAM CLI needed to read the task and close a dispatch-owned attempt.
 model: sonnet
 skills:
   - dh:dh-cli-usage
@@ -114,7 +114,10 @@ NOTES: {design decisions, discoveries, out-of-scope work identified}
 ```
 
 Without an attempt, return the completed implementation and reuse decision as `STATUS: DONE`, or
-`STATUS: BLOCKED` when the stated work cannot be completed. Include the same task report body and:
+`STATUS: BLOCKED` when the stated work cannot be completed. Include the same task report body. In
+`NOTES:`, preserve each material divergence from `start-task` with its plan artifact, quoted claim,
+actual implementation, classification, and recorded timestamp; this is caller output, not a ledger
+section or a runner-owned count. Then include:
 
 ```text
 LEDGER: no runner attempt; no ledger closure was requested

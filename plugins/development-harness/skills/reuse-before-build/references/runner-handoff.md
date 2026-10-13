@@ -8,8 +8,9 @@ change task goals or grant orchestrator authority.
 This handoff is only for a dispatch that owns an attempt number. Without `N`, apply
 the decision procedure but do not run `plan update`, `plan read --attempt`, or `plan
 finish`; there is no runner-owned report or closure to persist. Return the decision
-to the caller and leave ledger state unchanged unless that caller separately owns a
-non-runner transition.
+and any material divergence disposition to the caller, and leave ledger state unchanged unless
+that caller separately owns a non-runner transition. The direct caller response records a
+divergence under `NOTES:`, not as a `Divergence Notes` section or an attempt-owned count.
 
 ## Enter and recover
 

@@ -1,6 +1,6 @@
 ---
 name: start-task
-description: Use when executing a task — reads the task and its orchestrator response from the work ledger, loads task-level skills, and implements against acceptance criteria. A dispatch-owned attempt also records divergences and the completion report, then closes; a direct invocation returns without runner closure. Triggers on task execution within the implement-feature loop or when an agent picks up a specific task from a plan.
+description: Use when executing a task — reads the task and its orchestrator response from the work ledger, loads task-level skills, and implements against acceptance criteria. A dispatch-owned attempt records divergences and the completion report, then closes; a direct invocation returns its task result and material divergence disposition without runner persistence or closure. Triggers on task execution within the implement-feature loop or when an agent picks up a specific task from a plan.
 argument-hint: <plan-address> [--task <task-id>] [--attempt <n>] [--complete <task-id>]
 user-invocable: true
 ---
@@ -107,9 +107,10 @@ Without an attempt number, no runner is closing anything, so move the status dir
    - If a skill fails to load, log a warning and continue. Do not abort task execution.
    - Task-level skills are **additive** to any skills already declared in the agent definition's frontmatter.
 
-3. Without `--attempt`, skip runner-only steps 3a, 4a, and 5. Do not renew a lease, append task
-   sections, or close an attempt. Those operations belong only to a dispatch-owned attempt. Step 4
-   still registers session context; then continue with step 6 and step 7.
+3. Without `--attempt`, skip runner-only steps 3a, 4a, and the attempt-owned branch of step 5. Do
+   not renew a lease, append task sections, or close an attempt. Those operations belong only to a
+   dispatch-owned attempt. Step 4 still registers session context; then continue with the direct
+   branch of step 5, step 6, and step 7.
 
 3a. With `--attempt`, your attempt is already open.
 
@@ -159,7 +160,7 @@ Without an attempt number, no runner is closing anything, so move the status dir
    you where the new deadline sits. A lease left to expire lets the orchestrator take the task back
    and hand it to another runner, and your commands then answer `stale-attempt`.
 
-5. **With `--attempt`, record divergence observations during implementation.**
+5. **Record material divergence observations during implementation.**
 
    While implementing, if you discover that the architect spec or feature-context
    describes something that does not match what you are implementing, record a
@@ -172,8 +173,8 @@ Without an attempt number, no runner is closing anything, so move the status dir
      name, different import path)
    - The difference affects the observable behavior, structure, or scope of the feature
 
-   Write the note and its running count in one command. Appending the section and setting the
-   count are sub-operations of a single `update`:
+   With `--attempt`, write the note and its running count in one command. Appending the section
+   and setting the count are sub-operations of a single `update`:
 
    ```bash
    <sam_cli/> plan update \
@@ -203,6 +204,11 @@ Without an attempt number, no runner is closing anything, so move the status dir
    backend no task file exists to edit, and a file written in one worktree is unreadable from
    another, so a file-based note is silently lost.
 
+   Without `--attempt`, do not run `plan update` or create a divergence count. Preserve each
+   material divergence in the immediate caller response under `NOTES:` using the same note body:
+   plan artifact and quoted claim, actual implementation, classification, and recorded timestamp.
+   This direct disposition is not a `Divergence Notes` task section and does not name an attempt.
+
    For full artifact classification rules and divergence thresholds, see
    [plan-artifact-lifecycle.md](../../docs/plan-artifact-lifecycle.md).
 
@@ -217,8 +223,9 @@ Without an attempt number, no runner is closing anything, so move the status dir
 7. When selecting an implementation approach during execution, activate
    `/dh:reuse-before-build` in runner mode. With `--attempt`, follow its bundled runner
    handoff before research or attempt closure. Without `--attempt`, make and return the
-   decision without its attempt-owned `plan update`, `plan read --attempt`, or `plan finish`
-   commands. Implement against the task acceptance criteria and run its verification steps.
+   decision and any material divergence in the immediate caller response, without its
+   attempt-owned `plan update`, `plan read --attempt`, or `plan finish` commands. Implement
+   against the task acceptance criteria and run its verification steps.
 
 ---
 
