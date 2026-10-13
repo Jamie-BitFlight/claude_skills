@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "status": "prepared-unexecuted",
-  "role": "fresh complete-trace verifier",
-  "purpose": "Independently replay a frozen complete-trace candidate against the frozen source-only reference without consulting historical lane outputs or receipts.",
+  "status": "awaiting-fresh-blind-candidate",
+  "role": "independent complete-trace adjudicator",
+  "purpose": "Grade a separately produced blind-extractor candidate against the frozen source-only reference after the candidate is materialized into an isolated adjudicator bundle.",
   "inputs": {
     "reference": {
       "path": "./trace-reference.json",
@@ -10,18 +10,13 @@
     },
     "contract": {
       "path": "./grading-contract.json",
-      "sha256": "9a42cc5615f86a614c31272ca92a303c37cbc78a5c19857f38b667909525a529"
+      "sha256": "77c9e8f01ce2022f1b92bc63f193ac2db4cef6897df8bbcd2c23d6d931c1cf0c"
     },
     "grader": {
       "path": "./scripts/grade_controls.py",
       "sha256": "fe915c3531f4e5983ea14b9f2a7b435b028b65e3aeda7eade62d8bd655e8784c"
     },
-    "candidate": {
-      "path": "./trace-reference.json",
-      "sha256": "3ffbd7d4e29ed685b39685fc5e4aa6eecf994606cd21752e61665ac08a176966",
-      "role": "frozen canonical replay candidate; its cases are intentionally identical to the frozen reference for source-fidelity replay",
-      "boundary": "This candidate permits an independent source-replay and grader-control receipt. It is not a blind-extractor output and cannot establish independent extraction or corpus acceptance."
-    }
+    "candidate": "A fresh blind extractor must produce and freeze this complete-trace candidate before adjudication. The materialized adjudicator bundle copies it as candidate/candidate.json and records its SHA-256 in bundle-manifest.json."
   },
   "exclusions": [
     "cases/**/records/**",
@@ -31,13 +26,13 @@
     "historical claim-projection receipts"
   ],
   "required_checks": [
-    "Verify each declared input digest before grading.",
-    "Run the grader against the declared candidate path; require zero missed, false, and source replay failures in every row.",
+    "Validate the emitted adjudicator bundle; its manifest must bind the candidate SHA-256 and reject extra files.",
+    "Run the grader against candidate/candidate.json; require zero missed, false, and source replay failures in every row.",
     "Run the grader self-check; it must reject the tracked removed-span and corrupted-quote controls.",
     "Run record-integrity validation after the final package bytes are fixed and bind its package_root_sha256 in the verifier receipt."
   ],
   "receipt_requirements": [
-    "Identify the fresh verifier context and declared candidate digest.",
+    "Identify the fresh blind-producer bundle, producer context, and adjudicator bundle candidate digest.",
     "Record exact command, stdout, stderr, and exit status for candidate grade, control self-check, and integrity validation.",
     "State only the source-only complete-trace result; do not claim runtime behavior, architecture selection, or publication closure."
   ]

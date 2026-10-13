@@ -1,7 +1,7 @@
 {
-  "schema_version": 3,
-  "status": "blind-extractor-input-boundary-with-separate-complete-reference-adjudication",
-  "consumer": "A blind source-only extractor receives exactly one declared case bundle and pinned source material. The legacy proposed-claim file remains historical limited-scope material and is not an input to complete-trace extraction or adjudication.",
+  "schema_version": 4,
+  "status": "blind-extractor-input-boundary-awaiting-fresh-candidate",
+  "consumer": "A blind source-only extractor receives a materialized bundle containing exactly the declared source packets and questions. The legacy proposed-claim file remains historical limited-scope material and is not an input to complete-trace extraction or adjudication.",
   "excluded": [
     "candidate-trace.json",
     "case-adjudications.json",
@@ -85,6 +85,12 @@
     }
   ],
   "fresh_verifier_requirement": "Use a new context that has not read cases/**/records, case-adjudications.json, candidate-trace.json, controls, grading results, or trace-reference.json.",
+  "blind_bundle_materialization": {
+    "script": "./scripts/materialize_verifier_bundles.py",
+    "invocation": "uv run --script scripts/materialize_verifier_bundles.py --producer-output <outside-corpus-output-dir>",
+    "validation": "uv run --script scripts/materialize_verifier_bundles.py --check <outside-corpus-output-dir>",
+    "guarantee": "The emitted directory contains only bundle-manifest.json and the allowlisted source packets and source questions. Any extra file, missing file, or digest mismatch fails validation."
+  },
   "historical_claims_receipt_only": [
     {
       "path": "cases/pinned-main-t5/verifier-input/proposed-claims.json",
@@ -106,10 +112,15 @@
   "complete_reference_adjudicator": {
     "input": [
       "trace-reference.json",
-      "frozen blind-extractor complete-trace candidate",
+      "the separately produced frozen blind-extractor complete-trace candidate",
       "source material needed for cited-byte replay",
       "grading-contract.json"
     ],
+    "materialization": {
+      "script": "./scripts/materialize_verifier_bundles.py",
+      "invocation": "uv run --script scripts/materialize_verifier_bundles.py --adjudicator-output <outside-corpus-output-dir> --candidate <fresh-candidate-path>",
+      "validation": "uv run --script scripts/materialize_verifier_bundles.py --check <outside-corpus-output-dir>"
+    },
     "excluded_as_independent_proof": [
       "raw lane observations",
       "case-adjudications.json",

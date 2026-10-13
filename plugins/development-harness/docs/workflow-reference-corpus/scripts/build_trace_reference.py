@@ -61,6 +61,17 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def control_candidate_bytes(controls: dict[str, Any]) -> bytes:
+    """Serialize deterministic control candidates in the repository format.
+
+    Returns:
+        UTF-8 JSON bytes for the tracked control-candidate artifact.
+    """
+    encoded = json.dumps(controls, indent=2, sort_keys=True)
+    encoded = re.sub(r"\[\n(?P<indent>\s+)(?P<value>\"(?:[^\"\\\\]|\\\\.)*\")\n\s+\]", r"[\g<value>]", encoded)
+    return (encoded + "\n").encode()
+
+
 def write_control_candidates(path: Path, controls: dict[str, Any]) -> None:
     """Write control candidates in the repository's canonical JSON format.
 
@@ -69,9 +80,7 @@ def write_control_candidates(path: Path, controls: dict[str, Any]) -> None:
         controls: Deterministic control payload to serialize.
 
     """
-    encoded = json.dumps(controls, indent=2, sort_keys=True)
-    encoded = re.sub(r"\[\n(?P<indent>\s+)(?P<value>\"(?:[^\"\\\\]|\\\\.)*\")\n\s+\]", r"[\g<value>]", encoded)
-    path.write_text(encoded + "\n", encoding="utf-8")
+    path.write_bytes(control_candidate_bytes(controls))
 
 
 def as_list(value: Any) -> list[Any]:
@@ -702,13 +711,23 @@ def build_controls(reference: dict[str, Any]) -> dict[str, Any]:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--write", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--write", action="store_true")
+    mode.add_argument("--check", action="store_true")
     arguments = parser.parse_args()
     reference = build_reference()
     controls = build_controls(reference)
+    trace_bytes = (json.dumps(reference, indent=2) + "\n").encode()
+    controls_bytes = control_candidate_bytes(controls)
     if arguments.write:
-        (ROOT / "trace-reference.json").write_text(json.dumps(reference, indent=2) + "\n")
+        (ROOT / "trace-reference.json").write_bytes(trace_bytes)
         write_control_candidates(ROOT / "controls/control-candidates.json", controls)
+    elif arguments.check:
+        expected = {"trace-reference.json": trace_bytes, "controls/control-candidates.json": controls_bytes}
+        mismatches = [path for path, contents in expected.items() if (ROOT / path).read_bytes() != contents]
+        if mismatches:
+            raise SystemExit(json.dumps({"status": "failed", "drift": mismatches}, indent=2))
+        print(json.dumps({"status": "passed", "generated": sorted(expected)}))
     else:
         print(
             json.dumps(
