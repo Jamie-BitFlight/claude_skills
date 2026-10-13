@@ -113,8 +113,12 @@ repos:
         # indent) -- excluded for the same reason, not hand-authored config.
         # workflow-reference-corpus/trace-reference.json is generated replay
         # data above Biome's processing limit; its generator validates it.
+        # control-candidates.json is generator-owned and byte-checked by
+        # build_trace_reference.py.
+        # independent-candidate-v2.json is an immutable external regression
+        # fixture; its retained SHA-256 validates exact preservation.
         # harness_compatibility.json is also generated on demand and ignored.
-        exclude: (graphify-out/|^(.*/)?\.(claude|codex|cursor)-plugin/plugin\.json$|^\.claude-plugin/marketplace\.json$|dh-workflow-graph\.json$|^plugins/development-harness/docs/workflow-reference-corpus/trace-reference\.json$|^harness_compatibility\.json$)
+        exclude: (graphify-out/|^(.*/)?\.(claude|codex|cursor)-plugin/plugin\.json$|^\.claude-plugin/marketplace\.json$|dh-workflow-graph\.json$|^plugins/development-harness/docs/workflow-reference-corpus/(trace-reference|controls/(control-candidates|independent-candidate-v2))\.json$|^harness_compatibility\.json$)
 
   - repo: https://github.com/DavidAnson/markdownlint-cli2
     rev: v0.23.2

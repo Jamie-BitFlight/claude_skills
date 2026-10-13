@@ -10,11 +10,11 @@
     },
     "contract": {
       "path": "./grading-contract.json",
-      "sha256": "e38d41bd8c8adce32bf6659893ae1cdbbe1e53963ad50f8738fdb78c93b97dd2"
+      "sha256": "9422a72cbfbf537d50eb6c80a079af94bb18dbed2baa600c938020ae3ede005d"
     },
     "grader": {
       "path": "./scripts/grade_controls.py",
-      "sha256": "a5aca3b76aeb9b27cb0b3378ac2971ef8bb9c054034c16c665f08b9114813aba"
+      "sha256": "a86417764f823f30ec3451d09ac992b253044f1d17031f78b958131a23c4bf46"
     },
     "controls": {
       "path": "./controls/control-candidates.json",

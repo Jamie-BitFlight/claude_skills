@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "role": "blind complete-trace extractor",
   "purpose": "Define the non-gold JSON shape a fresh source-only extractor must emit after reading its producer bundle. This contract names no accepted relation, annotation, source span, or reference answer.",
   "output": {
@@ -31,9 +31,13 @@
       "terminal",
       "artifacts",
       "consumers",
+      "unknown_ids",
+      "contradiction_ids",
       "source_spans"
     ],
     "annotation_required_fields": ["id", "source_spans"],
+    "consumer_required_fields": ["name", "comparison_status"],
+    "consumer_comparison_statuses": ["changed", "unchanged", "unresolved"],
     "source_span_required_fields": [
       "id",
       "repository_path",
@@ -50,7 +54,7 @@
     "Emit exactly one case for every allowed_case_ids value and no other case id.",
     "Copy each case source_revision and raw_record_inventory from the supplied source packets without deriving records from undisclosed material.",
     "Give every accepted relation, unknown, and contradiction at least one complete revision-bound source span.",
-    "Use case-local unique identifiers and make relation unknown_ids and contradiction_ids lists of existing case-local annotation ids.",
+    "Use case-local unique identifiers; make relation unknown_ids and contradiction_ids lists of existing case-local annotation ids; and represent every consumer as an object with name, comparison_status, and comparison_evidence_span_ids.",
     "Keep unsupported raw material in rejected_relations or rejected_annotations; do not infer runtime behavior or select an architecture."
   ],
   "prohibited_inputs": [
@@ -61,5 +65,6 @@
     "raw lane records",
     "historical claim-projection receipts"
   ],
-  "handoff": "Freeze the emitted candidate and provide its path and SHA-256 to the separate adjudicator. A syntactically valid candidate is not an acceptance receipt."
+  "validation": "Run `uv run --script scripts/validate_candidate.py --candidate <candidate.json> --contract blind-candidate-contract.json` from a materialized producer bundle before handoff. The validator rejects malformed nested collections before an adjudicator grades the candidate.",
+  "handoff": "Freeze the emitted candidate and provide its path and SHA-256 to the separate adjudicator. A schema-valid candidate is not an acceptance receipt."
 }

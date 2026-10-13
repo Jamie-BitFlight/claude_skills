@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.11"
 # ///
-# ruff: file-ignore[complex-structure, too-many-branches]
+# ruff: file-ignore[complex-structure, too-many-branches, too-many-locals]
 """Materialize and validate isolated producer and adjudicator input bundles."""
 
 from __future__ import annotations
@@ -9,15 +9,21 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import runpy
 import shutil
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 ROOT = Path(__file__).resolve().parents[1]
 PRODUCER_MANIFEST = ROOT / "verifier-input-manifest.json"
 ADJUDICATOR_INPUT = ROOT / "complete-trace-verifier-input.json"
 CANDIDATE_CONTRACT = ROOT / "blind-candidate-contract.json"
+candidate_schema_failures = cast(
+    "Callable[[dict[str, Any], dict[str, Any]], list[dict[str, str]]]",
+    runpy.run_path(str(Path(__file__).with_name("candidate_schema.py")))["candidate_schema_failures"],
+)
 
 
 def digest(path: Path) -> str:
@@ -225,6 +231,8 @@ def materialize_producer(output_path: Path) -> Path:
     if not isinstance(contract_digest, str) or digest(CANDIDATE_CONTRACT) != contract_digest:
         raise ValueError("declared blind candidate contract digest mismatch")
     copy_file(CANDIDATE_CONTRACT, output, Path("blind-candidate-contract.json"), files)
+    copy_file(ROOT / "scripts/candidate_schema.py", output, Path("scripts/candidate_schema.py"), files)
+    copy_file(ROOT / "scripts/validate_candidate.py", output, Path("scripts/validate_candidate.py"), files)
     write_commands(output, "blind-extractor", files)
     write_manifest(
         output,
@@ -252,6 +260,8 @@ def materialize_adjudicator(output_path: Path, candidate_path: Path) -> Path:
         (ROOT / "grading-contract.json", Path("grading-contract.json")),
         (ROOT / "controls/control-candidates.json", Path("controls/control-candidates.json")),
         (ROOT / "controls/negative-controls.json", Path("controls/negative-controls.json")),
+        (CANDIDATE_CONTRACT, Path("blind-candidate-contract.json")),
+        (ROOT / "scripts/candidate_schema.py", Path("scripts/candidate_schema.py")),
         (ROOT / "scripts/grade_controls.py", Path("scripts/grade_controls.py")),
         (ROOT / "scripts/record_integrity.py", Path("scripts/record_integrity.py")),
         (ROOT / "record-integrity.json", Path("record-integrity.json")),
@@ -270,7 +280,32 @@ def materialize_adjudicator(output_path: Path, candidate_path: Path) -> Path:
     return output
 
 
-def validate_bundle(path: Path) -> dict[str, Any]:
+def candidate_validation_result(root: Path, role: str, supplied_candidate: Path | None) -> dict[str, Any] | None:
+    """Return a structured schema failure for a supplied or bundled candidate."""
+    if role == "blind-extractor" and supplied_candidate is None:
+        return None
+    candidate_path = root / "candidate.json" if role == "complete-trace-adjudicator" else supplied_candidate
+    if candidate_path is None or not candidate_path.is_file():
+        return {"status": "failed", "candidate_schema_failures": [{"path": "candidate", "reason": "missing_file"}]}
+    if role == "complete-trace-adjudicator" and supplied_candidate is not None:
+        if not supplied_candidate.is_file():
+            return {
+                "status": "failed",
+                "candidate_schema_failures": [{"path": "candidate", "reason": "missing_supplied_file"}],
+            }
+        if digest(candidate_path) != digest(supplied_candidate):
+            return {
+                "status": "failed",
+                "candidate_schema_failures": [{"path": "candidate", "reason": "supplied_digest_mismatch"}],
+            }
+    contract = load(root / "blind-candidate-contract.json")
+    failures = candidate_schema_failures(load(candidate_path), contract)
+    if failures:
+        return {"status": "failed", "candidate_schema_failures": failures}
+    return None
+
+
+def validate_bundle(path: Path, supplied_candidate: Path | None = None) -> dict[str, Any]:
     """Fail closed if a materialized bundle has altered files or failed checks.
 
     Returns:
@@ -299,6 +334,12 @@ def validate_bundle(path: Path) -> dict[str, Any]:
     actual = {file.relative_to(root).as_posix() for file in root.rglob("*") if file.is_file()}
     if actual != expected:
         raise ValueError(json.dumps({"unexpected": sorted(actual - expected), "missing": sorted(expected - actual)}))
+    role = manifest.get("role")
+    if not isinstance(role, str):
+        raise TypeError("bundle manifest role must be a string")
+    candidate_result = candidate_validation_result(root, role, supplied_candidate)
+    if candidate_result is not None:
+        return {"role": role, "files": len(files), **candidate_result}
     commands_document = load(root / "bundle-commands.json")
     commands = commands_document.get("commands")
     if not isinstance(commands, list):
@@ -334,7 +375,7 @@ def validate_bundle(path: Path) -> dict[str, Any]:
         except json.JSONDecodeError:
             pass
         results.append(result)
-    return {"status": "passed", "role": manifest.get("role"), "files": len(files), "commands": results}
+    return {"status": "passed", "role": role, "files": len(files), "commands": results}
 
 
 def main() -> None:
@@ -358,8 +399,10 @@ def main() -> None:
             "path": str(materialize_adjudicator(arguments.adjudicator_output, arguments.candidate)),
         }
     else:
-        result = validate_bundle(arguments.check)
+        result = validate_bundle(arguments.check, arguments.candidate)
     print(json.dumps(result, sort_keys=True))
+    if result["status"] == "failed":
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

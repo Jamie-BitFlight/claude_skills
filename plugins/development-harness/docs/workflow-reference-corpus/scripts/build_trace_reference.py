@@ -638,6 +638,69 @@ def build_controls(reference: dict[str, Any]) -> dict[str, Any]:
             "fail",
         ),
         (
+            "consumer-not-object",
+            [
+                {
+                    "op": "set_relation_field",
+                    "case_id": consumer_case,
+                    "relation_id": consumer_relation,
+                    "field": "consumers",
+                    "value": ["malformed-consumer"],
+                }
+            ],
+            "fail",
+        ),
+        (
+            "consumer-missing-required-fields",
+            [
+                {
+                    "op": "set_relation_field",
+                    "case_id": consumer_case,
+                    "relation_id": consumer_relation,
+                    "field": "consumers",
+                    "value": [{}],
+                }
+            ],
+            "fail",
+        ),
+        (
+            "consumer-invalid-status",
+            [
+                {
+                    "op": "set_relation_field",
+                    "case_id": consumer_case,
+                    "relation_id": consumer_relation,
+                    "field": "consumers",
+                    "value": [
+                        {
+                            "name": "malformed-consumer",
+                            "comparison_status": "invalid",
+                            "comparison_evidence_span_ids": [],
+                        }
+                    ],
+                }
+            ],
+            "fail",
+        ),
+        (
+            "source-span-missing-fields",
+            [
+                {
+                    "op": "set_relation_field",
+                    "case_id": actor_case,
+                    "relation_id": actor_relation,
+                    "field": "source_spans",
+                    "value": [{}],
+                }
+            ],
+            "fail",
+        ),
+        (
+            "relations-not-array",
+            [{"op": "set_case_field", "case_id": actor_case, "field": "relations", "value": "malformed"}],
+            "fail",
+        ),
+        (
             "dropped-unknown",
             [{"op": "remove_annotation", "case_id": unknown_case, "collection": "unknowns", "id": unknown_id}],
             "fail",

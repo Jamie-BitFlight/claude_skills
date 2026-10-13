@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.11"
 # ///
-# ruff: file-ignore[complex-structure, too-many-branches, too-many-locals, too-many-return-statements]
+# ruff: file-ignore[complex-structure, too-many-branches, too-many-locals, too-many-return-statements, too-many-statements]
 """Replay and grade complete source-only workflow traces deterministically."""
 
 from __future__ import annotations
@@ -10,12 +10,18 @@ import argparse
 import copy
 import hashlib
 import json
+import runpy
 import shutil
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 ROOT = Path(__file__).resolve().parents[1]
+candidate_schema_failures = cast(
+    "Callable[[dict[str, Any], dict[str, Any]], list[dict[str, str]]]",
+    runpy.run_path(str(Path(__file__).with_name("candidate_schema.py")))["candidate_schema_failures"],
+)
 DIMENSIONS = (
     "relations",
     "terminals",
@@ -85,7 +91,9 @@ def duplicate_ids(items: list[dict[str, Any]]) -> list[str]:
     return duplicates
 
 
-def structural_failures(reference: dict[str, Any], candidate: dict[str, Any]) -> dict[str, list[str]]:
+def structural_failures(
+    reference: dict[str, Any], candidate: dict[str, Any], candidate_contract: dict[str, Any]
+) -> dict[str, list[str]]:
     """Validate exact complete-trace coverage before dimension scoring.
 
     Returns:
@@ -95,6 +103,16 @@ def structural_failures(reference: dict[str, Any], candidate: dict[str, Any]) ->
     candidate_cases = candidate.get("cases")
     if not isinstance(candidate_cases, list) or not all(isinstance(case, dict) for case in candidate_cases):
         return {"__corpus__": ["candidate_cases_not_list"]}
+    for schema_failure in candidate_schema_failures(candidate, candidate_contract):
+        path = schema_failure["path"]
+        case_id = "__corpus__"
+        if path.startswith("cases["):
+            index_text = path.split("]", 1)[0].removeprefix("cases[")
+            if index_text.isdigit() and int(index_text) < len(candidate_cases):
+                candidate_id = candidate_cases[int(index_text)].get("id")
+                if isinstance(candidate_id, str):
+                    case_id = candidate_id
+        failures.setdefault(case_id, []).append(f"schema:{path}:{schema_failure['reason']}")
     reference_cases = object_collection(reference, "cases")
     reference_ids = {case["id"] for case in reference_cases}
     candidate_ids = [case.get("id") for case in candidate_cases]
@@ -310,21 +328,22 @@ def replay_case(case: dict[str, Any], source_replay_root: Path | None) -> list[d
             if not isinstance(span, dict):
                 failures.append({"id": str(item.get("id")), "reason": "invalid_source_span"})
                 continue
+            span_id = str(span.get("id", item.get("id")))
             path = span.get("repository_path")
             if not isinstance(path, str) or not isinstance(span.get("quote"), str):
-                failures.append({"id": str(span.get("id", item.get("id"))), "reason": "incomplete_source_span"})
+                failures.append({"id": span_id, "reason": "incomplete_source_span"})
                 continue
             revision = case.get("source_revision")
             if not isinstance(revision, str):
-                failures.append({"id": str(span.get("id", item.get("id"))), "reason": "invalid_source_revision"})
+                failures.append({"id": span_id, "reason": "invalid_source_revision"})
                 continue
             try:
                 content = source_bytes(revision, path, cache, source_replay_root)
             except ValueError as error:
-                failures.append({"id": str(span.get("id", item.get("id"))), "reason": f"source_unavailable:{error}"})
+                failures.append({"id": span_id, "reason": f"source_unavailable:{error}"})
                 continue
             if span.get("source_sha256") and hashlib.sha256(content).hexdigest() != span["source_sha256"]:
-                failures.append({"id": span["id"], "reason": "source_sha256_mismatch"})
+                failures.append({"id": span_id, "reason": "source_sha256_mismatch"})
                 continue
             start, end = span.get("byte_start"), span.get("byte_end_exclusive")
             if (
@@ -332,7 +351,7 @@ def replay_case(case: dict[str, Any], source_replay_root: Path | None) -> list[d
                 or not isinstance(end, int)
                 or content[start:end].decode(errors="replace") != span["quote"]
             ):
-                failures.append({"id": span["id"], "reason": "quoted_byte_span_mismatch"})
+                failures.append({"id": span_id, "reason": "quoted_byte_span_mismatch"})
     return failures
 
 
@@ -370,7 +389,7 @@ def dimension_items(case: dict[str, Any], dimension: str) -> dict[str, str]:
                 "consumers": relation.get("consumers", []),
             })
         elif dimension == "consumer_change":
-            for index, consumer in enumerate(relation.get("consumers", [])):
+            for index, consumer in enumerate(object_collection(relation, "consumers")):
                 values[f"{relation_id}/consumer-{index}"] = canonical({
                     "name": consumer.get("name"),
                     "comparison_status": consumer.get("comparison_status"),
@@ -414,14 +433,17 @@ def score(reference_case: dict[str, Any], candidate_case: dict[str, Any], dimens
 
 
 def grade(
-    reference: dict[str, Any], candidate: dict[str, Any], source_replay_root: Path | None = None
+    reference: dict[str, Any],
+    candidate: dict[str, Any],
+    candidate_contract: dict[str, Any],
+    source_replay_root: Path | None = None,
 ) -> dict[str, Any]:
     """Grade all complete-trace dimensions and source replays.
 
     Returns:
         Per-case grading outcome.
     """
-    failures = structural_failures(reference, candidate)
+    failures = structural_failures(reference, candidate, candidate_contract)
     candidates = index_cases(candidate) if isinstance(candidate.get("cases"), list) else {}
     results: list[dict[str, Any]] = []
     for reference_case in object_collection(reference, "cases"):
@@ -470,6 +492,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--candidates", type=Path, default=ROOT / "controls/control-candidates.json")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--source-replay-root", type=Path)
+    parser.add_argument("--candidate-contract", type=Path, default=ROOT / "blind-candidate-contract.json")
     parser.add_argument("--self-check", action="store_true")
     return parser.parse_args()
 
@@ -478,8 +501,9 @@ def main() -> None:
     """Run a complete candidate grade or the control self-check."""
     arguments = parse_args()
     reference = load(arguments.reference)
+    candidate_contract = load(arguments.candidate_contract)
     if arguments.candidate:
-        output = grade(reference, load(arguments.candidate), arguments.source_replay_root)
+        output = grade(reference, load(arguments.candidate), candidate_contract, arguments.source_replay_root)
         encoded = json.dumps(output, indent=2, sort_keys=True) + "\n"
         if arguments.output:
             arguments.output.write_text(encoded)
@@ -488,7 +512,9 @@ def main() -> None:
     controls = load(arguments.candidates)
     control_results: list[dict[str, Any]] = []
     for control in controls["controls"]:
-        result = grade(reference, hydrate(reference, control["candidate"]), arguments.source_replay_root)
+        result = grade(
+            reference, hydrate(reference, control["candidate"]), candidate_contract, arguments.source_replay_root
+        )
         if result["verdict"] != control["expected"]["verdict"]:
             raise SystemExit(f"{control['id']}: expected {control['expected']['verdict']}, got {result['verdict']}")
         control_results.append({"id": control["id"], "verdict": result["verdict"], "grade": result})

@@ -1,5 +1,5 @@
 {
-  "schema_version": 5,
+  "schema_version": 6,
   "status": "complete-trace-grading-contract-awaiting-independent-receipt",
   "scope": "The grader compares source-only complete traces for the four bounded #4102 cases. It never establishes runtime behavior, production truth, general completeness, or #4103/#4104 architecture.",
   "reference": "./trace-reference.json",
@@ -37,7 +37,8 @@
       "each relation unknown_ids and contradiction_ids value is a list of existing case-local annotation ids",
       "extra relations score false and duplicate identifiers reject the candidate"
     ],
-    "consumer_statuses": ["changed", "unchanged", "unresolved"]
+    "consumer_statuses": ["changed", "unchanged", "unresolved"],
+    "recursive_contract": "./blind-candidate-contract.json"
   },
   "deterministic_grader": {
     "script": "./scripts/grade_controls.py",
@@ -64,7 +65,7 @@
       ]
     },
     "self_check_invocation": "uv run --script scripts/grade_controls.py --reference trace-reference.json --candidates controls/control-candidates.json --source-replay-root source-replay --self-check",
-    "boundary": "The adjudicator bundle receives a frozen canonical reference and a frozen candidate only after blind extraction. It contains only the exact revision-bound source bytes required for span replay; it does not use raw-lane records, adjudications, historical receipts, or a control identifier as an independent verification oracle."
+    "boundary": "The adjudicator bundle receives a frozen canonical reference and a frozen candidate only after blind extraction. It validates the candidate recursively against blind-candidate-contract.json before replay or dimension scoring. It contains only the exact revision-bound source bytes required for span replay; it does not use raw-lane records, adjudications, historical receipts, or a control identifier as an independent verification oracle."
   },
   "source_replay": {
     "method": "For every quoted source span, resolve repository_path under source-replay/<candidate case source_revision>/ in the adjudicator bundle; compare source SHA-256 and exact UTF-8 byte slice before scoring. The source bundle materializer obtains each byte-identical file with git show at the declared revision and rejects a digest mismatch before delivery.",

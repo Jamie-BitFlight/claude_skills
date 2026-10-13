@@ -4,7 +4,7 @@ This directory is the bounded #4102 source-reference corpus. [trace-reference.js
 
 ## Roles
 
-1. A blind extractor receives a materialized, allowlisted source-packet/question bundle and separately supplied pinned source material identified by those packets. It never receives raw lanes, the complete reference, adjudications, controls, grades, or adjacent proposed claims. It produces a frozen complete-trace candidate that follows [blind-candidate-contract.json](./blind-candidate-contract.json).
+1. A blind extractor receives a materialized, allowlisted source-packet/question bundle and separately supplied pinned source material identified by those packets. It never receives raw lanes, the complete reference, adjudications, controls, grades, or adjacent proposed claims. It produces a frozen complete-trace candidate that follows [blind-candidate-contract.json](./blind-candidate-contract.json) and passes its emitted `scripts/validate_candidate.py` schema validator before handoff.
 2. A separate adjudicator receives that produced candidate, the frozen reference, the grading contract, and the source material needed for byte replay. [grade_controls.py](./scripts/grade_controls.py) emits correct, missed, false, and replay outcomes for relations, terminals, actors, artifacts/consumers, uncertainty/contradictions, and consumer change status.
 3. Historical raw-lane records and claim-projection receipts remain attributable evidence. They are not independent complete-trace verification.
 

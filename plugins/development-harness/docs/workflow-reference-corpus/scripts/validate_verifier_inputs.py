@@ -7,10 +7,16 @@ from __future__ import annotations
 
 import hashlib
 import json
+import runpy
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 ROOT = Path(__file__).resolve().parents[1]
+candidate_schema_failures = cast(
+    "Callable[[dict[str, Any], dict[str, Any]], list[dict[str, str]]]",
+    runpy.run_path(str(Path(__file__).with_name("candidate_schema.py")))["candidate_schema_failures"],
+)
 ALLOWED_SUFFIXES = (
     "/verifier-input/source-packet.json",
     "/verifier-input/source-question.md",
@@ -44,11 +50,37 @@ def candidate_contract_failures(manifest: dict[str, Any]) -> list[str]:
     return [] if digest(ROOT / path) == expected_digest else ["candidate_contract_digest"]
 
 
+def regression_fixture_failures() -> list[str]:
+    """Verify the retained malformed independent candidate stays byte-exact and invalid.
+
+    Returns:
+        Fixture-integrity or expected-schema-failure identifiers.
+    """
+    controls: dict[str, Any] = json.loads((ROOT / "controls/negative-controls.json").read_text())
+    fixtures = controls.get("independent_regression_fixtures")
+    if not isinstance(fixtures, list) or len(fixtures) != 1 or not isinstance(fixtures[0], dict):
+        return ["independent_fixture_metadata"]
+    fixture = fixtures[0]
+    path = fixture.get("path")
+    expected_digest = fixture.get("sha256")
+    expected_paths = fixture.get("expected_schema_failure_paths")
+    if not isinstance(path, str) or not isinstance(expected_digest, str) or not isinstance(expected_paths, list):
+        return ["independent_fixture_fields"]
+    fixture_path = ROOT / "controls" / path.removeprefix("./")
+    if not fixture_path.is_file() or digest(fixture_path) != expected_digest:
+        return ["independent_fixture_digest"]
+    contract: dict[str, Any] = json.loads((ROOT / "blind-candidate-contract.json").read_text())
+    candidate: dict[str, Any] = json.loads(fixture_path.read_text())
+    actual_paths = {failure["path"] for failure in candidate_schema_failures(candidate, contract)}
+    return [f"independent_fixture_missing_failure:{path}" for path in expected_paths if path not in actual_paths]
+
+
 def main() -> None:
     """Check that blind and historical inputs are disjoint."""
     manifest: dict[str, Any] = json.loads((ROOT / "verifier-input-manifest.json").read_text())
     failures: list[str] = []
     failures.extend(candidate_contract_failures(manifest))
+    failures.extend(regression_fixture_failures())
     blind_paths: set[str] = set()
     for bundle in manifest["case_bundles"]:
         for file in bundle["files"]:

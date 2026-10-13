@@ -231,6 +231,105 @@
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
+            "case_id": "pinned-main-t5",
+            "field": "consumers",
+            "op": "set_relation_field",
+            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/run-stamp",
+            "value": ["malformed-consumer"]
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "fail"
+      },
+      "id": "consumer-not-object"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "pinned-main-t5",
+            "field": "consumers",
+            "op": "set_relation_field",
+            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/run-stamp",
+            "value": [
+              {}
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "fail"
+      },
+      "id": "consumer-missing-required-fields"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "pinned-main-t5",
+            "field": "consumers",
+            "op": "set_relation_field",
+            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/run-stamp",
+            "value": [
+              {
+                "comparison_evidence_span_ids": [],
+                "comparison_status": "invalid",
+                "name": "malformed-consumer"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "fail"
+      },
+      "id": "consumer-invalid-status"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "pinned-main-t5",
+            "field": "source_spans",
+            "op": "set_relation_field",
+            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation",
+            "value": [
+              {}
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "fail"
+      },
+      "id": "source-span-missing-fields"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "pinned-main-t5",
+            "field": "relations",
+            "op": "set_case_field",
+            "value": "malformed"
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "fail"
+      },
+      "id": "relations-not-array"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
             "case_id": "grooming-nested-references",
             "collection": "unknowns",
             "id": "grooming-nested-references/actor-a-final/unknown-intake-E",

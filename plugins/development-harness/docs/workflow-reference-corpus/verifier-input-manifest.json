@@ -20,7 +20,7 @@
   ],
   "candidate_contract": {
     "path": "blind-candidate-contract.json",
-    "sha256": "79c69a94e1efb11d9c5826b7186328e4d430fba2006dc8f01fb52307b3de7ca4",
+    "sha256": "930708e131a1b0ac9209dfd9a7f3187a8e92c0c5eb9c7d293bda48e0174b68f5",
     "purpose": "Non-gold output schema for a fresh blind extractor. It defines required fields and replay-span structure without disclosing canonical relations or annotations."
   },
   "case_bundles": [
@@ -94,7 +94,7 @@
     "script": "./scripts/materialize_verifier_bundles.py",
     "invocation": "uv run --script scripts/materialize_verifier_bundles.py --producer-output <outside-corpus-output-dir>",
     "validation": "uv run --script scripts/materialize_verifier_bundles.py --check <outside-corpus-output-dir>",
-    "guarantee": "The emitted directory contains only bundle-manifest.json, bundle-commands.json, the allowlisted source packets/questions, and the non-gold candidate contract. Any extra file, missing file, or digest mismatch fails validation."
+    "guarantee": "The emitted directory contains only bundle-manifest.json, bundle-commands.json, the allowlisted source packets/questions, and the non-gold candidate contract plus recursive schema validator scripts. Any extra file, missing file, or digest mismatch fails validation."
   },
   "historical_claims_receipt_only": [
     {
