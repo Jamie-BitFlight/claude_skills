@@ -52,6 +52,8 @@ Without an attempt number, no runner is closing anything, so move the status dir
 ```
 
 `--reason` is required — the ledger records why a status moved with no runner behind it.
+With no prior attempt, this writes only the direct `task.state` event: do not create or claim a
+Completion Report for this path. Once an attempt exists, the report and closure remain attempt-owned.
 
 ---
 

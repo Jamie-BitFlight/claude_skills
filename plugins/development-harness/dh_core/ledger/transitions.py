@@ -1691,7 +1691,8 @@ def state(
             refuse("task-accepted")
         if not force and int(row["attempt_open"] or 0) == 1:
             refuse("leased")
-        if new_status == COMPLETE and not force and not report_complete(conn, plan, task, int(row["attempts"] or 0)):
+        attempts = int(row["attempts"] or 0)
+        if new_status == COMPLETE and attempts > 0 and not force and not report_complete(conn, plan, task, attempts):
             refuse("report-missing")
         conn.execute(
             "UPDATE tasks SET status = :status, attempt_open = 0, accepted = :accepted, completed = :completed "
