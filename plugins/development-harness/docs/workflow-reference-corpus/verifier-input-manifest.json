@@ -1,7 +1,7 @@
 {
-  "schema_version": 5,
+  "schema_version": 7,
   "status": "blind-extractor-input-boundary-awaiting-fresh-candidate",
-  "consumer": "A blind source-only extractor receives a materialized bundle containing exactly the declared source packets/questions, non-gold candidate contract, and bundle command manifest. The legacy proposed-claim file remains historical limited-scope material and is not an input to complete-trace extraction or adjudication.",
+  "consumer": "A blind source-only extractor receives a materialized bundle containing exactly the declared source packets/questions, public record provenance, the non-gold canonical source-to-IR contract, and bundle command manifest. The legacy proposed-claim file remains historical limited-scope material and is not an input to complete-trace extraction or adjudication.",
   "excluded": [
     "candidate-trace.json",
     "case-adjudications.json",
@@ -20,9 +20,27 @@
   ],
   "candidate_contract": {
     "path": "blind-candidate-contract.json",
-    "sha256": "930708e131a1b0ac9209dfd9a7f3187a8e92c0c5eb9c7d293bda48e0174b68f5",
-    "purpose": "Non-gold output schema for a fresh blind extractor. It defines required fields and replay-span structure without disclosing canonical relations or annotations."
+    "sha256": "0a351cbf9ce99679e9cc9680b228faa3dd88d8a05a36a5099c97c9fd45706cb7",
+    "purpose": "Non-gold output schema for a fresh blind extractor. It defines required fields and public canonicalization references without disclosing canonical relations or annotations."
   },
+  "producer_public_files": [
+    {
+      "path": "canonical-source-ir.json",
+      "sha256": "df99171dc714cb9c946dcf8bfcf81102d6f9409c3beca0a59746a1d4384e8604"
+    },
+    {
+      "path": "record-manifest.json",
+      "sha256": "1f01042a333e49d615a1d6ba8d03bff21cf7d5d177896f7684aa16d9e9e0dd05"
+    },
+    {
+      "path": "source-unit-manifest.json",
+      "sha256": "9c8a40a4cf7ffa52df98d58645ce37cff386be020900eaca37f65f6db0f1ee28"
+    },
+    {
+      "path": "scripts/canonical_ir.py",
+      "sha256": "bf2f1cacb4d68ff14abaaad5a724396132ad6360c86f5b7c01249410f2a0b4d4"
+    }
+  ],
   "case_bundles": [
     {
       "case_id": "pinned-main-t5",
@@ -35,6 +53,10 @@
         {
           "path": "cases/pinned-main-t5/verifier-input/source-question.md",
           "sha256": "178d3b3e32102fdc95414e34883b2b40a1842a9b16a9c36ead4ee89fbcc48c56"
+        },
+        {
+          "path": "cases/pinned-main-t5/verifier-input/raw/e66b55e05e130ea905afaf8d650ec0f5980d08d0/plugins/development-harness/agents/review-synthesizer.blob",
+          "sha256": "79ff90bd57d5b9a6d4c8d85f644ac2f45d8c5667aecc85135e969d409d0bdc17"
         }
       ]
     },
@@ -49,6 +71,10 @@
         {
           "path": "cases/pinned-4095-source-check/verifier-input/source-question.md",
           "sha256": "bebc72d0b1a308bd9e714c2c7260fb814405cc1ec41a7cae2a86259c12bc1a44"
+        },
+        {
+          "path": "cases/pinned-4095-source-check/verifier-input/raw/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/plugins/development-harness/skills/multi-perspective-review/references/dispatch-flow.md",
+          "sha256": "6d207ee471d7fdd96918c2b0f3d6107e0e6fb67180b06bbb0c3181d8e1eb685d"
         }
       ]
     },
@@ -63,6 +89,10 @@
         {
           "path": "cases/grooming-main/verifier-input/source-question.md",
           "sha256": "184c23f3d99266dc347cd5eba52e77941b40aeb00e7fb848cbcbb2c53bc5540f"
+        },
+        {
+          "path": "cases/grooming-main/verifier-input/raw/e66b55e05e130ea905afaf8d650ec0f5980d08d0/plugins/development-harness/agents/backlog-item-groomer.blob",
+          "sha256": "9014262057ac14eef5fa1e39fc54b016f66a8e2ac772abec89fb9cf2472450cb"
         }
       ]
     },
@@ -85,6 +115,46 @@
         {
           "path": "cases/prose-task-profile-start-task/verifier-input/handoff-a-source-question.md",
           "sha256": "1dfcfe0254aba2eedc696a99e5a8eb8fc35a395b16fbd9959e8e1cc41ef90d5b"
+        },
+        {
+          "path": "cases/prose-task-profile-start-task/verifier-input/raw/e66b55e05e130ea905afaf8d650ec0f5980d08d0/.claude/settings.json",
+          "sha256": "0c060d0e8a7ce5cf4cc669ce899733c63fee805ca025dbbb5168967648051b0d"
+        },
+        {
+          "path": "cases/prose-task-profile-start-task/verifier-input/raw/e66b55e05e130ea905afaf8d650ec0f5980d08d0/plugins/agentskill-kaizen/.mcp.json",
+          "sha256": "107f9195829e3ca518256e528734e096731f51589d7d8e28b616b42ea19822a8"
+        },
+        {
+          "path": "cases/prose-task-profile-start-task/verifier-input/raw/e66b55e05e130ea905afaf8d650ec0f5980d08d0/plugins/development-harness/agents/task-worker.blob",
+          "sha256": "05a3af180ff2ef050ab1500eea887615b60b3fc22aba865e58eda2327d890894"
+        },
+        {
+          "path": "cases/prose-task-profile-start-task/verifier-input/raw/e66b55e05e130ea905afaf8d650ec0f5980d08d0/plugins/development-harness/hooks/hooks.json",
+          "sha256": "bc1cf1f793de2b34ac7595d93627a8bac9c2a8e95ca87729f216c1a307806dc3"
+        },
+        {
+          "path": "cases/prose-task-profile-start-task/verifier-input/raw/e66b55e05e130ea905afaf8d650ec0f5980d08d0/plugins/development-harness/scripts/prepare_clean_worktree.sh",
+          "sha256": "f5d721440d81b01b4e3ef51b1b15688b73657e5baa81a38840d8285bdee88bc3"
+        },
+        {
+          "path": "cases/prose-task-profile-start-task/verifier-input/raw/e66b55e05e130ea905afaf8d650ec0f5980d08d0/plugins/development-harness/scripts/verify_migration_fidelity.py.blob",
+          "sha256": "8ef7685d7597bac16eb9d358c4a981c85f56e3adac74f16f0c52eb9c01710a71"
+        },
+        {
+          "path": "cases/prose-task-profile-start-task/verifier-input/raw/e66b55e05e130ea905afaf8d650ec0f5980d08d0/plugins/development-harness/skills/final-verification/source.blob",
+          "sha256": "3febfdcd12d83f2c83513dd3f848d931fd542d4053cbdd3d3e0a4e5b159d5a00"
+        },
+        {
+          "path": "cases/prose-task-profile-start-task/verifier-input/raw/e66b55e05e130ea905afaf8d650ec0f5980d08d0/plugins/development-harness/skills/kage-bunshin/scripts/spawn.py.blob",
+          "sha256": "81eb4726f465dea2aec79a398409dbd5ed1ea7a80b5b272d241a2ba0c8071b27"
+        },
+        {
+          "path": "cases/prose-task-profile-start-task/verifier-input/raw/e66b55e05e130ea905afaf8d650ec0f5980d08d0/plugins/development-harness/skills/start-task/source.blob",
+          "sha256": "4f790099e26f2fac961f4390456be8fe1fd7cd657b43e31bbb4f0d48e10e3fc7"
+        },
+        {
+          "path": "cases/prose-task-profile-start-task/verifier-input/raw/e66b55e05e130ea905afaf8d650ec0f5980d08d0/plugins/development-harness/skills/validation-protocol/source.blob",
+          "sha256": "39a4dc1e1e12ca3444602e6ba9cf62cde95f6da13028af73cacdfbe3cfb29d23"
         }
       ]
     }
@@ -94,7 +164,7 @@
     "script": "./scripts/materialize_verifier_bundles.py",
     "invocation": "uv run --script scripts/materialize_verifier_bundles.py --producer-output <outside-corpus-output-dir>",
     "validation": "uv run --script scripts/materialize_verifier_bundles.py --check <outside-corpus-output-dir>",
-    "guarantee": "The emitted directory contains only bundle-manifest.json, bundle-commands.json, the allowlisted source packets/questions, and the non-gold candidate contract plus recursive schema validator scripts. Any extra file, missing file, or digest mismatch fails validation."
+    "guarantee": "The emitted directory contains only bundle-manifest.json, bundle-commands.json, the allowlisted source packets/questions, every declared revision-pinned raw source blob, packet-derived revision-pinned source-inputs plus producer-source-manifest.json, the digest-bound finite source-unit vocabulary, public record provenance, the non-gold canonical contract, and recursive validator scripts. Any extra file, missing file, or digest mismatch fails validation."
   },
   "historical_claims_receipt_only": [
     {

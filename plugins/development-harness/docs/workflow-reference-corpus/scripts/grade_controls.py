@@ -18,10 +18,16 @@ from pathlib import Path
 from typing import Any, cast
 
 ROOT = Path(__file__).resolve().parents[1]
+canonical_ir = runpy.run_path(str(Path(__file__).with_name("canonical_ir.py")))
 candidate_schema_failures = cast(
     "Callable[[dict[str, Any], dict[str, Any]], list[dict[str, str]]]",
     runpy.run_path(str(Path(__file__).with_name("candidate_schema.py")))["candidate_schema_failures"],
 )
+canonicalize_trace = cast(
+    "Callable[..., tuple[dict[str, Any] | None, list[dict[str, str]]]]", canonical_ir["canonicalize_trace"]
+)
+source_unit_signature = cast("Callable[[str, str, dict[str, Any]], str]", canonical_ir["source_unit_signature"])
+source_units_by_case = cast("Callable[[object], dict[tuple[str, str], set[str]]]", canonical_ir["source_units_by_case"])
 DIMENSIONS = (
     "relations",
     "terminals",
@@ -91,6 +97,23 @@ def duplicate_ids(items: list[dict[str, Any]]) -> list[str]:
     return duplicates
 
 
+def public_source_units(case_id: str, revision: str) -> set[str]:
+    """Return exact public source-unit signatures for one case revision.
+
+    Returns:
+        Case-scoped quote interval signatures from the finite public manifest.
+    """
+    return source_units_by_case(load(ROOT / "source-unit-manifest.json")).get((case_id, revision), set())
+
+
+def source_unit_is_declared(case_id: str, revision: str, span: dict[str, Any], allowed_units: set[str]) -> bool:
+    """Return whether a structurally complete span is in the public finite vocabulary."""
+    try:
+        return source_unit_signature(case_id, revision, span) in allowed_units
+    except KeyError:
+        return False
+
+
 def structural_failures(
     reference: dict[str, Any], candidate: dict[str, Any], candidate_contract: dict[str, Any]
 ) -> dict[str, list[str]]:
@@ -128,11 +151,10 @@ def structural_failures(
         case_id = candidate_case.get("id")
         if not isinstance(case_id, str) or case_id not in reference_by_id:
             continue
-        reference_case = reference_by_id[case_id]
         case_failures = failures.setdefault(case_id, [])
         required = (
             "source_revision",
-            "raw_record_inventory",
+            "record_manifest",
             "relations",
             "rejected_relations",
             "rejected_annotations",
@@ -142,8 +164,11 @@ def structural_failures(
         for field in required:
             if field not in candidate_case:
                 case_failures.append(f"missing_field:{field}")
-        if candidate_case.get("raw_record_inventory") != reference_case["raw_record_inventory"]:
-            case_failures.append("raw_record_inventory_mismatch")
+        expected_manifest = [
+            entry for entry in load(ROOT / "record-manifest.json")["records"] if entry["case_id"] == case_id
+        ]
+        if sorted(candidate_case.get("record_manifest", []), key=canonical) != sorted(expected_manifest, key=canonical):
+            case_failures.append("record_manifest_provenance_mismatch")
         for collection in ("relations", "rejected_relations", "rejected_annotations", "unknowns", "contradictions"):
             items = candidate_case.get(collection)
             if not isinstance(items, list) or not all(isinstance(item, dict) for item in items):
@@ -151,10 +176,6 @@ def structural_failures(
                 continue
             for duplicate_id in duplicate_ids(items):
                 case_failures.append(f"duplicate_{collection}_id:{duplicate_id}")
-        if candidate_case.get("rejected_relations") != reference_case.get("rejected_relations"):
-            case_failures.append("rejected_relations_mismatch")
-        if candidate_case.get("rejected_annotations") != reference_case.get("rejected_annotations"):
-            case_failures.append("rejected_annotations_mismatch")
         unknown_ids = {
             item["id"] for item in object_collection(candidate_case, "unknowns") if isinstance(item.get("id"), str)
         }
@@ -175,12 +196,19 @@ def structural_failures(
             "consumers",
             "source_spans",
         )
+        revision = candidate_case.get("source_revision")
+        allowed_source_units = public_source_units(case_id, revision) if isinstance(revision, str) else set()
         for relation in object_collection(candidate_case, "relations"):
             for field in required_relation_fields:
                 if field not in relation:
                     case_failures.append(f"relation_missing_field:{relation.get('id')}:{field}")
             if not relation.get("source_spans"):
                 case_failures.append(f"relation_missing_replayable_source_span:{relation.get('id')}")
+            for span in object_collection(relation, "source_spans"):
+                if not isinstance(revision, str) or not source_unit_is_declared(
+                    case_id, revision, span, allowed_source_units
+                ):
+                    case_failures.append(f"source_span_not_in_public_source_unit_manifest:{relation.get('id')}")
             for field, valid_ids in (("unknown_ids", unknown_ids), ("contradiction_ids", contradiction_ids)):
                 links = relation.get(field)
                 if not isinstance(links, list) or not all(isinstance(link, str) for link in links):
@@ -193,6 +221,11 @@ def structural_failures(
             for item in object_collection(candidate_case, collection):
                 if not item.get("source_spans"):
                     case_failures.append(f"{collection}_missing_replayable_source_span:{item.get('id')}")
+                for span in object_collection(item, "source_spans"):
+                    if not isinstance(revision, str) or not source_unit_is_declared(
+                        case_id, revision, span, allowed_source_units
+                    ):
+                        case_failures.append(f"source_span_not_in_public_source_unit_manifest:{item.get('id')}")
         if not case_failures:
             failures.pop(case_id, None)
     return failures
@@ -246,6 +279,57 @@ def apply_mutation(trace: dict[str, Any], mutation: dict[str, Any]) -> None:
             key: value for key, value in mutation.items() if key not in {"op", "case_id", "collection"}
         })
         return
+    if operation == "relabel_transport_ids":
+        annotation_ids: dict[str, str] = {}
+        for collection in ("unknowns", "contradictions"):
+            for index, annotation in enumerate(case[collection]):
+                original_id = annotation["id"]
+                replacement = f"transport-{collection}-{index}"
+                annotation_ids[original_id] = replacement
+                annotation["id"] = replacement
+                for span_index, span in enumerate(annotation["source_spans"]):
+                    span["id"] = f"transport-{collection}-{index}-span-{span_index}"
+        for index, relation in enumerate(case["relations"]):
+            relation["id"] = f"transport-relation-{index}"
+            relation["unknown_ids"] = [annotation_ids[item] for item in relation["unknown_ids"]]
+            relation["contradiction_ids"] = [annotation_ids[item] for item in relation["contradiction_ids"]]
+            for span_index, span in enumerate(relation["source_spans"]):
+                span["id"] = f"transport-relation-{index}-span-{span_index}"
+        return
+    if operation == "equivalent_format":
+        for relation in case["relations"]:
+            for field in ("actor", "condition", "action", "effect"):
+                if isinstance(relation.get(field), str):
+                    relation[field] = f"  {relation[field].upper()}  "
+            for consumer in relation["consumers"]:
+                consumer["name"] = f"  {consumer['name'].upper()}  "
+                consumer["comparison_status"] = consumer["comparison_status"].upper()
+        return
+    if operation == "reorder_collection":
+        case[mutation["collection"]].reverse()
+        return
+    if operation == "move_relation_to_rejection":
+        relation = relation_index(case)[mutation["relation_id"]]
+        case["relations"] = [item for item in case["relations"] if item is not relation]
+        case["rejected_relations"].append({
+            "id": "transport-rejection",
+            "source_records": relation.get("source_records", []),
+            "reason_code": "no_exact_replayable_source_span",
+            "source_unit": relation,
+        })
+        return
+    if operation == "merge_source_units":
+        primary = relation_index(case)[mutation["relation_id"]]
+        secondary = relation_index(case)[mutation["merge_relation_id"]]
+        primary["source_spans"].extend(copy.deepcopy(secondary["source_spans"]))
+        case["relations"] = [item for item in case["relations"] if item is not secondary]
+        return
+    if operation == "set_rejection_reason":
+        for item in case[mutation["collection"]]:
+            if item["id"] == mutation["id"]:
+                item["reason_code"] = mutation["value"]
+                return
+        raise ValueError("rejection mutation target missing")
     relation = relation_index(case)[mutation["relation_id"]]
     if operation == "remove_relation":
         case["relations"] = [item for item in case["relations"] if item["id"] != relation["id"]]
@@ -262,6 +346,10 @@ def apply_mutation(trace: dict[str, Any], mutation: dict[str, Any]) -> None:
         relation["source_spans"][0]["quote"] = mutation["value"]
     elif operation == "append_duplicate_relation":
         case["relations"].append(copy.deepcopy(relation))
+    elif operation == "append_split_relation":
+        split = copy.deepcopy(relation)
+        split["id"] = f"transport-split-{relation['id']}"
+        case["relations"].append(split)
     else:
         raise ValueError(f"unknown mutation operation: {operation}")
 
@@ -304,6 +392,102 @@ def source_bytes(
             raise ValueError(result.stderr.decode(errors="replace").strip())
         cache[key] = result.stdout
     return cache[key]
+
+
+def source_derived_semantic_control() -> dict[str, str]:
+    """Prove canonical equivalence from one producer-visible pinned source interval.
+
+    Returns:
+        A passing control record when equivalent local records canonicalize together
+        and a changed semantic relation does not.
+    """
+    revision = "e66b55e05e130ea905afaf8d650ec0f5980d08d0"
+    repository_path = "plugins/development-harness/agents/review-synthesizer.md"
+    source_input = ROOT / "source-replay" / revision / repository_path
+    if not source_input.is_file():
+        source_input = (
+            ROOT
+            / "cases/pinned-main-t5/verifier-input/raw"
+            / revision
+            / "plugins/development-harness/agents/review-synthesizer.blob"
+        )
+    quote = "Before following any other instruction, first load `dh:synthesize-review-findings` and follow its process step by step."
+    content = source_input.read_bytes()
+    quote_bytes = quote.encode()
+    byte_start = content.index(quote_bytes)
+    byte_end = byte_start + len(quote_bytes)
+    line_start = content[:byte_start].count(b"\n") + 1
+    span = {
+        "id": "producer-local-span",
+        "repository_path": repository_path,
+        "source_sha256": hashlib.sha256(content).hexdigest(),
+        "line_start": line_start,
+        "line_end": line_start,
+        "byte_start": byte_start,
+        "byte_end_exclusive": byte_end,
+        "quote": quote,
+        "quote_sha256": hashlib.sha256(quote_bytes).hexdigest(),
+    }
+    relation = {
+        "id": "producer-local-relation",
+        "actor": None,
+        "condition": "before following any other instruction",
+        "action": "load dh:synthesize-review-findings",
+        "effect": None,
+        "continuations": None,
+        "terminal": None,
+        "artifacts": [],
+        "consumers": [],
+        "unknown_ids": [],
+        "contradiction_ids": [],
+        "source_spans": [span],
+    }
+    trace: dict[str, Any] = {
+        "cases": [
+            {
+                "id": "source-derived-control",
+                "source_revision": revision,
+                "record_manifest": [],
+                "relations": [relation],
+                "rejected_relations": [],
+                "rejected_annotations": [],
+                "unknowns": [],
+                "contradictions": [],
+            }
+        ]
+    }
+    equivalent = copy.deepcopy(trace)
+    equivalent_case = cast("dict[str, Any]", equivalent["cases"][0])
+    equivalent_relation = cast("dict[str, Any]", equivalent_case["relations"][0])
+    equivalent_relation["id"] = "independent-local-relation"
+    equivalent_span = cast("dict[str, Any]", equivalent_relation["source_spans"][0])
+    equivalent_span["id"] = "independent-local-span"
+    equivalent_relation["condition"] = " Before   Following Any Other Instruction "
+    equivalent_relation["action"] = " LOAD dh:synthesize-review-findings "
+    incorrect = copy.deepcopy(trace)
+    incorrect_case = cast("dict[str, Any]", incorrect["cases"][0])
+    incorrect_relation = cast("dict[str, Any]", incorrect_case["relations"][0])
+    incorrect_relation["action"] = "skip dh:synthesize-review-findings"
+    source_unit_manifest = {
+        "schema_version": 1,
+        "source_units": [
+            {
+                "case_id": "source-derived-control",
+                "source_revision": revision,
+                **{key: span[key] for key in span if key != "id"},
+            }
+        ],
+    }
+    canonical_trace, trace_failures = canonicalize_trace(trace, source_unit_manifest)
+    canonical_equivalent, equivalent_failures = canonicalize_trace(equivalent, source_unit_manifest)
+    canonical_incorrect, incorrect_failures = canonicalize_trace(incorrect, source_unit_manifest)
+    if trace_failures or equivalent_failures or incorrect_failures:
+        raise ValueError("source-derived control failed canonicalization")
+    if canonical_trace != canonical_equivalent:
+        raise ValueError("source-derived equivalent record did not canonicalize identically")
+    if canonical_trace == canonical_incorrect:
+        raise ValueError("source-derived wrong semantic relation canonicalized identically")
+    return {"id": "source-derived-semantic-equivalence", "verdict": "pass"}
 
 
 def replay_case(case: dict[str, Any], source_replay_root: Path | None) -> list[dict[str, str]]:
@@ -432,6 +616,21 @@ def score(reference_case: dict[str, Any], candidate_case: dict[str, Any], dimens
     return {"dimension": dimension, "correct": correct, "missed": missed, "false": false}
 
 
+def rejection_failures(reference_case: dict[str, Any], candidate_case: dict[str, Any]) -> list[dict[str, str]]:
+    """Report semantic rejection-classification differences independent of order.
+
+    Returns:
+        Named differences between canonical rejected-source classifications.
+    """
+    failures: list[dict[str, str]] = []
+    for collection in ("rejected_relations", "rejected_annotations"):
+        reference_ids = {item["id"] for item in object_collection(reference_case, collection)}
+        candidate_ids = {item["id"] for item in object_collection(candidate_case, collection)}
+        if reference_ids != candidate_ids:
+            failures.append({"id": reference_case["id"], "reason": f"{collection}_classification_mismatch"})
+    return failures
+
+
 def grade(
     reference: dict[str, Any],
     candidate: dict[str, Any],
@@ -444,9 +643,16 @@ def grade(
         Per-case grading outcome.
     """
     failures = structural_failures(reference, candidate, candidate_contract)
-    candidates = index_cases(candidate) if isinstance(candidate.get("cases"), list) else {}
+    canonical_reference, reference_failures = canonicalize_trace(reference)
+    canonical_candidate, candidate_failures = canonicalize_trace(candidate)
+    canonicalization_failures = [{"source": "reference", **failure} for failure in reference_failures] + [
+        {"source": "candidate", **failure} for failure in candidate_failures
+    ]
+    if canonical_reference is None:
+        raise ValueError("frozen reference cannot be canonicalized")
+    candidates = index_cases(canonical_candidate) if canonical_candidate is not None else {}
     results: list[dict[str, Any]] = []
-    for reference_case in object_collection(reference, "cases"):
+    for reference_case in object_collection(canonical_reference, "cases"):
         candidate_case = candidates.get(reference_case["id"])
         if candidate_case is None:
             results.extend(
@@ -465,6 +671,11 @@ def grade(
         replay_failures = replay_case(candidate_case, source_replay_root)
         structural = [*failures.get("__corpus__", []), *failures.get(reference_case["id"], [])]
         replay_failures.extend({"id": reference_case["id"], "reason": failure} for failure in structural)
+        replay_failures.extend(rejection_failures(reference_case, candidate_case))
+        replay_failures.extend(
+            {"id": reference_case["id"], "reason": f"canonicalization:{failure['reason']}"}
+            for failure in candidate_failures
+        )
         if candidate_case.get("source_revision") != reference_case["source_revision"]:
             replay_failures.append({"id": reference_case["id"], "reason": "source_revision_mismatch"})
         for dimension in DIMENSIONS:
@@ -473,8 +684,9 @@ def grade(
             row["verdict"] = "pass" if not row["missed"] and not row["false"] and not replay_failures else "fail"
             results.append(row)
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "acceptance_threshold": "every case and every dimension has zero missed, zero false, and zero source replay failures",
+        "canonicalization_failures": canonicalization_failures,
         "results": results,
         "verdict": "pass" if all(row["verdict"] == "pass" for row in results) else "fail",
     }
@@ -518,6 +730,7 @@ def main() -> None:
         if result["verdict"] != control["expected"]["verdict"]:
             raise SystemExit(f"{control['id']}: expected {control['expected']['verdict']}, got {result['verdict']}")
         control_results.append({"id": control["id"], "verdict": result["verdict"], "grade": result})
+    control_results.append(source_derived_semantic_control())
     output = {"status": "self-check-passed", "control_results": control_results}
     encoded = json.dumps(output, indent=2, sort_keys=True) + "\n"
     if arguments.output:

@@ -1,5 +1,5 @@
 {
-  "schema_version": 6,
+  "schema_version": 7,
   "status": "complete-trace-grading-contract-awaiting-independent-receipt",
   "scope": "The grader compares source-only complete traces for the four bounded #4102 cases. It never establishes runtime behavior, production truth, general completeness, or #4103/#4104 architecture.",
   "reference": "./trace-reference.json",
@@ -9,7 +9,7 @@
     "required_case_fields": [
       "id",
       "source_revision",
-      "raw_record_inventory",
+      "record_manifest",
       "relations",
       "rejected_relations",
       "rejected_annotations",
@@ -30,9 +30,9 @@
     ],
     "validation": [
       "candidate case ids exactly match the four reference cases with no duplicates",
-      "each candidate raw_record_inventory exactly matches its reference case",
-      "each candidate rejected_relations and rejected_annotations exactly match the frozen reference",
-      "relation, unknown, and contradiction ids are unique within each case",
+      "each candidate record_manifest exactly matches the public record-manifest projection for its case",
+      "canonicalization deterministically classifies and compares rejected_relations and rejected_annotations without collection ordering",
+      "transport relation, unknown, contradiction, and span ids are rewritten from the public canonical source-to-IR contract before comparison",
       "every accepted relation, unknown, and contradiction has at least one complete revision-bound source span",
       "each relation unknown_ids and contradiction_ids value is a list of existing case-local annotation ids",
       "extra relations score false and duplicate identifiers reject the candidate"
@@ -53,6 +53,7 @@
         "missed",
         "false",
         "source_replay_failures",
+        "canonicalization_failures",
         "verdict"
       ],
       "dimensions": [
@@ -65,7 +66,7 @@
       ]
     },
     "self_check_invocation": "uv run --script scripts/grade_controls.py --reference trace-reference.json --candidates controls/control-candidates.json --source-replay-root source-replay --self-check",
-    "boundary": "The adjudicator bundle receives a frozen canonical reference and a frozen candidate only after blind extraction. It validates the candidate recursively against blind-candidate-contract.json before replay or dimension scoring. It contains only the exact revision-bound source bytes required for span replay; it does not use raw-lane records, adjudications, historical receipts, or a control identifier as an independent verification oracle."
+    "boundary": "The adjudicator bundle receives a frozen canonical reference and a frozen candidate only after blind extraction. It applies canonical-source-ir.json to both sides before replay or dimension scoring, reports canonicalization failures separately, and compares semantic keys rather than producer labels. It contains only the exact revision-bound source bytes required for span replay; it does not use raw-lane records, adjudications, historical receipts, or a control identifier as an independent verification oracle."
   },
   "source_replay": {
     "method": "For every quoted source span, resolve repository_path under source-replay/<candidate case source_revision>/ in the adjudicator bundle; compare source SHA-256 and exact UTF-8 byte slice before scoring. The source bundle materializer obtains each byte-identical file with git show at the declared revision and rejects a digest mismatch before delivery.",

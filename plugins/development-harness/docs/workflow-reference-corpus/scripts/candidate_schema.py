@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import hashlib
+import runpy
 from pathlib import PurePosixPath
 from typing import Any
 
 SHA256_HEX_LENGTH = 64
+canonicalize_trace = runpy.run_path(str(PurePosixPath(__file__).with_name("canonical_ir.py")))["canonicalize_trace"]
 
 
 def failure(path: str, reason: str) -> dict[str, str]:
@@ -169,7 +171,7 @@ def candidate_schema_failures(candidate: dict[str, Any], contract: dict[str, Any
             if case_id not in allowed_case_ids:
                 failures.append(failure(f"{path}.id", "unsupported_case_id"))
         required_string(case, "source_revision", path, failures)
-        for collection in ("raw_record_inventory", "rejected_relations", "rejected_annotations"):
+        for collection in ("record_manifest", "rejected_relations", "rejected_annotations"):
             object_items(case.get(collection), f"{path}.{collection}", failures)
         relations = object_items(case.get("relations"), f"{path}.relations", failures)
         for relation_index, relation in enumerate(relations):
@@ -183,4 +185,6 @@ def candidate_schema_failures(candidate: dict[str, Any], contract: dict[str, Any
         for case_id in allowed_case_ids
         if observed_ids.count(case_id) != 1
     )
+    _canonical_trace, canonicalization_failures = canonicalize_trace(candidate)
+    failures.extend(failure(item["path"], f"canonical:{item['reason']}") for item in canonicalization_failures)
     return failures

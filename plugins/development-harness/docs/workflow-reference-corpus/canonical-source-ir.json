@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "purpose": "Public, non-gold canonicalization contract for complete workflow traces. It defines representation and identity, not a case-specific accepted trace.",
+  "source_unit": {
+    "selection": "Read only the revision-pinned source files explicitly listed by a supplied source packet's cited_sources, sources, quoted_source_files, or committed_sources collection. The materialized producer bundle copies those bytes under source-inputs/ and binds their paths and hashes in producer-source-manifest.json. source-unit-manifest.json is the complete finite public vocabulary of allowed case/revision/path/hash/range/quote units; it defines quote granularity without stating relation or annotation semantics. A source unit is one exact listed UTF-8 byte interval in one declared file. The producer must emit one relation or annotation per such interval; it may not invent a unit without a manifest entry or combine intervals into one unit.",
+    "relation_boundary": "For every emitted relation or annotation, source_spans must canonicalize to exactly one source span. Two records citing the same span with different semantic payloads are competing interpretations of one source unit and receive different canonical semantic IDs. One record containing two spans fails noncanonical_source_unit_boundary; two records with the same span and semantics fail noncanonical_relation_boundary.",
+    "source_packet_algorithm": "For each source-unit-manifest.json entry for the case and revision, resolve its path and SHA-256, then read the byte-identical source-inputs/ copy named by producer-source-manifest.json. Verify the manifest digest, byte interval, quote bytes, and one-based line range. Normalize and sort the declared intervals by repository_path, byte_start, byte_end_exclusive, and quote SHA-256; deduplicate identical intervals. This ordered set is the complete producer-visible unit vocabulary for the submitted trace. Reject every span that is not exactly one declared source-unit-manifest.json entry.",
+    "span": "A source span uses UTF-8 byte_start inclusive and byte_end_exclusive, one-based inclusive line_start and line_end, NFKC quote text, and SHA-256 of the exact UTF-8 quote and whole source file. Duplicate spans collapse by canonical span ID and sort lexicographically."
+  },
+  "field_extraction": {
+    "actor": "Use an actor only when the selected quoted interval itself names an actor. Do not infer an actor from a file name, front matter, a surrounding heading, repository metadata, or the producer. Otherwise emit null.",
+    "condition": "Use the source unit's condition value exactly; null means no stated condition.",
+    "action": "Use action, then operation, then kind. Do not synthesize an action when all are absent.",
+    "effect": "Use effect, then to. Do not synthesize an effect when both are absent.",
+    "continuations_terminal": "Use continuations, then continuation, and terminal exactly. null and an empty collection remain distinct values.",
+    "artifacts_consumers": "Use artifacts, then artifact; use consumers, then consumer. A scalar becomes a one-item list. A consumer scalar has comparison_status unresolved; a consumer object supplies name and comparison_status.",
+    "annotations": "Classify an explicit unknown as unknown and an explicit contradiction as contradiction. Do not infer annotations from missing fields or conflicting prose."
+  },
+  "normalization": {
+    "text": "NFKC Unicode normalization, collapse all whitespace to one ASCII space, then Unicode case-fold. null remains null; empty strings remain empty strings.",
+    "lists": "Normalize each member, remove duplicate source spans, and sort by canonical JSON signature. Semantic lists preserve duplicates only when the field itself represents repeated source units.",
+    "fields": [
+      "actor",
+      "condition",
+      "action",
+      "effect",
+      "continuations",
+      "terminal",
+      "artifacts",
+      "consumer.name",
+      "consumer.comparison_status",
+      "annotation.statement"
+    ],
+    "consumer_comparison_statuses": ["changed", "unchanged", "unresolved"]
+  },
+  "identities": {
+    "algorithm": "SHA-256 over UTF-8 `workflow-reference-corpus/v1/<domain>\\0<canonical-json>`.",
+    "domains": {
+      "span": "path, source SHA-256, line range, byte range, normalized quote, quote SHA-256",
+      "relation": "case ID, normalized actor/condition/action/effect, normalized continuation/terminal, sorted artifacts, sorted canonical consumers, sorted span IDs, sorted canonical annotation IDs",
+      "unknown": "class, normalized statement, sorted span IDs",
+      "contradiction": "class, normalized statement, sorted span IDs",
+      "consumer": "canonical relation ID, normalized consumer name and comparison status",
+      "rejection": "collection, reason code, source-record scope, normalized source unit"
+    },
+    "transport_identifiers": "The producer may use local IDs while constructing a trace. Canonicalization ignores those labels, rewrites identities from content, and remaps annotation links before comparison."
+  },
+  "annotations": {
+    "classes": ["unknown", "contradiction"],
+    "link_rule": "A relation link names an annotation source unit. Canonicalization resolves it to the derived annotation ID and sorts the final link set. Unknown links or links with no selected annotation fail canonicalization."
+  },
+  "rejections": {
+    "accepted_unit": "A relation or annotation with one or more exact replayable source spans.",
+    "reason_codes": ["no_exact_replayable_source_span"],
+    "classification": "A source unit with no exact replayable source span belongs to its rejected collection with the sole listed reason code, its source-record scope, and normalized source-unit payload. Order is not significant."
+  }
+}

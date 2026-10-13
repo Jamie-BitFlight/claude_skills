@@ -23,6 +23,7 @@ ALLOWED_SUFFIXES = (
     "/verifier-input/handoff-a-source-packet.json",
     "/verifier-input/handoff-a-source-question.md",
 )
+RAW_SOURCE_MARKER = "/verifier-input/raw/"
 
 
 def digest(path: Path) -> str:
@@ -48,6 +49,30 @@ def candidate_contract_failures(manifest: dict[str, Any]) -> list[str]:
     if not isinstance(path, str) or not isinstance(expected_digest, str):
         return ["candidate_contract_invalid"]
     return [] if digest(ROOT / path) == expected_digest else ["candidate_contract_digest"]
+
+
+def producer_public_file_failures(manifest: dict[str, Any]) -> list[str]:
+    """Validate every producer-visible canonicalization input by digest.
+
+    Returns:
+        Digest or shape failures for the public producer contract files.
+    """
+    files = manifest.get("producer_public_files")
+    if not isinstance(files, list):
+        return ["producer_public_files_missing"]
+    failures: list[str] = []
+    for entry in files:
+        if (
+            not isinstance(entry, dict)
+            or not isinstance(entry.get("path"), str)
+            or not isinstance(entry.get("sha256"), str)
+        ):
+            failures.append("producer_public_file_invalid")
+            continue
+        path = ROOT / entry["path"]
+        if not path.is_file() or digest(path) != entry["sha256"]:
+            failures.append(f"producer_public_file_digest:{entry['path']}")
+    return failures
 
 
 def regression_fixture_failures() -> list[str]:
@@ -80,12 +105,13 @@ def main() -> None:
     manifest: dict[str, Any] = json.loads((ROOT / "verifier-input-manifest.json").read_text())
     failures: list[str] = []
     failures.extend(candidate_contract_failures(manifest))
+    failures.extend(producer_public_file_failures(manifest))
     failures.extend(regression_fixture_failures())
     blind_paths: set[str] = set()
     for bundle in manifest["case_bundles"]:
         for file in bundle["files"]:
             path = file["path"]
-            if not path.endswith(ALLOWED_SUFFIXES):
+            if not path.endswith(ALLOWED_SUFFIXES) and RAW_SOURCE_MARKER not in path:
                 failures.append(f"blind_allowlist:{path}")
             if "proposed-claims.json" in path:
                 failures.append(f"historical_claim_in_blind_bundle:{path}")

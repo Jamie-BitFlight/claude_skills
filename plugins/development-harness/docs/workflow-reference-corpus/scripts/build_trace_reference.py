@@ -8,17 +8,27 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import operator
 import re
+import runpy
 import shutil
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 ROOT = Path(__file__).resolve().parents[1]
+canonical_ir = runpy.run_path(str(Path(__file__).with_name("canonical_ir.py")))
+REJECTION_REASON = cast("str", canonical_ir["REJECTION_REASON"])
+canonicalize_trace = cast(
+    "Callable[..., tuple[dict[str, Any] | None, list[dict[str, str]]]]", canonical_ir["canonicalize_trace"]
+)
+source_unit_payload = cast("Callable[[str, str, dict[str, Any]], dict[str, Any]]", canonical_ir["source_unit_payload"])
 LINE_RANGE_LENGTH = 2
+MIN_SOURCE_UNIT_RELATIONS = 2
 CASE_RECORDS = {
     "pinned-main-t5": (
         "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
@@ -59,6 +69,38 @@ def load(path: Path) -> Any:
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def producer_source_digests() -> dict[str, set[str]]:
+    """Return the source digests explicitly shipped to a blind producer.
+
+    Returns:
+        Case-scoped SHA-256 values for every packet-declared public source input.
+    """
+    manifest = load(ROOT / "verifier-input-manifest.json")
+    output: dict[str, set[str]] = {}
+    for bundle in manifest["case_bundles"]:
+        digests: set[str] = set()
+        for entry in bundle["files"]:
+            if not entry["path"].endswith("source-packet.json"):
+                continue
+            packet = load(ROOT / entry["path"])
+            for collection, digest_field in (
+                (packet.get("cited_sources"), "sha256"),
+                (packet.get("sources"), "raw_sha256"),
+                (packet.get("quoted_source_files"), "sha256"),
+                (packet.get("committed_sources"), "sha256"),
+            ):
+                if isinstance(collection, list):
+                    digests.update(
+                        item[digest_field]
+                        for item in collection
+                        if isinstance(item, dict)
+                        and isinstance(item.get("path"), str)
+                        and isinstance(item.get(digest_field), str)
+                    )
+        output[bundle["case_id"]] = digests
+    return output
 
 
 def control_candidate_bytes(controls: dict[str, Any]) -> bytes:
@@ -304,10 +346,39 @@ def relation_from_raw(
     }
 
 
+def source_units(item: dict[str, Any]) -> list[dict[str, Any]]:
+    """Split a raw observation into one exact-span source unit per emitted item.
+
+    Returns:
+        One item for every exact replayable source span, or the original item
+        when no exact span exists and the rejection classifier must retain it.
+    """
+    spans = item["source_spans"]
+    if not spans:
+        return [item]
+    units: list[dict[str, Any]] = []
+    for index, span in enumerate(spans):
+        unit = copy.deepcopy(item)
+        unit["id"] = f"{item['id']}/source-unit-{index}"
+        unit["source_spans"] = [span]
+        unit["evidence_span_ids"] = [span["id"]]
+        consumers = unit.get("consumers", [])
+        if isinstance(consumers, list):
+            for consumer in consumers:
+                if isinstance(consumer, dict):
+                    consumer["comparison_evidence_span_ids"] = [span["id"]]
+        units.append(unit)
+    return units
+
+
 def bind_relation_annotations(case: dict[str, Any]) -> None:
     """Normalize relation annotation values into case-local annotation identifiers."""
     for collection, raw_key in (("unknowns", "unknown"), ("contradictions", "contradiction")):
-        known = {item["id"] for item in case[collection]}
+        known: dict[str, list[str]] = {}
+        for item in case[collection]:
+            raw_id = item.get("source_annotation_id")
+            if isinstance(raw_id, str):
+                known.setdefault(raw_id, []).append(item["id"])
         for relation in case["relations"]:
             record_id = relation["source_records"][0]
             links: list[str] = []
@@ -316,7 +387,7 @@ def bind_relation_annotations(case: dict[str, Any]) -> None:
                     continue
                 candidate_id = f"{record_id}/{value}" if isinstance(value, str) else ""
                 if candidate_id in known:
-                    links.append(candidate_id)
+                    links.extend(known[candidate_id])
                     continue
                 annotation_id = f"{relation['id']}/{raw_key}-{index}"
                 case[collection].append({
@@ -326,7 +397,7 @@ def bind_relation_annotations(case: dict[str, Any]) -> None:
                     "source_spans": relation["source_spans"],
                     "source_annotation": {"kind": raw_key, "value": value},
                 })
-                known.add(annotation_id)
+                known[annotation_id] = [annotation_id]
                 links.append(annotation_id)
             relation[f"{raw_key}_ids"] = links
 
@@ -342,11 +413,13 @@ def collect_relations(
     raw_relations = trace.get("relationships", trace.get("steps", trace.get("records", [])))
     if not isinstance(raw_relations, list):
         return []
-    return [
-        relation_from_raw(case_id, record_id, relation, index, revision, sources, evidence_by_id)
-        for index, relation in enumerate(raw_relations)
-        if isinstance(relation, dict)
-    ]
+    relations: list[dict[str, Any]] = []
+    for index, relation in enumerate(raw_relations):
+        if isinstance(relation, dict):
+            relations.extend(
+                source_units(relation_from_raw(case_id, record_id, relation, index, revision, sources, evidence_by_id))
+            )
+    return relations
 
 
 def collect_annotations(
@@ -362,22 +435,47 @@ def collect_annotations(
         if not isinstance(annotation, dict):
             continue
         annotation_id = str(annotation.get("id", f"{key}-{index}"))
-        annotations.append({
+        item = {
             "id": f"{record_id}/{annotation_id}",
+            "source_annotation_id": f"{record_id}/{annotation_id}",
             "source_records": [record_id],
             "statement": annotation.get("statement", annotation.get("condition", annotation)),
             "source_spans": evidence_spans(
                 annotation.get("evidence"), record_id, annotation_id, revision, sources, evidence_by_id
             ),
             "source_annotation": annotation,
-        })
+        }
+        annotations.extend(source_units(item))
     return annotations
 
 
-def build_reference() -> dict[str, Any]:
+def build_source_unit_manifest(cases: list[dict[str, Any]]) -> dict[str, Any]:
+    """Build the non-gold, finite source-unit vocabulary from replayable spans.
+
+    Returns:
+        A case-scoped source-unit manifest without semantic relation payloads.
+    """
+    units: dict[str, dict[str, Any]] = {}
+    for case in cases:
+        case_id = case["id"]
+        revision = case["source_revision"]
+        for collection in ("relations", "unknowns", "contradictions"):
+            for item in case[collection]:
+                for span in item["source_spans"]:
+                    unit = source_unit_payload(case_id, revision, span)
+                    units[json.dumps(unit, sort_keys=True, separators=(",", ":"))] = unit
+    return {
+        "schema_version": 1,
+        "purpose": "Public, non-gold finite source-unit vocabulary for blind complete-trace extraction. Each entry binds one case-scoped revision-pinned source quote interval; it does not state a relation, annotation, acceptance, or rejection semantic payload.",
+        "source_units": [units[key] for key in sorted(units)],
+    }
+
+
+def build_reference() -> tuple[dict[str, Any], dict[str, Any]]:
+    record_manifest = load(ROOT / "record-manifest.json")["records"]
+    public_source_digests = producer_source_digests()
     cases: list[dict[str, Any]] = []
     for case_id, (revision, records) in CASE_RECORDS.items():
-        inventory: list[dict[str, Any]] = []
         relations: list[dict[str, Any]] = []
         rejected_relations: list[dict[str, Any]] = []
         rejected_annotations: list[dict[str, Any]] = []
@@ -389,48 +487,53 @@ def build_reference() -> dict[str, Any]:
             record_id = f"{case_id}/{label}"
             source_packet_path = path.with_name("source-packet.json")
             sources, evidence_by_id = catalog(source_packet_path)
-            inventory.append({
-                "record_id": record_id,
-                "trace_path": trace_path,
-                "raw_trace_sha256": sha256(path),
-                "authority": "raw-source-only-lane; retained without relation-level lane selection",
-            })
             for relation in collect_relations(case_id, record_id, trace, revision, sources, evidence_by_id):
-                if relation["evidence_complete"]:
+                if (
+                    relation["evidence_complete"]
+                    and relation["source_spans"][0]["source_sha256"] in public_source_digests[case_id]
+                ):
                     relations.append(relation)
                 else:
                     rejected_relations.append({
                         "id": relation["id"],
                         "source_records": relation["source_records"],
-                        "reason": "no_exact_replayable_source_span_in_retained_raw_evidence",
-                        "raw_evidence": relation["source_relation"].get("evidence"),
+                        "reason_code": REJECTION_REASON,
+                        "source_unit": relation["source_relation"],
                     })
             for annotation in collect_annotations(trace, record_id, "unknowns", revision, sources, evidence_by_id):
-                if annotation["source_spans"]:
+                if (
+                    annotation["source_spans"]
+                    and annotation["source_spans"][0]["source_sha256"] in public_source_digests[case_id]
+                ):
                     unknowns.append(annotation)
                 else:
                     rejected_annotations.append({
                         "id": annotation["id"],
+                        "source_records": annotation["source_records"],
                         "collection": "unknowns",
-                        "reason": "no_exact_replayable_source_span_in_retained_raw_evidence",
-                        "raw_evidence": annotation["source_annotation"].get("evidence"),
+                        "reason_code": REJECTION_REASON,
+                        "source_unit": annotation["source_annotation"],
                     })
             for annotation in collect_annotations(
                 trace, record_id, "contradictions", revision, sources, evidence_by_id
             ):
-                if annotation["source_spans"]:
+                if (
+                    annotation["source_spans"]
+                    and annotation["source_spans"][0]["source_sha256"] in public_source_digests[case_id]
+                ):
                     contradictions.append(annotation)
                 else:
                     rejected_annotations.append({
                         "id": annotation["id"],
+                        "source_records": annotation["source_records"],
                         "collection": "contradictions",
-                        "reason": "no_exact_replayable_source_span_in_retained_raw_evidence",
-                        "raw_evidence": annotation["source_annotation"].get("evidence"),
+                        "reason_code": REJECTION_REASON,
+                        "source_unit": annotation["source_annotation"],
                     })
         case = {
             "id": case_id,
             "source_revision": revision,
-            "raw_record_inventory": inventory,
+            "record_manifest": [entry for entry in record_manifest if entry["case_id"] == case_id],
             "relations": relations,
             "rejected_relations": rejected_relations,
             "rejected_annotations": rejected_annotations,
@@ -441,18 +544,20 @@ def build_reference() -> dict[str, Any]:
         }
         bind_relation_annotations(case)
         cases.append(case)
+    source_units = build_source_unit_manifest(cases)
+    normalized, failures = canonicalize_trace({"cases": cases}, source_units)
+    if failures or normalized is None:
+        raise ValueError(json.dumps({"canonicalization_failures": failures}, indent=2))
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "reference_status": "replayable-source-only-awaiting-independent-complete-trace-receipts",
         "normalization": {
-            "relation_identity": "record_id plus immutable raw relation id; identical spans never merge accepted relations",
-            "rejection_rule": "A relation is accepted only with at least one exact revision-bound source span. Otherwise it remains in rejected_relations with its retained raw evidence identifiers.",
-            "consumer_status": "unresolved unless the raw lane supplies a source-supported comparison status",
-            "terminal_rule": "null terminals retain the raw lane boundary and are not inferred as success or failure",
+            "canonical_source_ir": "canonical-source-ir.json",
+            "record_manifest": "record-manifest.json",
             "authority": "This file normalizes frozen source-only records for grading; it does not upgrade raw observations or claim-projection receipts to complete-trace verification.",
         },
-        "cases": cases,
-    }
+        "cases": normalized["cases"],
+    }, source_units
 
 
 def first_matching(reference: dict[str, Any], predicate: Any) -> tuple[str, str] | None:
@@ -481,6 +586,12 @@ def build_controls(reference: dict[str, Any]) -> dict[str, Any]:
     contradiction = next(
         ((case["id"], item["id"]) for case in reference["cases"] for item in case["contradictions"]), None
     )
+    rejected_relation = next(
+        ((case["id"], item["id"]) for case in reference["cases"] for item in case["rejected_relations"]), None
+    )
+    source_unit_case = next(
+        (case for case in reference["cases"] if len(case["relations"]) >= MIN_SOURCE_UNIT_RELATIONS), None
+    )
     case_id, relation_id = required_target(terminal, "a terminal")
     actor_case, actor_relation = required_target(actor, "an actor")
     continuation_case, continuation_relation = required_target(continuation, "a continuation")
@@ -488,10 +599,18 @@ def build_controls(reference: dict[str, Any]) -> dict[str, Any]:
     consumer_case, consumer_relation = required_target(consumer, "a consumer")
     unknown_case, unknown_id = required_target(unknown, "an unknown")
     contradiction_case, _contradiction_id = required_target(contradiction, "a contradiction")
+    rejected_relation_case, rejected_relation_id = required_target(rejected_relation, "a rejected relation")
+    if source_unit_case is None:
+        raise ValueError("frozen records do not expose two source units for the merge control")
+    merge_case_id = source_unit_case["id"]
+    merge_relation_id = source_unit_case["relations"][0]["id"]
+    merge_target_id = source_unit_case["relations"][1]["id"]
     unknown_link_case, unknown_link_relation = required_target(unknown_link, "an unknown link")
     contradiction_link_case, contradiction_link_relation = required_target(contradiction_link, "a contradiction link")
     controls = [
         ("correct-source-replay", [], "pass"),
+        ("equivalent-transport-identifiers", [{"op": "relabel_transport_ids", "case_id": actor_case}], "pass"),
+        ("equivalent-normalized-format", [{"op": "equivalent_format", "case_id": actor_case}], "pass"),
         (
             "mixed-revision-sourcecheck",
             [
@@ -532,6 +651,23 @@ def build_controls(reference: dict[str, Any]) -> dict[str, Any]:
         (
             "same-span-collapse",
             [{"op": "remove_relation", "case_id": continuation_case, "relation_id": continuation_relation}],
+            "fail",
+        ),
+        (
+            "noncanonical-relation-boundary",
+            [{"op": "append_split_relation", "case_id": actor_case, "relation_id": actor_relation}],
+            "fail",
+        ),
+        (
+            "merged-source-unit-boundary",
+            [
+                {
+                    "op": "merge_source_units",
+                    "case_id": merge_case_id,
+                    "relation_id": merge_relation_id,
+                    "merge_relation_id": merge_target_id,
+                }
+            ],
             "fail",
         ),
         (
@@ -746,9 +882,32 @@ def build_controls(reference: dict[str, Any]) -> dict[str, Any]:
             "fail",
         ),
         (
-            "incomplete-raw-record-inventory",
-            [{"op": "set_case_field", "case_id": "pinned-main-t5", "field": "raw_record_inventory", "value": []}],
+            "record-manifest-provenance",
+            [{"op": "set_case_field", "case_id": "pinned-main-t5", "field": "record_manifest", "value": []}],
             "fail",
+        ),
+        (
+            "accepted-rejected-classification",
+            [{"op": "move_relation_to_rejection", "case_id": actor_case, "relation_id": actor_relation}],
+            "fail",
+        ),
+        (
+            "rejection-reason-change",
+            [
+                {
+                    "op": "set_rejection_reason",
+                    "case_id": rejected_relation_case,
+                    "collection": "rejected_relations",
+                    "id": rejected_relation_id,
+                    "value": "unsupported",
+                }
+            ],
+            "fail",
+        ),
+        (
+            "equivalent-rejection-order",
+            [{"op": "reorder_collection", "case_id": rejected_relation_case, "collection": "rejected_relations"}],
+            "pass",
         ),
         (
             "missing-required-case-field",
@@ -793,15 +952,21 @@ def main() -> None:
     mode.add_argument("--write", action="store_true")
     mode.add_argument("--check", action="store_true")
     arguments = parser.parse_args()
-    reference = build_reference()
+    reference, source_units = build_reference()
     controls = build_controls(reference)
     trace_bytes = (json.dumps(reference, indent=2) + "\n").encode()
     controls_bytes = control_candidate_bytes(controls)
+    source_units_bytes = (json.dumps(source_units, indent=2) + "\n").encode()
     if arguments.write:
         (ROOT / "trace-reference.json").write_bytes(trace_bytes)
         write_control_candidates(ROOT / "controls/control-candidates.json", controls)
+        (ROOT / "source-unit-manifest.json").write_bytes(source_units_bytes)
     elif arguments.check:
-        expected = {"trace-reference.json": trace_bytes, "controls/control-candidates.json": controls_bytes}
+        expected = {
+            "trace-reference.json": trace_bytes,
+            "controls/control-candidates.json": controls_bytes,
+            "source-unit-manifest.json": source_units_bytes,
+        }
         mismatches = [path for path, contents in expected.items() if (ROOT / path).read_bytes() != contents]
         if mismatches:
             raise SystemExit(json.dumps({"status": "failed", "drift": mismatches}, indent=2))

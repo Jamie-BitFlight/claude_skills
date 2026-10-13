@@ -16,6 +16,36 @@
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
+            "case_id": "grooming-nested-references",
+            "op": "relabel_transport_ids"
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "pass"
+      },
+      "id": "equivalent-transport-identifiers"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "op": "equivalent_format"
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "pass"
+      },
+      "id": "equivalent-normalized-format"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
             "case_id": "pinned-4095-source-check",
             "op": "set_case_revision",
             "value": "e66b55e05e130ea905afaf8d650ec0f5980d08d0"
@@ -32,10 +62,10 @@
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "case_id": "pinned-main-t5",
+            "case_id": "grooming-nested-references",
             "field": "actor",
             "op": "set_relation_field",
-            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation",
+            "relation_id": "relation:000ca4ecba5e9f0ba90f364aaee56e49b20dbef925b031594fce1814c66625e8",
             "value": "loaded profile as spawned child"
           }
         ]
@@ -50,10 +80,10 @@
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "case_id": "pinned-main-t5",
+            "case_id": "grooming-nested-references",
             "field": "continuations",
             "op": "set_relation_field",
-            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation",
+            "relation_id": "relation:02b1fb841cadfdd28ce782beaa6203d770fb23dbed18622a1b7e15ba6348724e",
             "value": []
           }
         ]
@@ -68,9 +98,9 @@
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "case_id": "pinned-main-t5",
+            "case_id": "grooming-nested-references",
             "op": "remove_relation",
-            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation"
+            "relation_id": "relation:02b1fb841cadfdd28ce782beaa6203d770fb23dbed18622a1b7e15ba6348724e"
           }
         ]
       },
@@ -84,9 +114,42 @@
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "case_id": "pinned-main-t5",
+            "case_id": "grooming-nested-references",
+            "op": "append_split_relation",
+            "relation_id": "relation:000ca4ecba5e9f0ba90f364aaee56e49b20dbef925b031594fce1814c66625e8"
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "fail"
+      },
+      "id": "noncanonical-relation-boundary"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "merge_relation_id": "relation:002be92d0440ce7b10e01efc0aa1e498e9475a3f44e9f51b08e43cd09d0e3f75",
+            "op": "merge_source_units",
+            "relation_id": "relation:000ca4ecba5e9f0ba90f364aaee56e49b20dbef925b031594fce1814c66625e8"
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "fail"
+      },
+      "id": "merged-source-unit-boundary"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
             "op": "remove_source_spans",
-            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation"
+            "relation_id": "relation:000ca4ecba5e9f0ba90f364aaee56e49b20dbef925b031594fce1814c66625e8"
           }
         ]
       },
@@ -100,9 +163,9 @@
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "case_id": "pinned-main-t5",
+            "case_id": "grooming-nested-references",
             "op": "corrupt_source_quote",
-            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation",
+            "relation_id": "relation:000ca4ecba5e9f0ba90f364aaee56e49b20dbef925b031594fce1814c66625e8",
             "value": "unsupported source quote"
           }
         ]
@@ -150,10 +213,10 @@
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "case_id": "pinned-main-t5",
+            "case_id": "grooming-nested-references",
             "field": "terminal",
             "op": "set_relation_field",
-            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/missing-diff",
+            "relation_id": "relation:000ca4ecba5e9f0ba90f364aaee56e49b20dbef925b031594fce1814c66625e8",
             "value": null
           }
         ]
@@ -168,10 +231,10 @@
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "case_id": "pinned-main-t5",
+            "case_id": "grooming-nested-references",
             "field": "terminal",
             "op": "set_relation_field",
-            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/missing-diff",
+            "relation_id": "relation:000ca4ecba5e9f0ba90f364aaee56e49b20dbef925b031594fce1814c66625e8",
             "value": {
               "kind": "invented",
               "outcome": "unsupported"
@@ -189,17 +252,17 @@
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "case_id": "pinned-main-t5",
+            "case_id": "grooming-nested-references",
             "field": "artifacts",
             "op": "set_relation_field",
-            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation",
+            "relation_id": "relation:002be92d0440ce7b10e01efc0aa1e498e9475a3f44e9f51b08e43cd09d0e3f75",
             "value": []
           },
           {
-            "case_id": "pinned-main-t5",
+            "case_id": "grooming-nested-references",
             "field": "consumers",
             "op": "set_relation_field",
-            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation",
+            "relation_id": "relation:002be92d0440ce7b10e01efc0aa1e498e9475a3f44e9f51b08e43cd09d0e3f75",
             "value": []
           }
         ]
@@ -214,9 +277,9 @@
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "case_id": "pinned-main-t5",
+            "case_id": "pinned-4095-source-check",
             "op": "set_consumer_status",
-            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/run-stamp",
+            "relation_id": "relation:0105b4c0bfa22f50ae9fff2010881d466fa84d86bbeac8c4cc52cf169b91be5c",
             "value": "changed"
           }
         ]
@@ -231,10 +294,10 @@
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "case_id": "pinned-main-t5",
+            "case_id": "pinned-4095-source-check",
             "field": "consumers",
             "op": "set_relation_field",
-            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/run-stamp",
+            "relation_id": "relation:0105b4c0bfa22f50ae9fff2010881d466fa84d86bbeac8c4cc52cf169b91be5c",
             "value": ["malformed-consumer"]
           }
         ]
@@ -249,10 +312,10 @@
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "case_id": "pinned-main-t5",
+            "case_id": "pinned-4095-source-check",
             "field": "consumers",
             "op": "set_relation_field",
-            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/run-stamp",
+            "relation_id": "relation:0105b4c0bfa22f50ae9fff2010881d466fa84d86bbeac8c4cc52cf169b91be5c",
             "value": [
               {}
             ]
@@ -269,10 +332,10 @@
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "case_id": "pinned-main-t5",
+            "case_id": "pinned-4095-source-check",
             "field": "consumers",
             "op": "set_relation_field",
-            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/run-stamp",
+            "relation_id": "relation:0105b4c0bfa22f50ae9fff2010881d466fa84d86bbeac8c4cc52cf169b91be5c",
             "value": [
               {
                 "comparison_evidence_span_ids": [],
@@ -293,10 +356,10 @@
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "case_id": "pinned-main-t5",
+            "case_id": "grooming-nested-references",
             "field": "source_spans",
             "op": "set_relation_field",
-            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation",
+            "relation_id": "relation:000ca4ecba5e9f0ba90f364aaee56e49b20dbef925b031594fce1814c66625e8",
             "value": [
               {}
             ]
@@ -313,7 +376,7 @@
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "case_id": "pinned-main-t5",
+            "case_id": "grooming-nested-references",
             "field": "relations",
             "op": "set_case_field",
             "value": "malformed"
@@ -332,7 +395,7 @@
           {
             "case_id": "grooming-nested-references",
             "collection": "unknowns",
-            "id": "grooming-nested-references/actor-a-final/unknown-intake-E",
+            "id": "unknown:201d07d4aae53df4526e0b6b42a3861408310752b04eda625ec962582d58facd",
             "op": "remove_annotation"
           }
         ]
@@ -347,7 +410,7 @@
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "case_id": "pinned-main-t5",
+            "case_id": "grooming-nested-references",
             "collection": "contradictions",
             "id": "invented-contradiction",
             "op": "append_annotation",
@@ -369,7 +432,7 @@
             "case_id": "grooming-nested-references",
             "field": "unknown_ids",
             "op": "set_relation_field",
-            "relation_id": "grooming-nested-references/actor-a-final/unknown-research-investigation",
+            "relation_id": "relation:000ca4ecba5e9f0ba90f364aaee56e49b20dbef925b031594fce1814c66625e8",
             "value": []
           }
         ]
@@ -384,10 +447,10 @@
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "case_id": "pinned-main-t5",
+            "case_id": "grooming-nested-references",
             "field": "contradiction_ids",
             "op": "set_relation_field",
-            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/content-store-boundary",
+            "relation_id": "relation:000ca4ecba5e9f0ba90f364aaee56e49b20dbef925b031594fce1814c66625e8",
             "value": ["invented-contradiction-link"]
           }
         ]
@@ -403,7 +466,7 @@
         "mutations": [
           {
             "case_id": "pinned-main-t5",
-            "field": "raw_record_inventory",
+            "field": "record_manifest",
             "op": "set_case_field",
             "value": []
           }
@@ -412,7 +475,57 @@
       "expected": {
         "verdict": "fail"
       },
-      "id": "incomplete-raw-record-inventory"
+      "id": "record-manifest-provenance"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "op": "move_relation_to_rejection",
+            "relation_id": "relation:000ca4ecba5e9f0ba90f364aaee56e49b20dbef925b031594fce1814c66625e8"
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "fail"
+      },
+      "id": "accepted-rejected-classification"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "collection": "rejected_relations",
+            "id": "rejection:0a1935224a2bc9ee5c615c62e3ef7fe8db13467ab304560645d47bfae400637a",
+            "op": "set_rejection_reason",
+            "value": "unsupported"
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "fail"
+      },
+      "id": "rejection-reason-change"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "collection": "rejected_relations",
+            "op": "reorder_collection"
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "pass"
+      },
+      "id": "equivalent-rejection-order"
     },
     {
       "candidate": {
@@ -451,9 +564,9 @@
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "case_id": "pinned-main-t5",
+            "case_id": "grooming-nested-references",
             "op": "remove_source_spans",
-            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation"
+            "relation_id": "relation:000ca4ecba5e9f0ba90f364aaee56e49b20dbef925b031594fce1814c66625e8"
           }
         ]
       },
@@ -467,9 +580,9 @@
         "base_reference": "../trace-reference.json",
         "mutations": [
           {
-            "case_id": "pinned-main-t5",
+            "case_id": "grooming-nested-references",
             "op": "append_duplicate_relation",
-            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation"
+            "relation_id": "relation:02b1fb841cadfdd28ce782beaa6203d770fb23dbed18622a1b7e15ba6348724e"
           }
         ]
       },
