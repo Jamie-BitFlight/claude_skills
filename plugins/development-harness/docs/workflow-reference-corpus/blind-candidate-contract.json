@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "role": "blind complete-trace extractor",
+  "purpose": "Define the non-gold JSON shape a fresh source-only extractor must emit after reading its producer bundle. This contract names no accepted relation, annotation, source span, or reference answer.",
+  "output": {
+    "path": "candidate.json",
+    "top_level_required_fields": ["cases"],
+    "allowed_case_ids": [
+      "pinned-main-t5",
+      "pinned-4095-source-check",
+      "grooming-nested-references",
+      "prose-task-profile-start-task"
+    ],
+    "case_required_fields": [
+      "id",
+      "source_revision",
+      "raw_record_inventory",
+      "relations",
+      "rejected_relations",
+      "rejected_annotations",
+      "unknowns",
+      "contradictions"
+    ],
+    "relation_required_fields": [
+      "id",
+      "actor",
+      "condition",
+      "action",
+      "effect",
+      "continuations",
+      "terminal",
+      "artifacts",
+      "consumers",
+      "source_spans"
+    ],
+    "annotation_required_fields": ["id", "source_spans"],
+    "source_span_required_fields": [
+      "id",
+      "repository_path",
+      "source_sha256",
+      "line_start",
+      "line_end",
+      "byte_start",
+      "byte_end_exclusive",
+      "quote",
+      "quote_sha256"
+    ]
+  },
+  "rules": [
+    "Emit exactly one case for every allowed_case_ids value and no other case id.",
+    "Copy each case source_revision and raw_record_inventory from the supplied source packets without deriving records from undisclosed material.",
+    "Give every accepted relation, unknown, and contradiction at least one complete revision-bound source span.",
+    "Use case-local unique identifiers and make relation unknown_ids and contradiction_ids lists of existing case-local annotation ids.",
+    "Keep unsupported raw material in rejected_relations or rejected_annotations; do not infer runtime behavior or select an architecture."
+  ],
+  "prohibited_inputs": [
+    "trace-reference.json",
+    "controls",
+    "grading-contract.json",
+    "grader output",
+    "raw lane records",
+    "historical claim-projection receipts"
+  ],
+  "handoff": "Freeze the emitted candidate and provide its path and SHA-256 to the separate adjudicator. A syntactically valid candidate is not an acceptance receipt."
+}

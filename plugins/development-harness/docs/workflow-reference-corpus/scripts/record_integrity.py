@@ -125,12 +125,65 @@ def validate(document: dict[str, object]) -> list[str]:
     return failures
 
 
+def validate_bundle(root: Path, manifest_path: Path) -> list[str]:
+    """Validate a materialized bundle's closed file and digest inventory.
+
+    Returns:
+        All detected integrity failures.
+    """
+    document = json.loads(manifest_path.read_text(encoding="utf-8"))
+    entries = document.get("files")
+    if not isinstance(entries, list):
+        return ["bundle_files_not_list"]
+    expected = {manifest_path.name}
+    failures: list[str] = []
+    for entry in entries:
+        if (
+            not isinstance(entry, dict)
+            or not isinstance(entry.get("path"), str)
+            or not isinstance(entry.get("sha256"), str)
+        ):
+            failures.append("bundle_invalid_entry")
+            continue
+        relative = Path(entry["path"])
+        if relative.is_absolute() or ".." in relative.parts:
+            failures.append(f"bundle_path_escape:{entry['path']}")
+            continue
+        expected.add(relative.as_posix())
+        source = root / relative
+        if not source.is_file():
+            failures.append(f"bundle_missing:{entry['path']}")
+        elif digest(source) != entry["sha256"]:
+            failures.append(f"bundle_digest:{entry['path']}")
+    actual = {path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file()}
+    failures.extend(f"bundle_unexpected:{path}" for path in sorted(actual - expected))
+    failures.extend(f"bundle_missing:{path}" for path in sorted(expected - actual))
+    return failures
+
+
 def main() -> None:
     """Write and/or validate the tracked-byte integrity inventory."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--validate", action="store_true")
+    parser.add_argument("--bundle-root", type=Path)
+    parser.add_argument("--bundle-manifest", type=Path)
+    parser.add_argument("--validate-bundle", action="store_true")
     arguments = parser.parse_args()
+    if arguments.validate_bundle:
+        if arguments.write or arguments.validate or arguments.bundle_root is None or arguments.bundle_manifest is None:
+            raise SystemExit("--validate-bundle requires --bundle-root and --bundle-manifest only")
+        root = arguments.bundle_root.resolve()
+        manifest = (root / arguments.bundle_manifest).resolve()
+        try:
+            manifest.relative_to(root)
+        except ValueError as error:
+            raise SystemExit("bundle manifest must be inside bundle root") from error
+        failures = validate_bundle(root, manifest)
+        if failures:
+            raise SystemExit(json.dumps({"status": "failed", "failures": failures}, indent=2))
+        print(json.dumps({"status": "passed", "files": len(list(root.rglob("*")))}))
+        return
     target = ROOT / "record-integrity.json"
     if arguments.write:
         target.write_text(json.dumps(inventory(), indent=2) + "\n")

@@ -81,6 +81,21 @@
       "defect": "Remove the required raw-record inventory from an otherwise matching case."
     },
     {
+      "id": "missing-required-case-field",
+      "class": "candidate schema completeness",
+      "defect": "Remove a required case field from an otherwise matching candidate."
+    },
+    {
+      "id": "wrong-case-id",
+      "class": "exact case coverage",
+      "defect": "Replace a declared case identifier with an undeclared identifier."
+    },
+    {
+      "id": "no-span-candidate-relation",
+      "class": "replayable source evidence",
+      "defect": "Remove every source span from an otherwise matching accepted relation."
+    },
+    {
       "id": "duplicate-relation-id",
       "class": "identifier uniqueness",
       "defect": "Append a second relation with an existing identifier."

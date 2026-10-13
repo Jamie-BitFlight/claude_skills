@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "status": "complete-trace-grading-contract-awaiting-independent-receipt",
   "scope": "The grader compares source-only complete traces for the four bounded #4102 cases. It never establishes runtime behavior, production truth, general completeness, or #4103/#4104 architecture.",
   "reference": "./trace-reference.json",
@@ -43,7 +43,7 @@
     "script": "./scripts/grade_controls.py",
     "reference": "./trace-reference.json",
     "candidates": "./controls/control-candidates.json",
-    "candidate_invocation": "uv run --script plugins/development-harness/docs/workflow-reference-corpus/scripts/grade_controls.py --reference <frozen-reference> --candidate <frozen-complete-trace-candidate> --output <grading-output>",
+    "candidate_invocation": "uv run --script scripts/grade_controls.py --reference trace-reference.json --candidate candidate.json --source-replay-root source-replay --output <grading-output>",
     "result_shape": {
       "required_fields": [
         "case_id",
@@ -63,11 +63,11 @@
         "consumer_change"
       ]
     },
-    "self_check_invocation": "uv run --script plugins/development-harness/docs/workflow-reference-corpus/scripts/grade_controls.py --self-check",
-    "boundary": "The grader receives a frozen canonical reference and a frozen candidate only after blind extraction. It does not use raw-lane records, adjudications, historical receipts, or a control identifier as an independent verification oracle."
+    "self_check_invocation": "uv run --script scripts/grade_controls.py --reference trace-reference.json --candidates controls/control-candidates.json --source-replay-root source-replay --self-check",
+    "boundary": "The adjudicator bundle receives a frozen canonical reference and a frozen candidate only after blind extraction. It contains only the exact revision-bound source bytes required for span replay; it does not use raw-lane records, adjudications, historical receipts, or a control identifier as an independent verification oracle."
   },
   "source_replay": {
-    "method": "For every quoted source span, resolve repository_path at the candidate case source_revision with git show; compare source SHA-256 and exact UTF-8 byte slice before scoring.",
+    "method": "For every quoted source span, resolve repository_path under source-replay/<candidate case source_revision>/ in the adjudicator bundle; compare source SHA-256 and exact UTF-8 byte slice before scoring. The source bundle materializer obtains each byte-identical file with git show at the declared revision and rejects a digest mismatch before delivery.",
     "rejection_conditions": [
       "candidate source revision differs from the canonical case revision",
       "source object cannot be resolved",

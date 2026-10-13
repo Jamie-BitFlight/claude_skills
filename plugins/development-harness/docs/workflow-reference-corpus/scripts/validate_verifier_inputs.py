@@ -28,10 +28,27 @@ def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def candidate_contract_failures(manifest: dict[str, Any]) -> list[str]:
+    """Return failures for the non-gold producer candidate contract.
+
+    Returns:
+        Zero or more contract-validation failure identifiers.
+    """
+    candidate_contract = manifest.get("candidate_contract")
+    if not isinstance(candidate_contract, dict):
+        return ["candidate_contract_missing"]
+    path = candidate_contract.get("path")
+    expected_digest = candidate_contract.get("sha256")
+    if not isinstance(path, str) or not isinstance(expected_digest, str):
+        return ["candidate_contract_invalid"]
+    return [] if digest(ROOT / path) == expected_digest else ["candidate_contract_digest"]
+
+
 def main() -> None:
     """Check that blind and historical inputs are disjoint."""
     manifest: dict[str, Any] = json.loads((ROOT / "verifier-input-manifest.json").read_text())
     failures: list[str] = []
+    failures.extend(candidate_contract_failures(manifest))
     blind_paths: set[str] = set()
     for bundle in manifest["case_bundles"]:
         for file in bundle["files"]:

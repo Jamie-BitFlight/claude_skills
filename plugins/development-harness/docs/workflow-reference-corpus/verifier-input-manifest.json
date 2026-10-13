@@ -1,7 +1,7 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "status": "blind-extractor-input-boundary-awaiting-fresh-candidate",
-  "consumer": "A blind source-only extractor receives a materialized bundle containing exactly the declared source packets and questions. The legacy proposed-claim file remains historical limited-scope material and is not an input to complete-trace extraction or adjudication.",
+  "consumer": "A blind source-only extractor receives a materialized bundle containing exactly the declared source packets/questions, non-gold candidate contract, and bundle command manifest. The legacy proposed-claim file remains historical limited-scope material and is not an input to complete-trace extraction or adjudication.",
   "excluded": [
     "candidate-trace.json",
     "case-adjudications.json",
@@ -18,6 +18,11 @@
     "**/verifier-input/handoff-a-source-packet.json",
     "**/verifier-input/handoff-a-source-question.md"
   ],
+  "candidate_contract": {
+    "path": "blind-candidate-contract.json",
+    "sha256": "79c69a94e1efb11d9c5826b7186328e4d430fba2006dc8f01fb52307b3de7ca4",
+    "purpose": "Non-gold output schema for a fresh blind extractor. It defines required fields and replay-span structure without disclosing canonical relations or annotations."
+  },
   "case_bundles": [
     {
       "case_id": "pinned-main-t5",
@@ -89,7 +94,7 @@
     "script": "./scripts/materialize_verifier_bundles.py",
     "invocation": "uv run --script scripts/materialize_verifier_bundles.py --producer-output <outside-corpus-output-dir>",
     "validation": "uv run --script scripts/materialize_verifier_bundles.py --check <outside-corpus-output-dir>",
-    "guarantee": "The emitted directory contains only bundle-manifest.json and the allowlisted source packets and source questions. Any extra file, missing file, or digest mismatch fails validation."
+    "guarantee": "The emitted directory contains only bundle-manifest.json, bundle-commands.json, the allowlisted source packets/questions, and the non-gold candidate contract. Any extra file, missing file, or digest mismatch fails validation."
   },
   "historical_claims_receipt_only": [
     {
@@ -113,13 +118,13 @@
     "input": [
       "trace-reference.json",
       "the separately produced frozen blind-extractor complete-trace candidate",
-      "source material needed for cited-byte replay",
+      "bundle-local source-replay bytes needed for cited-byte replay",
       "grading-contract.json"
     ],
     "materialization": {
       "script": "./scripts/materialize_verifier_bundles.py",
       "invocation": "uv run --script scripts/materialize_verifier_bundles.py --adjudicator-output <outside-corpus-output-dir> --candidate <fresh-candidate-path>",
-      "validation": "uv run --script scripts/materialize_verifier_bundles.py --check <outside-corpus-output-dir>"
+      "validation": "uv run --script scripts/materialize_verifier_bundles.py --check <outside-corpus-output-dir>; this validates the closed inventory, declared command dependencies, and executes bundle-relative integrity, candidate-grade, and control-self-check commands without treating a candidate verdict as acceptance."
     },
     "excluded_as_independent_proof": [
       "raw lane observations",

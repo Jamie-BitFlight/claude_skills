@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.11"
 # ///
-# ruff: file-ignore[complex-structure, too-many-branches]
+# ruff: file-ignore[complex-structure, too-many-branches, too-many-locals, too-many-return-statements]
 """Replay and grade complete source-only workflow traces deterministically."""
 
 from __future__ import annotations
@@ -53,7 +53,18 @@ def index_cases(trace: dict[str, Any]) -> dict[str, dict[str, Any]]:
     Returns:
         Cases keyed by id.
     """
-    return {case["id"]: case for case in trace["cases"]}
+    cases = trace.get("cases")
+    if not isinstance(cases, list):
+        return {}
+    return {case_id: case for case in cases if isinstance(case, dict) and isinstance(case_id := case.get("id"), str)}
+
+
+def object_collection(case: dict[str, Any], field: str) -> list[dict[str, Any]]:
+    """Return a candidate collection without trusting malformed input."""
+    value = case.get(field)
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, dict)]
 
 
 def duplicate_ids(items: list[dict[str, Any]]) -> list[str]:
@@ -84,7 +95,7 @@ def structural_failures(reference: dict[str, Any], candidate: dict[str, Any]) ->
     candidate_cases = candidate.get("cases")
     if not isinstance(candidate_cases, list) or not all(isinstance(case, dict) for case in candidate_cases):
         return {"__corpus__": ["candidate_cases_not_list"]}
-    reference_cases = reference["cases"]
+    reference_cases = object_collection(reference, "cases")
     reference_ids = {case["id"] for case in reference_cases}
     candidate_ids = [case.get("id") for case in candidate_cases]
     for case_id in duplicate_ids(candidate_cases):
@@ -127,18 +138,29 @@ def structural_failures(reference: dict[str, Any], candidate: dict[str, Any]) ->
         if candidate_case.get("rejected_annotations") != reference_case.get("rejected_annotations"):
             case_failures.append("rejected_annotations_mismatch")
         unknown_ids = {
-            item["id"]
-            for item in candidate_case.get("unknowns", [])
-            if isinstance(item, dict) and isinstance(item.get("id"), str)
+            item["id"] for item in object_collection(candidate_case, "unknowns") if isinstance(item.get("id"), str)
         }
         contradiction_ids = {
             item["id"]
-            for item in candidate_case.get("contradictions", [])
-            if isinstance(item, dict) and isinstance(item.get("id"), str)
+            for item in object_collection(candidate_case, "contradictions")
+            if isinstance(item.get("id"), str)
         }
-        for relation in candidate_case.get("relations", []):
-            if not isinstance(relation, dict):
-                continue
+        required_relation_fields = (
+            "id",
+            "actor",
+            "condition",
+            "action",
+            "effect",
+            "continuations",
+            "terminal",
+            "artifacts",
+            "consumers",
+            "source_spans",
+        )
+        for relation in object_collection(candidate_case, "relations"):
+            for field in required_relation_fields:
+                if field not in relation:
+                    case_failures.append(f"relation_missing_field:{relation.get('id')}:{field}")
             if not relation.get("source_spans"):
                 case_failures.append(f"relation_missing_replayable_source_span:{relation.get('id')}")
             for field, valid_ids in (("unknown_ids", unknown_ids), ("contradiction_ids", contradiction_ids)):
@@ -150,8 +172,8 @@ def structural_failures(reference: dict[str, Any], candidate: dict[str, Any]) ->
                     if link not in valid_ids:
                         case_failures.append(f"invalid_{field}_link:{relation.get('id')}:{link}")
         for collection in ("unknowns", "contradictions"):
-            for item in candidate_case.get(collection, []):
-                if isinstance(item, dict) and not item.get("source_spans"):
+            for item in object_collection(candidate_case, collection):
+                if not item.get("source_spans"):
                     case_failures.append(f"{collection}_missing_replayable_source_span:{item.get('id')}")
         if not case_failures:
             failures.pop(case_id, None)
@@ -164,7 +186,11 @@ def relation_index(case: dict[str, Any]) -> dict[str, dict[str, Any]]:
     Returns:
         Relations keyed by id.
     """
-    return {relation["id"]: relation for relation in case["relations"]}
+    return {
+        relation_id: relation
+        for relation in object_collection(case, "relations")
+        if isinstance(relation_id := relation.get("id"), str)
+    }
 
 
 def apply_mutation(trace: dict[str, Any], mutation: dict[str, Any]) -> None:
@@ -176,6 +202,12 @@ def apply_mutation(trace: dict[str, Any], mutation: dict[str, Any]) -> None:
         return
     if operation == "set_case_field":
         case[mutation["field"]] = mutation["value"]
+        return
+    if operation == "remove_case_field":
+        case.pop(mutation["field"], None)
+        return
+    if operation == "set_case_id":
+        case["id"] = mutation["value"]
         return
     if operation == "append_duplicate_case":
         trace["cases"].append(copy.deepcopy(case))
@@ -230,7 +262,9 @@ def hydrate(reference: dict[str, Any], candidate: dict[str, Any]) -> dict[str, A
     return trace
 
 
-def source_bytes(revision: str, path: str, cache: dict[tuple[str, str], bytes]) -> bytes:
+def source_bytes(
+    revision: str, path: str, cache: dict[tuple[str, str], bytes], source_replay_root: Path | None
+) -> bytes:
     """Load and cache one revision-bound Git source blob.
 
     Returns:
@@ -238,6 +272,12 @@ def source_bytes(revision: str, path: str, cache: dict[tuple[str, str], bytes]) 
     """
     key = (revision, path)
     if key not in cache:
+        if source_replay_root is not None:
+            source = source_replay_root / revision / path
+            if not source.is_file():
+                raise ValueError(f"bundle source unavailable: {source}")
+            cache[key] = source.read_bytes()
+            return cache[key]
         git = shutil.which("git")
         if git is None:
             raise ValueError("git executable unavailable")
@@ -248,7 +288,7 @@ def source_bytes(revision: str, path: str, cache: dict[tuple[str, str], bytes]) 
     return cache[key]
 
 
-def replay_case(case: dict[str, Any]) -> list[dict[str, str]]:
+def replay_case(case: dict[str, Any], source_replay_root: Path | None) -> list[dict[str, str]]:
     """Validate every required source span in a candidate case.
 
     Returns:
@@ -256,7 +296,11 @@ def replay_case(case: dict[str, Any]) -> list[dict[str, str]]:
     """
     failures: list[dict[str, str]] = []
     cache: dict[tuple[str, str], bytes] = {}
-    trace_items = [*case["relations"], *case.get("unknowns", []), *case.get("contradictions", [])]
+    trace_items = [
+        *object_collection(case, "relations"),
+        *object_collection(case, "unknowns"),
+        *object_collection(case, "contradictions"),
+    ]
     for item in trace_items:
         spans = item.get("source_spans")
         if not isinstance(spans, list) or not spans:
@@ -270,10 +314,14 @@ def replay_case(case: dict[str, Any]) -> list[dict[str, str]]:
             if not isinstance(path, str) or not isinstance(span.get("quote"), str):
                 failures.append({"id": str(span.get("id", item.get("id"))), "reason": "incomplete_source_span"})
                 continue
+            revision = case.get("source_revision")
+            if not isinstance(revision, str):
+                failures.append({"id": str(span.get("id", item.get("id"))), "reason": "invalid_source_revision"})
+                continue
             try:
-                content = source_bytes(case["source_revision"], path, cache)
+                content = source_bytes(revision, path, cache, source_replay_root)
             except ValueError as error:
-                failures.append({"id": span["id"], "reason": f"source_unavailable:{error}"})
+                failures.append({"id": str(span.get("id", item.get("id"))), "reason": f"source_unavailable:{error}"})
                 continue
             if span.get("source_sha256") and hashlib.sha256(content).hexdigest() != span["source_sha256"]:
                 failures.append({"id": span["id"], "reason": "source_sha256_mismatch"})
@@ -295,8 +343,10 @@ def dimension_items(case: dict[str, Any], dimension: str) -> dict[str, str]:
         Item signatures keyed by stable identifier.
     """
     values: dict[str, str] = {}
-    for relation in case["relations"]:
-        relation_id = relation["id"]
+    for relation in object_collection(case, "relations"):
+        relation_id = relation.get("id")
+        if not isinstance(relation_id, str):
+            continue
         if dimension == "relations":
             values[relation_id] = canonical({
                 "id": relation_id,
@@ -327,11 +377,16 @@ def dimension_items(case: dict[str, Any], dimension: str) -> dict[str, str]:
                 })
     if dimension == "uncertainty_contradictions":
         for collection in ("unknowns", "contradictions"):
-            for item in case.get(collection, []):
-                values[item["id"]] = canonical(item)
-        for relation in case["relations"]:
+            for item in object_collection(case, collection):
+                item_id = item.get("id")
+                if isinstance(item_id, str):
+                    values[item_id] = canonical(item)
+        for relation in object_collection(case, "relations"):
+            relation_id = relation.get("id")
+            if not isinstance(relation_id, str):
+                continue
             if relation.get("unknown_ids") or relation.get("contradiction_ids"):
-                values[f"{relation['id']}/annotation-links"] = canonical({
+                values[f"{relation_id}/annotation-links"] = canonical({
                     "unknown_ids": relation.get("unknown_ids", []),
                     "contradiction_ids": relation.get("contradiction_ids", []),
                 })
@@ -352,13 +407,15 @@ def score(reference_case: dict[str, Any], candidate_case: dict[str, Any], dimens
     if dimension == "relations":
         false.extend(
             f"{relation_id}#duplicate-{index}"
-            for index, relation_id in enumerate(duplicate_ids(candidate_case["relations"]), start=1)
+            for index, relation_id in enumerate(duplicate_ids(object_collection(candidate_case, "relations")), start=1)
         )
     false.sort()
     return {"dimension": dimension, "correct": correct, "missed": missed, "false": false}
 
 
-def grade(reference: dict[str, Any], candidate: dict[str, Any]) -> dict[str, Any]:
+def grade(
+    reference: dict[str, Any], candidate: dict[str, Any], source_replay_root: Path | None = None
+) -> dict[str, Any]:
     """Grade all complete-trace dimensions and source replays.
 
     Returns:
@@ -367,7 +424,7 @@ def grade(reference: dict[str, Any], candidate: dict[str, Any]) -> dict[str, Any
     failures = structural_failures(reference, candidate)
     candidates = index_cases(candidate) if isinstance(candidate.get("cases"), list) else {}
     results: list[dict[str, Any]] = []
-    for reference_case in reference["cases"]:
+    for reference_case in object_collection(reference, "cases"):
         candidate_case = candidates.get(reference_case["id"])
         if candidate_case is None:
             results.extend(
@@ -383,10 +440,10 @@ def grade(reference: dict[str, Any], candidate: dict[str, Any]) -> dict[str, Any
                 for dimension in DIMENSIONS
             )
             continue
-        replay_failures = replay_case(candidate_case)
+        replay_failures = replay_case(candidate_case, source_replay_root)
         structural = [*failures.get("__corpus__", []), *failures.get(reference_case["id"], [])]
         replay_failures.extend({"id": reference_case["id"], "reason": failure} for failure in structural)
-        if candidate_case["source_revision"] != reference_case["source_revision"]:
+        if candidate_case.get("source_revision") != reference_case["source_revision"]:
             replay_failures.append({"id": reference_case["id"], "reason": "source_revision_mismatch"})
         for dimension in DIMENSIONS:
             row = {"case_id": reference_case["id"], **score(reference_case, candidate_case, dimension)}
@@ -412,6 +469,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--candidate", type=Path)
     parser.add_argument("--candidates", type=Path, default=ROOT / "controls/control-candidates.json")
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--source-replay-root", type=Path)
     parser.add_argument("--self-check", action="store_true")
     return parser.parse_args()
 
@@ -421,7 +479,7 @@ def main() -> None:
     arguments = parse_args()
     reference = load(arguments.reference)
     if arguments.candidate:
-        output = grade(reference, load(arguments.candidate))
+        output = grade(reference, load(arguments.candidate), arguments.source_replay_root)
         encoded = json.dumps(output, indent=2, sort_keys=True) + "\n"
         if arguments.output:
             arguments.output.write_text(encoded)
@@ -430,7 +488,7 @@ def main() -> None:
     controls = load(arguments.candidates)
     control_results: list[dict[str, Any]] = []
     for control in controls["controls"]:
-        result = grade(reference, hydrate(reference, control["candidate"]))
+        result = grade(reference, hydrate(reference, control["candidate"]), arguments.source_replay_root)
         if result["verdict"] != control["expected"]["verdict"]:
             raise SystemExit(f"{control['id']}: expected {control['expected']['verdict']}, got {result['verdict']}")
         control_results.append({"id": control["id"], "verdict": result["verdict"], "grade": result})

@@ -688,6 +688,21 @@ def build_controls(reference: dict[str, Any]) -> dict[str, Any]:
             "fail",
         ),
         (
+            "missing-required-case-field",
+            [{"op": "remove_case_field", "case_id": "pinned-main-t5", "field": "unknowns"}],
+            "fail",
+        ),
+        (
+            "wrong-case-id",
+            [{"op": "set_case_id", "case_id": "pinned-main-t5", "value": "not-a-declared-complete-trace-case"}],
+            "fail",
+        ),
+        (
+            "no-span-candidate-relation",
+            [{"op": "remove_source_spans", "case_id": actor_case, "relation_id": actor_relation}],
+            "fail",
+        ),
+        (
             "duplicate-relation-id",
             [{"op": "append_duplicate_relation", "case_id": continuation_case, "relation_id": continuation_relation}],
             "fail",

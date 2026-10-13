@@ -21,7 +21,7 @@
       "controls/**",
       "grading-contract.json",
       "scripts/grade_controls.py",
-      "records/**"
+      "cases/**/records/**"
     ],
     "blind_extractor_may_receive": [
       "one assigned verifier-input source packet and source question",
@@ -89,7 +89,8 @@
     "grading_contract": "./grading-contract.json",
     "receipt_manifest": "./evidence/receipts/manifest.json",
     "record_integrity": "./record-integrity.json",
-    "complete_trace_verifier_input": "./complete-trace-verifier-input.json"
+    "complete_trace_verifier_input": "./complete-trace-verifier-input.json",
+    "blind_candidate_contract": "./blind-candidate-contract.json"
   },
   "acceptance_boundary": {
     "current_state": "The complete source-only reference and deterministic controls are present, but no valid independent complete-trace receipt is committed.",

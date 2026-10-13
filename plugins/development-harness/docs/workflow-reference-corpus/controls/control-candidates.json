@@ -321,6 +321,54 @@
         "mutations": [
           {
             "case_id": "pinned-main-t5",
+            "field": "unknowns",
+            "op": "remove_case_field"
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "fail"
+      },
+      "id": "missing-required-case-field"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "pinned-main-t5",
+            "op": "set_case_id",
+            "value": "not-a-declared-complete-trace-case"
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "fail"
+      },
+      "id": "wrong-case-id"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "pinned-main-t5",
+            "op": "remove_source_spans",
+            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation"
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "fail"
+      },
+      "id": "no-span-candidate-relation"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "pinned-main-t5",
             "op": "append_duplicate_relation",
             "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation"
           }

@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "status": "awaiting-fresh-blind-candidate",
   "role": "independent complete-trace adjudicator",
   "purpose": "Grade a separately produced blind-extractor candidate against the frozen source-only reference after the candidate is materialized into an isolated adjudicator bundle.",
@@ -10,11 +10,20 @@
     },
     "contract": {
       "path": "./grading-contract.json",
-      "sha256": "77c9e8f01ce2022f1b92bc63f193ac2db4cef6897df8bbcd2c23d6d931c1cf0c"
+      "sha256": "e38d41bd8c8adce32bf6659893ae1cdbbe1e53963ad50f8738fdb78c93b97dd2"
     },
     "grader": {
       "path": "./scripts/grade_controls.py",
-      "sha256": "fe915c3531f4e5983ea14b9f2a7b435b028b65e3aeda7eade62d8bd655e8784c"
+      "sha256": "a5aca3b76aeb9b27cb0b3378ac2971ef8bb9c054034c16c665f08b9114813aba"
+    },
+    "controls": {
+      "path": "./controls/control-candidates.json",
+      "purpose": "Deterministic full-trace controls, including malformed-candidate cases, supplied only to the adjudicator."
+    },
+    "integrity": {
+      "script": "./scripts/record_integrity.py",
+      "record": "./record-integrity.json",
+      "purpose": "Validate the emitted bundle's closed digest inventory and retain the corpus package-byte provenance."
     },
     "candidate": "A fresh blind extractor must produce and freeze this complete-trace candidate before adjudication. The materialized adjudicator bundle copies it as candidate/candidate.json and records its SHA-256 in bundle-manifest.json."
   },
@@ -26,10 +35,10 @@
     "historical claim-projection receipts"
   ],
   "required_checks": [
-    "Validate the emitted adjudicator bundle; its manifest must bind the candidate SHA-256 and reject extra files.",
-    "Run the grader against candidate/candidate.json; require zero missed, false, and source replay failures in every row.",
-    "Run the grader self-check; it must reject the tracked removed-span and corrupted-quote controls.",
-    "Run record-integrity validation after the final package bytes are fixed and bind its package_root_sha256 in the verifier receipt."
+    "Run the commands declared in bundle-commands.json, or the materializer --check command; both validate the emitted closed inventory, each declared dependency, and the bundle-relative commands.",
+    "Run the candidate-grade command against candidate.json with source-replay; require zero missed, false, and source replay failures in every row before claiming acceptance.",
+    "Run the control-self-check command; it must reject every tracked negative control, including missing field, wrong case id, and no-span candidates.",
+    "Run record-integrity validation after final corpus package bytes are fixed and bind its package_root_sha256 in a separately authored verifier receipt."
   ],
   "receipt_requirements": [
     "Identify the fresh blind-producer bundle, producer context, and adjudicator bundle candidate digest.",
