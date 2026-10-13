@@ -31,11 +31,11 @@
     "blind_bundle_validator": "./scripts/validate_verifier_inputs.py",
     "complete_reference_adjudicator_receives": [
       "trace-reference.json",
-      "a frozen blind-extractor candidate trace",
+      "the immutable replay candidate declared by complete-trace-verifier-input.json",
       "the source material needed for byte replay",
       "grading-contract.json and grader-only controls"
     ],
-    "boundary": "Raw-lane observations, case adjudications, and historical claim-projection receipts are retained evidence only; none is independent complete-trace verification."
+    "boundary": "Raw-lane observations, case adjudications, and historical claim-projection receipts are retained evidence only. The declared replay candidate supports source-fidelity verification only; it is not an independent complete-trace extraction."
   },
   "cases": [
     {

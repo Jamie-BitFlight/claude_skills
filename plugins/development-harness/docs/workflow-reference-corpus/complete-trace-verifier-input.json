@@ -10,13 +10,18 @@
     },
     "contract": {
       "path": "./grading-contract.json",
-      "sha256": "866e7751ccd1242bfb400bb4e9a1b62dbf0cf401771d76f5ac341eb149af06f0"
+      "sha256": "9a42cc5615f86a614c31272ca92a303c37cbc78a5c19857f38b667909525a529"
     },
     "grader": {
       "path": "./scripts/grade_controls.py",
       "sha256": "fe915c3531f4e5983ea14b9f2a7b435b028b65e3aeda7eade62d8bd655e8784c"
     },
-    "candidate": "A separately frozen complete-trace candidate supplied after the verifier starts. It must declare the same four case ids and source revisions."
+    "candidate": {
+      "path": "./trace-reference.json",
+      "sha256": "3ffbd7d4e29ed685b39685fc5e4aa6eecf994606cd21752e61665ac08a176966",
+      "role": "frozen canonical replay candidate; its cases are intentionally identical to the frozen reference for source-fidelity replay",
+      "boundary": "This candidate permits an independent source-replay and grader-control receipt. It is not a blind-extractor output and cannot establish independent extraction or corpus acceptance."
+    }
   },
   "exclusions": [
     "cases/**/records/**",
@@ -27,12 +32,12 @@
   ],
   "required_checks": [
     "Verify each declared input digest before grading.",
-    "Run the grader against the supplied candidate; require zero missed, false, and source replay failures in every row.",
+    "Run the grader against the declared candidate path; require zero missed, false, and source replay failures in every row.",
     "Run the grader self-check; it must reject the tracked removed-span and corrupted-quote controls.",
     "Run record-integrity validation after the final package bytes are fixed and bind its package_root_sha256 in the verifier receipt."
   ],
   "receipt_requirements": [
-    "Identify the fresh verifier context and candidate digest.",
+    "Identify the fresh verifier context and declared candidate digest.",
     "Record exact command, stdout, stderr, and exit status for candidate grade, control self-check, and integrity validation.",
     "State only the source-only complete-trace result; do not claim runtime behavior, architecture selection, or publication closure."
   ]

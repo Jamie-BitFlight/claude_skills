@@ -82,7 +82,7 @@
     "maximum_missed": 0,
     "maximum_false": 0,
     "maximum_source_replay_failures": 0,
-    "receipt_requirement": "A separately authored independent complete-trace receipt must identify the frozen reference, candidate, source-replay result, and complete record-integrity digest before any accepted or independently-verified claim."
+    "receipt_requirement": "A separately authored source-fidelity receipt must identify the frozen reference, declared replay candidate, source-replay result, and complete record-integrity digest. Only a separately produced blind-extractor candidate can support an independent extraction or acceptance claim."
   },
   "historical_receipts": {
     "status": "limited-claim-projection-evidence-only",

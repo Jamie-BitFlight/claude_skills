@@ -5,7 +5,7 @@
   "scope": "Every package artifact consumed or declared by the corpus after final writes and formatting. Immutable freeze receipts remain separate historical provenance.",
   "non_self_referential_root_strategy": "record-integrity.json is intentionally excluded from artifact_digests. package_root_sha256 hashes the complete sorted digest map of every other package artifact, including manifests, receipts, blind/adjudicator inputs, controls, scripts, references, and records.",
   "artifact_digests": {
-    "README.md": "78e774f3a7bd2192e7245d4405984e0c3cbe61f36a7f66d7a10dcc839409026f",
+    "README.md": "c7f3b3f8dbf98861501a61a44075e839714d1fd348bfaec2599a947f6a92dd58",
     "candidate-trace.json": "db0949c680cb6a00fded3e8d3f5e78ff6bb3549e962d074bae2535589f1110fb",
     "case-adjudications.json": "973bf07177dbee521f3506d65fe0403dac87ab9dfe67ae80116f3930641a90dc",
     "cases/grooming-main/intake-verification.json": "8f0f9943171065a29fc1cb2970fa12872bd524ef5124ffd66b23c8f028a77dbe",
@@ -116,15 +116,15 @@
     "cases/prose-task-profile-start-task/verifier-input/raw/e66b55e05e130ea905afaf8d650ec0f5980d08d0/plugins/development-harness/skills/validation-protocol/source.blob": "39a4dc1e1e12ca3444602e6ba9cf62cde95f6da13028af73cacdfbe3cfb29d23",
     "cases/prose-task-profile-start-task/verifier-input/source-packet.json": "77133d864082a703704f07ef43e5ac5abc8b674eb823e6d2170cc11f47c330b4",
     "cases/prose-task-profile-start-task/verifier-input/source-question.md": "756c20621ae218bc0369a69143deedb24285ea950e8a533f178d4cf141887da1",
-    "complete-trace-verifier-input.json": "972935c13928bec58f78c0659a6769ad97d7028eb7f3b7e43728b95d5bc6ecb2",
+    "complete-trace-verifier-input.json": "34a41e2cdd11396f8026e9fb7ad21f565bd8b23f29df603c08957b86f95ade21",
     "controls/control-candidates.json": "42fea890495ad15b7d0f9a6b268344eca216e061a99bd4b337795a16889999a7",
     "controls/negative-controls.json": "ae10e22f152ae2684bfa687a47a4439995379831f1e9d4dfe4523fb6f4e7f471",
-    "corpus-manifest.json": "06ba656b12c1062058b6c4fd08c58bc905eaccdbe628546c6cdef3bc0b992174",
+    "corpus-manifest.json": "f652788f40b44cc39d2bd5c3bb140266182ec49c29666f6059b7683b232e49fe",
     "evidence/receipts/20261013-independent-control-grade.json.blob": "54368c487603c2a8f06a543dc82f6608237e4de4d5d4e17d3abb53ed3e048ff8",
     "evidence/receipts/20261013-verify-pr4111-a.json.blob": "319ff225646cd6d7d1b515b715ffa1310861aaf95453240f3a6ebe6bdc5681e0",
     "evidence/receipts/20261013-verify-pr4111-b.json.blob": "b97589b637e053ea1fda2a7416157b78f4101d18d604bbaa71c212ddb01467e9",
     "evidence/receipts/manifest.json": "e39de1c5d41641a686e7c5387241795e37ccee0f83907f1997a5eb363cd0a7ac",
-    "grading-contract.json": "866e7751ccd1242bfb400bb4e9a1b62dbf0cf401771d76f5ac341eb149af06f0",
+    "grading-contract.json": "9a42cc5615f86a614c31272ca92a303c37cbc78a5c19857f38b667909525a529",
     "manifest.json": "784c93b5738190437e277861e393d680adeab2ac472974e5deb4e73df1cfd83c",
     "scripts/build_trace_reference.py": "1105ac2b883a58f0e5b3f792fe56b6bcc0a027ca134f727771f25d1f1d83fe16",
     "scripts/grade_controls.py": "fe915c3531f4e5983ea14b9f2a7b435b028b65e3aeda7eade62d8bd655e8784c",
@@ -133,7 +133,7 @@
     "trace-reference.json": "3ffbd7d4e29ed685b39685fc5e4aa6eecf994606cd21752e61665ac08a176966",
     "verifier-input-manifest.json": "f063506ae972ec051dd3ece67974c1a06ef71af9bfe3b0aa3794ed2c599bcb63"
   },
-  "package_root_sha256": "96807622652daa8a9e3788c0e75bd64f1847381e36422da4507acc2737fa6e2b",
+  "package_root_sha256": "6ae5408b30d83a37e9e6047d1679e0fb21b5c680f4a8641b5affcf00bf9cf4da",
   "primary_record_count": 10,
   "records": {
     "pinned-main-t5/review-a": {

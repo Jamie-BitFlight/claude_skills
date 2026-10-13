@@ -5,7 +5,7 @@ This directory is the bounded #4102 source-reference corpus. [trace-reference.js
 ## Roles
 
 1. A blind extractor receives only its case source packet, question, source revision, and pinned source material. It never receives raw lanes, the complete reference, adjudications, controls, or grades.
-2. The complete-reference adjudicator receives the frozen reference, a frozen blind-extractor candidate, and source material for byte replay. [grade_controls.py](./scripts/grade_controls.py) emits correct, missed, false, and replay outcomes for relations, terminals, actors, artifacts/consumers, uncertainty/contradictions, and consumer change status.
+2. The fresh source-fidelity verifier receives the frozen reference and the immutable replay candidate declared in [complete-trace-verifier-input.json](./complete-trace-verifier-input.json), plus source material for byte replay. [grade_controls.py](./scripts/grade_controls.py) emits correct, missed, false, and replay outcomes for relations, terminals, actors, artifacts/consumers, uncertainty/contradictions, and consumer change status. That candidate is not a blind-extractor output.
 3. Historical raw-lane records and claim-projection receipts remain attributable evidence. They are not independent complete-trace verification.
 
 ## Current boundary
