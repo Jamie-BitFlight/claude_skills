@@ -1,84 +1,319 @@
 {
-  "schema_version": 1,
-  "status": "grader-only-synthetic-control-candidates",
+  "schema_version": 2,
+  "status": "grader-only-complete-trace-control-candidates",
+  "candidate_shape": "Each fixture hydrates the frozen complete trace reference, then applies transparent trace mutations. The grader receives the resulting full trace, not scalar assertions.",
   "controls": [
     {
       "id": "correct-source-replay",
       "candidate": {
-        "case_id": "pinned-main-t5",
-        "source_revision": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
-        "profile_spawned_child": false,
-        "nested_reference_return_count": 2,
-        "same_span_relation_ids": ["executor-loads-profile", "profile-defines-procedure"],
-        "expected_distinct_same_span_relations": 2,
-        "activity_stamping_specific_consumer": "unobserved"
+        "base_reference": "../trace-reference.json",
+        "mutations": []
       },
-      "expected": { "verdict": "pass", "reason": "all_required_source_boundaries_hold" }
+      "expected": {
+        "verdict": "pass"
+      }
     },
     {
       "id": "mixed-revision-sourcecheck",
       "candidate": {
-        "case_id": "pinned-4095-source-check",
-        "source_revision": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
-        "profile_spawned_child": false,
-        "nested_reference_return_count": 2,
-        "same_span_relation_ids": ["historical-source-check", "historical-consumer"],
-        "expected_distinct_same_span_relations": 2,
-        "activity_stamping_specific_consumer": "unobserved"
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "op": "set_case_revision",
+            "case_id": "pinned-4095-source-check",
+            "value": "e66b55e05e130ea905afaf8d650ec0f5980d08d0"
+          }
+        ]
       },
-      "expected": { "verdict": "fail", "reason": "source_revision_mismatch" }
+      "expected": {
+        "verdict": "fail"
+      }
     },
     {
       "id": "profile-is-child",
       "candidate": {
-        "case_id": "prose-task-profile-start-task",
-        "source_revision": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
-        "profile_spawned_child": true,
-        "nested_reference_return_count": 2,
-        "same_span_relation_ids": ["task-worker-executes", "profile-loads"],
-        "expected_distinct_same_span_relations": 2,
-        "activity_stamping_specific_consumer": "unobserved"
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "op": "set_relation_field",
+            "case_id": "pinned-main-t5",
+            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation",
+            "field": "actor",
+            "value": "loaded profile as spawned child"
+          }
+        ]
       },
-      "expected": { "verdict": "fail", "reason": "loaded_profile_is_not_spawned_child" }
+      "expected": {
+        "verdict": "fail"
+      }
     },
     {
       "id": "nested-return-loss",
       "candidate": {
-        "case_id": "grooming-nested-references",
-        "source_revision": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
-        "profile_spawned_child": false,
-        "nested_reference_return_count": 0,
-        "same_span_relation_ids": ["grooming-return", "consumer-return"],
-        "expected_distinct_same_span_relations": 2,
-        "activity_stamping_specific_consumer": "unobserved"
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "op": "set_relation_field",
+            "case_id": "pinned-main-t5",
+            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation",
+            "field": "continuations",
+            "value": []
+          }
+        ]
       },
-      "expected": { "verdict": "fail", "reason": "nested_return_missing" }
+      "expected": {
+        "verdict": "fail"
+      }
     },
     {
       "id": "same-span-collapse",
       "candidate": {
-        "case_id": "pinned-main-t5",
-        "source_revision": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
-        "profile_spawned_child": false,
-        "nested_reference_return_count": 2,
-        "same_span_relation_ids": ["collapsed", "collapsed"],
-        "expected_distinct_same_span_relations": 2,
-        "activity_stamping_specific_consumer": "unobserved"
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "op": "remove_relation",
+            "case_id": "pinned-main-t5",
+            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation"
+          }
+        ]
       },
-      "expected": { "verdict": "fail", "reason": "same_span_relations_collapsed" }
+      "expected": {
+        "verdict": "fail"
+      }
     },
     {
       "id": "activity-stamping-overclaim",
       "candidate": {
-        "case_id": "prose-task-profile-start-task",
-        "source_revision": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
-        "profile_spawned_child": false,
-        "nested_reference_return_count": 2,
-        "same_span_relation_ids": ["declared-post-tool-use", "unknown-global-activation"],
-        "expected_distinct_same_span_relations": 2,
-        "activity_stamping_specific_consumer": "absent"
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "op": "append_false_relation",
+            "case_id": "prose-task-profile-start-task",
+            "id": "unsupported-activity-stamping",
+            "actor": "configuration",
+            "condition": "registry entry",
+            "action": "claim runtime activation",
+            "effect": "specific consumer exists",
+            "terminal": null,
+            "artifacts": [],
+            "consumers": [
+              {
+                "name": "activity-stamping",
+                "comparison_status": "unchanged",
+                "comparison_evidence_span_ids": []
+              }
+            ],
+            "unknown_ids": [],
+            "contradiction_ids": [],
+            "evidence_span_ids": [],
+            "source_spans": []
+          }
+        ]
       },
-      "expected": { "verdict": "fail", "reason": "activity_stamping_consumer_overclaim" }
+      "expected": {
+        "verdict": "fail"
+      }
+    },
+    {
+      "id": "missed-terminal",
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "op": "set_relation_field",
+            "case_id": "pinned-main-t5",
+            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/missing-diff",
+            "field": "terminal",
+            "value": null
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "fail"
+      }
+    },
+    {
+      "id": "false-terminal",
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "op": "set_relation_field",
+            "case_id": "pinned-main-t5",
+            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/missing-diff",
+            "field": "terminal",
+            "value": {
+              "kind": "invented",
+              "outcome": "unsupported"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "fail"
+      }
+    },
+    {
+      "id": "missed-artifact-consumer",
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "op": "set_relation_field",
+            "case_id": "pinned-main-t5",
+            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation",
+            "field": "artifacts",
+            "value": []
+          },
+          {
+            "op": "set_relation_field",
+            "case_id": "pinned-main-t5",
+            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation",
+            "field": "consumers",
+            "value": []
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "fail"
+      }
+    },
+    {
+      "id": "consumer-change-misclassification",
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "op": "set_consumer_status",
+            "case_id": "pinned-main-t5",
+            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/run-stamp",
+            "value": "changed"
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "fail"
+      }
+    },
+    {
+      "id": "dropped-unknown",
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "op": "remove_annotation",
+            "case_id": "grooming-nested-references",
+            "collection": "unknowns",
+            "id": "grooming-nested-references/actor-a-final/unknown-intake-E"
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "fail"
+      }
+    },
+    {
+      "id": "invented-contradiction",
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "op": "append_annotation",
+            "case_id": "pinned-main-t5",
+            "collection": "contradictions",
+            "id": "invented-contradiction",
+            "statement": "unsupported",
+            "source_spans": []
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "fail"
+      }
+    },
+    {
+      "id": "dropped-unknown-link",
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "op": "set_relation_field",
+            "case_id": "grooming-nested-references",
+            "relation_id": "grooming-nested-references/actor-a-final/unknown-research-investigation",
+            "field": "unknown_ids",
+            "value": []
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "fail"
+      }
+    },
+    {
+      "id": "invented-contradiction-link",
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "op": "set_relation_field",
+            "case_id": "pinned-main-t5",
+            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/content-store-boundary",
+            "field": "contradiction_ids",
+            "value": ["invented-contradiction-link"]
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "fail"
+      }
+    },
+    {
+      "id": "incomplete-raw-record-inventory",
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "op": "set_case_field",
+            "case_id": "pinned-main-t5",
+            "field": "raw_record_inventory",
+            "value": []
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "fail"
+      }
+    },
+    {
+      "id": "duplicate-relation-id",
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "op": "append_duplicate_relation",
+            "case_id": "pinned-main-t5",
+            "relation_id": "pinned-main-t5/review-a/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0/invocation"
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "fail"
+      }
+    },
+    {
+      "id": "duplicate-case-id",
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "op": "append_duplicate_case",
+            "case_id": "pinned-main-t5"
+          }
+        ]
+      },
+      "expected": {
+        "verdict": "fail"
+      }
     }
   ]
 }

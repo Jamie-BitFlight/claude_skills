@@ -1,18 +1,15 @@
 # Workflow reference corpus
 
-This directory is the bounded #4102 source-reference corpus. Its primary data is the [case manifest](./corpus-manifest.json), [lane-boundary adjudications](./case-adjudications.json), [fresh-verifier input manifest](./verifier-input-manifest.json), and [grading contract](./grading-contract.json); this document does not duplicate their records.
+This directory is the bounded #4102 source-reference corpus. [trace-reference.json](./trace-reference.json) normalizes every retained primary record for all four required cases without selecting a raw lane, inferring runtime behavior, or selecting #4103/#4104 architecture.
 
-The existing [candidate manifest](./manifest.json) and [candidate trace](./candidate-trace.json) remain observed seed material. They are not gold, do not establish complete workflow coverage, and stay outside blind trace/check executor input.
+## Roles
 
-## Record flow
+1. A blind extractor receives only its case source packet, question, source revision, and pinned source material. It never receives raw lanes, the complete reference, adjudications, controls, or grades.
+2. The complete-reference adjudicator receives the frozen reference, a frozen blind-extractor candidate, and source material for byte replay. [grade_controls.py](./scripts/grade_controls.py) emits correct, missed, false, and replay outcomes for relations, terminals, actors, artifacts/consumers, uncertainty/contradictions, and consumer change status.
+3. Historical raw-lane records and claim-projection receipts remain attributable evidence. They are not independent complete-trace verification.
 
-1. A case source packet pins the declared revision, blobs, byte passages, and source question.
-2. Independent source-only trace and check records freeze before comparison and record their actual exposure boundary.
-3. Source adjudication retains the raw observations, records lane-level source boundaries, and preserves shared omissions and disagreements without treating actor self-checks as independent verification.
-4. Independent grading replays the cited source and runs separate correct and defective controls under the grading contract.
+## Current boundary
 
-No completion is asserted beyond the case manifest's bounded acceptance boundary. This corpus makes no general-completeness, runtime, production-ontology, publication, #4103, #4104, or #4105 claim.
+The corpus contains a source-only complete-trace reference and deterministic full-trace controls. It is **not accepted or independently verified as a complete trace** until separately authored valid receipts bind a blind candidate, source replay, and final tracked-byte integrity.
 
-## Bounded acceptance
-
-The declared claim projection and its controls have passed the independent receipts indexed by [evidence/receipts/manifest.json](./evidence/receipts/manifest.json). This is acceptance of the revision-bound, declared claim projection only. It does not promote the corpus to a general workflow-completeness claim, establish runtime behavior, or close #3223.
+The immutable historical receipts cover six bounded claim projections, not seven. Their wording is retained as historical evidence and does not establish complete traces. The corpus makes no general-completeness, runtime, production-ontology, publication, #4103, #4104, or #4105 claim.

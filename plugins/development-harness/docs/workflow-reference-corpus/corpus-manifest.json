@@ -1,8 +1,8 @@
 {
-  "schema_version": 2,
-  "corpus_version": "2.0.0-bounded-verified-reference",
-  "status": "bounded-reference-accepted-for-declared-claim-projection",
-  "purpose": "Bounded #4102 source-reference corpus. It preserves revision-bound source-only records and an adjudicated record boundary for fresh verifiers; it is not a runtime-behavior claim, gold corpus, or production relationship schema.",
+  "schema_version": 3,
+  "corpus_version": "3.0.0-source-only-complete-trace-reference",
+  "status": "complete-source-only-reference-awaiting-independent-complete-trace-receipts",
+  "purpose": "Bounded #4102 corpus containing every frozen primary source-only record and a canonical complete-trace normalization for deterministic source replay and grading. It is not a runtime claim or production relationship schema.",
   "authority": {
     "issue": "#4102",
     "ledger_unit": "4111/4102"
@@ -10,120 +10,89 @@
   "candidate_seed": {
     "manifest": "./manifest.json",
     "trace": "./candidate-trace.json",
-    "role": "observed-unverified-candidate-control",
+    "role": "historical-observed-unverified-seed",
     "not_gold": true
   },
   "input_isolation": {
-    "blind_executor_must_not_receive": [
+    "blind_extractor_must_not_receive": [
+      "trace-reference.json",
       "candidate-trace.json",
       "case-adjudications.json",
-      "controls/negative-controls.json",
+      "controls/**",
       "grading-contract.json",
-      "records/**/trace-output.json",
-      "records/**/check-output.json",
-      "records/**/exposure.json",
-      "records/**/timing.json"
+      "scripts/grade_controls.py",
+      "records/**"
     ],
-    "blind_executor_may_receive": [
-      "verifier-input-manifest.json",
-      "the assigned case verifier-input/source-packet.json",
-      "the assigned case verifier-input/source-question.md",
-      "the revision and blob identities declared by that source packet"
+    "blind_extractor_may_receive": [
+      "one assigned verifier-input source packet and source question",
+      "the assigned source revision and blob identities",
+      "the source material identified by that packet"
     ],
-    "required_exposure_record": [
-      "executor identity",
-      "input manifest digest",
-      "source packet digest",
-      "excluded-material declaration",
-      "frozen output digest"
-    ]
+    "blind_bundle_validator": "./scripts/validate_verifier_inputs.py",
+    "complete_reference_adjudicator_receives": [
+      "trace-reference.json",
+      "a frozen blind-extractor candidate trace",
+      "the source material needed for byte replay",
+      "grading-contract.json and grader-only controls"
+    ],
+    "boundary": "Raw-lane observations, case adjudications, and historical claim-projection receipts are retained evidence only; none is independent complete-trace verification."
   },
   "cases": [
     {
       "id": "pinned-main-t5",
-      "status": "declared-claim-projection-independently-verified",
+      "status": "source-only-complete-reference-awaiting-independent-receipt",
       "source_revision": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
-      "archive_sha256": "774119606e49dec3bcbc41623c290d18467a0141fb5a0bf55b6fd75f648ff14d",
-      "source_packet": "./cases/pinned-main-t5/verifier-input/source-packet.json",
-      "source_question": "./cases/pinned-main-t5/verifier-input/source-question.md",
-      "proposed_claims": "./cases/pinned-main-t5/verifier-input/proposed-claims.json",
       "records": [
         "./cases/pinned-main-t5/records/review-a",
         "./cases/pinned-main-t5/records/review-b"
       ],
-      "adjudication": "./case-adjudications.json#pinned-main-t5",
-      "entry_question": "Trace the multi-perspective-review path through every source-supported terminal, including start-task, task-worker/profile loading, review synthesizer, SAM writes, verdict schema, and affected consumers."
+      "canonical_trace": "./trace-reference.json#pinned-main-t5"
     },
     {
       "id": "pinned-4095-source-check",
-      "status": "declared-claim-projection-independently-verified-with-retained-historical-lane-disagreement",
+      "status": "source-only-complete-reference-awaiting-independent-receipt",
       "source_revision": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
-      "archive_sha256": "30dad549fccc82a3b98c67f5918746bb2100db64b5639dce06c803faea0530cd",
-      "source_packet": "./cases/pinned-4095-source-check/verifier-input/source-packet.json",
-      "source_question": "./cases/pinned-4095-source-check/verifier-input/source-question.md",
-      "proposed_claims": "./cases/pinned-4095-source-check/verifier-input/proposed-claims.json",
       "records": [
         "./cases/pinned-4095-source-check/records/review-a",
         "./cases/pinned-4095-source-check/records/review-b"
       ],
-      "adjudication": "./case-adjudications.json#pinned-4095-source-check",
-      "entry_question": "Trace SourceCheck at this distinct #4095 revision and retain revision-specific provenance rather than collapsing it into pinned main."
+      "canonical_trace": "./trace-reference.json#pinned-4095-source-check"
     },
     {
       "id": "grooming-nested-references",
-      "status": "declared-claim-projection-independently-verified",
+      "status": "source-only-complete-reference-awaiting-independent-receipt",
       "source_revision": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
-      "archive_sha256": "774119606e49dec3bcbc41623c290d18467a0141fb5a0bf55b6fd75f648ff14d",
-      "source_packet": "./cases/grooming-main/verifier-input/source-packet.json",
-      "source_question": "./cases/grooming-main/verifier-input/source-question.md",
-      "proposed_claims": "./cases/grooming-main/verifier-input/proposed-claims.json",
       "records": [
         "./cases/grooming-main/records/actor-a/final",
         "./cases/grooming-main/records/actor-b/initial",
         "./cases/grooming-main/records/actor-b/attempt-2",
         "./cases/grooming-main/records/actor-b/attempt-3"
       ],
-      "adjudication": "./case-adjudications.json#grooming-nested-references",
-      "entry_question": "Trace the grooming route, including source-supported nested references, nested returns, branches, consumers, and terminals."
+      "canonical_trace": "./trace-reference.json#grooming-nested-references"
     },
     {
       "id": "prose-task-profile-start-task",
-      "status": "declared-claim-projection-independently-verified",
+      "status": "source-only-complete-reference-awaiting-independent-receipt",
       "source_revision": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
-      "archive_sha256": "774119606e49dec3bcbc41623c290d18467a0141fb5a0bf55b6fd75f648ff14d",
-      "source_packet": "./cases/prose-task-profile-start-task/verifier-input/source-packet.json",
-      "source_question": "./cases/prose-task-profile-start-task/verifier-input/source-question.md",
-      "proposed_claims": "./cases/prose-task-profile-start-task/verifier-input/proposed-claims.json",
       "records": [
         "./cases/prose-task-profile-start-task/records/handoff-a",
         "./cases/prose-task-profile-start-task/records/handoff-b"
       ],
-      "adjudication": "./case-adjudications.json#prose-task-profile-start-task",
-      "entry_question": "Trace the prose-heavy task/profile/start-task handoff. Distinguish task-worker as executor from the loaded specialist profile; do not invent a spawned child."
+      "canonical_trace": "./trace-reference.json#prose-task-profile-start-task"
     }
   ],
   "frozen_reference": {
+    "complete_trace": "./trace-reference.json",
     "adjudications": "./case-adjudications.json",
     "verifier_input_manifest": "./verifier-input-manifest.json",
     "controls": "./controls/negative-controls.json",
     "grading_contract": "./grading-contract.json",
     "receipt_manifest": "./evidence/receipts/manifest.json",
-    "record_integrity": "./record-integrity.json",
-    "final_independent_verification": "complete-for-declared-claim-projection"
-  },
-  "telemetry": {
-    "aggregate_duration_seconds": null,
-    "aggregate_input_tokens": null,
-    "aggregate_output_tokens": null,
-    "aggregate_cost": null,
-    "reason": "The source lanes expose heterogeneous observation boundaries; no aggregate is inferred. Per-record timing files remain authoritative."
+    "record_integrity": "./record-integrity.json"
   },
   "acceptance_boundary": {
-    "satisfied_for_declared_claim_projection": [
-      "Two fresh independent source-fidelity receipts passed against the frozen verifier input bundle.",
-      "An independent deterministic control-grade receipt passed the correct control and every declared negative control with byte-identical repeated outputs.",
-      "Receipt digests are committed under evidence/receipts and bound by its manifest."
-    ],
+    "current_state": "The complete source-only reference and deterministic controls are present, but no valid independent complete-trace receipt is committed.",
+    "historical_projection_receipts": "Six bounded claim projections, not seven and not complete traces, remain immutable historical evidence only.",
     "excluded": [
       "general workflow completeness",
       "runtime execution or persistent ontology claims",

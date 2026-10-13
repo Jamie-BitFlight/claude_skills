@@ -1,7 +1,7 @@
 {
-  "schema_version": 1,
-  "status": "frozen-ungraded-negative-control-specification",
-  "isolation": "This file is withheld from trace/check executors and supplied only to an independent grader after verifier outputs freeze.",
+  "schema_version": 2,
+  "status": "frozen-complete-trace-negative-control-specification",
+  "isolation": "This file is withheld from blind extractors and supplied only to the complete-reference adjudicator/grader after candidate traces freeze.",
   "candidates": "./control-candidates.json",
   "controls": [
     {
@@ -34,6 +34,61 @@
       "id": "activity-stamping-overclaim",
       "class": "unsupported relation",
       "defect": "Treat the cited registries' lack of the specific activity-stamping consumer as absence of PostToolUse handlers or runtime activation."
+    },
+    {
+      "id": "missed-terminal",
+      "class": "terminal fidelity",
+      "defect": "Remove a source-supported terminal from the hydrated complete trace."
+    },
+    {
+      "id": "false-terminal",
+      "class": "terminal fidelity",
+      "defect": "Replace a source-supported terminal with an invented terminal."
+    },
+    {
+      "id": "missed-artifact-consumer",
+      "class": "artifact and consumer fidelity",
+      "defect": "Remove source-supported artifacts and consumers from a relation."
+    },
+    {
+      "id": "consumer-change-misclassification",
+      "class": "changed unchanged unresolved consumer fidelity",
+      "defect": "Replace a source-only unresolved consumer status with changed."
+    },
+    {
+      "id": "dropped-unknown",
+      "class": "uncertainty fidelity",
+      "defect": "Remove a source-supported unknown."
+    },
+    {
+      "id": "invented-contradiction",
+      "class": "contradiction fidelity",
+      "defect": "Add an unsupported contradiction."
+    },
+    {
+      "id": "dropped-unknown-link",
+      "class": "uncertainty association fidelity",
+      "defect": "Retain an unknown annotation while removing its relation-level source-to-terminal link."
+    },
+    {
+      "id": "invented-contradiction-link",
+      "class": "contradiction association fidelity",
+      "defect": "Attach a relation to an annotation identifier that does not exist in the case."
+    },
+    {
+      "id": "incomplete-raw-record-inventory",
+      "class": "complete raw-record coverage",
+      "defect": "Remove the required raw-record inventory from an otherwise matching case."
+    },
+    {
+      "id": "duplicate-relation-id",
+      "class": "identifier uniqueness",
+      "defect": "Append a second relation with an existing identifier."
+    },
+    {
+      "id": "duplicate-case-id",
+      "class": "identifier uniqueness and exact case coverage",
+      "defect": "Append a second case with an existing identifier."
     }
   ],
   "observed_grades": [],
