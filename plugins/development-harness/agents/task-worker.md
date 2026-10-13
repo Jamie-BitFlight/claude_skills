@@ -82,17 +82,19 @@ oracle, or boundary decision before that increment. The design step does not cha
 authorization or specialist profile. For a test-review-only task, load `/dh:test-reviewer` instead
 and preserve its read-only boundary. Both feed the existing verification and completion contract.
 
-Load the `dh:start-task` skill with the plan address, task ID, and attempt number
-(`{plan} --task {task_id} --attempt {A}`). During its execution, apply the preloaded
-`dh:reuse-before-build` in runner mode when selecting an implementation approach.
+Load the `dh:start-task` skill with the plan address, task ID, and the attempt number when the
+dispatch supplied one (`{plan} --task {task_id} --attempt {A}`). During its execution, apply the
+preloaded `dh:reuse-before-build` in runner mode when selecting an implementation approach. A
+worker without an attempt must not invoke the handoff's attempt-owned persistence or closure
+commands.
 
 `start-task` owns the round from here:
 
 - Loading task-level skills from task metadata
 - Implementing against acceptance criteria and running the task's verification steps
-- Renewing the lease before work that may outrun it
-- Appending the `Completion Report` and `Verification Results` sections for this attempt
-- Closing the attempt with `plan finish`
+- Renewing the lease before work that may outrun it, when it owns an attempt
+- Appending the `Completion Report` and `Verification Results` sections for its attempt
+- Closing its owned attempt with `plan finish`
 
 If the dispatcher's prompt names skills to load, load them before calling start-task. Loading a
 skill twice is a no-op.

@@ -13,8 +13,10 @@ capability. Select the caller's mode:
 - **Planning:** apply the procedure before choosing an implementation. Carry the
   decision in the caller's existing task sections, not a new task field or stage.
 - **Runner:** apply during `dh:start-task` execution, including late discovery.
-  Read [Runner handoff](./references/runner-handoff.md) before research or closure;
-  it binds lease ordering and durable evidence to the owned task and attempt.
+  When the dispatch owns an attempt, read [Runner handoff](./references/runner-handoff.md)
+  before research or closure; it binds lease ordering and durable evidence to that task and
+  attempt. Without an attempt, make the decision but leave attempt-owned persistence and
+  closure to the caller that owns them.
 - **Review:** remain read-only. Recover the implementation's requirements and
   decision from its diff, consumers and task evidence, then assess the choice.
 

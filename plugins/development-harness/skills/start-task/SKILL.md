@@ -211,13 +211,16 @@ Without an attempt number, no runner is closing anything, so move the status dir
    is complete.
 
 7. When selecting an implementation approach during execution, activate
-   `/dh:reuse-before-build` in runner mode. Follow its bundled runner handoff before
-   research or attempt closure. Implement against the task acceptance criteria and
-   run its verification steps.
+   `/dh:reuse-before-build` in runner mode. With `--attempt`, follow its bundled runner
+   handoff before research or attempt closure. Without `--attempt`, make and return the
+   decision without its attempt-owned `plan update`, `plan read --attempt`, or `plan finish`
+   commands. Implement against the task acceptance criteria and run its verification steps.
 
 ---
 
 ## Close the Attempt
 
-Follow the runner contract's completion steps for the attempt named by your dispatch. Return
-your response under `dh:subagent-contract` after closure or a refusal that prevents it.
+With an attempt, follow the runner contract's completion steps and return your response under
+`dh:subagent-contract` after closure or a refusal that prevents it. Without an attempt, no
+runner owns closure: return the implementation and reuse decision, and leave ledger state
+unchanged unless the `--complete` route above is explicitly requested.
