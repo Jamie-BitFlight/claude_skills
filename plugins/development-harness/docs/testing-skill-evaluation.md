@@ -81,10 +81,6 @@ applicable execution tasks; S6 Code Reviewer and Comprehensive Test Review load 
 Both new skills load the shared testing-principles document. Source checks demonstrate these
 reference contracts, not that an agent follows them or preserves their semantics.
 
-The workflow-map extractor remains retired/pending redesign in
-`meta-workflow-graph-refresh/references/COVERAGE.md`. No layer JSON, generated graph, or explorer is
-presented as refreshed. Issue #3903 tracks workflow-map and native-harness evaluation evidence.
-
 The Codex activation inventory is a separate generated scaffold. Keep it synchronized with the
 existing full-repository generator and its `--check`; entries with no observed activation retain
 null evidence. Inventory presence is not behavioral success.

@@ -1,0 +1,1 @@
+{"excludes": ["graphify-out/", ".tmp/", ".venv/", "__pycache__/", "*.pyc", ".env", ".env.*", "*.local", "*.local.*", ".claude/agent-memory/", "tests/", "tests_sam/", "tests_backlog/", "backlog_core/tests/", "sam_schema/tests/", "**/fixtures/", "**/evals/", "**/test_*.py", "**/*_test.py"], "gitignore": true}
