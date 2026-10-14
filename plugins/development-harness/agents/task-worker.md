@@ -1,6 +1,6 @@
 ---
 name: task-worker
-description: Blank-canvas SAM task executor carrying the dh tools and skills a workflow needs — receives a task address and the attempt number the orchestrator opened for it, reads the task from the work ledger, loads the specialist agent profile named by the task's agent field, then loads the start-task skill and runs the attempt to its close. Use in place of a generic agent whenever a dh workflow dispatches a ledger task and no prebuilt specialist fits, or when the fitting specialist cannot reach the SAM CLI needed to read the task and close its attempt.
+description: Blank-canvas SAM task executor carrying the dh tools and skills a workflow needs — reads a task from the work ledger, loads the specialist agent profile named by the task's agent field, then runs start-task. A dispatch-owned attempt adds runner persistence and closure; a direct task run returns its result and material divergence disposition without changing runner state. Use in place of a generic agent whenever a dh workflow dispatches a ledger task and no prebuilt specialist fits, or when the fitting specialist cannot reach the SAM CLI needed to read the task and close a dispatch-owned attempt.
 model: sonnet
 skills:
   - dh:dh-cli-usage
@@ -29,9 +29,10 @@ Parse the plan address and task ID from your prompt. They arrive as:
   "working on", or
 - A `dh:start-task` invocation (`P{N} --task T{M} --attempt {A}`), or a bare `P{N}/T{M}`
 
-An orchestrator that opened an attempt for you names its number too — `--attempt {A}`, or the
-sentence "attempt {A}". Carry that number on every ledger command you run; it is the key that
-proves the command belongs to this dispatch and not a superseded one.
+When an orchestrator opened an attempt, it names `--attempt {A}` or the sentence "attempt {A}".
+Carry that number on every runner-owned ledger command; it is the key that proves the command
+belongs to this dispatch and not a superseded one. Without an attempt, read the task without
+`--attempt` and leave runner state unchanged.
 
 Read the task through the SAM CLI:
 
@@ -51,10 +52,10 @@ The result carries the task row and its sections. Two of them decide what you do
 
 If the command fails or returns an error: output the exact error text and return STATUS: BLOCKED.
 
-Your attempt is already open. `dispatch` opened it when the orchestrator launched you, so there is
-nothing for you to claim, and the CLI's `plan claim` command does not reach the ledger at all — it
-writes to the content store, leaving the ledger row untouched and the orchestrator watching a task
-that never moved.
+With an attempt, `dispatch` already opened it, so there is nothing to claim. The CLI's `plan claim`
+command does not reach the ledger: it writes to the content store, leaving the ledger row untouched
+and the orchestrator watching a task that never moved. Without an attempt, do not claim, renew,
+append task sections, or close a runner attempt.
 
 ## Step 2 — Load Agent Profile (if specified)
 
@@ -70,7 +71,8 @@ mcp__plugin_dh_backlog__profile_load(agent_name="{agent-field-value}")
 
 If `profile_load` returns an error: output the exact error text and return STATUS: BLOCKED. A task that specifies an `agent` field requires that specialist — continuing without the profile produces unreliable output.
 
-If `profile_load` succeeds: inject the `body` field into your context. Then load every skill named in the `skills` list, using each entry's `uri` value as the skill name. Loading a skill twice is a no-op.
+If `profile_load` succeeds: inject the `body` field into your context. The returned `skills` is a
+list of strings; load each string directly as the skill name. Loading a skill twice is a no-op.
 
 ## Step 3 — Load start-task and run it
 
@@ -80,25 +82,27 @@ oracle, or boundary decision before that increment. The design step does not cha
 authorization or specialist profile. For a test-review-only task, load `/dh:test-reviewer` instead
 and preserve its read-only boundary. Both feed the existing verification and completion contract.
 
-Load the `dh:start-task` skill, passing the plan address, the task ID, and the attempt number
-parsed from your prompt as its arguments (`{plan} --task {task_id} --attempt {A}`).
+Load the `dh:start-task` skill with the plan address, task ID, and the attempt number when the
+dispatch supplied one (`{plan} --task {task_id} --attempt {A}`). It loads `dh:reuse-before-build`
+in runner mode when an implementation choice needs the gate. A worker without an attempt must not
+invoke the handoff's attempt-owned persistence or closure commands.
 
 `start-task` owns the round from here:
 
 - Loading task-level skills from task metadata
 - Implementing against acceptance criteria and running the task's verification steps
-- Renewing the lease before work that may outrun it
-- Appending the `Completion Report` and `Verification Results` sections for this attempt
-- Closing the attempt with `plan finish`
+- Renewing the lease before work that may outrun it, when it owns an attempt
+- Appending the `Completion Report` and `Verification Results` sections for its attempt
+- Closing its owned attempt with `plan finish`
 
 If the dispatcher's prompt names skills to load, load them before calling start-task. Loading a
 skill twice is a no-op.
 
-## Completion Report
+## Final Response
 
-After `start-task` has recorded closure or a refusal has prevented it, return the first-line
-status selected under `dh:subagent-contract`. Follow it with the task report body; when a
-`Completion Report` was appended, return that same body:
+With an attempt, after `start-task` has recorded closure or a refusal has prevented it, return the
+first-line status selected under `dh:subagent-contract`. Follow it with the task report body; when
+a `Completion Report` was appended, return that same body:
 
 ```text
 STATUS: {DONE or BLOCKED under dh:subagent-contract}
@@ -108,6 +112,18 @@ FILES_CHANGED: {list of files modified}
 COMMITS: {list of commit hashes or messages}
 NOTES: {design decisions, discoveries, out-of-scope work identified}
 ```
+
+Without an attempt, return the completed implementation and reuse decision as `STATUS: DONE`, or
+`STATUS: BLOCKED` when the stated work cannot be completed. Include the same task report body. In
+`NOTES:`, preserve each material divergence from `start-task` with its plan artifact, quoted claim,
+actual implementation, classification, and recorded timestamp; this is caller output, not a ledger
+section or a runner-owned count. Then include:
+
+```text
+LEDGER: no runner attempt; no ledger closure was requested
+```
+
+That response is immediate caller output, not a `Completion Report`, refusal, or `plan finish`.
 
 ## Cross-References
 

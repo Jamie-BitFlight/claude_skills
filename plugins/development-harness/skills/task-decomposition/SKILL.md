@@ -93,6 +93,10 @@ Build the dependency graph:
 - Identify which tasks must complete before others can start
 - Identify which tasks can run in parallel (no shared file conflicts)
 - Document WHY parallelization is safe for each parallel group
+- When selecting an implementation approach, activate `/dh:reuse-before-build` in planning mode.
+  If it remains UNRESOLVED, add its cheapest decisive check as a discovery predecessor only of
+  the dependent implementation task; otherwise retain the decision and evidence actually checked
+  in that task. Then continue dependency mapping.
 
 ### Step 6 — Assign Agents
 

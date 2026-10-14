@@ -75,6 +75,13 @@ criteria and verification sections. Keep planning at the current useful resoluti
 authorize test implementation or require a complete upfront suite for TDD. Continue independent
 planning when a design is partial; expose consequential missing decisions before execution.
 
+When selecting a task's implementation approach, activate `/dh:reuse-before-build` in
+planning mode. Carry its applicable decision and evidence in the task's existing
+Context/Requirements/Verification fields. During plan-level decomposition, create and encode
+any discovery predecessor in the dependent task's dependencies. A single-task prompt may encode
+only a supplied predecessor; otherwise preserve an UNRESOLVED decision and its cheapest check
+without inventing a dependency or task ID.
+
 Every worker task must specify:
 
 - scope boundaries (what is in and out)

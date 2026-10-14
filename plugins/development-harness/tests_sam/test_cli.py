@@ -629,16 +629,37 @@ def test_state_output_shows_old_and_new_status(plan_dir: Path) -> None:
     assert data == {"id": "T3", "status": "complete"}
 
 
+def test_state_direct_complete_closes_a_zero_attempt_ledger_task() -> None:
+    """The documented direct CLI route records completion without a runner report."""
+    plan_id = _create_ledger_task("T1")
+
+    result = runner.invoke(
+        app,
+        ["plan", "state", "--address", f"{plan_id}/T1", "--new-status", "complete", "--reason", "completed directly"],
+    )
+
+    assert result.exit_code == 0, result.stderr
+    assert json.loads(result.stdout)["status"] == "complete"
+    conn = ledger.open_ledger()
+    try:
+        row = ledger.read(conn, plan_id, "T1").row
+        assert row is not None
+        assert row["attempts"] == 0
+        assert row["attempt_open"] == 0
+    finally:
+        conn.close()
+
+
 # ---------------------------------------------------------------------------
 # sam finish
 # ---------------------------------------------------------------------------
 
 
-def _dispatch_ledger_task(task_id: str) -> str:
-    """Create a one-task ledger plan and open an attempt on it.
+def _create_ledger_task(task_id: str) -> str:
+    """Create a one-task ledger plan and return its id.
 
     Args:
-        task_id: The task id to create and dispatch.
+        task_id: The task id to create.
 
     Returns:
         The canonical plan id the task was created under.
@@ -650,6 +671,23 @@ def _dispatch_ledger_task(task_id: str) -> str:
                 conn, slug=f"finish-{task_id.lower()}", goal="goal", tasks=[{"id": task_id, "title": "one"}]
             ).plan
         )
+    finally:
+        conn.close()
+    return plan_id
+
+
+def _dispatch_ledger_task(task_id: str) -> str:
+    """Create a one-task ledger plan and open an attempt on it.
+
+    Args:
+        task_id: The task id to create and dispatch.
+
+    Returns:
+        The canonical plan id the task was created under.
+    """
+    plan_id = _create_ledger_task(task_id)
+    conn = ledger.open_ledger()
+    try:
         ledger.dispatch(conn, plan_id, task_id)
     finally:
         conn.close()

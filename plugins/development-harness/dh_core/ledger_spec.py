@@ -1230,7 +1230,7 @@ TRANSITIONS: list[Transition] = [
                 Check(reason="status-invalid"),
                 Check(reason="task-accepted", unless="--force"),
                 Check(reason="leased", unless="--force, or attempt_open is 0"),
-                Check(reason="report-missing", unless="--new-status is not complete, or --force"),
+                Check(reason="report-missing", unless="--new-status is not complete, or --force, or attempts is 0"),
             ],
             effects=[
                 Effect(column="attempt_open", value="0"),
@@ -1243,7 +1243,9 @@ TRANSITIONS: list[Transition] = [
             note=(
                 "CASCADE applies when entering failed. Leaving failed by state keeps the cascade: the "
                 "dependents stay skipped because the work was abandoned rather than redone. Only reclaim, "
-                "which returns the task to not-started, reverses it."
+                "which returns the task to not-started, reverses it. A direct complete with no attempts "
+                "records task.state without fabricating an attempt-owned report; once an attempt exists, "
+                "complete still requires that attempt's report unless forced."
             ),
         )
         for s in OPEN_STATUSES

@@ -1619,6 +1619,31 @@ def test_state_without_a_reason_refuses_rather_than_moving_the_task(
     assert store.events_of(set_conn, set_plan, kind="task.state") == []
 
 
+def test_state_direct_complete_requires_no_attempt_report(set_conn: sqlite3.Connection, set_plan: str) -> None:
+    """A reasoned direct completion records state without inventing runner-owned report data."""
+    result = transitions.state(set_conn, set_plan, "T1", new_status=COMPLETE, reason="completed directly")
+
+    row = store.fetch_task(set_conn, set_plan, "T1")
+    assert result.events == ["task.state"]
+    assert row["status"] == COMPLETE
+    assert row["attempts"] == 0
+    assert transitions.sections_of(set_conn, set_plan, "T1") == []
+
+
+def test_state_complete_requires_a_report_after_an_attempt(set_conn: sqlite3.Connection, set_plan: str) -> None:
+    """The direct exception cannot close a task whose runner left no report."""
+    attempt = dispatch_task(set_conn, set_plan)
+    transitions.finish(set_conn, set_plan, "T1", attempt=attempt, result=BLOCKED)
+
+    with pytest.raises(store.Refusal, match="report-missing"):
+        transitions.state(set_conn, set_plan, "T1", new_status=COMPLETE, reason="completed directly")
+
+    row = store.fetch_task(set_conn, set_plan, "T1")
+    assert row["status"] == BLOCKED
+    assert row["attempts"] == 1
+    assert transitions.sections_of(set_conn, set_plan, "T1") == []
+
+
 def test_ready_full_false_returns_the_compact_manifest(set_conn: sqlite3.Connection, set_plan: str) -> None:
     """``queries.ready(full=False)`` must return only the 7-field routing manifest.
 
