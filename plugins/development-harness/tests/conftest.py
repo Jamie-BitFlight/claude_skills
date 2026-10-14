@@ -25,17 +25,11 @@ _plugin_dir = Path(__file__).parent.parent
 if str(_plugin_dir) not in sys.path:
     sys.path.insert(0, str(_plugin_dir))
 
-# Standalone script modules (cli_output, merge_layer, etc.) live in
+# Standalone script modules (cli_output, etc.) live in
 # scripts/ and are imported by tests as bare module names.
 _scripts_dir = _plugin_dir / "scripts"
 if str(_scripts_dir) not in sys.path:
     sys.path.insert(0, str(_scripts_dir))
-
-# Standalone script modules that live under docs/ (assemble_graph.py) are
-# also imported by tests as bare module names.
-_docs_dir = _plugin_dir / "docs"
-if str(_docs_dir) not in sys.path:
-    sys.path.insert(0, str(_docs_dir))
 
 import backlog_core.models as bc_models
 import pytest

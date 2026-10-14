@@ -298,10 +298,6 @@ people, or processes:**
 - Load [Layer 1 README](./docs/sdlc-layers/layer-1/README.md) — language plugin design: harness role mapping, workflow pattern taxonomy, linting discovery protocol
 - Load [ARL Meta Layer](./docs/sdlc-layers/arl-meta-layer.md) — ARL human probing design across layers
 
-**Adding skills or agents, or modifying workflow logic (Mermaid forks, agent dispatch, MCP tools, artifact flows):**
-
-- Run `/dh:meta-workflow-graph-refresh` — step-by-step extraction and assembly process for keeping `docs/dh-workflow-graph.json` accurate after structural changes; covers which layer to re-extract, how to run the ensemble, and how to rebuild the graph
-
 **Checking whether a CLI or MCP capability already exists, before building, replacing, or diagnosing one:**
 
 - Load `dh:dh-meta-docs` — its [DH CLI Command Reference](./skills/dh-cli-usage/references/command-reference.md) is the only document naming the CLI adapter's actual entry point, `sam_schema/cli.py`, with the grouped commands (`plan`, `backlog`, `dispatch`, `artifact`, `active-task`) and their invocation form. Every backlog, plan, artifact, and dispatch operation this plugin exposes over MCP has a CLI equivalent there. Check it before concluding a capability is missing — a filename search alone does not find it.
@@ -316,10 +312,10 @@ A completed change in one of these categories carries a documentation obligation
 |---|---|
 | Process change (new stage, changed sequencing, new touchpoint) | Yes — update Default Development Flow |
 | Data structure change (new field, changed type, new entity) | Yes — update `models.py` first |
-| New or removed MCP tool | Yes — run `/dh:meta-workflow-graph-refresh` to update G8 layer |
+| New or removed MCP tool | Yes — update the affected capability documentation |
 | New artifact type | Yes — add the `ArtifactType` member in `backlog_core/models.py` and, unless no agent registers it, the row in [dh_core/artifact_registry.py](./dh_core/artifact_registry.py); the gate accepts the type only once both exist |
-| Changed artifact lifecycle | Yes — update Artifact Conventions and Plan Artifact Lifecycle; run `/dh:meta-workflow-graph-refresh` to update G2 layer |
-| New skill, agent, or Mermaid decision fork added | Yes — run `/dh:meta-workflow-graph-refresh` to update L0/L1 or G4 layer |
+| Changed artifact lifecycle | Yes — update Artifact Conventions and Plan Artifact Lifecycle |
+| New skill, agent, or Mermaid decision fork added | Yes — update the affected capability documentation |
 | Refactoring (same behavior, different code structure) | No |
 | Agent prompt changes (better instructions, same behavior) | No |
 | UI/UX changes | No |

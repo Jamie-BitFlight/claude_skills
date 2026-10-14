@@ -15,17 +15,13 @@
       "**/*.jsx",
       "**/*.tsx",
       "**/*.json",
-      "!**/plugins/development-harness/docs/workflow-reference-corpus/trace-reference.json",
-      "!**/plugins/development-harness/docs/workflow-reference-corpus/controls/control-candidates.json",
-      "!**/plugins/development-harness/docs/workflow-reference-corpus/controls/independent-candidate-v2.json",
       "!**/.claude-plugin/plugin.json",
       "!.claude-plugin/marketplace.json",
       "!**/.codex-plugin/plugin.json",
       "!**/.cursor-plugin/plugin.json",
       "!**/*.lock",
       "!**/dist",
-      "!**/graphify-out",
-      "!**/dh-workflow-graph.json"
+      "!**/graphify-out"
     ]
   },
   "formatter": {

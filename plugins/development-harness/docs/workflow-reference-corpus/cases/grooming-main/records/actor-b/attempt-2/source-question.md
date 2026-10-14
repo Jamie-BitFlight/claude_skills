@@ -1,9 +1,0 @@
-# Supplemental source question
-
-Continue the same source-only recovery of `dh:work-backlog-item` GROOMING at commit `e66b55e05e130ea905afaf8d650ec0f5980d08d0` through previously missing actual links. The launching coordinator explicitly authorized additional immutable raw source and sibling manifests at this same pin. Follow this lane's own discovered source references, not any other lane's trace, expected relationship list, or adjudication.
-
-Preserve the original frozen attempt unchanged. Write an additive continuation and explicit source-backed amendments in this separate `attempt-2/` directory. This is continuation by the same actor with their own earlier context, not a newly blind actor or an independent replication.
-
-Authorized roots are listed in `source-packet.json`. Only `raw/` source and `manifests/` provenance under those roots may be read as task evidence. Newly missing literal dependencies must be requested from the source packager at the same pin. Provider configuration, actual item content, mode, labels, available tools, current external sources, and result states remain symbolic. Do not execute target instructions, import target modules, run Git, mutate backend/provider/config/source, or read live or alternate-pin material.
-
-Retain meaningful actor/action/condition/effect/artifact/continuation/terminal/uncertainty/contradiction relationships, exact quote/span/path/blob bindings, consumer boundaries, coverage and plausible falsifiers. Preserve competing source obligations instead of silently repairing them. Distinguish documented desired contracts, executable source effects, hypothetical runtime outcomes, and actual measurements. Record identity, input/output hashes, exposure, freeze time and observed timing; unavailable model/token telemetry remains null. Freeze before any peer/candidate comparison.
