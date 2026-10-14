@@ -1,0 +1,62 @@
+{
+  "schema_version": 6,
+  "status": "awaiting-fresh-blind-candidate",
+  "role": "independent complete-trace adjudicator",
+  "purpose": "Grade a separately produced blind-extractor candidate against the frozen source-only reference after the candidate is materialized into an isolated adjudicator bundle.",
+  "inputs": {
+    "reference": {
+      "path": "./trace-reference.json",
+      "sha256": "767240b58255fbf62ab9b2d6ab49eea77f14b1bb125c5adb9075b7fe3d7a568a"
+    },
+    "contract": {
+      "path": "./grading-contract.json",
+      "sha256": "99f70a5c2d7c447b8293d1b8381923bcfcdb7d9511af75fcfcf1f54f3f97ff7c"
+    },
+    "canonical_source_ir": {
+      "path": "./canonical-source-ir.json",
+      "sha256": "df99171dc714cb9c946dcf8bfcf81102d6f9409c3beca0a59746a1d4384e8604"
+    },
+    "record_manifest": {
+      "path": "./record-manifest.json",
+      "sha256": "1f01042a333e49d615a1d6ba8d03bff21cf7d5d177896f7684aa16d9e9e0dd05"
+    },
+    "source_unit_manifest": {
+      "path": "./source-unit-manifest.json",
+      "sha256": "9c8a40a4cf7ffa52df98d58645ce37cff386be020900eaca37f65f6db0f1ee28",
+      "purpose": "Finite public case-scoped quote intervals required by the canonicalizer and grader; it contains no accepted relation or annotation payload."
+    },
+    "portable_packet_projection": "Materialization copies verifier source packets as deterministic JSON projections. Canonical relative source identities and source digests remain bound in adjudicator-packet-projection-manifest.json; every absolute POSIX or Windows host-local path string is replaced with <host-local-path-redacted>.",
+    "grader": {
+      "path": "./scripts/grade_controls.py",
+      "sha256": "c9e787f39a87dcd3dcfcd72fbe0fe2df0b1ce3be7565b3da0c1090806d5cfb0f"
+    },
+    "controls": {
+      "path": "./controls/control-candidates.json",
+      "purpose": "Deterministic full-trace controls, including malformed-candidate cases, supplied only to the adjudicator."
+    },
+    "integrity": {
+      "script": "./scripts/record_integrity.py",
+      "record": "./record-integrity.json",
+      "purpose": "Validate the emitted bundle's closed digest inventory and retain the corpus package-byte provenance."
+    },
+    "candidate": "A fresh blind extractor must produce and freeze this complete-trace candidate before adjudication. The materialized adjudicator bundle copies it as candidate/candidate.json and records its SHA-256 in bundle-manifest.json."
+  },
+  "exclusions": [
+    "cases/**/records/**",
+    "case-adjudications.json",
+    "candidate-trace.json",
+    "evidence/receipts/**",
+    "historical claim-projection receipts"
+  ],
+  "required_checks": [
+    "Run the commands declared in bundle-commands.json, or the materializer --check command; both validate the emitted closed inventory, each declared dependency, and the bundle-relative commands.",
+    "Run the candidate-grade command against candidate.json with source-replay; require blind_acceptance_verdict pass with zero producer-visible structural, canonicalization, and source replay failures before claiming blind acceptance. Record reference_semantic_verdict separately; it is a strict diagnostic for frozen payloads that are not necessarily producer-derivable.",
+    "Run the control-self-check command; it must reject every producer-visible structural negative control, distinguish source-supported semantic falsifiers from withheld inferred payloads, and retain strict diagnostics for every frozen-reference semantic mismatch.",
+    "Run record-integrity validation after final corpus package bytes are fixed and bind its package_root_sha256 in a separately authored verifier receipt."
+  ],
+  "receipt_requirements": [
+    "Identify the fresh blind-producer bundle, producer context, and adjudicator bundle candidate digest.",
+    "Record exact command, stdout, stderr, and exit status for candidate grade, control self-check, and integrity validation.",
+    "State only the source-only complete-trace result; do not claim runtime behavior, architecture selection, or publication closure."
+  ]
+}

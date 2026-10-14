@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "case_id": "pinned-main-t5",
+  "source_revision": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+  "records": [
+    {
+      "record_id": "PREF-MAIN-001",
+      "claim": "The review synthesizer reads the T1-T4 Review Results, runs the synthesis procedure, and writes raw punch-list JSON to the Punch List section.",
+      "citations": [
+        {
+          "repository_path": "plugins/development-harness/agents/review-synthesizer.md",
+          "raw_path": "raw/e66b55e05e130ea905afaf8d650ec0f5980d08d0/plugins/development-harness/agents/review-synthesizer.blob",
+          "git_blob_sha": "03a6f26ea9d6968b16d5e03c50d74a6d5fb3d8c4",
+          "sha256": "79ff90bd57d5b9a6d4c8d85f644ac2f45d8c5667aecc85135e969d409d0bdc17",
+          "line_start": 20,
+          "line_end": 22
+        }
+      ]
+    }
+  ],
+  "boundary": "These proposed records are source claims for fresh fidelity verification, not final independent verification or a complete workflow model."
+}

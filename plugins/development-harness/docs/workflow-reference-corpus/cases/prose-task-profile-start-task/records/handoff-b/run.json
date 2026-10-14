@@ -1,0 +1,87 @@
+{
+  "run_id": "handoff-B",
+  "status": "SOURCE_TRACE_FROZEN_WITH_EXPLICIT_BOUNDARIES",
+  "source_pin": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+  "actor": "corpus-handoff-B",
+  "role_type": "sub-agent",
+  "model_identity_supplied_by_harness": "openai/gpt-6.1-sol",
+  "parent_model_identity": null,
+  "process_id_metadata_packager": 383055,
+  "first_measured_utc": "2026-10-12T04:54:37.932790+00:00",
+  "task_started_at": null,
+  "frozen_at": "2026-10-12T05:34:38.432126+00:00",
+  "directory": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-runs/handoff-B",
+  "metrics": {
+    "records": 291,
+    "falsifiers": 70,
+    "quote_bindings": 587,
+    "quoted_source_files": 82,
+    "quoted_source_file_bytes_total": 563924,
+    "manifest_files": 34,
+    "hash_mismatches": 0,
+    "remaining_dependency_entries": 0,
+    "wall_clock_task_seconds": null,
+    "input_tokens": null,
+    "output_tokens": null,
+    "cost": null,
+    "runtime_test_count": 0,
+    "target_import_count": 0
+  },
+  "source_change_scope": "No target source/provider/config modifications",
+  "runtime_conformance_status": null,
+  "self_gold_status": null,
+  "remaining_scope": [],
+  "required_files": [
+    "run.json",
+    "source-packet.json",
+    "source-question.md",
+    "trace-output.json",
+    "check-output.json",
+    "exposure.json",
+    "timing.json"
+  ],
+  "frozen_output_hashes": {
+    "source-packet.json": {
+      "sha256": "b0810c1efe79a8ebed766b4a0933848c041796ea4cd5781e6d296e2d2dc3e9d1",
+      "bytes": 94439
+    },
+    "source-question.md": {
+      "sha256": "756c20621ae218bc0369a69143deedb24285ea950e8a533f178d4cf141887da1",
+      "bytes": 2386
+    },
+    "trace-output.json": {
+      "sha256": "558b7997cd007b4dc183a41e37969213d2e5feaf2cf33aa135ff00d96d8d71f8",
+      "bytes": 955516
+    },
+    "check-output.json": {
+      "sha256": "09d542e13a3394ef7ec5a434035d40ad60024f3f9598bb7c4b528ed7d59d6a1a",
+      "bytes": 421999
+    },
+    "exposure.json": {
+      "sha256": "e248174e385f43436b6685abe6715ae57eacf2ac7f8e88bce11491c220cade1f",
+      "bytes": 28320
+    },
+    "timing.json": {
+      "sha256": "a97660fbac477a869480bed5ac5e6695ae2c3e06e7b2d9dad74d9a0bf9e3808d",
+      "bytes": 369
+    }
+  },
+  "authored_input_hashes": {
+    "authored-boundary-additions.json": "20e372df6a4089094e421d5dcbe3dbe8d25a26456e8d4a826e53c80a0919a92b",
+    "authored-checks.json": "3eba41fbf43a9966a82270bba1ce8f1143ca859842385534e9b715500bccb64d",
+    "authored-completion.json": "0e81e5a3d35ff9a60acbbca716ff9524a67fcb4d052c4262bea99906d464cd71",
+    "authored-control.json": "43b81262f1a6f2a601be42bf2e5eda66c636915e4a641f96e3899305bf794d4f",
+    "authored-core.json": "126057a1dde898c2cc7e6f89fdf890b0497f75f66d6f06c4a8bb0be391a11f1b",
+    "authored-final-crosschecks.json": "6a0cf11fed8b77c21ed7efac4d253c462f3210cd0b1c3c008873d5e54ff65053",
+    "authored-ledger-lifecycle.json": "e082cfcfb8e52df5c94cacec4051265beb6e115b493f0a8103afd13149e77938",
+    "authored-methods-isolation.json": "1e9ea2ec0ae9c813336790cc2fa4848400f5f09b3ef1b6f3b01ddd549dfe2de5",
+    "authored-nested-lenses.json": "a44077b7bfcf60b3bf7c7fad8a0286d278686429e9dde86e7ebb37e9c1fe3aac",
+    "authored-quality-consumers.json": "67b58517acffe672e10d8d6991372e8453affd5f24b7b464455ee8d7e9767fff",
+    "authored-supplied-frontiers.json": "5913142eeed6b8369d66c32869b19f36ea1784d63bb8f50470cf24ea335a7797",
+    "authored-task-profile.json": "6b61f645305b927272ce2f5bb39c1f9382a724b7bc32bae2f97e12181e3351a5",
+    "authored-transcript-method.json": "715d6a56b647f7c1b5f60a9795c47edd8d922610f51bbaf5c09308b07b19e55f",
+    "authored-transport-hook.json": "cd15bf3c26188884a1a229a6fcfc58836fcc7b47a857ce5f4bf2bb048e525227",
+    "authored-z-closure.json": "ab7d94f9f234dd62b8def7d0ffed5e1b625816cd55863d9b12334a4903621481"
+  },
+  "metadata_program_sha256": "58b648a7e3ae742d54116b54b743c89160dd859ccde5d0fa021a33f8c6d81e8f"
+}

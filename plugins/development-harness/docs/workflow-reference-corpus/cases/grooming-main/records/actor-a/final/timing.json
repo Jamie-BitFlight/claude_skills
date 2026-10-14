@@ -1,0 +1,16 @@
+{
+  "lane": "groom-A-attempt2",
+  "first_captured_wall_clock_observation_utc": "2026-10-12T05:05:59.503531+00:00",
+  "investigation_start_utc": null,
+  "investigation_elapsed_seconds": null,
+  "metadata_collection_start_utc": "2026-10-12T06:00:40.518134+00:00",
+  "raw_output_freeze_utc": "2026-10-12T06:00:40.681042+00:00",
+  "metadata_collection_elapsed_seconds": 0.162922159,
+  "tool_timing_seconds": null,
+  "input_tokens": null,
+  "output_tokens": null,
+  "total_tokens": null,
+  "model_reported_by_harness": "openai/gpt-6.1-sol",
+  "model_actual_api_id": null,
+  "limitation": "No token or full investigation timing telemetry was exposed; metadata interval is measured with perf_counter_ns"
+}

@@ -1,0 +1,696 @@
+{
+  "candidate_shape": "Each fixture hydrates the frozen complete trace reference, then applies transparent trace mutations. The grader receives the resulting full trace, not scalar assertions.",
+  "controls": [
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": []
+      },
+      "expected": {
+        "blind_acceptance": "pass",
+        "reference_semantic": "pass"
+      },
+      "id": "correct-source-replay"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "op": "relabel_transport_ids"
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "pass",
+        "reference_semantic": "pass"
+      },
+      "id": "equivalent-transport-identifiers"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "op": "equivalent_format"
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "pass",
+        "reference_semantic": "pass"
+      },
+      "id": "equivalent-normalized-format"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "pinned-4095-source-check",
+            "op": "set_case_revision",
+            "value": "e66b55e05e130ea905afaf8d650ec0f5980d08d0"
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
+      },
+      "id": "mixed-revision-sourcecheck"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "field": "actor",
+            "op": "set_relation_field",
+            "relation_id": "relation:000ca4ecba5e9f0ba90f364aaee56e49b20dbef925b031594fce1814c66625e8",
+            "value": "loaded profile as spawned child"
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "pass",
+        "reference_semantic": "fail"
+      },
+      "id": "profile-is-child"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "prose-task-profile-start-task",
+            "field": "action",
+            "op": "set_relation_field",
+            "relation_id": "relation:2879a944374fb1c0813db2c822434b0268ea67af0755a4da66314b40ab77099c",
+            "value": "ignore the source-supported action"
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
+      },
+      "id": "source-supported-wrong-action"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "field": "continuations",
+            "op": "set_relation_field",
+            "relation_id": "relation:02b1fb841cadfdd28ce782beaa6203d770fb23dbed18622a1b7e15ba6348724e",
+            "value": []
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "pass",
+        "reference_semantic": "fail"
+      },
+      "id": "nested-return-loss"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "op": "remove_relation",
+            "relation_id": "relation:02b1fb841cadfdd28ce782beaa6203d770fb23dbed18622a1b7e15ba6348724e"
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "pass",
+        "reference_semantic": "fail"
+      },
+      "id": "same-span-collapse"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "op": "append_split_relation",
+            "relation_id": "relation:000ca4ecba5e9f0ba90f364aaee56e49b20dbef925b031594fce1814c66625e8"
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
+      },
+      "id": "noncanonical-relation-boundary"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "merge_relation_id": "relation:002be92d0440ce7b10e01efc0aa1e498e9475a3f44e9f51b08e43cd09d0e3f75",
+            "op": "merge_source_units",
+            "relation_id": "relation:000ca4ecba5e9f0ba90f364aaee56e49b20dbef925b031594fce1814c66625e8"
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
+      },
+      "id": "merged-source-unit-boundary"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "op": "remove_source_spans",
+            "relation_id": "relation:000ca4ecba5e9f0ba90f364aaee56e49b20dbef925b031594fce1814c66625e8"
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
+      },
+      "id": "removed-source-span"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "op": "corrupt_source_quote",
+            "relation_id": "relation:000ca4ecba5e9f0ba90f364aaee56e49b20dbef925b031594fce1814c66625e8",
+            "value": "unsupported source quote"
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
+      },
+      "id": "corrupted-source-quote"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "action": "claim runtime activation",
+            "actor": "configuration",
+            "artifacts": [],
+            "case_id": "prose-task-profile-start-task",
+            "condition": "registry entry",
+            "consumers": [
+              {
+                "comparison_evidence_span_ids": [],
+                "comparison_status": "unchanged",
+                "name": "activity-stamping"
+              }
+            ],
+            "contradiction_ids": [],
+            "effect": "specific consumer exists",
+            "evidence_span_ids": [],
+            "id": "unsupported-activity-stamping",
+            "op": "append_false_relation",
+            "source_spans": [],
+            "terminal": null,
+            "unknown_ids": []
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
+      },
+      "id": "activity-stamping-overclaim"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "field": "terminal",
+            "op": "set_relation_field",
+            "relation_id": "relation:000ca4ecba5e9f0ba90f364aaee56e49b20dbef925b031594fce1814c66625e8",
+            "value": null
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "pass",
+        "reference_semantic": "fail"
+      },
+      "id": "missed-terminal"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "field": "terminal",
+            "op": "set_relation_field",
+            "relation_id": "relation:000ca4ecba5e9f0ba90f364aaee56e49b20dbef925b031594fce1814c66625e8",
+            "value": {
+              "kind": "invented",
+              "outcome": "unsupported"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "pass",
+        "reference_semantic": "fail"
+      },
+      "id": "false-terminal"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "field": "artifacts",
+            "op": "set_relation_field",
+            "relation_id": "relation:002be92d0440ce7b10e01efc0aa1e498e9475a3f44e9f51b08e43cd09d0e3f75",
+            "value": []
+          },
+          {
+            "case_id": "grooming-nested-references",
+            "field": "consumers",
+            "op": "set_relation_field",
+            "relation_id": "relation:002be92d0440ce7b10e01efc0aa1e498e9475a3f44e9f51b08e43cd09d0e3f75",
+            "value": []
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "pass",
+        "reference_semantic": "fail"
+      },
+      "id": "missed-artifact-consumer"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "pinned-4095-source-check",
+            "op": "set_consumer_status",
+            "relation_id": "relation:0105b4c0bfa22f50ae9fff2010881d466fa84d86bbeac8c4cc52cf169b91be5c",
+            "value": "changed"
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "pass",
+        "reference_semantic": "fail"
+      },
+      "id": "consumer-change-misclassification"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "pinned-4095-source-check",
+            "field": "consumers",
+            "op": "set_relation_field",
+            "relation_id": "relation:0105b4c0bfa22f50ae9fff2010881d466fa84d86bbeac8c4cc52cf169b91be5c",
+            "value": ["malformed-consumer"]
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
+      },
+      "id": "consumer-not-object"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "pinned-4095-source-check",
+            "field": "consumers",
+            "op": "set_relation_field",
+            "relation_id": "relation:0105b4c0bfa22f50ae9fff2010881d466fa84d86bbeac8c4cc52cf169b91be5c",
+            "value": [
+              {}
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
+      },
+      "id": "consumer-missing-required-fields"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "pinned-4095-source-check",
+            "field": "consumers",
+            "op": "set_relation_field",
+            "relation_id": "relation:0105b4c0bfa22f50ae9fff2010881d466fa84d86bbeac8c4cc52cf169b91be5c",
+            "value": [
+              {
+                "comparison_evidence_span_ids": [],
+                "comparison_status": "invalid",
+                "name": "malformed-consumer"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
+      },
+      "id": "consumer-invalid-status"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "field": "source_spans",
+            "op": "set_relation_field",
+            "relation_id": "relation:000ca4ecba5e9f0ba90f364aaee56e49b20dbef925b031594fce1814c66625e8",
+            "value": [
+              {}
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
+      },
+      "id": "source-span-missing-fields"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "field": "relations",
+            "op": "set_case_field",
+            "value": "malformed"
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
+      },
+      "id": "relations-not-array"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "collection": "unknowns",
+            "id": "unknown:201d07d4aae53df4526e0b6b42a3861408310752b04eda625ec962582d58facd",
+            "op": "remove_annotation"
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
+      },
+      "id": "dropped-unknown"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "collection": "contradictions",
+            "id": "invented-contradiction",
+            "op": "append_annotation",
+            "source_spans": [],
+            "statement": "unsupported"
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
+      },
+      "id": "invented-contradiction"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "field": "unknown_ids",
+            "op": "set_relation_field",
+            "relation_id": "relation:000ca4ecba5e9f0ba90f364aaee56e49b20dbef925b031594fce1814c66625e8",
+            "value": []
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "pass",
+        "reference_semantic": "fail"
+      },
+      "id": "dropped-unknown-link"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "field": "contradiction_ids",
+            "op": "set_relation_field",
+            "relation_id": "relation:000ca4ecba5e9f0ba90f364aaee56e49b20dbef925b031594fce1814c66625e8",
+            "value": ["invented-contradiction-link"]
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
+      },
+      "id": "invented-contradiction-link"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "pinned-main-t5",
+            "field": "record_manifest",
+            "op": "set_case_field",
+            "value": []
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
+      },
+      "id": "record-manifest-provenance"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "op": "move_relation_to_rejection",
+            "relation_id": "relation:000ca4ecba5e9f0ba90f364aaee56e49b20dbef925b031594fce1814c66625e8"
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "pass",
+        "reference_semantic": "fail"
+      },
+      "id": "accepted-rejected-classification"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "collection": "rejected_relations",
+            "id": "rejection:0a1935224a2bc9ee5c615c62e3ef7fe8db13467ab304560645d47bfae400637a",
+            "op": "set_rejection_reason",
+            "value": "unsupported"
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
+      },
+      "id": "rejection-reason-change"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "collection": "rejected_relations",
+            "op": "reorder_collection"
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "pass",
+        "reference_semantic": "pass"
+      },
+      "id": "equivalent-rejection-order"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "pinned-main-t5",
+            "field": "unknowns",
+            "op": "remove_case_field"
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
+      },
+      "id": "missing-required-case-field"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "pinned-main-t5",
+            "op": "set_case_id",
+            "value": "not-a-declared-complete-trace-case"
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
+      },
+      "id": "wrong-case-id"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "pinned-main-t5",
+            "op": "remove_case"
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
+      },
+      "id": "missing-public-case-coverage"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "op": "clear_cases"
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
+      },
+      "id": "empty-public-case-coverage"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "op": "remove_source_spans",
+            "relation_id": "relation:000ca4ecba5e9f0ba90f364aaee56e49b20dbef925b031594fce1814c66625e8"
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
+      },
+      "id": "no-span-candidate-relation"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "grooming-nested-references",
+            "op": "append_duplicate_relation",
+            "relation_id": "relation:02b1fb841cadfdd28ce782beaa6203d770fb23dbed18622a1b7e15ba6348724e"
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
+      },
+      "id": "duplicate-relation-id"
+    },
+    {
+      "candidate": {
+        "base_reference": "../trace-reference.json",
+        "mutations": [
+          {
+            "case_id": "pinned-main-t5",
+            "op": "append_duplicate_case"
+          }
+        ]
+      },
+      "expected": {
+        "blind_acceptance": "fail",
+        "reference_semantic": "fail"
+      },
+      "id": "duplicate-case-id"
+    }
+  ],
+  "schema_version": 4,
+  "status": "grader-only-complete-trace-control-candidates"
+}

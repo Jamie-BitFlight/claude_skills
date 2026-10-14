@@ -1,0 +1,148 @@
+{
+  "schema_version": 3,
+  "status": "frozen-complete-trace-negative-control-specification",
+  "isolation": "This file is withheld from blind extractors and supplied only to the complete-reference adjudicator/grader after candidate traces freeze.",
+  "candidates": "./control-candidates.json",
+  "independent_regression_fixtures": [
+    {
+      "id": "independent-candidate-v2-malformed-consumers",
+      "path": "./independent-candidate-v2.json",
+      "sha256": "049391ca4d71fd8d254989db4cbdeb177257dddff0a08dfc458d4a96cd0cbb8b",
+      "expected_schema_failure_paths": [
+        "cases[2].relations[0].consumers[0]",
+        "cases[2].relations[1].consumers[0]"
+      ],
+      "boundary": "This retained independently authored rejected candidate is a regression fixture only. Its schema failure does not alter the independent adjudicators' FAIL result or provide complete-trace acceptance evidence."
+    }
+  ],
+  "controls": [
+    {
+      "id": "correct-source-replay",
+      "class": "correct source trace",
+      "defect": null,
+      "purpose": "Confirm that the grader can accept a fully revision- and passage-bound trace before evaluating defects."
+    },
+    {
+      "id": "mixed-revision-sourcecheck",
+      "class": "stale or mixed-revision evidence",
+      "defect": "Substitute a main-pin anchor for an e0b629 historical SourceCheck claim."
+    },
+    {
+      "id": "profile-is-child",
+      "class": "wrong actor or terminal",
+      "defect": "Treat the task-worker's loaded specialist profile as a spawned child executor."
+    },
+    {
+      "id": "nested-return-loss",
+      "class": "lost nested return",
+      "defect": "Drop a source-supported nested reference return while retaining its caller."
+    },
+    {
+      "id": "same-span-collapse",
+      "class": "incorrectly merged same-span relation",
+      "defect": "Merge distinct relations that cite one source span."
+    },
+    {
+      "id": "activity-stamping-overclaim",
+      "class": "unsupported relation",
+      "defect": "Treat the cited registries' lack of the specific activity-stamping consumer as absence of PostToolUse handlers or runtime activation."
+    },
+    {
+      "id": "missed-terminal",
+      "class": "terminal fidelity",
+      "defect": "Remove a source-supported terminal from the hydrated complete trace."
+    },
+    {
+      "id": "false-terminal",
+      "class": "terminal fidelity",
+      "defect": "Replace a source-supported terminal with an invented terminal."
+    },
+    {
+      "id": "missed-artifact-consumer",
+      "class": "artifact and consumer fidelity",
+      "defect": "Remove source-supported artifacts and consumers from a relation."
+    },
+    {
+      "id": "consumer-change-misclassification",
+      "class": "changed unchanged unresolved consumer fidelity",
+      "defect": "Replace a source-only unresolved consumer status with changed."
+    },
+    {
+      "id": "consumer-not-object",
+      "class": "consumer-change recursive schema",
+      "defect": "Replace a required consumer object with a string so grading must emit a structured failure rather than throw."
+    },
+    {
+      "id": "consumer-missing-required-fields",
+      "class": "consumer-change recursive schema",
+      "defect": "Replace a consumer with an empty object so required nested fields fail structurally."
+    },
+    {
+      "id": "consumer-invalid-status",
+      "class": "consumer-change recursive schema",
+      "defect": "Use a consumer object with a comparison status outside the declared enum."
+    },
+    {
+      "id": "source-span-missing-fields",
+      "class": "source-span recursive schema",
+      "defect": "Replace a replay span with an empty object so grading emits schema failures without indexing absent fields."
+    },
+    {
+      "id": "relations-not-array",
+      "class": "relation collection recursive schema",
+      "defect": "Replace the relation collection with a scalar so every grading dimension returns structured failure rows."
+    },
+    {
+      "id": "dropped-unknown",
+      "class": "uncertainty fidelity",
+      "defect": "Remove a source-supported unknown."
+    },
+    {
+      "id": "invented-contradiction",
+      "class": "contradiction fidelity",
+      "defect": "Add an unsupported contradiction."
+    },
+    {
+      "id": "dropped-unknown-link",
+      "class": "uncertainty association fidelity",
+      "defect": "Retain an unknown annotation while removing its relation-level source-to-terminal link."
+    },
+    {
+      "id": "invented-contradiction-link",
+      "class": "contradiction association fidelity",
+      "defect": "Attach a relation to an annotation identifier that does not exist in the case."
+    },
+    {
+      "id": "incomplete-raw-record-inventory",
+      "class": "complete raw-record coverage",
+      "defect": "Remove the required raw-record inventory from an otherwise matching case."
+    },
+    {
+      "id": "missing-required-case-field",
+      "class": "candidate schema completeness",
+      "defect": "Remove a required case field from an otherwise matching candidate."
+    },
+    {
+      "id": "wrong-case-id",
+      "class": "exact case coverage",
+      "defect": "Replace a declared case identifier with an undeclared identifier."
+    },
+    {
+      "id": "no-span-candidate-relation",
+      "class": "replayable source evidence",
+      "defect": "Remove every source span from an otherwise matching accepted relation."
+    },
+    {
+      "id": "duplicate-relation-id",
+      "class": "identifier uniqueness",
+      "defect": "Append a second relation with an existing identifier."
+    },
+    {
+      "id": "duplicate-case-id",
+      "class": "identifier uniqueness and exact case coverage",
+      "defect": "Append a second case with an existing identifier."
+    }
+  ],
+  "observed_grades": [],
+  "expected_outcomes": "withheld until grading"
+}

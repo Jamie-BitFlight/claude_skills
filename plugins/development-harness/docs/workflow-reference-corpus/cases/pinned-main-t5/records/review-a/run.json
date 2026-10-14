@@ -1,0 +1,73 @@
+{
+  "case": "main_e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+  "commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+  "actor": "corpus-review-A",
+  "freeze_timestamp_utc": "2026-10-12T05:47:47.209043+00:00",
+  "source_only": true,
+  "target_execution_or_import": false,
+  "not_gold_or_independent_verification": true,
+  "status": "RAW_SOURCE_CLOSURE_RECORDED",
+  "model": "openai/gpt-6.1-sol",
+  "harness": "Claude Agent SDK according to injected environment",
+  "runtime_version": null,
+  "relationships_count": 175,
+  "required_source_paths_count": 30,
+  "missing_committed_source_count": 0,
+  "input_manifest_hashes": [
+    {
+      "path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+      "source_pin_sha256": "45118ba43819c7fb1a033e3207879d389023a3d2a8174e1bf6ce779b5c6fe358",
+      "file_manifest_sha256": "a2fb928e9ce2c11c8e3eae257d2a1c77702929f98c49635dcb9c356bf6c36d02"
+    },
+    {
+      "path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e66b55e05e130ea905afaf8d650ec0f5980d08d0/20261012-main-raw-closure-7637791fb04649e2bea8f826eeb30253",
+      "source_pin_sha256": "d8d7aead9cef3dea5f4b9fbef10bc2e273b43b57f0baaaa4a1f43f546ea41901",
+      "file_manifest_sha256": "43bbd2905e2266eb012770eea1cd2f850c18b2c8d54e4fcf07aad58b9f4406e0"
+    },
+    {
+      "path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e66b55e05e130ea905afaf8d650ec0f5980d08d0/20261012-review-raw-5885a9f06ed64aa7a3b6e9fd5d292bd7",
+      "source_pin_sha256": "7421ad5c0a8427874778daae5800f791df5a4bc0ade15d68084f2e9d8db04088",
+      "file_manifest_sha256": "6a01da35081af9d8ff12b4aee8b1ec1424b6ba96012fa4fd8bdae0bf363d4741"
+    },
+    {
+      "path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e66b55e05e130ea905afaf8d650ec0f5980d08d0/20261012-review-principles-raw-dc82e67cbeca4dee8ef3798ba0aa533c",
+      "source_pin_sha256": "b8e443c2687c08091f1d3996318c2d294bdee8cdf423a51e869674c38d5790be",
+      "file_manifest_sha256": "1946df2b211e303849a6dd3594bcec01c165eda9c4d82fc81acb6865eac53055"
+    },
+    {
+      "path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e66b55e05e130ea905afaf8d650ec0f5980d08d0/20261012-task-hook-raw-c0acb115edb44acfa87e77060b08330a",
+      "source_pin_sha256": "6eff0717b853755c764ab9ce668b247cefab6cc5e6b1688f1f57219dffdee631",
+      "file_manifest_sha256": "404449e7e919fee05108abe1ffd4c0ee4f417bc53ce69adcab2b1f04402368c7"
+    },
+    {
+      "path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e66b55e05e130ea905afaf8d650ec0f5980d08d0/20261012-procedural-raw-ad550fd241894c4b8d3724972121755a",
+      "source_pin_sha256": "bea429f3d48610f9557fc1ac1ecaca27a5956961aaafc8044361017743f04406",
+      "file_manifest_sha256": "a4a300c5e31544dfff602253d9350bc690be642ba9c3d5746a303f08f52df0b9"
+    },
+    {
+      "path": "/home/jamienelson/repos/claude_skills/.tmp/corpus-inputs/supplements/e66b55e05e130ea905afaf8d650ec0f5980d08d0/20261012-test-method-ecosystems-raw-26afe5d23e7046b39e26bbb0a866d2d3",
+      "source_pin_sha256": "aff07120210fea0f02e66741f34c75f415b0490506d1c96cd31df1f2e8895c18",
+      "file_manifest_sha256": "74ddc00912f2126466239ee06a5b99cedfb47d068d737ea02eaca6607c5cddd1"
+    }
+  ],
+  "authored_spec_hashes": {
+    "trace-spec-1.json": "3991b20a726a0bddf61b7f3a67f702c6b4830a6bdf5b40b9e225ef23f7095f26",
+    "trace-spec-2.json": "c0e8a08257a98dc27b68f908b04a7da275028a59f4fa3d05f971ff2244acaf96",
+    "trace-spec-3.json": "ff1eadeb1b5e8819b30fa253682c21ac21a9256350b8bb909829b2113f2fb265",
+    "main-supplement-spec.json": "6b1d3b069f70b42db1e37b776a4eac60e7dc4a625c6f0dbe714670b925f32e6a",
+    "review-closure-spec.json": "b6275b994e887cd947a5254bc7e553e6362025e69647fe19d9051536955ac963",
+    "complete-final-closure-spec.json": "39ea24e668a0bea6c30666b7e1dc93f171550435a9ea3316753e3d4184348c8b"
+  },
+  "serializer_sha256": "95b859a228e7c12bc5b3367fee2a3192e5e6fa33b2be8c9239bed66974099426",
+  "output_sha256": {
+    "timing.json": "13032d8bedf9cc2e9b7d093ef8e4ade36e2ac8d9bcec15fc98730e5bd9eba5f8",
+    "check-output.json": "75a463d3d73b48427b0d2f818d7391dd9bc0fbffa2d267744e14685fc18398f4",
+    "exposure.json": "16b11dfcf8efc2d7006a793c18d9f1a3a718caaf5f9efed75641b71934d65e56",
+    "source-question.md": "178d3b3e32102fdc95414e34883b2b40a1842a9b16a9c36ead4ee89fbcc48c56",
+    "trace-output.json": "2c9361d2560f81f29f92635426b0312a72fd787a427b757ce723851a5cdb3c45",
+    "source-packet.json": "dfd1f849dab24f716f8a1de60b95b234bff646c1ac118fc7d3cd42c21cce67a8"
+  },
+  "overall_evaluation_or_runtime_approval": false,
+  "errors": [],
+  "old_frozen_output_overwritten": false
+}

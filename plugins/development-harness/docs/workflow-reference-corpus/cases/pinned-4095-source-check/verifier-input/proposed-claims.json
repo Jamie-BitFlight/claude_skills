@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "case_id": "pinned-4095-source-check",
+  "source_revision": "e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947",
+  "records": [
+    {
+      "record_id": "PREF-4095-001",
+      "claim": "At this historical revision, the dispatch flow sends a failed SourceCheck to an abort before plan creation and sends a successful SourceCheck to file parsing.",
+      "citations": [
+        {
+          "repository_path": "plugins/development-harness/skills/multi-perspective-review/references/dispatch-flow.md",
+          "raw_path": "raw/e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947/plugins/development-harness/skills/multi-perspective-review/references/dispatch-flow.md",
+          "git_blob_sha": "2bed9605a1590e4afd65f4f4887bed34374a0363",
+          "sha256": "6d207ee471d7fdd96918c2b0f3d6107e0e6fb67180b06bbb0c3181d8e1eb685d",
+          "line_start": 14,
+          "line_end": 16
+        }
+      ]
+    }
+  ],
+  "boundary": "The historical pin is distinct from main. This projection does not resolve Review B's blocked historical consumer/conditional-policy frontier."
+}

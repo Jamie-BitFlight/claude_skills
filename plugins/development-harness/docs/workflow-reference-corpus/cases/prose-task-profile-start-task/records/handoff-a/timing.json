@@ -1,0 +1,8 @@
+{
+  "started_at_utc": "2026-10-12T22:30:54Z",
+  "frozen_at_utc": "2026-10-12T22:32:05Z",
+  "tokens_in": null,
+  "tokens_out": null,
+  "cost": null,
+  "note": "Command/tool telemetry is unavailable; timestamps record observed command time only."
+}

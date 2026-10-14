@@ -1,0 +1,18 @@
+{
+  "case": "main_e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+  "commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+  "actor": "corpus-review-A",
+  "freeze_timestamp_utc": "2026-10-12T05:47:47.209043+00:00",
+  "source_only": true,
+  "target_execution_or_import": false,
+  "not_gold_or_independent_verification": true,
+  "trace_start_utc": null,
+  "trace_duration_ms": null,
+  "serialization_start_utc": "2026-10-12T05:47:47.120621+00:00",
+  "serialization_duration_ms": 98.643258,
+  "tool_calls": null,
+  "tool_duration_ms": null,
+  "tokens_input": null,
+  "tokens_output": null,
+  "tokens_total": null
+}

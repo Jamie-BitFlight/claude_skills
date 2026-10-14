@@ -1,0 +1,49 @@
+{
+  "frozen_unix": 1791782736.5206904,
+  "previous_freeze_unchanged": true,
+  "peer_comparison_performed": false,
+  "files": [
+    {
+      "path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-runs/review-B/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947-review-source-continuation/check-output.json",
+      "sha256": "485c81cdf6fe2b1894a34eeed09b4dc3e711502084565e6e196af6771b85849e",
+      "bytes": 44884
+    },
+    {
+      "path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-runs/review-B/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947-review-source-continuation/exposure.json",
+      "sha256": "385d51522d167748a81be9a636824cb78a5813c9409fd0b642f68deb799b6fb1",
+      "bytes": 16910
+    },
+    {
+      "path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-runs/review-B/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947-review-source-continuation/run.json",
+      "sha256": "2727cf842a0892a3299743d28971d65305f729816be1ab1b5031988378b38457",
+      "bytes": 12187
+    },
+    {
+      "path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-runs/review-B/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947-review-source-continuation/source-packet.json",
+      "sha256": "28d22cdc1afcd7ab9226bc0f3c1e7b7a1ef4d8b4a448dd2f04995a2fa558ce79",
+      "bytes": 683517
+    },
+    {
+      "path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-runs/review-B/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947-review-source-continuation/source-question.md",
+      "sha256": "638cc95925bb919f3c50810afca8707f4cd821009ba4dc99b1786590d0731879",
+      "bytes": 576
+    },
+    {
+      "path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-runs/review-B/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947-review-source-continuation/timing.json",
+      "sha256": "71d5027b95aae5d8988ea4b102106d3ff1acfdad8e10159be43ad8e4b4810658",
+      "bytes": 455
+    },
+    {
+      "path": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-runs/review-B/sourcecheck_4095_e0b62965e13bcbdfd0648ae810d7dbb7ed3f1947-review-source-continuation/trace-output.json",
+      "sha256": "bcb11d3c5f7643f4f4f178ea3d1f1f704ce3b7f585a7a3b573b1e4d87e1d564e",
+      "bytes": 231049
+    }
+  ],
+  "aggregate_sha256": "e6a9892805fb7ea756bb6dc8cc991de5aa287ce1f5a092018da313821fa002ac",
+  "source_root_manifest_hashes": [
+    "5d06e2f9c4131fea9204452af4ab7c1dc57e10278cb33f97c6d83fe20ca1d276",
+    "1b247721eb1f8fca62c2d7b5963f8b0d2258f437b436c1bb81dd24c73a65b708",
+    "f214894412baf85781a40354f1aaa6340f7db5b1d33391d3be3fca446c66b8ce",
+    "39e3ac432c77999aef5a0a4f93940e3e1ac7641ac20087f7879309329d2c7dca"
+  ]
+}

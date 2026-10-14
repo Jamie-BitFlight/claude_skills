@@ -1,0 +1,132 @@
+{
+  "lane": "groom-B",
+  "attempt": "3-literal-source-closure",
+  "check_kind": "Independent rawsource fidelity/omission challenge; no peer/candidate/gold comparison or adjudication",
+  "source_fidelity_challenges": [
+    {
+      "id": "LC01",
+      "observation": "create-artifact requires returnonlylogicalID and backgroundagents returnID rather than content. Its report-only STATUS template gives type/action/content_stored/chars but omits artifact_id. A conforming template alone therefore does not carry the required locator.",
+      "evidence": ["T04", "T07"],
+      "effect": "Producer delivery identity and consumer discovery requirements must remain distinct; no actual missing-ID return was run.",
+      "falsifier": "A governing caller adds artifact_id or helper's source names a mandatory additional logicalID field outside this exclusive template."
+    },
+    {
+      "id": "LC02",
+      "observation": "Registry says feature-context producers re-register sameartifact_id so oneentryperitem. Actual discovery uses plan/feature-context-{slug}.md while feature-researcher uses feature-context-{slug}. Both are permitted writers. Those are distinct logical IDs for equalitem/slug.",
+      "evidence": ["T32", "T33", "T34"],
+      "effect": "Different IDs can add siblings, and implicit mostrecent-type read can pick a different producer's document. Registry row assumption is not established by actual caller literals; no runtime wrongdocument asserted.",
+      "falsifier": "Registration canonicalizes both strings to oneID before manifest lookup, or consumer always addresses desired artifact_id and registryone-entry assumption is explicitly replaced."
+    },
+    {
+      "id": "LC03",
+      "observation": "Deployment model says cross .claude/plugins sharedutility condition MISSING and mustrescopebeforeplanning. Planner owner ordinarily proceeds WITH-GAPS if MISSINGwithsignal. No explicit deployment-specific hard-block mapping is declared by the grooming adapter.",
+      "evidence": ["T03", "T35"],
+      "effect": "Retain deployment's progression condition and approving-with-gap path separately, not silently turnallMISSING into blocked or ignore the rescope requirement.",
+      "falsifier": "Samepin source maps this deployment condition to a genuine owner HARD-BLOCKED or completes scope resolution before approval, rather than merely carrying it as ordinarygap."
+    },
+    {
+      "id": "LC04",
+      "observation": "Bounded helper forwards normalchildexit,124timeout after cleanupattempt, or2invalidinvocation/OSerror. Parentdiagnostic reference treats124/othernonzero/traceback/servererror as failures, rather than interpreting silence or leaderexit as cleanup proof.",
+      "evidence": ["T09", "T10", "T11"],
+      "effect": "Source cleanupintent and actualkill/runtime evidence remain distinct; platform and process-tree boundaries are not fabricated from source reading.",
+      "falsifier": "A runtime assertion separately proves every descendant exited; no such runtime was executed by this lane."
+    }
+  ],
+  "omission_checks": [
+    {
+      "question": "Did final missingliteral dependencies remain opaque or get substituted with live/otherpin material?",
+      "result": "No: deploymentmodel,create-artifactecosystem and vendoredrun_bounded sources read at matchedpin with sibling provenance; no archive/liveimports/execution."
+    },
+    {
+      "question": "Were conditional RCA method continuations dropped because they are outside present executionpermission?",
+      "result": "No: supplied process-siren and material/sampling references plus comprehensive-testreview\u2192testreviewer\u2192testingprinciples traced as guarded source handoffs. No correction,comparison,sampling,testexecution was authorized or performed.",
+      "evidence": ["T12", "T19", "T21", "T23", "T24", "T27"]
+    },
+    {
+      "question": "Were artifacts, taskplans and registration results conflated?",
+      "result": "No: logicaldocumentcontent/manifest/deliverylocator are separate; nativeplans exclusivelySAM; action/contentstored not schema/runtimesuccess; producer-ID mismatch challenged against actualsecondwriter.",
+      "evidence": ["T04", "T05", "T06", "T07", "T32", "T33", "T34"]
+    },
+    {
+      "question": "Did new process model introduce a universal schema, iterationcap or proofrequirement?",
+      "result": "No: source modelonly relevantfields, recursion strictnarrower/decisionevidence, no universalcap; TLA/Lean optionalclaim-fit methods; metadata JSON representation remains lane-local, no universalconsumercontract.",
+      "evidence": ["T12", "T13", "T17"]
+    },
+    {
+      "question": "Did source method sampling recommendations become this corpus run's quota or observedperformance?",
+      "result": "No: optionalsource-sampling guidance retained under selectionpredicate; no samples/modelAPI/tokenmeasurements executed. Modeltoken telemetry remainsnull.",
+      "evidence": ["T21", "T22"]
+    },
+    {
+      "question": "Did completeanalysis turn source target into approved/ready workflow?",
+      "result": "No: taskcompletion separatefromprocessassessment/readiness, sourcecontradictions/intentgaps remain explicit; no runtime/gold/controlanswer claim.",
+      "evidence": ["T12", "T16", "T17", "T26"]
+    },
+    {
+      "question": "Were previousraw outputs repaired or compared with peers?",
+      "result": "No: previousattempts frozenunchanged; this is same-actor additive sourcecontinuation with explicit exposure, not a newfreshindependentreplication."
+    }
+  ],
+  "coverage": {
+    "requested_missing_sources": "All earlier lane requests supplied and used at exactpin; no outstanding required literal source request at this recoveredgrooming boundary.",
+    "system_scope": "Core start/routing/intake/analyze/swarm/finalize/drift/error/finally, direct nested skills/agent contracts, relevant backend/artifact/consumer boundaries, and guarded RCA continuations; three frozenrawparts form the full lane output.",
+    "conditional_later_boundaries": "Later design/implementation/testauthoring/migration/runtime external research remain named guardedhandoffs, not authorization to execute or recursively explore unrelatedtargets.",
+    "source_fidelity": "Unresolved contradictions retained with falsifiers across frozenchecks; task DONE does not attest targetsourceconformance.",
+    "runtime_testing": "Not performed."
+  },
+  "metadata_checks": {
+    "checked_at": "2026-10-12T05:31:42.924921+00:00",
+    "source_bindings": 13,
+    "exact_quote_spans": 35,
+    "relationships": 24,
+    "unique_relationship_ids": 24,
+    "failures": [],
+    "root_manifest_hashes": {
+      "original": {
+        "file_manifest_sha256": "a2fb928e9ce2c11c8e3eae257d2a1c77702929f98c49635dcb9c356bf6c36d02",
+        "source_pin_sha256": "45118ba43819c7fb1a033e3207879d389023a3d2a8174e1bf6ce779b5c6fe358",
+        "declared_commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0"
+      },
+      "main": {
+        "file_manifest_sha256": "43bbd2905e2266eb012770eea1cd2f850c18b2c8d54e4fcf07aad58b9f4406e0",
+        "source_pin_sha256": "d8d7aead9cef3dea5f4b9fbef10bc2e273b43b57f0baaaa4a1f43f546ea41901",
+        "declared_commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0"
+      },
+      "procedural": {
+        "file_manifest_sha256": "a4a300c5e31544dfff602253d9350bc690be642ba9c3d5746a303f08f52df0b9",
+        "source_pin_sha256": "bea429f3d48610f9557fc1ac1ecaca27a5956961aaafc8044361017743f04406",
+        "declared_commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0"
+      },
+      "linked": {
+        "file_manifest_sha256": "85a4f02d025cd31436ce37e7cd97adea2d2dcb5d88d3b2ab50d3ae19d03e0db3",
+        "source_pin_sha256": "e54d2be6f11589ca4e67df8f8ecba5beaa74e5d17ea7255985cf1978cce6f923",
+        "declared_commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0"
+      },
+      "registration": {
+        "file_manifest_sha256": "0c50e7f41d2bd6d0fcbb05b8179005e3b3a32a7868d1291ec363e20a7e15a2d4",
+        "source_pin_sha256": "f98cff8c52ecd2f6bb55c66cd602efd280f86bde252a66ff2372d695ae5e7aa5",
+        "declared_commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0"
+      }
+    },
+    "semantic_limit": "Mechanical bindings validate quote/path/hash metadata, not runtime conformance or a gold answer.",
+    "final_checks": {
+      "checked_at": "2026-10-12T05:33:20.196635+00:00",
+      "relationships": 26,
+      "unique_relationship_ids": 26,
+      "quote_span_failures": [],
+      "field_reference_failures": [],
+      "prior_frozen_trace_hash_checks": {
+        "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-runs/groom-B/trace-output.json": {
+          "sha256": "eda5990f9842a9da4fc987b22e77935cbb259b231fc2bebde10fae7186f120ac",
+          "unchanged": true
+        },
+        "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-runs/groom-B/attempt-2/trace-output.json": {
+          "sha256": "e9476097fc9b5871026e398e939bb2dd7fff1f547d55569039cc740c2b37ddcf",
+          "unchanged": true
+        }
+      },
+      "semantic_limit": "Rawsource completion not targetapproval or runtimeconformance."
+    }
+  },
+  "frozen_at": "2026-10-12T05:33:20.196635+00:00"
+}

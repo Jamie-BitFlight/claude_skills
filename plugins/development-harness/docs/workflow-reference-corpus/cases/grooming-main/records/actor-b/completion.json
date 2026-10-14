@@ -1,0 +1,19 @@
+{
+  "agent_identity": "corpus-groom-B",
+  "status": "DONE_SOURCE_RECOVERY",
+  "commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+  "final_run": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-runs/groom-B/attempt-3/run.json",
+  "final_run_sha256": "7151f71b0ffdfafab1093c7761838e242eafe3cbab63e960e5289eae78d2d461",
+  "final_freeze_receipt": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-runs/groom-B/attempt-3/freeze-receipt.json",
+  "final_freeze_receipt_sha256": "e83e136b323763e8281dd8f453f8e059894ff7a0441e428ee8dde423fe13ca51",
+  "final_frozen_at": "2026-10-12T05:33:20.196635+00:00",
+  "raw_trace_parts": [
+    "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-runs/groom-B/trace-output.json",
+    "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-runs/groom-B/attempt-2/trace-output.json",
+    "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-runs/groom-B/attempt-3/trace-output.json"
+  ],
+  "read_contract": "Read the additive raw parts together, with each part's source-packet/check-output/exposure/timing. Earlier blocked statuses are historical dependency states, not the final completion state. Attempt-2 explicit source-backed amendments qualify earlier unresolved effects; previous frozen files are not overwritten.",
+  "missing_required_dependencies_at_recovered_groom_boundary": [],
+  "independence": "Same actor completed a source-only pass and source continuations. No peer/candidate/gold/control answer consulted or comparison/adjudication performed. Own prior trace bytes were hashed only for preservation metadata.",
+  "completion_limit": "Source recovery DONE does not approve the target workflow, resolve its source contradictions, prove runtime behavior, or claim unrelated later design/execution internals were executed or exhaustively traced."
+}

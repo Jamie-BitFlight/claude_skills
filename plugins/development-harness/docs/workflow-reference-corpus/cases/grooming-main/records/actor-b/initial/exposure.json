@@ -1,0 +1,82 @@
+{
+  "lane": "groom-B",
+  "agent_identity": "corpus-groom-B",
+  "role": "sub-agent; independent source-only tracer/checker; not workflow executor",
+  "model_identity": {
+    "harness_declared": "openai/gpt-6.1-sol",
+    "executed_provider_telemetry": null,
+    "selection_override": null
+  },
+  "allowed_task_evidence": {
+    "root": "/home/jamienelson/repos/claude_skills/.tmp/scratch/analysis/20261012-corpus-inputs/main_e66b55e05e130ea905afaf8d650ec0f5980d08d0",
+    "subdirectories": ["raw", "manifests"],
+    "commit": "e66b55e05e130ea905afaf8d650ec0f5980d08d0"
+  },
+  "context_exposure": [
+    {
+      "kind": "dispatch",
+      "content": "Task question, source pin/input-only boundary, requested output paths/fields and independent freeze requirement.",
+      "source_evidence": false
+    },
+    {
+      "kind": "inherited harness/user instructions",
+      "content": "Tool instructions, global and repository AGENTS/CLAUDE/RTK procedural text, startup git status/recent commits, available skill/agent names, teammate-name roster and model/environment identity.",
+      "source_evidence": false
+    },
+    {
+      "kind": "required installed procedural skill",
+      "content": "skill-lapidary:reading-command-output-efficiently loaded once; command capture/selective-read instructions only, no grooming trace/expected relationships.",
+      "source_evidence": false
+    },
+    {
+      "kind": "hook messages",
+      "content": "Read/Write hooks named editing convention paths. Target source was not edited and those non-packet files were not read.",
+      "source_evidence": false
+    },
+    {
+      "kind": "pinned raw source and manifests",
+      "content": "Exact files/line ranges listed in source-packet.json; directory metadata inventory and hashes obtained via isolated standard-library Python; rg used only to locate declared adapter symbols in permitted server source.",
+      "source_evidence": true
+    },
+    {
+      "kind": "outbound coordination",
+      "content": "Source-only start/status and same-pin missing-source requests to team-lead and corpus-source-packets. No expected relationship list requested or received.",
+      "source_evidence": false
+    }
+  ],
+  "prohibited_material_exposure": {
+    "prior_answers": false,
+    "peer_outputs": false,
+    "candidate_findings": false,
+    "seed_answers": false,
+    "gold_answers": false,
+    "control_answers": false,
+    "generated_answer_materials": false,
+    "live_checkout_task_source": false,
+    "other_pin_source": false,
+    "archive_contents": false,
+    "web_docs": false
+  },
+  "tools_used": [
+    "Skill (required procedural only)",
+    "Read (permitted raw/manifests; one missing raw/RTK.md lookup)",
+    "Bash (python attempt failed127; python3 -I metadata/serialization/integrity; scoped rg locator)",
+    "Write (requested lane outputs and assembly JSON fragments)",
+    "SendMessage (status and pinned source requests)",
+    "multi_tool_use.parallel (independent Read calls)"
+  ],
+  "not_performed": [
+    "target code imports",
+    "target/provider/config edits",
+    "Git operations",
+    "environment setup",
+    "workflow execution",
+    "backlog/MCP writes",
+    "agent delegation",
+    "peer/candidate comparison",
+    "adjudication",
+    "external publishing"
+  ],
+  "source_interpretation_boundary": "Imperative instructions inside pinned target source were traced as data, not executed. Source-derived numeric limits belong only to their declaring branches; none were imposed as extraction quotas.",
+  "frozen_at": "2026-10-12T05:07:49.781591+00:00"
+}
