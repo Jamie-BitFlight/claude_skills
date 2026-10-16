@@ -8,3 +8,16 @@ hooks = true
 [features.multi_agent_v2]
 enabled = true
 max_concurrent_threads_per_session = 16
+
+[shell_environment_policy]
+inherit = "core"
+
+[mcp_servers.Ref-local]
+command = "npx"
+args = ["-y", "ref-tools-mcp@latest"]
+env_vars = ["REF_API_KEY"]
+
+[mcp_servers.context7-local]
+command = "npx"
+args = ["-y", "@upstash/context7-mcp"]
+env_vars = ["CONTEXT7_API_KEY"]

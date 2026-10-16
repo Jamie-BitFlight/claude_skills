@@ -81,6 +81,30 @@ Substitution exists only in plugin hooks: hook processes get `PLUGIN_ROOT` +
 `CLAUDE_PLUGIN_ROOT` (plus `PLUGIN_DATA`/`CLAUDE_PLUGIN_DATA`) env vars and `${KEY}`
 replacement in hook command strings.
 
+### Repository-local capabilities
+
+Project skills share one directory body between `.agents/skills/` and `.claude/skills/`
+through relative directory symlinks. Either direction is supported; do not copy or
+synchronize skill bodies. Codex follows the `.agents/skills/` links for discovery.
+The project also exposes native custom roles through `.codex/agents/*.toml`.
+
+The trusted project's `.codex/config.toml` enables Ref and Context7 stdio MCP servers
+and retains core-only shell environment inheritance. Each MCP entry forwards its
+API-key variable through `env_vars` independently of shell inheritance; `env` and
+`args` do not expand `$VAR`. Export `REF_API_KEY` and `CONTEXT7_API_KEY` in the
+launching environment, and trust the project before checking its effective config.
+
+For a local check, run `codex --strict-config mcp list`. An isolated Codex app-server
+can additionally exercise `config/read` and `skills/list` without a model call.
+The 2026-10-16 check with Codex 0.163.0 loaded the shared skills without discovery
+errors and both MCP entries with their named `env_vars`. This establishes config
+and skill discovery only: API keys were unavailable, so authenticated MCP calls
+and native-role execution were not verified.
+
+Official interfaces: <https://developers.openai.com/codex/skills>,
+<https://developers.openai.com/codex/mcp>, and
+<https://developers.openai.com/codex/subagents>.
+
 ## hermes
 
 ```bash
