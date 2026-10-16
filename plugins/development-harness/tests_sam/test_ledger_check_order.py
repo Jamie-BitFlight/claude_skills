@@ -170,9 +170,9 @@ UNCONSTRUCTIBLE: dict[tuple[str, str, str], str] = {
     unordered("update", ("attempt-closed", "attempt-required")): (
         "attempt-required fires only when --attempt is absent; attempt-closed only when it is present"
     ),
-    unordered("update", ("attempt-required", "direct-divergence-attempt")): (
-        "attempt-required needs an attempt-owned report section, while direct-divergence-attempt "
-        "needs the distinct Direct Divergence Notes section"
+    unordered("update", ("attempt-required", "direct-evidence-attempt")): (
+        "attempt-required needs an attempt-owned report section, while direct-evidence-attempt "
+        "needs one of the distinct reserved direct evidence sections"
     ),
     unordered("renew", ("stale-attempt", "unmatched-path")): (
         "renew takes the --path branch or the --attempt branch, and each check's unless waives it in the other"
@@ -897,7 +897,7 @@ def state_accepted_and_incomplete_direct_record(tmp_path: Path) -> Arranged:
     )
 
 
-@register("update", IN_PROGRESS, ("stale-attempt", "direct-divergence-attempt"))
+@register("update", IN_PROGRESS, ("stale-attempt", "direct-evidence-attempt"))
 def update_stale_attempt_and_direct_note(tmp_path: Path) -> Arranged:
     """A stale caller cannot append a zero-attempt note to an attempted task."""
     conn = new_ledger(tmp_path)
@@ -913,7 +913,7 @@ def update_stale_attempt_and_direct_note(tmp_path: Path) -> Arranged:
     )
 
 
-@register("update", IN_PROGRESS, ("attempt-closed", "direct-divergence-attempt"))
+@register("update", IN_PROGRESS, ("attempt-closed", "direct-evidence-attempt"))
 def update_closed_attempt_and_direct_note(tmp_path: Path) -> Arranged:
     """A closed attempt is reported before an invalid direct-note carrier."""
     conn = new_ledger(tmp_path)

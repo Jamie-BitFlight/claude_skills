@@ -57,6 +57,11 @@ An export carries only current direct evidence. Rejected direct records remain i
 audit history, but an export/import round trip must not restore them as fresh completion or divergence
 evidence. Valid current records remain usable after that same round trip.
 
+Creating a plan starts a new evidence generation even when its ID was used by an older plan.
+`Direct Completion Record` and `Direct Divergence Notes` are both reserved zero-attempt carriers;
+appending either after a runner attempt is refused with `direct-evidence-attempt` rather than storing
+proof that cannot be read back as current or used for completion.
+
 | id | observed | command |
 |---|---|---|
 | J1 | `complete`, its applicable durable evidence is present, every acceptance criterion met and every verification step passed | `accept --address P/T --note "<why>"` |

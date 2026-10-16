@@ -360,6 +360,9 @@ DIRECT_COMPLETION_SECTION = "Direct Completion Record"
 DIRECT_DIVERGENCE_SECTION = "Direct Divergence Notes"
 """The zero-attempt carrier for a material direct-task divergence."""
 
+DIRECT_EVIDENCE_SECTIONS: tuple[str, ...] = (DIRECT_COMPLETION_SECTION, DIRECT_DIVERGENCE_SECTION)
+"""Reserved direct carriers: both belong only to a task with zero runner attempts."""
+
 DIRECT_COMPLETION_FIELDS: tuple[str, ...] = (
     "TASK",
     "FILES_CHANGED",
@@ -631,10 +634,10 @@ REASONS: list[Reason] = [
         message="A direct completion record needs TASK, FILES_CHANGED, COMMITS, REUSE DECISION, VERIFICATION, and NOTES.",
     ),
     Reason(
-        code="direct-divergence-attempt",
+        code="direct-evidence-attempt",
         kind=ReasonKind.REFUSAL,
-        condition="Direct Divergence Notes is requested after a runner attempt",
-        message="A direct divergence note needs a zero-attempt task; preserve the later runner's divergence in its attempt-owned report.",
+        condition="a reserved direct evidence section is requested after a runner attempt",
+        message="Direct evidence sections need a zero-attempt task; use the runner's attempt-owned reports after an attempt exists.",
     ),
     Reason(
         code="not-complete",
@@ -1091,8 +1094,8 @@ TRANSITIONS: list[Transition] = [
             Check(reason="attempt-closed", unless="--attempt absent"),
             Check(reason="attempt-required"),
             Check(
-                reason="direct-divergence-attempt",
-                unless="--append-section is not Direct Divergence Notes, or attempts is 0",
+                reason="direct-evidence-attempt",
+                unless="--append-section is not a reserved direct evidence section, or attempts is 0",
             ),
         ],
         effects=[
@@ -1111,8 +1114,8 @@ TRANSITIONS: list[Transition] = [
                 Check(reason="stale-attempt", unless="--attempt absent"),
                 Check(reason="attempt-required"),
                 Check(
-                    reason="direct-divergence-attempt",
-                    unless="--append-section is not Direct Divergence Notes, or attempts is 0",
+                    reason="direct-evidence-attempt",
+                    unless="--append-section is not a reserved direct evidence section, or attempts is 0",
                 ),
             ],
             effects=[Effect(column="task model fields", value="per --set")],

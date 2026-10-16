@@ -536,6 +536,7 @@ LEDGER_OWNED_CONDITIONS: tuple[tuple[str, str], ...] = (
     ("a report section has no row at the current attempt", "report-missing"),
     ("a zero-attempt direct completion has no durable completion record", "direct-record-missing"),
     ("a zero-attempt direct completion record lacks required evidence", "direct-record-incomplete"),
+    ("a reserved direct evidence section is requested after a runner attempt", "direct-evidence-attempt"),
     ("acceptance is asked of a task that is not complete", "not-complete"),
     ("the ledger database sits on a filesystem WAL mode cannot share", "network-filesystem"),
 )

@@ -432,16 +432,18 @@ def report_complete(conn: sqlite3.Connection, plan: str, task: str, attempt: int
 
 
 def direct_evidence_generation_start(conn: sqlite3.Connection, plan: str, task: str) -> int:
-    """Return the first event sequence belonging to the task's current evidence generation.
+    """Return the event sequence marking the task's current direct-evidence generation.
 
-    Reclaim retains the append-only audit trail but starts another direct-completion generation.
-    Replacing a plan clears its materialized task rows and does the same for every task it imports.
+    Reclaim starts another direct generation while retaining audit history. Plan creation also
+    bounds it: a vacated plan ID may be reused after a milestone replacement renamed its old row.
+    Replacement starts a generation for every task it imports.
     """
     return int(
         rows_of(
             conn.execute(
                 "SELECT COALESCE(MAX(seq), 0) AS seq FROM events WHERE plan = :plan AND "
-                "((task = :task AND kind = 'task.reclaimed') OR (task IS NULL AND kind = 'plan.replaced'))",
+                "((task = :task AND kind = 'task.reclaimed') OR "
+                "(task IS NULL AND kind IN ('plan.created', 'plan.replaced')))",
                 {"plan": plan, "task": task},
             )
         )[0]["seq"]
@@ -466,10 +468,7 @@ def current_direct_evidence(conn: sqlite3.Connection, plan: str, task: str) -> l
     ):
         payload = json.loads(str(row["payload"]))
         if row["kind"] == "task.section":
-            if payload.get("attempt") == 0 and payload.get("name") in {
-                ledger_spec.DIRECT_COMPLETION_SECTION,
-                ledger_spec.DIRECT_DIVERGENCE_SECTION,
-            }:
+            if payload.get("attempt") == 0 and payload.get("name") in ledger_spec.DIRECT_EVIDENCE_SECTIONS:
                 entries.append(payload)
             continue
         if int(payload.get("attempts", -1)) != 0:
@@ -477,8 +476,7 @@ def current_direct_evidence(conn: sqlite3.Connection, plan: str, task: str) -> l
         entries.extend(
             section
             for section in payload.get("sections", [])
-            if isinstance(section, dict)
-            and section.get("name") in {ledger_spec.DIRECT_COMPLETION_SECTION, ledger_spec.DIRECT_DIVERGENCE_SECTION}
+            if isinstance(section, dict) and section.get("name") in ledger_spec.DIRECT_EVIDENCE_SECTIONS
         )
     return entries
 
@@ -498,7 +496,7 @@ def current_sections(conn: sqlite3.Connection, plan: str, task: str) -> list[dic
     # Event sequences and materialized section sequences are different domains. Match the
     # newest occurrences so an identical rejected record cannot reappear beside its replacement.
     for section in reversed(sections_of(conn, plan, task)):
-        if section["name"] not in {ledger_spec.DIRECT_COMPLETION_SECTION, ledger_spec.DIRECT_DIVERGENCE_SECTION}:
+        if section["name"] not in ledger_spec.DIRECT_EVIDENCE_SECTIONS:
             visible.append(section)
             continue
         key = (str(section["name"]), str(section["content"]))
@@ -1359,8 +1357,8 @@ def update(
                 require_open_attempt(row)
         if section in ledger_spec.REPORT_SECTIONS and attempt is None:
             refuse("attempt-required")
-        if section == ledger_spec.DIRECT_DIVERGENCE_SECTION and int(row["attempts"] or 0) != 0:
-            refuse("direct-divergence-attempt")
+        if section in ledger_spec.DIRECT_EVIDENCE_SECTIONS and int(row["attempts"] or 0) != 0:
+            refuse("direct-evidence-attempt")
         if section is not None:
             append_section(
                 conn,
