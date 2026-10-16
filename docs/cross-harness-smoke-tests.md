@@ -95,6 +95,9 @@ it is not exposed here. Script workflows with unresolved project-root commands
 or invalid CLI arguments are likewise not added; their canonical sources remain
 unchanged. Harness-specific tool names and optional integrations alone do not
 exclude an otherwise portable workflow.
+The research-process skill's literal Claude `Skill`/`Task`/`Agent` call templates
+are not adopted as a Codex surface without an explicit native handoff; its Claude
+source is unchanged.
 
 The trusted project's `.codex/config.toml` enables Ref and Context7 stdio MCP servers
 and retains core-only shell environment inheritance. Each MCP entry forwards its
