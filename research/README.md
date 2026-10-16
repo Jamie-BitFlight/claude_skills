@@ -665,7 +665,7 @@ Plugins and systems for coordinating multiple Claude Code agents with automatic 
 | Document | Description | Last Updated |
 | -------- | ----------- | ------------ |
 | [oh-my-claudecode.md](./agent-orchestration/oh-my-claudecode.md) | oh-my-claudecode (OMC) — zero-config multi-agent orchestration for Claude Code: 32 specialized agents across cognitive domains, natural language task routing, automatic parallelism, Sisyphus persistent execution mode (TypeScript, MIT) | 2026-03-28 |
-| [task-intent-drift-prevention.md](./agent-orchestration/task-intent-drift-prevention.md) | Evidence-backed guidance for tying agent validation and review loops to the user's existing task criteria, keeping unrelated suggestions advisory, and stopping self-justifying harness work | 2026-10-14 |
+| [task-intent-drift-prevention.md](./agent-orchestration/task-intent-drift-prevention.md) | Source-bounded synthesis of agent goal drift, evaluator feedback loops, multi-agent verification failures, and human steering; distinguishes published findings from unproven prevention claims | 2026-10-16 |
 
 **Key Topics**:
 

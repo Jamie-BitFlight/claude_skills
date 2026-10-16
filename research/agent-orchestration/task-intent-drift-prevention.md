@@ -13,7 +13,7 @@ freshness_tracking:
   last_verified: "2026-10-16"
   version_at_verification: "Engineering articles read in full; goal-drift publisher abstract and MASFT v1 abstract/introduction reviewed on 2026-10-16."
   next_review: "2027-01-16"
-  confidence_map: "Overview: medium, Evidence Status: medium, Problem Addressed: low (abstract-only studies), Key Features: medium, Technical Architecture: high, Limitations and Caveats: medium, Installation & Usage: high"
+  confidence_map: "Overview: low (mixed dated sources), Evidence Status: low (mixed dated and abstract-only sources), Problem Addressed: low (dated abstract-only studies), Key Features: low (mixed dated sources), Technical Architecture: low (dated Anthropic source), Limitations and Caveats: low (mixed dated sources), Installation & Usage: low (dated Anthropic example)"
 ---
 
 ## Overview
