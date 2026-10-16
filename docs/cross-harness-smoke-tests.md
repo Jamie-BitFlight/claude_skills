@@ -87,6 +87,9 @@ Project skills share one directory body between `.agents/skills/` and `.claude/s
 through relative directory symlinks. Either direction is supported; do not copy or
 synchronize skill bodies. Codex follows the `.agents/skills/` links for discovery.
 The project also exposes native custom roles through `.codex/agents/*.toml`.
+The `example-argument-substitution` harness remains Claude-only: its positional and
+command substitutions require Claude's load-time preprocessing, so it has no Codex
+discovery link.
 
 The trusted project's `.codex/config.toml` enables Ref and Context7 stdio MCP servers
 and retains core-only shell environment inheritance. Each MCP entry forwards its
