@@ -170,6 +170,10 @@ UNCONSTRUCTIBLE: dict[tuple[str, str, str], str] = {
     unordered("update", ("attempt-closed", "attempt-required")): (
         "attempt-required fires only when --attempt is absent; attempt-closed only when it is present"
     ),
+    unordered("update", ("attempt-required", "direct-divergence-attempt")): (
+        "attempt-required needs an attempt-owned report section, while direct-divergence-attempt "
+        "needs the distinct Direct Divergence Notes section"
+    ),
     unordered("renew", ("stale-attempt", "unmatched-path")): (
         "renew takes the --path branch or the --attempt branch, and each check's unless waives it in the other"
     ),
@@ -890,6 +894,38 @@ def state_accepted_and_incomplete_direct_record(tmp_path: Path) -> Arranged:
         plan=plan,
         task="T1",
         run=lambda: ledger.state(conn, plan, "T1", new_status=COMPLETE, reason="re-mark"),
+    )
+
+
+@register("update", IN_PROGRESS, ("stale-attempt", "direct-divergence-attempt"))
+def update_stale_attempt_and_direct_note(tmp_path: Path) -> Arranged:
+    """A stale caller cannot append a zero-attempt note to an attempted task."""
+    conn = new_ledger(tmp_path)
+    plan = plan_with(conn, ONE_TASK)
+    attempt = dispatch_task(conn, plan)
+    return Arranged(
+        conn=conn,
+        plan=plan,
+        task="T1",
+        run=lambda: ledger.update(
+            conn, plan, "T1", attempt=attempt + 1, section=spec.DIRECT_DIVERGENCE_SECTION, section_content="direct note"
+        ),
+    )
+
+
+@register("update", IN_PROGRESS, ("attempt-closed", "direct-divergence-attempt"))
+def update_closed_attempt_and_direct_note(tmp_path: Path) -> Arranged:
+    """A closed attempt is reported before an invalid direct-note carrier."""
+    conn = new_ledger(tmp_path)
+    plan = plan_with(conn, ONE_TASK)
+    attempt = returned_task(conn, plan)
+    return Arranged(
+        conn=conn,
+        plan=plan,
+        task="T1",
+        run=lambda: ledger.update(
+            conn, plan, "T1", attempt=attempt, section=spec.DIRECT_DIVERGENCE_SECTION, section_content="direct note"
+        ),
     )
 
 

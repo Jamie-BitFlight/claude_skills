@@ -1090,6 +1090,10 @@ TRANSITIONS: list[Transition] = [
             Check(reason="stale-attempt", unless="--attempt absent"),
             Check(reason="attempt-closed", unless="--attempt absent"),
             Check(reason="attempt-required"),
+            Check(
+                reason="direct-divergence-attempt",
+                unless="--append-section is not Direct Divergence Notes, or attempts is 0",
+            ),
         ],
         effects=[
             Effect(column="sections", value="one row (name, attempts, content) per --append-section"),
@@ -1103,7 +1107,14 @@ TRANSITIONS: list[Transition] = [
         Transition(
             command="update",
             from_status=s,
-            checks=[Check(reason="stale-attempt", unless="--attempt absent"), Check(reason="attempt-required")],
+            checks=[
+                Check(reason="stale-attempt", unless="--attempt absent"),
+                Check(reason="attempt-required"),
+                Check(
+                    reason="direct-divergence-attempt",
+                    unless="--append-section is not Direct Divergence Notes, or attempts is 0",
+                ),
+            ],
             effects=[Effect(column="task model fields", value="per --set")],
             events=["task.fields", "plan.fields"],
             note="a non-report section appends with attempt = tasks.attempts",
