@@ -6,8 +6,7 @@ user-invocable: false
 
 # Skill, Agent, and Plugin Review Patterns
 
-Read [Review principles](../../docs/review-principles.md) before applying these checks; it defines
-authority, applicability, evidence, and blocking criteria.
+Load `/dh:review-principles` before applying these checks.
 
 ## Establish the Consumer
 
@@ -76,7 +75,7 @@ configured validator and the checks below; report any unresolved capability as u
 
 | Candidate concern | Evidence that changes the decision |
 | --- | --- |
-| A skill links to `../../docs/review-principles.md` | Resolve it inside the installed plugin and verify the file is shipped; the directory name `docs` is not a defect. |
+| A skill loads `dh:review-principles` | Verify the named installed skill is present; a missing package is an activation/configuration concern, not a reason to invent a local substitute. |
 | A reviewer has a write tool for a registered report | Check its authorized output destination and whether reviewed files remain unchanged; investigate actual target-mutation authority. |
 | An agent uses a model ID or a YAML tool list | Validate the selected consumer's accepted fields and representations; a different preferred spelling is not evidence of rejection. |
 | A skill names an optional cross-plugin policy | Check availability and its declared fallback; do not infer installation from the author's repository layout. |

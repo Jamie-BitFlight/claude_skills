@@ -1,0 +1,39 @@
+{
+  "skill_name": "review-principles",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Review only this supplied change and evidence. The public contract requires a denied export to leave the prior published manifest unchanged. The changed handler writes the replacement manifest before checking authorization. A deterministic local test of the denied request observes the file changed. The repository does not require a particular exception class. Classify the concern and state the smallest correction boundary.",
+      "expected_output": "Identify a contract-backed blocking forbidden-effect defect without imposing unrelated exception or framework preferences.",
+      "files": [],
+      "expectations": [
+        "Treats the public denied-export invariant as the governing obligation.",
+        "Classifies the write-before-authorization path as blocking based on the supplied observation.",
+        "Keeps the correction focused on preventing the write or restoring the required invariant.",
+        "Does not require a new exception taxonomy, framework, or tracking schema."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "A reviewer sees a five-function module with duplicated validation branches. The supported API, tests, and active gates all pass; no caller, incident, or maintenance burden is supplied. The reviewer prefers a strategy pattern and wants the finding to block the change. Assess the request using only the supplied evidence.",
+      "expected_output": "Keep the strategy proposal non-blocking because a reviewer preference alone is not a demonstrated contract failure.",
+      "files": [],
+      "expectations": [
+        "Separates the style or maintainability suggestion from a required defect.",
+        "Names the missing evidence that could make the recommendation material.",
+        "Does not turn the suggestion into an architectural migration requirement."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "A multi-perspective reviewer receives a change scope, finds an unsupported authorization assumption, and has an existing Review Results JSON block with APPROVE, REJECT, and SKIP plus a task-section persistence route. Explain how to carry the finding forward.",
+      "expected_output": "Use the caller's existing verdict and persistence contract; do not invent a universal review result format.",
+      "files": [],
+      "expectations": [
+        "Keeps raw findings and the existing APPROVE/REJECT/SKIP contract with the caller.",
+        "Does not replace the existing JSON block or task-section route with a shared schema or artifact.",
+        "States evidence and consequence without claiming an unperformed probe."
+      ]
+    }
+  ]
+}

@@ -10,8 +10,7 @@ Load these checks when source, runtime entrypoints, or package scripts establish
 including JavaScript, TypeScript, CJS, and MJS. Apply TypeScript or CLI checks alongside them when
 relevant; a `package.json` alone does not distinguish server code from a browser build.
 
-Read [Review principles](../../docs/review-principles.md) before applying these checks; it defines
-authority, applicability, evidence, and blocking criteria.
+Load `/dh:review-principles` before applying these checks.
 
 ## Synchronous I/O in Request Path
 

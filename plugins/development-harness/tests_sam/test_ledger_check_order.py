@@ -46,6 +46,11 @@ The pairs no ledger state can make fail together, and why each was ruled out rat
   tasks with ``attempt_open`` 1, which a settled task never has.
 * ``state`` ``status-invalid`` with ``report-missing`` — ``report-missing`` is reached only when
   ``--new-status`` is ``complete``, which is a status ``status-invalid`` accepts.
+* ``state`` direct-record checks with ``status-invalid``, ``report-missing`` or ``leased`` — direct
+  completion checks require `complete`, zero prior attempts, and no open attempt. An invalid status,
+  a prior attempt needing a report, or a lease each violates one of those conditions first.
+* ``state`` ``direct-record-missing`` with ``direct-record-incomplete`` — one task either has no
+  direct record or has one that lacks evidence; it cannot satisfy both conditions at once.
 One pair is unreachable from one status but not from another, and so is not excused. ``accept``
 from ``complete`` cannot hold ``already-accepted`` with ``not-complete``: ``not-complete`` needs an
 open attempt there, and a task with an open attempt is one ``accept`` never accepted. The same pair
@@ -165,6 +170,10 @@ UNCONSTRUCTIBLE: dict[tuple[str, str, str], str] = {
     unordered("update", ("attempt-closed", "attempt-required")): (
         "attempt-required fires only when --attempt is absent; attempt-closed only when it is present"
     ),
+    unordered("update", ("attempt-required", "direct-evidence-attempt")): (
+        "attempt-required needs an attempt-owned report section, while direct-evidence-attempt "
+        "needs one of the distinct reserved direct evidence sections"
+    ),
     unordered("renew", ("stale-attempt", "unmatched-path")): (
         "renew takes the --path branch or the --attempt branch, and each check's unless waives it in the other"
     ),
@@ -180,6 +189,27 @@ UNCONSTRUCTIBLE: dict[tuple[str, str, str], str] = {
     ),
     unordered("state", ("status-invalid", "report-missing")): (
         "report-missing is reached only when --new-status is complete, which status-invalid accepts"
+    ),
+    unordered("state", ("status-invalid", "direct-record-missing")): (
+        "direct completion checks are reached only when --new-status is complete"
+    ),
+    unordered("state", ("status-invalid", "direct-record-incomplete")): (
+        "direct completion checks are reached only when --new-status is complete"
+    ),
+    unordered("state", ("report-missing", "direct-record-missing")): (
+        "report-missing needs a prior attempt while a direct completion record applies only at zero attempts"
+    ),
+    unordered("state", ("report-missing", "direct-record-incomplete")): (
+        "report-missing needs a prior attempt while a direct completion record applies only at zero attempts"
+    ),
+    unordered("state", ("leased", "direct-record-missing")): (
+        "an open attempt has incremented attempts, while direct completion applies only at zero attempts"
+    ),
+    unordered("state", ("leased", "direct-record-incomplete")): (
+        "an open attempt has incremented attempts, while direct completion applies only at zero attempts"
+    ),
+    unordered("state", ("direct-record-missing", "direct-record-incomplete")): (
+        "one task either lacks a direct record or has an incomplete direct record, never both"
     ),
 }
 """The pairs of checks no ledger state makes fail together, each with why it was ruled out."""
@@ -816,6 +846,86 @@ def state_no_reason_and_unreported(tmp_path: Path) -> Arranged:
     plan = imported(conn, status=COMPLETE, accepted=0, attempts=1)
     return Arranged(
         conn=conn, plan=plan, task="T1", run=lambda: ledger.state(conn, plan, "T1", new_status=COMPLETE, reason=None)
+    )
+
+
+@register("state", NOT_STARTED, ("reason-required", "direct-record-missing"))
+def state_no_reason_and_missing_direct_record(tmp_path: Path) -> Arranged:
+    """Direct completion without its reason or durable record stops on the reason first."""
+    conn = new_ledger(tmp_path)
+    plan = plan_with(conn, ONE_TASK)
+    return Arranged(
+        conn=conn, plan=plan, task="T1", run=lambda: ledger.state(conn, plan, "T1", new_status=COMPLETE, reason=None)
+    )
+
+
+@register("state", NOT_STARTED, ("reason-required", "direct-record-incomplete"))
+def state_no_reason_and_incomplete_direct_record(tmp_path: Path) -> Arranged:
+    """Direct completion with an incomplete record still checks the reason first."""
+    conn = new_ledger(tmp_path)
+    plan = plan_with(conn, ONE_TASK)
+    ledger.update(conn, plan, "T1", section="Direct Completion Record", section_content="TASK: incomplete")
+    return Arranged(
+        conn=conn, plan=plan, task="T1", run=lambda: ledger.state(conn, plan, "T1", new_status=COMPLETE, reason=None)
+    )
+
+
+@register("state", COMPLETE, ("task-accepted", "direct-record-missing"))
+def state_accepted_and_missing_direct_record(tmp_path: Path) -> Arranged:
+    """An accepted zero-attempt task preserves acceptance precedence over missing direct evidence."""
+    conn = new_ledger(tmp_path)
+    plan = imported(conn, status=COMPLETE, accepted=1, attempts=0)
+    return Arranged(
+        conn=conn,
+        plan=plan,
+        task="T1",
+        run=lambda: ledger.state(conn, plan, "T1", new_status=COMPLETE, reason="re-mark"),
+    )
+
+
+@register("state", COMPLETE, ("task-accepted", "direct-record-incomplete"))
+def state_accepted_and_incomplete_direct_record(tmp_path: Path) -> Arranged:
+    """An accepted zero-attempt task preserves acceptance precedence over incomplete direct evidence."""
+    conn = new_ledger(tmp_path)
+    plan = imported(conn, status=COMPLETE, accepted=1, attempts=0)
+    ledger.update(conn, plan, "T1", section="Direct Completion Record", section_content="TASK: incomplete")
+    return Arranged(
+        conn=conn,
+        plan=plan,
+        task="T1",
+        run=lambda: ledger.state(conn, plan, "T1", new_status=COMPLETE, reason="re-mark"),
+    )
+
+
+@register("update", IN_PROGRESS, ("stale-attempt", "direct-evidence-attempt"))
+def update_stale_attempt_and_direct_note(tmp_path: Path) -> Arranged:
+    """A stale caller cannot append a zero-attempt note to an attempted task."""
+    conn = new_ledger(tmp_path)
+    plan = plan_with(conn, ONE_TASK)
+    attempt = dispatch_task(conn, plan)
+    return Arranged(
+        conn=conn,
+        plan=plan,
+        task="T1",
+        run=lambda: ledger.update(
+            conn, plan, "T1", attempt=attempt + 1, section=spec.DIRECT_DIVERGENCE_SECTION, section_content="direct note"
+        ),
+    )
+
+
+@register("update", IN_PROGRESS, ("attempt-closed", "direct-evidence-attempt"))
+def update_closed_attempt_and_direct_note(tmp_path: Path) -> Arranged:
+    """A closed attempt is reported before an invalid direct-note carrier."""
+    conn = new_ledger(tmp_path)
+    plan = plan_with(conn, ONE_TASK)
+    attempt = returned_task(conn, plan)
+    return Arranged(
+        conn=conn,
+        plan=plan,
+        task="T1",
+        run=lambda: ledger.update(
+            conn, plan, "T1", attempt=attempt, section=spec.DIRECT_DIVERGENCE_SECTION, section_content="direct note"
+        ),
     )
 
 

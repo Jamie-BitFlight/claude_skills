@@ -8,8 +8,7 @@ user-invocable: false
 
 Stack-specific rules loaded by `dh:code-reviewer` when prompt files, model selection logic, or evaluation harness code are detected.
 
-Read [Review principles](../../docs/review-principles.md) before applying these checks; it defines
-authority, applicability, evidence, and blocking criteria. Verify model identifiers, request
+Load `/dh:review-principles` before applying these checks. Verify model identifiers, request
 parameters, and error semantics against the provider and SDK version the target actually uses.
 
 ## Prompt Hygiene

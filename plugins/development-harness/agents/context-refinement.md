@@ -232,8 +232,11 @@ here resolves a filesystem path.
 
 1. Read every task in the plan (all tasks, not just the current one), through the same STORE Step 1 found the plan on:
    - **STORE = CONTENT:** `mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action": "read"})` returns them all.
-   - **STORE = LEDGER:** the MCP tool still cannot reach it. `plan status --plan-address P{N}` (Step 1) already named every task id; for each one, run `<sam_cli/> plan read --address P{N}/T{M}` — its `sections` array is where a `Divergence Notes` or `Discovered During Implementation` section (added via `--append-section`, Step 4) actually lands; the flat task fields `status` returns do not carry it.
-2. Collect all `## Divergence Notes` sections from task bodies
+   - **STORE = LEDGER:** the MCP tool still cannot reach it. `plan status --plan-address P{N}` (Step 1) already named every task id; for each one, run `<sam_cli/> plan read --address P{N}/T{M}` — its `sections` array is where a `Divergence Notes` or `Discovered During Implementation` section (added via `--append-section`, Step 4) actually lands; the flat task fields `status` returns do not carry it. The read result excludes `Direct Divergence Notes` and `Direct Completion Record` entries invalidated by reclaim or plan replacement; audit history remains in the ledger event log and is not current evidence.
+2. Collect all `## Divergence Notes` sections from task bodies, every zero-attempt `Direct
+   Divergence Notes` section, and the `NOTES:` body of any zero-attempt `Direct Completion Record`.
+   These are the direct route's current durable task carriers; do not synthesize an attempt, a
+   divergence count, or an attempt-owned report to classify them.
 3. Collect all `### Discovered During Implementation` sections from Context Manifests
 4. Compare key claims in the architecture spec against the actual implementation files
 

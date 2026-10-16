@@ -8,8 +8,7 @@ user-invocable: false
 
 Stack-specific rules loaded by `dh:code-reviewer` when `pyproject.toml` or `*.py` files are detected.
 
-Read [Review principles](../../docs/review-principles.md) before applying these checks; it defines
-authority, applicability, evidence, and blocking criteria.
+Load `/dh:review-principles` before applying these checks.
 
 When available, load `/python-engineering:standards-for-python-development`; it owns the shared
 Python policy and contextual defaults. If that plugin is unavailable, use the checks below with

@@ -44,16 +44,49 @@ With an attempt number, follow the runner contract's outcome selection, report p
 and closure steps for that attempt. `--complete` names the task to close; select its result from
 what happened rather than treating this argument as proof of success.
 
-Without an attempt number, no runner is closing anything, so move the status directly and say why:
+Without an attempt number, first read the task without `--attempt` and inspect its ledger `attempts` count.
+The direct route is available only when that count is zero. If any prior attempt exists, do not
+move it directly: return the applicable refusal or blocked response and route the task to that
+attempt's report-and-finish contract.
+
+Before completing, compare the reuse result with this task's requested outcome:
+
+- If required implementation depends on an `UNRESOLVED` choice, follow `dh:reuse-before-build`'s
+  task-local deferral/needs-input route. Preserve the decision in the existing task/report; do not
+  append a completion record or move that implementation task to `complete`.
+- A research or review task may finish with `UNRESOLVED` only when delivering that assessment fully
+  meets its own acceptance criteria. That result does not complete dependent implementation work.
+
+With zero prior attempts, persist the direct route's evidence before moving state. This uses the
+ordinary task-section carrier at attempt zero, not a runner-owned report or a fabricated attempt:
+
+```bash
+<sam_cli/> plan update \
+  --plan-address P{N} --task-id T{M} \
+  --append-section "Direct Completion Record" \
+  --section-content "TASK: {what completed}
+FILES_CHANGED: {files or none}
+COMMITS: {commits or none}
+REUSE DECISION: {ADOPT|ADAPT|BUILD JUSTIFIED plus evidence; UNRESOLVED only for a completed assessment}
+VERIFICATION: {each verification step and evidence, or none}
+NOTES: {every material divergence disposition, or none}"
+```
+
+Read the task back and confirm the `Direct Completion Record` is present before moving its state:
+
+```bash
+<sam_cli/> plan read --address P{N}/T{M}
+```
 
 ```bash
 <sam_cli/> plan state \
   --address P{N}/T{M} --new-status=complete --reason "{why this moved without a runner}"
 ```
 
-`--reason` is required — the ledger records why a status moved with no runner behind it.
-With no prior attempt, this writes only the direct `task.state` event: do not create or claim a
-Completion Report for this path. Once an attempt exists, the report and closure remain attempt-owned.
+`--reason` is required — the ledger records why a status moved with no runner behind it. The ledger
+refuses a zero-attempt completion without this durable direct record, and it refuses a task with any
+prior attempt unless that attempt owns both report sections. Do not create or claim a `Completion
+Report` or `Verification Results` for this direct path.
 
 ---
 
@@ -110,11 +143,12 @@ Completion Report for this path. Once an attempt exists, the report and closure 
    - Task-level skills are **additive** to any skills already declared in the agent definition's frontmatter.
 
 3. Without `--attempt`, skip runner-only steps 3a, 4a, and the attempt-owned branch of step 5. Do
-   not renew a lease, append task sections, or close an attempt. Those operations belong only to a
-   dispatch-owned attempt. Step 4 still registers session context; then continue with the direct
-   branch of step 5, step 6, and step 7.
+   not renew a lease or close an attempt. Step 4 still registers session context; then continue
+   with the direct branch of step 5, step 6, and step 7. A material direct divergence is the one
+   exception to the usual no-section rule: its direct branch writes an owned attempt-zero section,
+   never an attempt report or divergence count.
 
-3a. With `--attempt`, your attempt is already open.
+3a. **With `--attempt`, your attempt is already open.**
 
    `dispatch` opened it when the orchestrator launched you, which is what set the task
    `in-progress` and started the lease. There is nothing to claim, and nothing to write to the
@@ -162,7 +196,7 @@ Completion Report for this path. Once an attempt exists, the report and closure 
    you where the new deadline sits. A lease left to expire lets the orchestrator take the task back
    and hand it to another runner, and your commands then answer `stale-attempt`.
 
-5. **Record material divergence observations during implementation.**
+5. **With `--attempt`, record divergence observations during implementation.**
 
    While implementing, if you discover that the architect spec or feature-context
    describes something that does not match what you are implementing, record a
@@ -206,10 +240,23 @@ Completion Report for this path. Once an attempt exists, the report and closure 
    backend no task file exists to edit, and a file written in one worktree is unreadable from
    another, so a file-based note is silently lost.
 
-   Without `--attempt`, do not run `plan update` or create a divergence count. Preserve each
-   material divergence in the immediate caller response under `NOTES:` using the same note body:
-   plan artifact and quoted claim, actual implementation, classification, and recorded timestamp.
-   This direct disposition is not a `Divergence Notes` task section and does not name an attempt.
+   Without `--attempt`, preserve each material divergence in the immediate caller response under
+   `NOTES:` using the same note body: plan artifact and quoted claim, actual implementation,
+   classification, and recorded timestamp. Also persist it before returning through the existing
+   task-section carrier at attempt zero:
+
+   ```bash
+   <sam_cli/> plan update \
+     --plan-address P{N} --task-id T{M} \
+     --append-section "Direct Divergence Notes" \
+     --section-content "{same material-divergence note body}"
+   ```
+
+   Do not create a divergence count, attempt, or attempt-owned report. This carrier is available
+   only while the task has zero prior attempts; otherwise return the direct-route refusal and use
+   that attempt's report-and-finish contract. If the caller explicitly uses the zero-attempt
+   `--complete` route above, put the same body in that route's owned `Direct Completion Record`
+   under `NOTES:` instead of a separate `Direct Divergence Notes` section.
 
    For full artifact classification rules and divergence thresholds, see
    [plan-artifact-lifecycle.md](../../docs/plan-artifact-lifecycle.md).
@@ -222,12 +269,15 @@ Completion Report for this path. Once an attempt exists, the report and closure 
    Including these trailers in task commits causes premature issue closure before verification
    is complete.
 
-7. When selecting an implementation approach during execution, activate
-   `/dh:reuse-before-build` in runner mode. With `--attempt`, follow its bundled runner
-   handoff before research or attempt closure. Without `--attempt`, make and return the
-   decision and any material divergence in the immediate caller response, without its
-   attempt-owned `plan update`, `plan read --attempt`, or `plan finish` commands. Implement
-   against the task acceptance criteria and run its verification steps.
+7. When selecting an implementation approach that may duplicate an existing solution, load
+   `/dh:reuse-before-build` in runner mode. With `--attempt`, follow its bundled runner handoff
+   before research or attempt closure. Without `--attempt`, make and return the decision and any
+   material divergence in the immediate caller response, without its attempt-owned `plan update`,
+   `plan read --attempt`, or `plan finish` commands. The direct branch owns `Direct Divergence
+   Notes` at attempt zero, and the explicit zero-attempt `--complete` route separately owns its
+   `Direct Completion Record`; neither creates an attempt-owned report.
+   Implement against the task acceptance
+   criteria and run its verification steps.
 
 ---
 
@@ -235,5 +285,6 @@ Completion Report for this path. Once an attempt exists, the report and closure 
 
 With an attempt, follow the runner contract's completion steps and return your response under
 `dh:subagent-contract` after closure or a refusal that prevents it. Without an attempt, no
-runner owns closure: return the implementation and reuse decision, and leave ledger state
-unchanged unless the `--complete` route above is explicitly requested.
+runner owns closure: return the implementation, reuse decision, and every material-divergence
+`NOTES:` disposition. Leave ledger state unchanged unless the zero-attempt `--complete` route
+above is explicitly requested and its `Direct Completion Record` was read back.

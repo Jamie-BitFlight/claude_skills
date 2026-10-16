@@ -10,8 +10,7 @@ Load these checks for browser-targeted HTML, CSS, JavaScript, TypeScript, JSX, a
 rendering/runtime path from source and relevant framework configuration; apply TypeScript checks
 alongside these checks when applicable.
 
-Read [Review principles](../../docs/review-principles.md) before applying these checks; it defines
-authority, applicability, evidence, and blocking criteria.
+Load `/dh:review-principles` before applying these checks.
 
 ## Accessibility
 

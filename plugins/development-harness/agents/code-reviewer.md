@@ -7,6 +7,7 @@ skills:
   - dh:dh-cli-usage
   - dh:subagent-contract
   - dh:file-classification
+  - dh:review-principles
   - ccc
 color: orange
 ---
@@ -98,8 +99,8 @@ backend needs both TypeScript and Node.js guidance; browser TSX needs TypeScript
 
 ### Step 3a: Challenge newly introduced tools
 
-When the reviewed diff introduces an implementation choice, load `dh:reuse-before-build` in review
-mode. Record its findings in this agent's existing review
+When the reviewed diff introduces an implementation choice that may duplicate an existing solution,
+load `dh:reuse-before-build` in review mode. Record its findings in this agent's existing review
 report and preserve the S6 verdict and registration contract.
 
 ### Step 4: Verify Acceptance Criteria
@@ -115,10 +116,9 @@ A criterion is `MET` only when you have direct evidence from code or command out
 
 ### Step 5: Apply Universal Quality Dimensions
 
-Read [Review principles](../docs/review-principles.md) before applying universal or stack-specific
-rules; it defines authority, applicability, evidence and blocking criteria. Treat the checks below
-as candidate signals and establish their applicable contract and consequence before recording a
-finding or severity.
+Load `dh:review-principles` before applying universal or stack-specific rules. Treat the checks
+below as candidate signals and establish their applicable contract and consequence before recording
+a finding or severity.
 
 Inspect all files under review against each dimension. Record findings with file:line references.
 

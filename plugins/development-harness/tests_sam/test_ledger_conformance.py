@@ -1619,15 +1619,54 @@ def test_state_without_a_reason_refuses_rather_than_moving_the_task(
     assert store.events_of(set_conn, set_plan, kind="task.state") == []
 
 
-def test_state_direct_complete_requires_no_attempt_report(set_conn: sqlite3.Connection, set_plan: str) -> None:
-    """A reasoned direct completion records state without inventing runner-owned report data."""
+def test_state_direct_complete_requires_a_direct_completion_record(set_conn: sqlite3.Connection, set_plan: str) -> None:
+    """A zero-attempt completion needs durable evidence without fabricating an attempt report."""
+    with pytest.raises(store.Refusal, match="direct-record-missing"):
+        transitions.state(set_conn, set_plan, "T1", new_status=COMPLETE, reason="completed directly")
+    with pytest.raises(store.Refusal, match="direct-record-missing"):
+        transitions.state(set_conn, set_plan, "T1", new_status=COMPLETE, reason="completed directly", force=True)
+
+    transitions.update(
+        set_conn,
+        set_plan,
+        "T1",
+        section="Direct Completion Record",
+        section_content="TASK: direct completion\nNOTES: no material divergence\nVERIFICATION: none",
+    )
+    with pytest.raises(store.Refusal, match="direct-record-incomplete"):
+        transitions.state(set_conn, set_plan, "T1", new_status=COMPLETE, reason="completed directly")
+
+    complete_record = (
+        "TASK: direct completion\n"
+        "FILES_CHANGED: none\n"
+        "COMMITS: none\n"
+        "REUSE DECISION: ADOPT — existing capability\n"
+        "VERIFICATION: none\n"
+        "NOTES: no material divergence"
+    )
+    transitions.update(set_conn, set_plan, "T1", section="Direct Completion Record", section_content=complete_record)
     result = transitions.state(set_conn, set_plan, "T1", new_status=COMPLETE, reason="completed directly")
 
     row = store.fetch_task(set_conn, set_plan, "T1")
     assert result.events == ["task.state"]
     assert row["status"] == COMPLETE
     assert row["attempts"] == 0
-    assert transitions.sections_of(set_conn, set_plan, "T1") == []
+    assert transitions.sections_of(set_conn, set_plan, "T1")[-1] == {
+        "plan": set_plan,
+        "task": "T1",
+        "name": "Direct Completion Record",
+        "attempt": 0,
+        "content": complete_record,
+        "seq": 2,
+    }
+    assert transitions.sections_of(set_conn, set_plan, "T1")[0] == {
+        "plan": set_plan,
+        "task": "T1",
+        "name": "Direct Completion Record",
+        "attempt": 0,
+        "content": "TASK: direct completion\nNOTES: no material divergence\nVERIFICATION: none",
+        "seq": 1,
+    }
 
 
 def test_state_complete_requires_a_report_after_an_attempt(set_conn: sqlite3.Connection, set_plan: str) -> None:
@@ -1642,6 +1681,244 @@ def test_state_complete_requires_a_report_after_an_attempt(set_conn: sqlite3.Con
     assert row["status"] == BLOCKED
     assert row["attempts"] == 1
     assert transitions.sections_of(set_conn, set_plan, "T1") == []
+
+
+def test_reclaim_invalidates_a_zero_attempt_direct_completion_record(
+    set_conn: sqlite3.Connection, set_plan: str
+) -> None:
+    """A returned direct task must write fresh evidence before completing again."""
+    record = (
+        "TASK: direct completion\n"
+        "FILES_CHANGED: none\n"
+        "COMMITS: none\n"
+        "REUSE DECISION: ADOPT — existing capability\n"
+        "VERIFICATION: none\n"
+        "NOTES: no material divergence"
+    )
+    transitions.update(set_conn, set_plan, "T1", section="Direct Completion Record", section_content=record)
+    transitions.state(set_conn, set_plan, "T1", new_status=COMPLETE, reason="completed directly")
+    transitions.reclaim(set_conn, set_plan, "T1", reason="judge said no")
+
+    with pytest.raises(store.Refusal, match="direct-record-missing"):
+        transitions.state(set_conn, set_plan, "T1", new_status=COMPLETE, reason="completed directly")
+    assert any(
+        section["name"] == spec.DIRECT_COMPLETION_SECTION
+        for section in transitions.sections_of(set_conn, set_plan, "T1")
+    )
+    assert not any(
+        section["name"] == spec.DIRECT_COMPLETION_SECTION
+        for section in transitions.read(set_conn, set_plan, "T1").sections
+    )
+
+    transitions.update(set_conn, set_plan, "T1", section=spec.DIRECT_COMPLETION_SECTION, section_content=record)
+    transitions.state(set_conn, set_plan, "T1", new_status=COMPLETE, reason="fresh identical evidence")
+    current_records = [
+        section
+        for section in transitions.read(set_conn, set_plan, "T1").sections
+        if section["name"] == spec.DIRECT_COMPLETION_SECTION
+    ]
+    assert len(current_records) == 1
+    assert current_records[0]["content"] == record
+
+
+def test_imported_direct_completion_evidence_is_current(set_conn: sqlite3.Connection) -> None:
+    """A zero-attempt imported record remains valid completion evidence."""
+    record = (
+        "TASK: imported completion\n"
+        "FILES_CHANGED: none\n"
+        "COMMITS: none\n"
+        "REUSE DECISION: ADOPT — imported capability\n"
+        "VERIFICATION: none\n"
+        "NOTES: no material divergence"
+    )
+    source = port.PlanSource(
+        plan_id="Pimported-direct",
+        fields={"feature": "imported", "goal": "keep direct evidence"},
+        tasks=[
+            port.TaskSource(
+                fields={"id": "T1", "title": "first", "status": NOT_STARTED},
+                attempts=0,
+                attempts_allowed=MAX_ATTEMPTS,
+                sections=[port.SectionSource(name=spec.DIRECT_COMPLETION_SECTION, content=record)],
+            )
+        ],
+        source="content",
+    )
+
+    port.import_plan(set_conn, source)
+    result = transitions.state(set_conn, source.plan_id, "T1", new_status=COMPLETE, reason="completed directly")
+
+    assert result.status == COMPLETE
+
+
+def test_replacing_a_plan_invalidates_its_direct_completion_record(set_conn: sqlite3.Connection, set_plan: str) -> None:
+    """A replacement task cannot complete from evidence its import cleared."""
+    record = (
+        "TASK: prior completion\n"
+        "FILES_CHANGED: none\n"
+        "COMMITS: none\n"
+        "REUSE DECISION: ADOPT — prior capability\n"
+        "VERIFICATION: none\n"
+        "NOTES: no material divergence"
+    )
+    transitions.update(set_conn, set_plan, "T1", section=spec.DIRECT_COMPLETION_SECTION, section_content=record)
+    replacement = port.PlanSource(
+        plan_id=set_plan,
+        fields={"feature": "replacement", "goal": "replace direct evidence"},
+        tasks=[
+            port.TaskSource(
+                fields={"id": "T1", "title": "replacement", "status": NOT_STARTED},
+                attempts=0,
+                attempts_allowed=MAX_ATTEMPTS,
+            )
+        ],
+        source="content",
+    )
+
+    port.import_plan(set_conn, replacement, replace=True)
+
+    with pytest.raises(store.Refusal, match="direct-record-missing"):
+        transitions.state(set_conn, set_plan, "T1", new_status=COMPLETE, reason="stale evidence")
+
+
+@pytest.mark.parametrize("reclaimed", [False, True], ids=["current", "reclaimed"])
+def test_export_import_preserves_direct_evidence_validity(
+    set_conn: sqlite3.Connection, set_plan: str, reclaimed: bool
+) -> None:
+    """A portable snapshot must preserve current evidence without reviving rejected evidence."""
+    record = (
+        "TASK: round-trip completion\n"
+        "FILES_CHANGED: none\n"
+        "COMMITS: none\n"
+        "REUSE DECISION: ADOPT — existing capability\n"
+        "VERIFICATION: direct check\n"
+        "NOTES: material divergence recorded"
+    )
+    transitions.update(
+        set_conn, set_plan, "T1", section=spec.DIRECT_DIVERGENCE_SECTION, section_content="material divergence"
+    )
+    transitions.update(set_conn, set_plan, "T1", section=spec.DIRECT_COMPLETION_SECTION, section_content=record)
+    if reclaimed:
+        transitions.state(set_conn, set_plan, "T1", new_status=COMPLETE, reason="first completion")
+        transitions.reclaim(set_conn, set_plan, "T1", reason="reject first completion")
+
+    source = port.projection_source(port.projection(set_conn, set_plan), source="content")
+    assert source is not None
+    port.import_plan(set_conn, source, replace=True)
+
+    if reclaimed:
+        with pytest.raises(store.Refusal, match="direct-record-missing"):
+            transitions.state(set_conn, set_plan, "T1", new_status=COMPLETE, reason="rejected round-trip evidence")
+        assert not any(
+            section["name"] in {spec.DIRECT_COMPLETION_SECTION, spec.DIRECT_DIVERGENCE_SECTION}
+            for section in transitions.read(set_conn, set_plan, "T1").sections
+        )
+    else:
+        result = transitions.state(set_conn, set_plan, "T1", new_status=COMPLETE, reason="valid round-trip evidence")
+        assert result.status == COMPLETE
+        current = {
+            section["name"]: section["content"] for section in transitions.read(set_conn, set_plan, "T1").sections
+        }
+        assert current[spec.DIRECT_COMPLETION_SECTION] == record
+        assert current[spec.DIRECT_DIVERGENCE_SECTION] == "material divergence"
+
+
+def test_reused_plan_id_needs_new_direct_evidence(set_conn: sqlite3.Connection) -> None:
+    """Renaming a milestone plan cannot lend its old proof to a later reuse of its ID."""
+    record = (
+        "TASK: original completion\n"
+        "FILES_CHANGED: none\n"
+        "COMMITS: none\n"
+        "REUSE DECISION: ADOPT — existing capability\n"
+        "VERIFICATION: direct check\n"
+        "NOTES: no material divergence"
+    )
+    original = port.PlanSource(
+        plan_id="Pidentity-old",
+        fields={"feature": "identity-old", "goal": "original task"},
+        milestone=37,
+        tasks=[
+            port.TaskSource(
+                fields={"id": "T1", "title": "original", "status": NOT_STARTED},
+                attempts_allowed=MAX_ATTEMPTS,
+                sections=[port.SectionSource(name=spec.DIRECT_COMPLETION_SECTION, content=record)],
+            )
+        ],
+        source="content",
+    )
+    port.import_plan(set_conn, original)
+    renamed = original.model_copy(
+        update={
+            "plan_id": "Pidentity-new",
+            "fields": {"feature": "identity-new", "goal": "replacement task"},
+            "tasks": [port.TaskSource(fields={"id": "T1", "title": "replacement"}, attempts_allowed=MAX_ATTEMPTS)],
+        }
+    )
+    port.import_plan(set_conn, renamed, replace=True)
+    reused = original.model_copy(
+        update={
+            "milestone": None,
+            "fields": {"feature": "identity-reused", "goal": "new task at old ID"},
+            "tasks": [port.TaskSource(fields={"id": "T1", "title": "new task"}, attempts_allowed=MAX_ATTEMPTS)],
+        }
+    )
+    port.import_plan(set_conn, reused)
+
+    with pytest.raises(store.Refusal, match="direct-record-missing"):
+        transitions.state(set_conn, reused.plan_id, "T1", new_status=COMPLETE, reason="prior incarnation proof")
+    transitions.update(set_conn, reused.plan_id, "T1", section=spec.DIRECT_COMPLETION_SECTION, section_content=record)
+    assert (
+        transitions.state(
+            set_conn, reused.plan_id, "T1", new_status=COMPLETE, reason="fresh proof for new incarnation"
+        ).status
+        == COMPLETE
+    )
+
+
+def test_direct_divergence_note_persists_without_an_attempt(set_conn: sqlite3.Connection, set_plan: str) -> None:
+    """A direct worker can retain a material divergence without impersonating a runner."""
+    note = "Classification: intent-divergence\nActual implementation: direct path"
+
+    result = transitions.update(set_conn, set_plan, "T1", section="Direct Divergence Notes", section_content=note)
+
+    row = store.fetch_task(set_conn, set_plan, "T1")
+    assert result.events == ["task.section"]
+    assert row["attempts"] == 0
+    assert transitions.sections_of(set_conn, set_plan, "T1")[-1] == {
+        "plan": set_plan,
+        "task": "T1",
+        "name": "Direct Divergence Notes",
+        "attempt": 0,
+        "content": note,
+        "seq": 1,
+    }
+
+
+@pytest.mark.parametrize(
+    "section", [spec.DIRECT_DIVERGENCE_SECTION, spec.DIRECT_COMPLETION_SECTION], ids=["divergence", "completion"]
+)
+def test_direct_evidence_sections_refuse_after_a_runner_attempt(
+    set_conn: sqlite3.Connection, set_plan: str, section: str
+) -> None:
+    """A direct carrier cannot be attributed to an earlier runner."""
+    attempt = dispatch_task(set_conn, set_plan)
+    transitions.finish(set_conn, set_plan, "T1", attempt=attempt, result=BLOCKED)
+
+    with pytest.raises(store.Refusal, match="direct-evidence-attempt"):
+        transitions.update(
+            set_conn, set_plan, "T1", section=section, section_content="Classification: intent-divergence"
+        )
+
+
+def test_state_force_does_not_bypass_report_requirements_after_an_attempt(
+    set_conn: sqlite3.Connection, set_plan: str
+) -> None:
+    """Force can clear ownership guards but cannot fabricate evidence for attempted work."""
+    attempt = dispatch_task(set_conn, set_plan)
+    transitions.finish(set_conn, set_plan, "T1", attempt=attempt, result=BLOCKED)
+
+    with pytest.raises(store.Refusal, match="report-missing"):
+        transitions.state(set_conn, set_plan, "T1", new_status=COMPLETE, reason="completed directly", force=True)
 
 
 def test_ready_full_false_returns_the_compact_manifest(set_conn: sqlite3.Connection, set_plan: str) -> None:

@@ -10,7 +10,12 @@ the decision procedure but do not run `plan update`, `plan read --attempt`, or `
 finish`; there is no runner-owned report or closure to persist. Return the decision
 and any material divergence disposition to the caller, and leave ledger state unchanged unless
 that caller separately owns a non-runner transition. The direct caller response records a
-divergence under `NOTES:`, not as a `Divergence Notes` section or an attempt-owned count.
+divergence under `NOTES:`. When that divergence is material, `dh:start-task` persists the same
+body in `Direct Divergence Notes` at attempt zero, without a count or attempt-owned report. Once
+any runner attempt exists, this direct carrier refuses so the runner's report-and-finish contract
+retains ownership. When `dh:start-task --complete` owns a zero-attempt completion, its dedicated
+direct route persists the same disposition in `Direct Completion Record` at attempt zero before
+state moves; this handoff does not create an attempt-owned report.
 
 ## Enter and recover
 
