@@ -19,22 +19,23 @@ metadata:
 
 This entry addresses task-intent drift in agent work: validation or review expands from the user's requested outcome into a self-justifying chain of new tests, runtime environments, and review passes. The prevention point is earlier than resource cleanup: preserve the original task and acceptance criteria as the authority for admitting work.
 
-For the incident that prompted this research, an explicitly directed skill was treated as requiring automatic-discovery and native-runtime evidence. The review of that unnecessary evidence then created further harness work and retained large disposable environments. The original outcome did not require either discovery testing or those environments.
+A reported local incident motivated this research, but no durable first-party incident record is included in this entry. Treat that account as unverified motivation, not a confirmed local root-cause finding. The scenario below illustrates the proposed failure mode; it is not a reproduced incident.
 
 ## Evidence Status
 
 | Claim | Status | Basis and limit |
 | --- | --- | --- |
-| Explicit skill invocation does not itself require an automatic-discovery test. | Observed task interpretation | A direct `/<skill>` route already instructs the agent which skill to load. Discovery may still be relevant when a product contract requires autonomous routing. |
+| A local incident followed the failure mode described below. | Unverified report | No durable first-party incident record is published with this entry; the scenario is illustrative and was not independently reproduced. |
+| Explicit skill invocation does not itself require an automatic-discovery test. | Proposed routing principle | A direct `/<skill>` route identifies the intended skill. Discovery may still be relevant when an applicable product contract requires autonomous routing. |
 | An evaluator loop needs stated criteria and measurable value. | Supported by source | Anthropic presents evaluator-optimizer loops as suitable when evaluation criteria are clear and refinement has measurable value. This is engineering guidance, not a universal rule. |
 | Long-running agents can drift from their original objective. | Supported by controlled research | Arike et al. show goal drift under their simulated conditions. The study does not measure this repository or PR-review workflows. |
 | Multi-agent systems exhibit specification, alignment, and verification/termination failure modes. | Supported by empirical taxonomy | Cemri et al. studied traces from several frameworks. The taxonomy identifies a relevant failure class; it does not prove any particular local review loop will recur. |
-| Existing task/backlog acceptance criteria and review/delegation reports can prevent this incident class. | Proposed | This is a workflow recommendation. It has not been implemented or empirically evaluated in this repository. |
+| Existing task/backlog acceptance criteria and review/delegation reports can prevent this incident class. | Proposed | This entry recommends the workflow; it neither implements the safeguards nor provides empirical evidence of their effectiveness. |
 | Disk, memory, and cleanup controls prevent task-intent drift. | Not supported | They contain consequences after bad work is admitted. They do not determine whether the work belongs to the task. |
 
 ## Problem Addressed
 
-The failure is not simply excessive scratch usage. It begins when an agent or reviewer treats a method suggestion as a new acceptance requirement:
+The failure mode considered here is not simply excessive scratch usage. The following illustrative scenario starts when an agent or reviewer treats a method suggestion as a new acceptance requirement:
 
 1. The user asks for a directed action and named outcome.
 2. A reviewer adds an unrequested proof obligation, such as automatic discovery for an explicit route.
@@ -56,7 +57,7 @@ A blocking finding must name all of the following:
 - observed evidence;
 - concrete impact on the user outcome, safety, data, or contract;
 - the smallest correction; and
-- a direct verification of that correction.
+- a concrete verification method, followed by observed verification after a correction exists.
 
 Unknown criterion identifiers do not prove that a concern is irrelevant. A reviewer may block for a directly applicable security, data-loss, or correctness contract when it shows the concrete impact. Suggestions without that connection remain advisory and must not start a new test, subtask, or merge block.
 
@@ -114,7 +115,7 @@ Use the pattern on the next task without new infrastructure:
 | A required criterion lacks a discriminating observation. | Mark it evidence-limited and qualify the result; do not report completion. |
 | An admitted runtime task is cancelled or a worker fails. | Preserve a compact receipt and clean only owner-registered disposable state; do not create sibling copies or use RAM staging. |
 
-The last scenario describes an untested mitigation target. It must be exercised with small controlled fixtures, including cancellation, failed setup, and sibling isolation, rather than large staged runtimes.
+The last scenario describes an untested mitigation target. A future implementation would need small controlled checks of cancellation, failed setup, and sibling isolation before claiming those safeguards work; this research entry supplies no such result and does not require building that implementation.
 
 ## References
 
@@ -123,7 +124,6 @@ The last scenario describes an untested mitigation target. It must be exercised 
 - Birgitta Böckeler, "Harness engineering for coding agent users" — computational controls are “deterministic and fast”; inferential controls are “slower and more expensive.” The article says neither reliably catches “overengineering and unnecessary features” or “misunderstood instructions.” <https://martinfowler.com/articles/exploring-gen-ai/harness-engineering.html> (accessed 2026-10-14)
 - Rauno Arike, Elizabeth Donoway, Henning Bartsch, and Marius Hobbhahn, "Evaluating Goal Drift in Language Model Agents" — the abstract defines goal drift as “an agent’s tendency to deviate from its original objective over time”; the paper gives an AI-coding example of expanding into forbidden directories. <https://doi.org/10.1609/aies.v8i1.36541> (accessed 2026-10-14)
 - Mert Cemri et al., "Why Do Multi-Agent LLM Systems Fail?" — the abstract groups failure modes into “(i) specification and system design failures, (ii) inter-agent misalignment, and (iii) task verification and termination.” <https://arxiv.org/html/2503.13657v1> (accessed 2026-10-14)
-- First-party incident evidence: `.tmp/scratch/reports/20261014-task-intent-drift-prevention-sources.md` and companion resource-boundary reports, accessed locally 2026-10-14. These are local incident records, not independently reproduced studies.
 
 ## Cross-References
 
