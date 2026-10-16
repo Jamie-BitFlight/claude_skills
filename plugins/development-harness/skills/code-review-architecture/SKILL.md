@@ -10,9 +10,8 @@ Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
 Generates a Mermaid module-dependency graph with topology signal colors from import/include
 analysis of the project source. Registers the result as a `codebase-analysis` artifact.
 
-Read [Review principles](../../docs/review-principles.md) before classifying findings; it defines
-authority, applicability, evidence, and blocking criteria. Graph shape is evidence for investigation;
-establish the affected contract and consequence before treating a signal as a defect.
+Load `/dh:review-principles` before classifying findings. Graph shape is evidence for
+investigation; establish the affected contract and consequence before treating a signal as a defect.
 
 ## When to Invoke
 

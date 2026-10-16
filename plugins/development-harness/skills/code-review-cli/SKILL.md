@@ -8,8 +8,7 @@ user-invocable: false
 
 Stack-specific rules loaded by `dh:code-reviewer` when CLI entrypoints are detected (argparse, click, typer, commander.js, or similar argument parsing libraries).
 
-Read [Review principles](../../docs/review-principles.md) before applying these checks; it defines
-authority, applicability, evidence, and blocking criteria. Establish the command's supported
+Load `/dh:review-principles` before applying these checks. Establish the command's supported
 platforms and human/machine output contracts before prescribing an exact flag or exit code.
 
 ## Exit Codes

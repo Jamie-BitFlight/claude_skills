@@ -56,8 +56,13 @@ Read the task and everything its attempts recorded:
 Read without `--attempt`: you are reviewing this task, not working an attempt on it, and naming an
 attempt you do not hold is refused as `stale-attempt`.
 
-The result carries the task row and the sections every attempt appended — the `Completion Report`
-and `Verification Results` the runner wrote are what this review is against.
+The result carries the task row and its durable task sections. When `attempts` is above zero, the
+`Completion Report` and `Verification Results` from the current attempt are what this review is
+against. When `attempts` is zero and the task is directly complete, review the `Direct Completion
+Record` tagged at attempt zero instead. It carries the direct route's task, files, commits, reuse
+decision, verification evidence, and material-divergence `NOTES:`; it is not an attempt report.
+If neither applicable evidence form is present, stop and report BLOCKED rather than inventing a
+reviewable execution record.
 
 `{plan_id}` and `{task_id}` are the address already supplied to the call above — retain them as-is
 for the rest of this workflow, and never parse `{plan_id}` for a plan number or slug. Read the slug

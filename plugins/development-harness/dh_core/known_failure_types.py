@@ -19,7 +19,7 @@ one of them.
 
 * :data:`dh_core.ledger_spec.REASONS` -- why a **CLI command** refused, no-op'd, or recorded an
   outcome about a ledger row: ``leased``, ``not-ready``, ``stale-attempt``, ``archived``,
-  ``attempts-exhausted``, ``report-missing``. Closed, owned by the state machine, printed by the
+  ``attempts-exhausted``, ``report-missing``, ``direct-record-missing``, ``direct-record-incomplete``. Closed, owned by the state machine, printed by the
   command itself. No agent chooses one; the ledger does.
 * ``reclaim --reason`` -- what the **Orchestrator** says when it sends a task back for another
   attempt (``dh_core.ledger_spec.COMMANDS``, the ``reclaim`` command). Free text today; a
@@ -534,6 +534,8 @@ LEDGER_OWNED_CONDITIONS: tuple[tuple[str, str], ...] = (
     ("the plan is archived, so no command may act on it", "archived"),
     ("the attempt budget is spent", "attempts-exhausted"),
     ("a report section has no row at the current attempt", "report-missing"),
+    ("a zero-attempt direct completion has no durable completion record", "direct-record-missing"),
+    ("a zero-attempt direct completion record lacks required evidence", "direct-record-incomplete"),
     ("acceptance is asked of a task that is not complete", "not-complete"),
     ("the ledger database sits on a filesystem WAL mode cannot share", "network-filesystem"),
 )

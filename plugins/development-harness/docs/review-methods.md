@@ -1,9 +1,9 @@
 # Review preparation and investigation
 
-Read [Review principles](./review-principles.md) before judging a candidate finding; it defines
-authority, applicability, evidence and blocking criteria. Preserve the caller's review scope,
-applicability rules, verdict schema, persistence and gate. Use these methods within the existing
-reviewer; they do not require additional workers.
+Load `/dh:review-principles` before judging a candidate finding. It defines authority,
+applicability, evidence, blocking criteria, and scope boundaries. Preserve the caller's review
+scope, applicability rules, verdict schema, persistence, and gate. Use these methods within the
+existing reviewer; they do not require additional workers.
 
 ## Prepare the review context
 

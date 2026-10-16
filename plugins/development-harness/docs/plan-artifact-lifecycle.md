@@ -154,6 +154,13 @@ Append notes to generated task or report content with this shape:
 The note count in task metadata is a convenience index. The note body remains
 the evidence source.
 
+For direct work with no attempt, `dh:start-task` owns the durable `Direct Divergence Notes` task
+section at attempt zero. For a zero-attempt direct completion, `dh:start-task --complete` instead
+owns the durable `Direct Completion Record` task section at attempt zero. Their material-divergence
+body uses this same evidence shape and is the source context refinement reads before plan-artifact
+classification. The terminal response repeats that disposition for the immediate caller; it does
+not replace the durable record or create a runner attempt.
+
 ### Freshness report
 
 After execution, compare every material claim in the plan and generated

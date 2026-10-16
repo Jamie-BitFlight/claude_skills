@@ -705,6 +705,9 @@ def projection(conn: sqlite3.Connection, plan: str) -> dict[str, Any]:
     ``ledger_spec.COMMANDS``, and this is what makes them one place: an exported plan is a plan the
     content path can open, and a plan the content path holds is one an import can read.
 
+    Only current direct evidence is portable. Rejected direct sections remain in the ledger's
+    audit trail but must not become fresh evidence when this snapshot is imported.
+
     Args:
         conn: An open ledger connection.
         plan: The plan id.
@@ -717,7 +720,7 @@ def projection(conn: sqlite3.Connection, plan: str) -> dict[str, Any]:
     """
     document = content_plan(store.fetch_plan(conn, plan))
     document[TASKS_KEY] = [
-        content_task(row, [visible(section) for section in transitions.sections_of(conn, plan, str(row["id"]))])
+        content_task(row, [visible(section) for section in transitions.current_sections(conn, plan, str(row["id"]))])
         for row in store.plan_tasks(conn, plan)
     ]
     return document

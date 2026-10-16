@@ -19,12 +19,27 @@ plan read --address Pc7d8e9f0/T04
 plan create --slug my-feature --goal "Route workflow I/O through the DH CLI"
 plan update --plan-address Pc7d8e9f0 --context "Background context for all tasks"
 plan update --plan-address Pc7d8e9f0 --task-id T04 --append-section "Divergence Notes" --section-content "### DN-1: Brief title"
-plan state --address Pc7d8e9f0/T04 --new-status=complete --reason "why this moved without a runner"
 plan claim --address Pc7d8e9f0/T04
 plan ready --plan-address Pc7d8e9f0
 plan status --plan-address Pc7d8e9f0
 plan validate --address Pc7d8e9f0
 plan migrate --plan-address tasks-3-integrate-sam-schema.md
+```
+
+For a zero-attempt direct completion, append one complete `Direct Completion Record`, read it
+back, then move state. The record must include non-empty `TASK:`, `FILES_CHANGED:`, `COMMITS:`,
+`REUSE DECISION:`, `VERIFICATION:`, and `NOTES:` fields; `--force` does not bypass this evidence
+or attempt-owned report requirements.
+
+```text
+plan update --plan-address Pc7d8e9f0 --task-id T04 --append-section "Direct Completion Record" --section-content "TASK: completed directly
+FILES_CHANGED: none
+COMMITS: none
+REUSE DECISION: ADOPT — existing capability
+VERIFICATION: none
+NOTES: none"
+plan read --address Pc7d8e9f0/T04
+plan state --address Pc7d8e9f0/T04 --new-status=complete --reason "why this moved without a runner"
 ```
 
 For a task-bearing plan, repeat the validated named options shown by `plan create --help`

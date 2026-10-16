@@ -44,14 +44,23 @@ update, state, append, and finalize actions on an imported plan.
 ## The judge
 
 Read before deciding: `read --address P/T` gives the current attempt's `Completion Report` and
-`Verification Results`. Compare them against the task's `acceptance_criteria` and
-`verification_steps`, and against the diff of the files the report's `FILES_CHANGED` lists since
-`plans.base_sha`.
+`Verification Results`. For a task with `attempts` equal to zero, a direct `complete` instead
+requires a current-generation `Direct Completion Record` tagged at attempt zero; it carries `TASK:`,
+`FILES_CHANGED:`, `COMMITS:`, `REUSE DECISION:`, `VERIFICATION:` and `NOTES:`. A reclaim or plan
+replacement invalidates earlier direct evidence for completion and refinement while retaining its
+append-only audit history. Compare the applicable durable evidence against the task's
+`acceptance_criteria` and `verification_steps`, and against the diff of the record's
+`FILES_CHANGED` list since `plans.base_sha`. A direct record is not a runner report and never
+substitutes for one after an attempt exists.
+
+An export carries only current direct evidence. Rejected direct records remain in the source ledger's
+audit history, but an export/import round trip must not restore them as fresh completion or divergence
+evidence. Valid current records remain usable after that same round trip.
 
 | id | observed | command |
 |---|---|---|
-| J1 | `complete`, every acceptance criterion met and every verification step passed | `accept --address P/T --note "<why>"` |
-| J2 | `complete`, a criterion unmet or a verification step failed | `reclaim --address P/T --reason judge --response "<what to change and why>"` |
+| J1 | `complete`, its applicable durable evidence is present, every acceptance criterion met and every verification step passed | `accept --address P/T --note "<why>"` |
+| J2 | `complete`, applicable evidence absent, a criterion unmet, or a verification step failed | `reclaim --address P/T --reason judge --response "<what to change and why>"` |
 | J3 | `returned`, both report sections present | judge as J1 or J2 |
 | J4 | `returned`, a report section absent | `reclaim --address P/T --reason no-report --response "append Completion Report and Verification Results with --attempt, then finish"` |
 | J5 | `in-progress`, launch of this session still running | wait |

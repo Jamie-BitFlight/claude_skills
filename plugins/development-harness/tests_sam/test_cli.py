@@ -629,9 +629,65 @@ def test_state_output_shows_old_and_new_status(plan_dir: Path) -> None:
     assert data == {"id": "T3", "status": "complete"}
 
 
-def test_state_direct_complete_closes_a_zero_attempt_ledger_task() -> None:
-    """The documented direct CLI route records completion without a runner report."""
+def test_state_direct_complete_closes_a_zero_attempt_ledger_task_with_a_direct_record() -> None:
+    """The direct CLI route persists completion evidence without a runner report."""
     plan_id = _create_ledger_task("T1")
+
+    missing = runner.invoke(
+        app,
+        ["plan", "state", "--address", f"{plan_id}/T1", "--new-status", "complete", "--reason", "completed directly"],
+    )
+    assert missing.exit_code == 1
+    assert "direct-record-missing" in missing.stderr
+
+    record = runner.invoke(
+        app,
+        [
+            "plan",
+            "update",
+            "--plan-address",
+            plan_id,
+            "--task-id",
+            "T1",
+            "--append-section",
+            "Direct Completion Record",
+            "--section-content",
+            "TASK: direct completion\nNOTES: no material divergence\nVERIFICATION: none",
+        ],
+    )
+    assert record.exit_code == 0, record.stderr
+
+    incomplete = runner.invoke(
+        app,
+        ["plan", "state", "--address", f"{plan_id}/T1", "--new-status", "complete", "--reason", "completed directly"],
+    )
+    assert incomplete.exit_code == 1
+    assert "direct-record-incomplete" in incomplete.stderr
+
+    complete_record = (
+        "TASK: direct completion\n"
+        "FILES_CHANGED: none\n"
+        "COMMITS: none\n"
+        "REUSE DECISION: ADOPT — existing capability\n"
+        "VERIFICATION: none\n"
+        "NOTES: no material divergence"
+    )
+    complete = runner.invoke(
+        app,
+        [
+            "plan",
+            "update",
+            "--plan-address",
+            plan_id,
+            "--task-id",
+            "T1",
+            "--append-section",
+            "Direct Completion Record",
+            "--section-content",
+            complete_record,
+        ],
+    )
+    assert complete.exit_code == 0, complete.stderr
 
     result = runner.invoke(
         app,
@@ -646,6 +702,7 @@ def test_state_direct_complete_closes_a_zero_attempt_ledger_task() -> None:
         assert row is not None
         assert row["attempts"] == 0
         assert row["attempt_open"] == 0
+        assert ledger.read(conn, plan_id, "T1").sections[-1]["content"] == complete_record
     finally:
         conn.close()
 

@@ -354,6 +354,22 @@ COLUMNS: list[Column] = [
 REPORT_SECTIONS: tuple[str, ...] = ("Completion Report", "Verification Results")
 """The two sections the report check requires, each tagged with the current attempt."""
 
+DIRECT_COMPLETION_SECTION = "Direct Completion Record"
+"""The zero-attempt evidence section the direct completion route owns, tagged with attempt zero."""
+
+DIRECT_DIVERGENCE_SECTION = "Direct Divergence Notes"
+"""The zero-attempt carrier for a material direct-task divergence."""
+
+DIRECT_COMPLETION_FIELDS: tuple[str, ...] = (
+    "TASK",
+    "FILES_CHANGED",
+    "COMMITS",
+    "REUSE DECISION",
+    "VERIFICATION",
+    "NOTES",
+)
+"""Non-empty labels required in one zero-attempt direct completion record."""
+
 AUTHORITY_SECTION = "Authority of These Instructions"
 """Rendered by ``read`` from :data:`AUTHORITY_PREAMBLE`, unconditionally, at the head of every
 response; not a stored section."""
@@ -601,6 +617,24 @@ REASONS: list[Reason] = [
         kind=ReasonKind.REFUSAL,
         condition="a section in REPORT_SECTIONS has no row tagged with the current attempt",
         message="A required report section has nothing written under this attempt. Write it, then close the attempt.",
+    ),
+    Reason(
+        code="direct-record-missing",
+        kind=ReasonKind.REFUSAL,
+        condition="a zero-attempt direct complete has no Direct Completion Record section",
+        message="A direct completion needs its Direct Completion Record before task state can become complete.",
+    ),
+    Reason(
+        code="direct-record-incomplete",
+        kind=ReasonKind.REFUSAL,
+        condition="the Direct Completion Record lacks a required direct-completion evidence field",
+        message="A direct completion record needs TASK, FILES_CHANGED, COMMITS, REUSE DECISION, VERIFICATION, and NOTES.",
+    ),
+    Reason(
+        code="direct-divergence-attempt",
+        kind=ReasonKind.REFUSAL,
+        condition="Direct Divergence Notes is requested after a runner attempt",
+        message="A direct divergence note needs a zero-attempt task; preserve the later runner's divergence in its attempt-owned report.",
     ),
     Reason(
         code="not-complete",
@@ -1230,7 +1264,9 @@ TRANSITIONS: list[Transition] = [
                 Check(reason="status-invalid"),
                 Check(reason="task-accepted", unless="--force"),
                 Check(reason="leased", unless="--force, or attempt_open is 0"),
-                Check(reason="report-missing", unless="--new-status is not complete, or --force, or attempts is 0"),
+                Check(reason="report-missing", unless="--new-status is not complete, or attempts is 0"),
+                Check(reason="direct-record-missing", unless="--new-status is not complete, or attempts is not 0"),
+                Check(reason="direct-record-incomplete", unless="--new-status is not complete, or attempts is not 0"),
             ],
             effects=[
                 Effect(column="attempt_open", value="0"),
@@ -1245,7 +1281,7 @@ TRANSITIONS: list[Transition] = [
                 "dependents stay skipped because the work was abandoned rather than redone. Only reclaim, "
                 "which returns the task to not-started, reverses it. A direct complete with no attempts "
                 "records task.state without fabricating an attempt-owned report; once an attempt exists, "
-                "complete still requires that attempt's report unless forced."
+                "complete still requires that attempt's report, including when another state guard is forced."
             ),
         )
         for s in OPEN_STATUSES

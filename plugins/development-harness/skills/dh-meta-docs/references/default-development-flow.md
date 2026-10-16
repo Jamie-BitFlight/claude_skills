@@ -306,4 +306,4 @@ Read these together to get the full system picture:
 
 - SAM methodology: <https://github.com/bitflight-devops/stateless-agent-methodology>
 - ARL human touchpoint model: [./human-touchpoint-model.md](./human-touchpoint-model.md)
-- SAM definition (work-backlog-item skill): [../../../skills/work-backlog-item/references/sam-definition.md](../../../skills/work-backlog-item/references/sam-definition.md)
+- SAM definition (work-backlog-item skill): [../../../skills/work-backlog-item/references/workflows/work/sam-definition.md](../../../skills/work-backlog-item/references/workflows/work/sam-definition.md)

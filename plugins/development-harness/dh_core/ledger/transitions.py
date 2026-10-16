@@ -431,6 +431,111 @@ def report_complete(conn: sqlite3.Connection, plan: str, task: str, attempt: int
     return set(ledger_spec.REPORT_SECTIONS) <= present
 
 
+def direct_evidence_generation_start(conn: sqlite3.Connection, plan: str, task: str) -> int:
+    """Return the first event sequence belonging to the task's current evidence generation.
+
+    Reclaim retains the append-only audit trail but starts another direct-completion generation.
+    Replacing a plan clears its materialized task rows and does the same for every task it imports.
+    """
+    return int(
+        rows_of(
+            conn.execute(
+                "SELECT COALESCE(MAX(seq), 0) AS seq FROM events WHERE plan = :plan AND "
+                "((task = :task AND kind = 'task.reclaimed') OR (task IS NULL AND kind = 'plan.replaced'))",
+                {"plan": plan, "task": task},
+            )
+        )[0]["seq"]
+    )
+
+
+def current_direct_evidence(conn: sqlite3.Connection, plan: str, task: str) -> list[dict[str, Any]]:
+    """Return zero-attempt direct evidence written in the task's current generation.
+
+    ``task.section`` owns evidence appended locally. ``task.imported`` carries an imported task's
+    sections in its event payload, so importing a valid direct record does not lose it merely
+    because no separate ``task.section`` event was written.
+    """
+    start = direct_evidence_generation_start(conn, plan, task)
+    entries: list[dict[str, Any]] = []
+    for row in rows_of(
+        conn.execute(
+            "SELECT kind, payload FROM events WHERE plan = :plan AND task = :task "
+            "AND kind IN ('task.section', 'task.imported') AND seq > :start ORDER BY seq",
+            {"plan": plan, "task": task, "start": start},
+        )
+    ):
+        payload = json.loads(str(row["payload"]))
+        if row["kind"] == "task.section":
+            if payload.get("attempt") == 0 and payload.get("name") in {
+                ledger_spec.DIRECT_COMPLETION_SECTION,
+                ledger_spec.DIRECT_DIVERGENCE_SECTION,
+            }:
+                entries.append(payload)
+            continue
+        if int(payload.get("attempts", -1)) != 0:
+            continue
+        entries.extend(
+            section
+            for section in payload.get("sections", [])
+            if isinstance(section, dict)
+            and section.get("name") in {ledger_spec.DIRECT_COMPLETION_SECTION, ledger_spec.DIRECT_DIVERGENCE_SECTION}
+        )
+    return entries
+
+
+def current_sections(conn: sqlite3.Connection, plan: str, task: str) -> list[dict[str, Any]]:
+    """Return task sections while hiding direct evidence invalidated by reclaim or replacement.
+
+    The append-only events and :func:`sections_of` retain every historical row for audit. ``read``
+    exposes only current direct evidence so consumers cannot mistake a rejected generation for a
+    current completion or divergence.
+    """
+    remaining: dict[tuple[str, str], int] = {}
+    for entry in current_direct_evidence(conn, plan, task):
+        key = (str(entry["name"]), str(entry["content"]))
+        remaining[key] = remaining.get(key, 0) + 1
+    visible: list[dict[str, Any]] = []
+    # Event sequences and materialized section sequences are different domains. Match the
+    # newest occurrences so an identical rejected record cannot reappear beside its replacement.
+    for section in reversed(sections_of(conn, plan, task)):
+        if section["name"] not in {ledger_spec.DIRECT_COMPLETION_SECTION, ledger_spec.DIRECT_DIVERGENCE_SECTION}:
+            visible.append(section)
+            continue
+        key = (str(section["name"]), str(section["content"]))
+        if int(section["attempt"]) == 0 and remaining.get(key):
+            visible.append(section)
+            remaining[key] -= 1
+    visible.reverse()
+    return visible
+
+
+def direct_completion_record_contents(conn: sqlite3.Connection, plan: str, task: str) -> list[str]:
+    """Return current-generation direct-completion record contents."""
+    return [
+        str(entry["content"])
+        for entry in current_direct_evidence(conn, plan, task)
+        if entry["name"] == ledger_spec.DIRECT_COMPLETION_SECTION
+    ]
+
+
+def direct_completion_record_complete(conn: sqlite3.Connection, plan: str, task: str) -> bool:
+    """Report whether a zero-attempt task holds complete durable direct-completion evidence.
+
+    The direct route has no runner and therefore cannot create the attempt-owned report sections.
+    It uses the ordinary durable task-section carrier at attempt zero instead.
+
+    Returns:
+        True when a direct record has every non-empty required evidence field.
+    """
+    for content in direct_completion_record_contents(conn, plan, task):
+        fields = {
+            line.partition(":")[0]: line.partition(":")[2].strip() for line in content.splitlines() if ":" in line
+        }
+        if all(fields.get(field) for field in ledger_spec.DIRECT_COMPLETION_FIELDS):
+            return True
+    return False
+
+
 def payload_reason(payload: object) -> str | None:
     """Read the ``reason`` out of one event payload as it comes back from the database.
 
@@ -928,7 +1033,8 @@ def read(conn: sqlite3.Connection, plan: str, task: str, *, attempt: int | None 
     """Read one task with its sections, renewing the lease when an attempt is named.
 
     Without ``attempt`` this reads, renews nothing and appends nothing. With ``attempt`` on an
-    in-progress task it renews the lease.
+    in-progress task it renews the lease. Reclaimed or replaced direct evidence remains auditable
+    in the event log but is excluded from the returned sections.
 
     Args:
         conn: An open ledger connection.
@@ -937,7 +1043,7 @@ def read(conn: sqlite3.Connection, plan: str, task: str, *, attempt: int | None 
         attempt: The attempt the runner holds, or None.
 
     Returns:
-        A result carrying the task row and every section row, headed unconditionally by
+        A result carrying the task row and its current sections, headed unconditionally by
         ``ledger_spec.AUTHORITY_SECTION`` and then by ``ledger_spec.RESPONSE_SECTION`` when the task
         carries an orchestrator response.
     """
@@ -948,7 +1054,7 @@ def read(conn: sqlite3.Connection, plan: str, task: str, *, attempt: int | None 
             plan=plan,
             task=task,
             row=row,
-            sections=with_authority(row, with_response(row, sections_of(conn, plan, task))),
+            sections=with_authority(row, with_response(row, current_sections(conn, plan, task))),
         )
     events: list[str] = []
     with store.transaction(conn):
@@ -960,7 +1066,7 @@ def read(conn: sqlite3.Connection, plan: str, task: str, *, attempt: int | None 
             renew_lease(conn, row, moment, via="read")
             events.append("lease.renewed")
         row = fetch_task(conn, plan, task)
-        found_sections = with_authority(row, with_response(row, sections_of(conn, plan, task)))
+        found_sections = with_authority(row, with_response(row, current_sections(conn, plan, task)))
     return TransitionResult(
         command="read", plan=plan, task=task, row=row, sections=found_sections, events=events, attempt=attempt
     )
@@ -1253,6 +1359,8 @@ def update(
                 require_open_attempt(row)
         if section in ledger_spec.REPORT_SECTIONS and attempt is None:
             refuse("attempt-required")
+        if section == ledger_spec.DIRECT_DIVERGENCE_SECTION and int(row["attempts"] or 0) != 0:
+            refuse("direct-divergence-attempt")
         if section is not None:
             append_section(
                 conn,
@@ -1670,7 +1778,8 @@ def state(
             typed optional rather than required so a caller cannot reach this transition without
             the refusal running, the way a required ``str`` parameter would let a caller who
             forwards its own optional input pass ``None`` straight through unchecked.
-        force: Waive the acceptance, lease and report checks and clear acceptance.
+        force: Waive the acceptance and lease checks and clear acceptance. Completion evidence
+            remains required.
 
     Returns:
         A result naming the resulting status and every task the cascade skipped.
@@ -1692,8 +1801,13 @@ def state(
         if not force and int(row["attempt_open"] or 0) == 1:
             refuse("leased")
         attempts = int(row["attempts"] or 0)
-        if new_status == COMPLETE and attempts > 0 and not force and not report_complete(conn, plan, task, attempts):
+        if new_status == COMPLETE and attempts > 0 and not report_complete(conn, plan, task, attempts):
             refuse("report-missing")
+        if new_status == COMPLETE and attempts == 0:
+            if not direct_completion_record_contents(conn, plan, task):
+                refuse("direct-record-missing")
+            if not direct_completion_record_complete(conn, plan, task):
+                refuse("direct-record-incomplete")
         conn.execute(
             "UPDATE tasks SET status = :status, attempt_open = 0, accepted = :accepted, completed = :completed "
             "WHERE plan = :plan AND id = :task",

@@ -8,8 +8,7 @@ user-invocable: false
 
 Stack-specific rules loaded by `dh:code-reviewer` when `tsconfig.json`, `*.ts`, or `*.tsx` files are detected.
 
-Read [Review principles](../../docs/review-principles.md) before applying these checks; it defines
-authority, applicability, evidence, and blocking criteria. Also apply Node.js checks for Node
+Load `/dh:review-principles` before applying these checks. Also apply Node.js checks for Node
 execution and Web checks for browser rendering, including TSX; language checks do not replace
 runtime checks.
 

@@ -1,6 +1,6 @@
 ---
 name: task-worker
-description: Blank-canvas SAM task executor carrying the dh tools and skills a workflow needs — reads a task from the work ledger, loads the specialist agent profile named by the task's agent field, then runs start-task. A dispatch-owned attempt adds runner persistence and closure; a direct task run returns its result and material divergence disposition without changing runner state. Use in place of a generic agent whenever a dh workflow dispatches a ledger task and no prebuilt specialist fits, or when the fitting specialist cannot reach the SAM CLI needed to read the task and close a dispatch-owned attempt.
+description: Blank-canvas SAM task executor carrying the dh tools and skills a workflow needs — receives a task address and optional attempt number, reads the task from the work ledger, loads the specialist agent profile named by the task's agent field, then runs start-task. A dispatch-owned attempt adds runner persistence and closure; a direct task run returns its result and material divergence disposition without changing runner state. Use in place of a generic agent whenever a dh workflow dispatches a ledger task and no prebuilt specialist fits, or when the fitting specialist cannot reach the SAM CLI needed to read the task and close a dispatch-owned attempt.
 model: sonnet
 skills:
   - dh:dh-cli-usage
@@ -52,10 +52,13 @@ The result carries the task row and its sections. Two of them decide what you do
 
 If the command fails or returns an error: output the exact error text and return STATUS: BLOCKED.
 
-With an attempt, `dispatch` already opened it, so there is nothing to claim. The CLI's `plan claim`
-command does not reach the ledger: it writes to the content store, leaving the ledger row untouched
+When the dispatcher supplied an attempt, it is already open. `dispatch` opened it when the
+orchestrator launched you, so there is nothing for you to claim, and the CLI's `plan claim` command
+does not reach the ledger at all — it writes to the content store, leaving the ledger row untouched
 and the orchestrator watching a task that never moved. Without an attempt, do not claim, renew,
-append task sections, or close a runner attempt.
+append attempt-owned sections, or close a runner attempt. A zero-attempt direct task may append
+`Direct Divergence Notes` or `Direct Completion Record`; after any runner attempt, return the
+direct-route refusal and let that attempt's report-and-finish contract own persistence.
 
 ## Step 2 — Load Agent Profile (if specified)
 
@@ -83,9 +86,10 @@ authorization or specialist profile. For a test-review-only task, load `/dh:test
 and preserve its read-only boundary. Both feed the existing verification and completion contract.
 
 Load the `dh:start-task` skill with the plan address, task ID, and the attempt number when the
-dispatch supplied one (`{plan} --task {task_id} --attempt {A}`). It loads `dh:reuse-before-build`
-in runner mode when an implementation choice needs the gate. A worker without an attempt must not
-invoke the handoff's attempt-owned persistence or closure commands.
+dispatch supplied one (`{plan} --task {task_id} --attempt {A}`). When selecting an implementation
+approach that may duplicate an existing solution, load `dh:reuse-before-build` in runner mode. A
+worker without an attempt must not invoke the handoff's attempt-owned persistence or closure
+commands.
 
 `start-task` owns the round from here:
 
@@ -116,14 +120,22 @@ NOTES: {design decisions, discoveries, out-of-scope work identified}
 Without an attempt, return the completed implementation and reuse decision as `STATUS: DONE`, or
 `STATUS: BLOCKED` when the stated work cannot be completed. Include the same task report body. In
 `NOTES:`, preserve each material divergence from `start-task` with its plan artifact, quoted claim,
-actual implementation, classification, and recorded timestamp; this is caller output, not a ledger
-section or a runner-owned count. Then include:
+actual implementation, classification, and recorded timestamp. `start-task` persists the same body
+as `Direct Divergence Notes` at attempt zero before this response, or in `Direct Completion Record`
+when this dispatch owns zero-attempt `--complete`; neither is a runner report, attempt, or count.
+Then include exactly one matching ledger summary:
+
+```text
+LEDGER: no runner attempt; direct --complete recorded task state after Direct Completion Record readback
+```
 
 ```text
 LEDGER: no runner attempt; no ledger closure was requested
 ```
 
-That response is immediate caller output, not a `Completion Report`, refusal, or `plan finish`.
+Use the first only when this dispatch completed the documented zero-attempt direct route; otherwise
+use the second. That response is immediate caller output, not a `Completion Report`, refusal, or
+`plan finish`.
 
 ## Cross-References
 
