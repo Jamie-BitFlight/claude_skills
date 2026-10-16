@@ -30,10 +30,10 @@ flowchart TD
     R1 -->|"Zero results"| S2["Strategy 2 — filter-first<br>backlog_list(topic='{slug}')"]
     S2 --> R2{Results?}
     R2 -->|"One or more matches"| UseS2["Use Strategy 2 result"]
-    R2 -->|"Zero results"| NoMatch["No match found<br>— proceed to Step 4 (create new item)"]
-    UseS1 --> Step4["Step 4: Link or Create"]
-    UseS2 --> Step4
-    NoMatch --> Step4
+    R2 -->|"Zero results"| NoMatch["No match found<br>— proceed to Step 3 admission and scope"]
+    UseS1 --> Step3["Step 3: Admit and classify before linking or creating"]
+    UseS2 --> Step3
+    NoMatch --> Step3
 ```
 
 **Strategy 1 — substring via `title=`**
@@ -58,33 +58,46 @@ The `topic` parameter performs a case-insensitive substring match against `metad
 
 If Strategy 2 returns one or more items, use the first match.
 
-If both strategies return zero results, treat as "no match found" and proceed to Step 4.
+If both strategies return zero results, retain "no match found" and proceed to Step 3 admission and scope before deciding whether Step 4 may create work.
 
 **Error handling**: If either `backlog list` call above fails, log the error, skip
-that strategy, and continue to the next strategy (or to Step 4 as "no match found" if all
+that strategy, and continue to the next strategy (or to Step 3 admission as "no match found" if all
 strategies fail). If the follow-up plan's `feature` field does not match the expected
 `{slug}-followup-{k}` pattern, log a warning and use the full `feature` value (with hyphens replaced by spaces) as the derived slug.
 
 ### Step 3: Classify Follow-up Findings
 
 For each follow-up plan, read its `context` field via
-`sam_plan(plan="{followup_plan_address}", config={"action": "read"})` and check for a `## Scope` section:
+`sam_plan(plan="{followup_plan_address}", config={"action": "read"})`, then load
+`dh:review-principles` before classifying scope or creating backlog work. That skill owns the
+admission record and the decision whether the concern can become a blocker or another work branch.
 
-- If `## Scope` is absent: default to **in-scope** and emit:
-  `WARNING: No ## Scope section in follow-up plan {followup_plan_address}. Defaulting to in-scope.`
-- If `## Scope: out-of-scope`: route immediately to backlog via `backlog_add` and
-  continue to the next follow-up. Do NOT proceed to Step 4 for this follow-up.
+1. Establish the relation to the parent task from the existing follow-up plan and parent-task
+   evidence. If it is not established, emit
+   `ADVISORY — RELATION UNESTABLISHED: {followup_plan_address}`. Preserve the plan reference and
+   concern in the caller's existing report, but do not add it to `{pending_followup_plan_addresses}`,
+   create or link backlog work, recurse, or block completion. Continue to the next follow-up.
+2. Once the relation is admitted, classify scope. Use `## Scope` when the context supplies it;
+   when it does not, determine scope from the existing plan and parent-task evidence. The absence
+   of that heading alone neither rejects the relation nor permits completion. If the available
+   evidence cannot establish scope, emit
+   `SCOPE UNESTABLISHED — PENDING ATTRIBUTION: {followup_plan_address}`, preserve the same
+   information, add its address to `{pending_followup_plan_addresses}`, and do not create, link,
+   recurse, or silently discard it.
+3. An admitted out-of-scope follow-up routes to backlog via `backlog_add` and continues to the
+   next follow-up. An admitted in-scope follow-up proceeds to Step 4.
 
 The following diagram is the authoritative procedure for Step 3 Classify Follow-up Findings. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
 
 ```mermaid
 flowchart TD
-    ReadScope["sam_plan(plan='{followup_plan_address}', config={action:'read'})<br>locate '## Scope' in context field"] --> ScopeExists{"Does '## Scope' section<br>exist in plan context?"}
-    ScopeExists -->|"No — section absent"| WarnDefault["Emit: WARNING: No ## Scope section in follow-up plan {followup_plan_address}.<br>Defaulting to in-scope."]
-    WarnDefault --> InScope["IN-SCOPE — proceed to Step 4"]
-    ScopeExists -->|"Yes"| ScopeValue{"## Scope field value?"}
-    ScopeValue -->|"'out-of-scope'"| OutScope["OUT-OF-SCOPE — route to backlog via backlog_add<br>Continue to next follow-up"]
-    ScopeValue -->|"Any other value (e.g. 'in-scope')"| InScope
+    ReadPlan["Read follow-up plan context and parent-task evidence"] --> Relation{"dh:review-principles<br>admits relation?"}
+    Relation -->|"No"| AdvisoryRelation["ADVISORY — RELATION UNESTABLISHED<br>preserve plan + concern; no blocker or work branch; next follow-up"]
+    Relation -->|"Yes"| Scope["Use ## Scope when present;<br>otherwise determine scope from existing evidence"]
+    Scope --> ScopeKnown{"Scope established?"}
+    ScopeKnown -->|"No"| PendingScope["SCOPE UNESTABLISHED — PENDING ATTRIBUTION<br>admitted material obligation; mark pending; stop this follow-up"]
+    ScopeKnown -->|"Yes: out-of-scope"| OutScope["OUT-OF-SCOPE — route to backlog via backlog_add<br>Continue to next follow-up"]
+    ScopeKnown -->|"Yes: in-scope"| InScope["IN-SCOPE — proceed to Step 4"]
 ```
 
 Out-of-scope backlog_add call pattern:
@@ -133,6 +146,29 @@ backlog update --selector "{derived_title}" --plan "{followup_plan_address}"
 
 ### Step 5: Recursion Gate
 
+### Guard 0: Admission and progress check
+
+Before any recursion, load `dh:review-principles`. Confirm that Step 3 established its admission
+record and that the proposed repeated review supplies the new distinguishing information it
+requires.
+
+If admission is missing, preserve the concern as `ADVISORY — RELATION UNESTABLISHED` in the caller's
+existing report. Do not add it to `{pending_followup_plan_addresses}`, create another work branch,
+or block completion; continue to the next follow-up.
+
+If a material relation is admitted but distinguishing progress is missing, output:
+
+```text
+RECURSION STOPPED — PROGRESS UNESTABLISHED
+Follow-up task: {followup_plan_address}
+Required: new distinguishing information or task-owner disposition
+```
+
+Preserve the admitted material obligation, add its address to `{pending_followup_plan_addresses}`,
+and do not create another review, test harness, discovery proof, environment, or recursion branch.
+Continue to the next follow-up if any remain. The parent status gate blocks completion until this
+admitted obligation has a disposition through the caller's existing contract.
+
 ### Guard 1: Depth check
 
 Before evaluating conditions, check the recursion counter:
@@ -179,12 +215,13 @@ If the planner-rt-ica artifact for this follow-up contains BLOCKED-FOR-PLANNING:
 If no BLOCKED-FOR-PLANNING signal: continue to Condition 1.
 
 **Evaluation order for each in-scope follow-up:**
-1. Guard 1: depth check (`{recursion_depth} >= 5` → stop all)
-2. Guard 2: RT-ICA BLOCKED check (`BLOCKED-FOR-PLANNING` in plan artifact → stop this follow-up)
-3. Condition 1: slug match
-4. Condition 2: High priority
-5. Both Conditions 1 and 2 met → increment depth, recurse
-6. Either not met → defer to backlog
+1. Guard 0: relation and progress check (missing → preserve pending attribution, stop this follow-up)
+2. Guard 1: depth check (`{recursion_depth} >= 5` → stop all)
+3. Guard 2: RT-ICA BLOCKED check (`BLOCKED-FOR-PLANNING` in plan artifact → stop this follow-up)
+4. Condition 1: slug match
+5. Condition 2: High priority
+6. Both Conditions 1 and 2 met → increment depth, recurse
+7. Either not met → defer to backlog
 
 For each follow-up plan, evaluate two conditions. BOTH must be true for recursion.
 
@@ -204,7 +241,8 @@ Increment {recursion_depth} by 1 before invoking implement-feature.
 Skill(skill="implement-feature", args="{followup_plan_address}")
 ```
 
-Then re-run `complete-implementation` on `{followup_plan_address}`.
+Then re-run `complete-implementation` on `{followup_plan_address}` only when the completed
+follow-up supplies the changed source, evidence, conditions, or hypothesis Guard 0 requires.
 
 **If EITHER condition is NOT met** -- defer to backlog:
 

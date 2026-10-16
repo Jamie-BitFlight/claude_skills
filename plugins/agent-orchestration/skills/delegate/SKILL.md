@@ -64,6 +64,12 @@ Both prompts open with the same two lines — copy them verbatim onto the first 
 PHASE: <one of the phase names>
 TASK: <one sentence>
 
+ORIGINAL OUTCOME:
+- <the user's requested outcome>
+
+ADMISSION:
+- <the acceptance criterion this phase advances, or the applicable source contract>
+
 OBSERVATIONS:
 - <facts already in your context: user statements, prior STATUS reports, verbatim errors, file:line if known>
 
@@ -102,9 +108,25 @@ Phase rows for `YOUR TASK`:
 | report | State what changed and the evidence for it: files, commands, outputs. Make no claim the evidence does not support. |
 | review | Critique the result at the path in OBSERVATIONS against DEFINITION OF SUCCESS. Report gaps, contradictions, unsupported claims. Fix nothing. |
 
+## Task-intent admission
+
+Every delegated phase records:
+
+- `ORIGINAL OUTCOME`: the user's requested outcome; and
+- `ADMISSION`: the acceptance criterion it advances or applicable source contract.
+
+An explicit skill or command selects its route. Discovery evidence is admitted only when the task or applicable contract makes autonomous routing a criterion.
+
+A finding blocks only when its evidence shows a concrete impact on the ORIGINAL OUTCOME or ADMISSION. Direct security, data-loss, and correctness blockers remain blocking. Record other suggestions as advisory; they do not create a new test, subtask, or merge block.
+
+Re-dispatch only when it can add new evidence, test a falsifiable hypothesis, correct a named defect, or use a changed condition to advance the ORIGINAL OUTCOME. Name that information value and what remains. For a missing input, re-dispatch when it can resolve the admitted criterion; otherwise change the approach or escalate.
+
+The two-attempt re-dispatch cap is a terminal safeguard, not a reason to retry without new information. At the cap, report `BLOCKED` with the named gap.
+
 Rules for filling it in:
 
 - A section you cannot fill from what is already in your context is omitted, not invented. Empty OBSERVATIONS or ECOSYSTEM CONTEXT is a valid state; a guess is not.
+- Fill ORIGINAL OUTCOME and ADMISSION as [Task-intent admission](#task-intent-admission) defines.
 - OBSERVATIONS is pass-through: only what is already in your context. Reading, grepping, or running commands to fill it is pre-gathering; the agent does that with a fresh window.
 - State observations as facts ("exit code 1", "the error text is: …"). Where you hold a hypothesis, label it: `Hypothesis to verify: …`.
 - Constraints are outcomes and boundaries, never steps. Naming the project's own gate in Commands is a constraint, not a step.
@@ -116,6 +138,12 @@ Rules for filling it in:
 ```text
 PHASE: <write | validate | test | read>
 TASK: <the exact instruction — the edit to make, the pattern to find, the command to run>
+
+ORIGINAL OUTCOME:
+- <the user's requested outcome>
+
+ADMISSION:
+- <the acceptance criterion this phase advances, or the applicable source contract>
 
 FILES:
 - <exact paths>
@@ -134,10 +162,7 @@ Reports are claims. For each one:
 - Check that the evidence supports the conclusion. "Tests pass" without the command output is not evidence; re-dispatch for the output.
 - Judge the returned work; do not re-derive it. Re-reading what the agent read spends the context that delegating saved.
 - Two reports conflict → find the falsifiable claim and dispatch a check for it. Confidence is not a tiebreaker.
-- `PARTIAL` → re-dispatch the remainder, naming exactly what is left.
-- `BLOCKED` on a missing input → supply it and re-dispatch. `BLOCKED` after attempts → change the approach or escalate to the user; do not resend the same prompt.
-
-Re-dispatch the same phase at most twice on the same gap. After that, stop and report `BLOCKED` to the user with the gap named.
+- Apply [Task-intent admission](#task-intent-admission) before treating a finding as blocking or scheduling a re-dispatch.
 
 Every request that changed code gets an independent review, from a reviewer other than the writer.
 

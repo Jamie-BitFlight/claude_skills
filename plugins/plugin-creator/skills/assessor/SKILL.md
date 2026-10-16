@@ -30,7 +30,10 @@ Verify the report exists, contains the score and marketplace-readiness result, a
 
 Activate `/plugin-creator:audit-skill-completeness` for individual marketplace candidates, low-scoring skills, or when the user requests deep quality evaluation. Otherwise record that this optional audit was not run.
 
-Phase 1 is complete when the structural report and both lifecycle audit results are present, and every optional-audit decision is recorded.
+Load `/plugin-creator:assessment-reporting` and apply its Finding Admission section before deciding
+which Phase 1 findings enter the executable plan. Preserve every finding in the reports.
+
+Phase 1 is complete when the structural report and both lifecycle audit results are present, every optional-audit decision is recorded, and each finding is marked admitted or advisory.
 
 ## Phase 2: Design
 
@@ -39,7 +42,7 @@ Dispatch `plugin-creator:refactor-planner` with:
 - **Input:** the complete Phase 1 assessment and audit results.
 - **Target:** `.plugin-creator/plans/refactor-design-{plugin-slug}.md`, where the slug is the plugin directory name.
 - **Context:** plugin root, current component paths, all findings, and validator output. Treat SK006/SK007 findings as the source of truth for complexity; do not copy numeric thresholds.
-- **Required content:** every finding mapped to a concrete transformation, target path, dependencies, preserved behavior, and safe parallelization group. Include split plans, agent optimizations, documentation changes, and orphan resolutions only when present in the findings.
+- **Required content:** every admitted finding mapped to a concrete transformation, target path, dependencies, preserved behavior, and safe parallelization group. Keep advisory findings in the report with their rationale, but do not create a transformation. Include split plans, agent optimizations, documentation changes, and orphan resolutions only when present in admitted findings.
 - **Completion:** write the target and return `STATUS: DONE` with its path, or `STATUS: BLOCKED` with the missing input.
 
 Read the design and verify every Phase 1 finding has one disposition. Phase 2 is complete when the design exists and has no undisposed finding.
@@ -50,7 +53,7 @@ Dispatch `plugin-creator:refactor-planner` with:
 
 - **Inputs:** `.plugin-creator/plans/refactor-design-{plugin-slug}.md` and the existing `.plugin-creator/plans/REFACTOR-PLAN.md` when present.
 - **Targets:** `.plugin-creator/plans/tasks-refactor-{plugin-slug}.md` and the matching plan-index entry.
-- **Task contract:** each task names its ID, type, target, dependencies, priority, execution role, at least three acceptance criteria, required inputs, expected outputs, at least three verification steps, and safe parallel peers. Express ordering through dependencies rather than temporal estimates.
+- **Task contract:** create tasks only for admitted transformations. Each task names its ID, type, target, dependencies, priority, execution role, at least three acceptance criteria, required inputs, expected outputs, at least three verification steps, and safe parallel peers. Express ordering through dependencies rather than temporal estimates.
 - **Routing:** `SKILL_SPLIT` to `/plugin-creator:refactor-skill`; `AGENT_OPTIMIZE` to `plugin-creator:subagent-refactorer`; `DOC_IMPROVE` to `plugin-creator:ai-doc-optimizer`; read-only audits to `plugin-creator:skill-auditor`; upstream synchronization to `plugin-creator:skill-content-updater`; description-only work to `/plugin-creator:write-frontmatter-description`.
 - **Verification tasks:** validate the completed plugin, then update plugin documentation when the design requires it.
 - **Completion:** write both targets and return `STATUS: DONE` with paths and parallelization groups, or `STATUS: BLOCKED` with the missing input.

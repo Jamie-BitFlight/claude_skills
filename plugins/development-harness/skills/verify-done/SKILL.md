@@ -15,6 +15,9 @@ user-invocable: true
 - [ ] **Type:** FIX / FEATURE / REFACTOR / DOCS / INVESTIGATION
 - [ ] **Strategy:** Executable verification vs. Static verification?
 
+For shared admission and progress guidance, load `dh:review-principles`; use
+`dh:validation-protocol` to select local validation evidence.
+
 ---
 
 > [!IMPORTANT]
@@ -33,10 +36,9 @@ flowchart TD
     Start(["Begin WORKS Check -- Section 2"]) --> Q{"Task type?"}
     Q -->|"Executable code -- compiled, scripted, or CLI-run"| A1["Execution check<br>Terminal output showing successful run<br>(exit code 0 is NOT enough)"]
     Q -->|"Static asset -- docs, configs, analysis"| B1["Accuracy check<br>Verified against source code or schema?"]
-    A1 --> A2["Real data check<br>Ran changed code path against real data<br>not just read the diff?"]
-    A2 --> A3["Regression check<br>Evidence that existing tests still pass?"]
-    A3 --> A4["Edge case check<br>Evidence of testing failure scenarios?"]
-    A4 --> AEvidence["Record code evidence<br>execution output, real data test,<br>test results, edge case result"]
+    A1 --> A2["Load review-principles<br>and follow its admission result"]
+    A2 --> A3["Run admitted direct evidence<br>and required configured gates"]
+    A3 --> AEvidence["Record code evidence and status"]
     B1 --> B2["Clarity check<br>Follows the established format?"]
     B2 --> B3["Validity check<br>Links and references resolve?"]
     B3 --> BEvidence["Record static evidence<br>accuracy check method,<br>format standard, link validation method"]
@@ -47,16 +49,15 @@ flowchart TD
 ### A. For Code (Executable)
 
 - [ ] **Execution:** Terminal output showing successful run? (Exit code 0 is NOT enough)
-- [ ] **Real data:** Ran the changed code path against real data, not just read the diff?
-- [ ] **Regression:** Evidence that existing tests still pass?
-- [ ] **Edge Cases:** Evidence of testing failure scenarios?
+- [ ] **Direct evidence:** Ran the evidence admitted by `dh:review-principles`?
+- [ ] **Regression:** Ran required configured gates?
 
 ```text
 EVIDENCE:
 - Execution output: [paste actual output]
-- Real data test: [command run, input used, output observed]
-- Test results: [paste test output]
-- Edge case tested: [describe scenario and result]
+- Direct evidence: [command, input, observed result, or owner-returned status]
+- Test results: [configured command and output]
+- Evidence status: [observed / not applicable / evidence-limited]
 ```
 
 ### B. For Static Assets (Docs, Configs, Analysis)
@@ -85,16 +86,16 @@ For bug fixes specifically:
 EVIDENCE:
 - Pre-fix behavior: [what was observed]
 - Post-fix behavior: [what is now observed]
-- Regression test added: [yes/no, location]
+- Retained-test decision: [location or `NO NEW TEST JUSTIFIED`]
 ```
 
 ---
 
 ## 4. Quality Gates
 
-- [ ] Pre-commit hooks passed?
-- [ ] Linting passed?
-- [ ] Type checking passed? (if applicable)
+- [ ] Required configured quality gates passed?
+- [ ] Linting passed? (if configured/applicable)
+- [ ] Type checking passed? (if configured/applicable)
 
 ```text
 EVIDENCE:
@@ -118,8 +119,8 @@ flowchart TD
     Q1 -->|"present"| Q2{"Classification type?"}
     Q2 -->|"procedural"| P["Sweep completeness<br>Codebase search returns zero<br>remaining instances of the pattern"]
     Q2 -->|"defect"| D["Root cause addressed<br>Fix targets root cause from evidence chain<br>+ scenario in scenario-target succeeds"]
-    Q2 -->|"recurring-pattern"| R["Guardrail added<br>New gate/check exists AND<br>covers the defect CLASS not just instance"]
-    Q2 -->|"missing-guardrail"| M["Gate gap filled<br>Guardrail triggers in the<br>exposing scenario"]
+    Q2 -->|"recurring-pattern"| R["Apply review-principles result<br>and record proportional evidence"]
+    Q2 -->|"missing-guardrail"| M["Apply review-principles result<br>and record proportional evidence"]
     Q2 -->|"unbounded-design"| U["Design implemented<br>Matches chosen direction +<br>trade-offs documented"]
     P --> Evidence
     D --> Evidence
@@ -194,14 +195,14 @@ If any of these thoughts occur, STOP and run the verification command:
 
 | Claim           | Required Evidence                                        |
 | --------------- | -------------------------------------------------------- |
-| "Code works"    | Terminal output showing execution against real data      |
+| "Code works"    | Direct observation that distinguishes the stated outcome |
 | "Tests pass"    | Actual test output, not assumption                       |
 | "Bug fixed"     | Before/after comparison                                  |
 | "Data synced"   | Read the destination after writing — not the tool output |
 | "Docs accurate" | Cross-reference with source                              |
 | "Config valid"  | Validation command output                                |
 | "Root cause fixed" | Evidence chain from grooming + fix addresses root cause claim |
-| "Guardrail added"  | New gate/check exists and triggers in exposing scenario       |
+| "Guardrail added"  | Owner-admitted guardrail triggers in exposing scenario |
 | "Agent completed"  | VCS diff reviewed + independent verification command run     |
 
 ---

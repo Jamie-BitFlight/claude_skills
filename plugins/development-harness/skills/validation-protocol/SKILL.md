@@ -23,6 +23,11 @@ Before claiming any fix works, follow this scientific validation protocol.
 
 A fix that "runs without failing" is not validated. A fix that demonstrates the specific expected outcome is validated.
 
+## Scope Each Validation Branch
+
+Load `dh:review-principles` before continuing with an extra validation branch or a review-raised
+requirement. Record its applicability and evidence status through the evidence fields below.
+
 ## The Protocol
 
 ### Step 1: Reproduce the Failing State
@@ -109,6 +114,8 @@ Success Criteria:
 - Confirm the success criteria from Step 2 are satisfied
   - Each criterion must be met with evidence
   - Partial success is not success
+- Carry out the direct observation admitted by `dh:review-principles`, then run required configured
+  quality gates and applicable safety, migration, or correctness contracts.
 - Document the verification evidence
 
 **Example**:
@@ -176,8 +183,8 @@ Step 4: Verified count matches expected value exactly
 
 ```text
 Step 3: Applied fix
-Step 4: Ran test suite - all 45 tests pass
-Step 4: Manually tested edge case - correct behavior observed
+Step 4: Re-ran the reproduction and observed the success criterion
+Step 4: Ran the applicable configured quality gate
 Step 4: Checked logs - no error messages, expected INFO logs present
 ```
 
@@ -187,7 +194,7 @@ Step 4: Checked logs - no error messages, expected INFO logs present
 "The main case works, so the fix is complete."
 ```
 
-**Problem**: Edge cases and boundary conditions may still be broken.
+**Problem**: A stated failure or boundary contract may still be unverified.
 
 **Correct Approach**:
 
@@ -209,9 +216,10 @@ This validation protocol complements but does not replace automated testing:
 
 **Validation Protocol**: Ensures the specific fix addresses the specific problem observed
 
-**Use both**:
+**Use direct validation and retained protection separately**:
 
-1. Follow validation protocol to verify the fix
-2. Add automated test to prevent regression
-3. Run full test suite to ensure no new issues
+1. Follow this protocol to verify the fix.
+2. Use `dh:test-designer` and the test-admission gate to decide whether a maintained regression
+   test has unique protection or return `NO NEW TEST JUSTIFIED`.
+3. Run required configured quality gates and record the `dh:review-principles` evidence status.
 

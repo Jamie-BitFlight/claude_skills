@@ -1,21 +1,25 @@
 # MCP Server Evaluation Guide [1]
 
-Complete guide for creating comprehensive evaluations to test whether LLMs can effectively use your MCP server to answer realistic, complex questions.
+Create evaluations that show whether an LLM can use your MCP server to achieve promised client outcomes.
 
 ## Purpose
 
-GOAL: The measure of MCP server quality is how well implementations enable LLMs with NO other context and access ONLY to the MCP server to answer realistic and difficult questions.
+GOAL: Measure whether an LLM with NO other context and access ONLY to the MCP server can achieve realistic, promised client outcomes.
+
+Every evaluation case must connect to a promised client outcome, a changed tool contract, an acceptance criterion, or a material client risk. The case must state the scenario, the failure it distinguishes, the answer oracle, and the existing environment and cost needed to run it. Keep that admission record in the existing task plan, review, or evaluation notes; the XML file remains only a question and answer.
 
 ## Overview
 
-REQUIREMENT: Create 10 human-readable questions requiring ONLY READ-ONLY, INDEPENDENT, NON-DESTRUCTIVE, and IDEMPOTENT operations to answer.
+REQUIREMENT: Create enough human-readable questions to cover the admitted outcomes and material risks. Use ONLY READ-ONLY, INDEPENDENT, NON-DESTRUCTIVE, and IDEMPOTENT operations.
+
+Question count and tool-call count are measurements, not targets. Do not add cases merely to reach a fixed count or require long tool sequences merely to make an evaluation harder.
 
 Each question must be:
 
 - Realistic
 - Clear and concise
 - Unambiguous
-- Complex (requiring potentially dozens of tool calls or steps)
+- Directly discriminating: a pass rules out a meaningful client or contract failure
 - Answerable with a single, verifiable value identified in advance
 
 ## Question Guidelines
@@ -30,37 +34,37 @@ RULE: The model must require ONLY NON-DESTRUCTIVE AND IDEMPOTENT tool use
 
 CONSTRAINT: Questions should not instruct or require modifying state to arrive at correct answer
 
-RULE: The model must create REALISTIC, CLEAR, CONCISE, and COMPLEX questions
+RULE: The model must create REALISTIC, CLEAR, CONCISE questions that discriminate the admitted outcome or risk
 
-CONSTRAINT: Must require another LLM to use multiple (potentially dozens of) tools or steps to answer
+CONSTRAINT: Use only the number of calls and steps required by the promised workflow. A single call is valid when it is the cheapest direct check.
 
 ### Complexity and Depth
 
 PATTERN: Multi-hop questions requiring multiple sub-questions and sequential tool calls
 
-CONSTRAINT: Each step should benefit from information found in previous questions
+CONSTRAINT: Use this only when the client outcome requires information from earlier calls.
 
-PATTERN: Extensive paging through multiple pages of results
+PATTERN: Paging through multiple pages of results
 
-CONSTRAINT: May require querying old data (1-2 years out-of-date) to find niche information
+CONSTRAINT: Use this only when pagination or historical retrieval is part of the promised tool contract or a material client risk.
 
 PATTERN: Deep understanding rather than surface-level knowledge
 
 CONSTRAINT: May pose complex ideas as True/False questions requiring evidence or use multiple-choice format
 
-RULE: The model must NOT make questions solvable with straightforward keyword search
+RULE: The model must test the reasoning or navigation the client outcome requires
 
 CONSTRAINT:
 
-- Do not include specific keywords from target content
-- Use synonyms, related concepts, or paraphrases
-- Require multiple searches, analyzing multiple related items, extracting context, then deriving answer
+- Do not disguise a direct lookup merely to defeat keyword search
+- Use paraphrase, aggregation, or multiple searches only when the client task needs them
+- Keep the smallest question that distinguishes the intended failure
 
 ### Tool Testing
 
-PATTERN: Questions that stress-test tool return values
+PATTERN: Questions that exercise a tool's returned data
 
-CONSTRAINT: May elicit tools returning large JSON objects or lists, overwhelming the LLM
+CONSTRAINT: Exercise large results, filtering, or pagination only when the server promises that behavior or a realistic client outcome depends on it. Keep exploration and evaluation requests caller-bounded.
 
 PATTERN: Questions requiring understanding multiple modalities of data:
 
@@ -73,9 +77,9 @@ RULE: The model must create questions that MOSTLY reflect real human use cases
 
 CONSTRAINT: The kinds of information retrieval tasks that HUMANS assisted by an LLM would care about
 
-PATTERN: Questions that may require dozens of tool calls
+PATTERN: Questions requiring several tool calls
 
-CONSTRAINT: This challenges LLMs with limited context and encourages MCP server tools to reduce information returned
+CONSTRAINT: Retain the sequence only when removing a call would stop the case from distinguishing its admitted failure.
 
 PATTERN: Include ambiguous questions
 
@@ -94,14 +98,14 @@ CONSTRAINT:
 - Do not ask questions that rely on "current state" which is dynamic
 - Do not count: number of reactions to a post, number of replies to a thread, number of members in a channel
 
-RULE: The model must NOT let the MCP server RESTRICT the kinds of questions created
+RULE: The model must use only the server capabilities needed for an admitted case
 
 CONSTRAINT:
 
-- Create challenging and complex questions
-- Some may not be solvable with available MCP server tools
+- A case must be answerable with the available read-only tools
+- Record an unavailable promised capability as an evidence limit or implementation finding; do not invent an unsupported question
 - Questions may require specific output formats (datetime vs. epoch time, JSON vs. MARKDOWN)
-- Questions may require dozens of tool calls to complete
+- Use the smallest format and retrieval path that gives a stable oracle
 
 ## Answer Guidelines
 
@@ -176,30 +180,26 @@ CONSTRAINT:
 
 PROCEDURE:
 
-1. Read documentation of target API to understand available endpoints and functionality
-2. If ambiguity exists, fetch additional information from the web
-3. Parallelize this step AS MUCH AS POSSIBLE
-4. Ensure each subagent is ONLY examining documentation from file system or web
+1. Read only the documentation needed to identify the promised outcomes, changed contracts, acceptance criteria, and material risks
+2. Fetch additional documentation only to resolve a named unanswered task question
+3. Stop when the admission record has enough evidence to select the cheapest direct cases
+4. If exploration repeats, record the unresolved question or new evidence that justifies it
 
 ### Step 2: Tool Inspection
 
 PROCEDURE:
 
-1. List tools available in the MCP server
-2. Inspect the MCP server directly
-3. Understand input/output schemas, docstrings, and descriptions
-4. WITHOUT calling the tools themselves at this stage
+1. List the tools relevant to each admitted case
+2. Inspect their input/output schemas, docstrings, and descriptions
+3. Record the smallest read-only route that can produce each case's oracle
 
 ### Step 3: Developing Understanding
 
 PROCEDURE:
 
-1. Repeat steps 1 & 2 until you have good understanding
-2. Iterate multiple times
-3. Think about the kinds of tasks you want to create
-4. Refine your understanding
-5. At NO stage should you READ the code of the MCP server implementation itself
-6. Use intuition and understanding to create reasonable, realistic, but VERY challenging tasks
+1. Refine a candidate only when an unresolved task question or new evidence can change its admission, oracle, or route
+2. At NO stage should you READ the code of the MCP server implementation itself
+3. Stop when each retained case has an admitted purpose and a direct oracle
 
 ### Step 4: Read-Only Content Inspection
 
@@ -207,22 +207,19 @@ PROCEDURE:
 
 1. USE the MCP server tools
 2. Inspect content using READ-ONLY and NON-DESTRUCTIVE operations ONLY
-3. Goal: identify specific content for creating realistic questions
+3. Goal: identify the smallest stable content needed for one admitted question at a time
 4. Should NOT call any tools that modify state
 5. Will NOT read the code of the MCP server implementation itself
-6. Parallelize this step with individual sub-agents pursuing independent explorations
-7. Ensure each subagent is only performing READ-ONLY, NON-DESTRUCTIVE, and IDEMPOTENT operations
-8. BE CAREFUL: SOME TOOLS may return LOTS OF DATA causing you to run out of CONTEXT
-9. Make INCREMENTAL, SMALL, AND TARGETED tool calls for exploration
-10. In all tool call requests, use the `limit` parameter to limit results (<10)
-11. Use pagination
+6. Keep exploration incremental, small, and targeted
+7. Use caller-controlled `limit` and pagination when the tool supports them; do not assume every tool accepts `limit`
+8. Continue only while a call can resolve the case's named question or establish its oracle
 
 ### Step 5: Task Generation
 
 PROCEDURE:
 
-1. After inspecting the content, create 10 human-readable questions
-2. An LLM should be able to answer these with the MCP server
+1. Create one human-readable question for each admitted coverage need, removing duplicates that distinguish the same failure
+2. Confirm an LLM can answer it with the MCP server's read-only tools
 3. Follow all question and answer guidelines
 
 ## Output Format
@@ -344,9 +341,9 @@ PROCEDURE:
 2. Load each task instruction and in parallel using MCP server and tools, identify correct answer by attempting to solve the task YOURSELF
 3. Flag any operations that require WRITE or DESTRUCTIVE operations
 4. Accumulate all CORRECT answers and replace any incorrect answers in the document
-5. Remove any `<qa_pair>` that require WRITE or DESTRUCTIVE operations
+5. Remove any `<qa_pair>` that requires WRITE or DESTRUCTIVE operations, lacks an admitted outcome or risk, or cannot distinguish a material failure
 
-CONSTRAINT: Parallelize solving tasks to avoid running out of context, then accumulate all answers and make changes to file at the end
+CONSTRAINT: Preserve the XML schema of `<question>` and `<answer>`. Keep coverage and admission rationale in the existing task record rather than adding evaluation-only fields or tools.
 
 ## Evaluation Scripts
 
@@ -390,13 +387,12 @@ See evaluation.py source code for complete command-line options and transport ty
 
 ## Tips for Quality Evaluations
 
-1. **Think Hard and Plan Ahead** before generating tasks
-2. **Parallelize Where Opportunity Arises** to speed up process and manage context
-3. **Focus on Realistic Use Cases** that humans would actually want to accomplish
-4. **Create Challenging Questions** that test limits of MCP server's capabilities
-5. **Ensure Stability** by using historical data and closed concepts
-6. **Verify Answers** by solving questions yourself using MCP server tools
-7. **Iterate and Refine** based on what you learn during process
+1. **Start from task intent**: admit each case through an outcome, contract, criterion, or material risk.
+2. **Use the cheapest discriminator**: avoid extra calls, cases, or environments that do not change the decision.
+3. **Focus on realistic use cases** that humans would actually want to accomplish.
+4. **Ensure stability** by using historical data and closed concepts.
+5. **Verify answers** by solving each retained question with MCP server tools.
+6. **Refine only on evidence**: an unresolved task question or new evidence must justify another exploration or evaluation pass.
 
 ## Summary
 

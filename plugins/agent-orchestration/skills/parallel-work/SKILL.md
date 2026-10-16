@@ -15,6 +15,10 @@ Parallelism buys fresh context per unit and speed. It costs coordination: a fan-
 
 Missing any one → serialize, or investigate first.
 
+## Task-intent admission
+
+For fan-outs and loops, apply [delegate's task-intent admission](../delegate/SKILL.md#task-intent-admission) as a reference within the current parallel-work phase.
+
 ## Shapes
 
 **Fan-out, fan-in.** N dispatches of the same phase, one per unit, sent together. A single consolidating dispatch waits for all of them — that wait is the barrier — and merges their delivery files into one. Keep each unit's output in a file; the consolidator reads paths, not your context.

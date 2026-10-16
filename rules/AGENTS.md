@@ -44,6 +44,7 @@ been added yet.
 | `model-selection.md` | model/effort tier by cognitive requirement | routing line + `.claude/hooks/context-rules-agent.mjs` |
 | `proactive-fix-gate.md` | gate before acting on a self-discovered problem | routing line |
 | `scratch-directory.md` | `.tmp/scratch/` fallback output convention | routing line |
+| `task-outcome-discipline.md` | keeps delegated, reviewed, and validated work tied to the requested outcome | routing line |
 
 A `manifest.json` entry means `.claude/hooks/context-rules.mjs` loads the file when a touched path matches its
 glob — read the actual pattern in `manifest.json` itself, not restated here. "routing line" means
