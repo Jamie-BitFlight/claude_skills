@@ -87,9 +87,14 @@ Project skills share one directory body between `.agents/skills/` and `.claude/s
 through relative directory symlinks. Either direction is supported; do not copy or
 synchronize skill bodies. Codex follows the `.agents/skills/` links for discovery.
 The project also exposes native custom roles through `.codex/agents/*.toml`.
-The `example-argument-substitution` harness remains Claude-only: its positional and
-command substitutions require Claude's load-time preprocessing, so it has no Codex
-discovery link.
+Only workflows usable without Claude load-time preprocessing are linked. Skills
+requiring injected arguments, command output, or skill-directory macros remain at
+their canonical Claude paths without a Codex discovery link. The git-history
+workflow's zero-exclusion fallback would lose its packaged default filtering, so
+it is not exposed here. Script workflows with unresolved project-root commands
+or invalid CLI arguments are likewise not added; their canonical sources remain
+unchanged. Harness-specific tool names and optional integrations alone do not
+exclude an otherwise portable workflow.
 
 The trusted project's `.codex/config.toml` enables Ref and Context7 stdio MCP servers
 and retains core-only shell environment inheritance. Each MCP entry forwards its
