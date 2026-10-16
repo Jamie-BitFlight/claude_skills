@@ -49,6 +49,14 @@ The direct route is available only when that count is zero. If any prior attempt
 move it directly: return the applicable refusal or blocked response and route the task to that
 attempt's report-and-finish contract.
 
+Before completing, compare the reuse result with this task's requested outcome:
+
+- If required implementation depends on an `UNRESOLVED` choice, follow `dh:reuse-before-build`'s
+  task-local deferral/needs-input route. Preserve the decision in the existing task/report; do not
+  append a completion record or move that implementation task to `complete`.
+- A research or review task may finish with `UNRESOLVED` only when delivering that assessment fully
+  meets its own acceptance criteria. That result does not complete dependent implementation work.
+
 With zero prior attempts, persist the direct route's evidence before moving state. This uses the
 ordinary task-section carrier at attempt zero, not a runner-owned report or a fabricated attempt:
 
@@ -59,7 +67,7 @@ ordinary task-section carrier at attempt zero, not a runner-owned report or a fa
   --section-content "TASK: {what completed}
 FILES_CHANGED: {files or none}
 COMMITS: {commits or none}
-REUSE DECISION: {ADOPT|ADAPT|BUILD JUSTIFIED|UNRESOLVED plus evidence}
+REUSE DECISION: {ADOPT|ADAPT|BUILD JUSTIFIED plus evidence; UNRESOLVED only for a completed assessment}
 VERIFICATION: {each verification step and evidence, or none}
 NOTES: {every material divergence disposition, or none}"
 ```
