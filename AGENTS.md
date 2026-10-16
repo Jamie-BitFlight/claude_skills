@@ -153,6 +153,8 @@ Before linting, formatting, or type-checking, read `docs/linting-and-type-checki
 Before writing, running, or placing a test, read `docs/testing.md`. A changed file does not imply
 that a maintained test should be added; apply its admission gate and accept `NO NEW TEST JUSTIFIED`
 when existing protection or cheaper deterministic validation is sufficient.
+Before extending or repeating a delegation, review, validation, runtime, or test branch, read
+`rules/task-outcome-discipline.md`.
 Before validating an MCP server (protocol, Codex, or Claude plugin integration), read
 `docs/mcp-server-validation.md`. After modifying any MCP server in a plugin, load
 `/fastmcp-creator:fastmcp-client-cli` and validate against the plugin's source directory, not the

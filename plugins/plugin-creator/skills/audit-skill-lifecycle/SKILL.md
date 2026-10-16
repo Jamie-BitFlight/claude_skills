@@ -58,6 +58,13 @@ Execute 7 audit dimensions as defined in `references/skill-lifecycle-audit.md`. 
 | Scriptable Command Sequences | Identify multi-step shell command patterns that parse output and make decisions | List of scriptable sequences with complexity reduction estimates |
 | Self-Referential Pattern Learning | Classify discovered issues by detection pattern, re-scan using new patterns until no new patterns emerge | patterns.md catalog with pattern definitions and all instances |
 
+### Finding Admission and Repeat Scans
+
+Load `/plugin-creator:assessment-reporting` and apply its Finding Admission section before creating
+a recommendation, remediation dispatch, tracking task, extra validation, or blocking result. Audit
+every dimension and retain advisory findings in the report. Its repeat-scan rule controls any
+follow-up scan.
+
 ### Step 3: Report Generation
 
 Write audit artifacts to `.plugin-creator/audits/` directory:
@@ -159,8 +166,8 @@ As audit discovers issues:
 
 1. Classify each issue by detection pattern that found it (e.g., "one-directional domain reference", "unguarded Python version contradiction")
 2. Record pattern with description and example
-3. Re-scan all already-audited skills using newly discovered pattern
-4. Repeat until no new patterns emerge
+3. Apply the shared Finding Admission rule before a pattern triggers a re-scan
+4. Repeat until no new patterns emerge; retain the convergence result when no follow-up scan is admitted
 
 Returns `patterns.md` file listing all discovered patterns with: pattern name, description, detection heuristic, and all instances found.
 

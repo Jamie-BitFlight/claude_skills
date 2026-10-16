@@ -47,6 +47,33 @@ consequence and exposure, not a syntax match, topology metric, arbitrary score, 
 Preserve material uncertainty and the cheapest discriminating next check through the caller's
 existing reporting route.
 
+## Admit further work
+
+Before a candidate can make the caller's verdict blocking or create a fix task, follow-up, repeated
+review, test harness, discovery check, or environment, record in the caller's existing reporting
+route:
+
+1. The original outcome, acceptance criterion, invariant, or applicable
+   correctness/security/data-loss contract.
+2. Observed evidence and concrete impact.
+3. The smallest correction and a concrete direct verification method.
+
+After a correction, record the observed result of that method through the caller's existing
+validation and reporting contract.
+
+When that relation or impact is missing, retain the candidate as advisory pending attribution or
+disposition. It cannot create a blocker or another work branch. An explicitly named skill or
+command selects a route; require automatic-discovery proof only when an applicable routing contract
+requires autonomous selection.
+
+Before repeating a review or probe, identify changed source, evidence, conditions, or hypothesis
+that can distinguish the admitted claim. Stop a branch that only rechecks a harness created by an
+earlier review. This admission rule does not waive configured mandatory gates, existing task
+classifications, migration-fidelity procedures, or caller-owned delegation/retry terminal limits.
+Do not introduce or override a fixed review retry count: continue only while new distinguishing
+information exists and the caller's applicable limits permit it. The caller retains ordinary
+authority to implement an admitted correction.
+
 ## Keep review in scope
 
 Read material source independently. Treat supplied context and evidence as pointers to verify, not

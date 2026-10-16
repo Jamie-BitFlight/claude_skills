@@ -102,7 +102,13 @@ dropped). Raising `w` is the mitigation; this is a property of voting ensembles 
    overhead on every one of the N parallel workers. Launch all in one parallel batch, low effort.
    Each writes findings in the fixed schema to its absolute OUTFILE.
 6. **Reduce (Phase 2).** Run the reducer algorithm below.
-7. **Emit.** Ranked, capped, structured output. An empty result is a valid terminal.
+7. **Emit.** Ranked, capped, structured candidates. An empty result is a valid terminal.
+
+## Admit Survivors
+
+A reducer survivor is a review candidate. Before the caller turns it into a block, patch, or task,
+load `/plugin-creator:assessment-reporting` and apply its Finding Admission section. Corroboration
+increases confidence in a candidate; it does not supply task authority.
 
 ## The reducer algorithm
 

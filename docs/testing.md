@@ -36,6 +36,11 @@ the same observation and show the corrected result. A one-time command, probe, i
 existing contract/system test, linter, parser, compiler, or other direct evidence may satisfy this
 close criterion. Necessary validation does not automatically become a permanent test.
 
+Before adding or repeating a validation branch, apply
+[`task-outcome-discipline.md`](../rules/task-outcome-discipline.md): tie it to the requested
+outcome and an admitted criterion or applicable contract. Stop a branch that only validates
+machinery it introduced, and report an unproven required criterion as evidence-limited.
+
 After deciding how the change will be validated, apply the
 [DH test admission gate](../plugins/development-harness/docs/testing-principles.md#test-admission-gate)
 or load [Test Designer](../plugins/development-harness/skills/test-designer/SKILL.md) to decide whether

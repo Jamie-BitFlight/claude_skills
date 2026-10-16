@@ -74,6 +74,13 @@ Execute 8 semantic audits across 3 depth tiers. See `references/agent-lifecycle-
 | 7. Scriptable Agent Patterns | 2 | Identify deterministic workflows replaceable by scripts | List of scriptable patterns with steps |
 | 8. Self-Referential Pattern Learning | 2 | Classify issues by pattern, re-scan with new patterns until convergence | Append to shared patterns.md |
 
+### Finding Admission and Repeat Scans
+
+Load `/plugin-creator:assessment-reporting` and apply its Finding Admission section before creating
+a recommendation, remediation dispatch, tracking task, extra validation, or blocking result. Audit
+every dimension and retain advisory findings in the report. Its repeat-scan rule controls any
+follow-up scan.
+
 ### Step 3: Capability Drift Check
 
 Activate `/plugin-creator:agent-capability-analyzer`.
@@ -149,7 +156,7 @@ Use `ALIGNED` when all three lists are empty or contain only minor phrasing diff
 
 #### Escalation
 
-Agents with `SIGNIFICANT_DRIFT` or `SCOPE_VIOLATION` verdicts MUST be flagged as audit findings in the report. Pass these agents to `subagent-refactorer` for remediation:
+Agents with `SIGNIFICANT_DRIFT` or `SCOPE_VIOLATION` verdicts MUST be flagged as audit findings in the report. Only an admitted finding is remediated through `subagent-refactorer`:
 
 ```text
 Dispatch `plugin-creator:subagent-refactorer` to fix description drift.
@@ -276,8 +283,8 @@ Same approach as skill-lifecycle-audit dimension 7:
 
 1. Classify each discovered issue by detection pattern
 2. Record the pattern with description, heuristic, and example
-3. Re-scan all already-audited agents using the newly discovered pattern
-4. Repeat until convergence
+3. Apply the shared Finding Admission rule before a pattern triggers a re-scan
+4. Repeat until convergence; retain the convergence result when no follow-up scan is admitted
 
 **Output:** Append to the shared `patterns.md` file (same file as skill-lifecycle-audit).
 

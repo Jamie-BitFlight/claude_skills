@@ -15,6 +15,20 @@ directive.
 
 Add subdirectories freely. Nothing in `.tmp/` is committed, linted, or quality-checked.
 
+## Task-owned runtime state
+
+Reuse immutable source references and installed runtimes for an admitted runtime check. Retain the
+compact report, logs, and source references needed for its claim, then clean task-owned disposable
+directories when work finishes or is cancelled. On resource exhaustion, stop the branch and report
+the limit; RAM-backed storage is not overflow staging. See `task-outcome-discipline.md` for
+admitting the branch in the first place.
+
+For a prose-only change, run changed-file checks with the existing shared toolchain and cache.
+Mandatory repository setup, including required compatibility generation, remains required. Do
+not add runtime setup, copy a runtime, or provision a worktree-local runtime beyond that
+mandatory setup. When a needed tool is unavailable, report the smallest exact check that
+requires it before provisioning anything.
+
 ## Delegation pattern
 
 ```text

@@ -36,6 +36,13 @@ the rubric.
 **Right:** run the hygiene checklist against the diff (fresh-eyes for the judgment items) as a
 required step, then ship.
 
+## 2a. Keep findings tied to the task
+
+Apply `task-outcome-discipline.md` when classifying findings. A blocker carries its applicable
+criterion or contract, evidence, concrete effect, smallest correction, and direct verification.
+Improvements without that connection are advisory and do not add a test, subtask, environment, or
+merge block.
+
 ## 3. Judgment review needs capable adjudication, not iterated cheap passes
 
 Route each review check by its error structure, not by a fixed reviewer tier — mechanical checks to

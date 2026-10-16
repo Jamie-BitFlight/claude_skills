@@ -421,6 +421,10 @@ After it, every `plan` command naming `{qg_plan_address}` reads and writes the l
 If the QG plan already exists and has blocked tasks, send each back before entering the dispatch
 loop. `reclaim` returns the task to `not-started` and records why, in one move:
 
+Load `dh:review-principles` before reclaiming a review or validation task; it owns the admission
+and progress decision. Its rule does not skip a configured mandatory gate, migration-fidelity
+procedure, task classification, or terminal safety limit.
+
 ```bash
 <sam_cli/> plan reclaim \
   --address "{qg_plan_address}/{task_id}" --reason rerun \
@@ -533,9 +537,13 @@ Initialization: `{recursion_depth}` is set to `0` at skill invocation. It increm
 before each call to `Skill(skill="implement-feature")` in the recursion path. A re-run
 of `/complete-implementation` on the same plan address starts `{recursion_depth}` at `0`.
 
-After all phases complete, route any follow-up plans created by Phase 1 (code-reviewer) to the
-backlog before deciding on recursion. This ensures no follow-up plan is orphaned when the
-orchestrator skips recursion.
+Initialize `{pending_followup_plan_addresses}` to empty at invocation. It contains only admitted
+material obligations whose scope or disposition remains unresolved; unadmitted advisory concerns
+stay in the existing report and never enter this blocking set.
+
+After all phases complete, assess follow-up plans created by Phase 1 (code-reviewer) through the
+admission and routing procedure below before deciding on recursion. This keeps admitted obligations
+from becoming orphaned without turning unrelated suggestions into backlog work or completion gates.
 
 ### Step 1: Detect Follow-up Plans
 
@@ -547,19 +555,27 @@ it resets and re-dispatches T1, then blocks. An absent verdict is not a passing 
 
 Check the `verdict` field in the report:
 
-- `PASS` — no blocking findings; skip the entire routing section (no follow-ups to route)
-- `NEEDS-WORK` or `FAIL` — extract the "Required changes (blocking)" section; each blocking
-  item becomes a follow-up to route. **When "Required changes (blocking)" is non-empty, run the
-  fix loop first (max 3 cycles, `{fix_cycle}`=0):** create one task per entry (`agent: dh:task-worker`)
-  with `sam_plan(config={"action": "create", "slug": "fix-{slug}-blocking-N", "goal":
-  "Resolve blocking review findings", "tasks": [...], "owner_reference": "{item_ref}"})`; store
-  its returned `plan_ref`, dispatch via `subagent_type="dh:task-worker"`, then send T1 back with
-  `plan reclaim --address "{qg_plan_address}/T1" --reason fixed --response "{what the fix changed}"`
-  and dispatch T1 again — `reclaim` returns it to `not-started` and records the response the next
-  runner reads first. If verdict is `PASS` or blocking entries empty →
-  proceed to Step 2; else `fix_cycle += 1`, repeat or BLOCKED at 3. **On BLOCKED** (exhausted
-  or fix task `blocked`): report `COMPLETION BLOCKED — Blocking Code Review Findings Not
-  Resolved`, do NOT route to backlog, stop, do not apply `status:verified`.
+- `PASS` — no blocking findings; skip the entire routing section (no follow-ups to route).
+- `NEEDS-WORK` or `FAIL` — extract the "Required changes (blocking)" section. Load
+  `dh:review-principles` to admit each item to the fix loop. Preserve the raw report and every
+  non-admitted item through the caller's existing attribution or disposition route; a
+  non-admitted item does not create a fix task or follow-up. If no blocking entry is admitted,
+  treat this review's fix loop as advisory and continue to Step 2 under the caller's existing
+  terminal contract without replacing the caller's recorded verdict. For each admitted blocking
+  entry, create one task (`agent: dh:task-worker`) with
+  `sam_plan(config={"action": "create", "slug": "fix-{slug}-blocking-N", "goal":
+  "Resolve blocking review findings", "tasks": [...], "owner_reference": "{item_ref}"})`;
+  store its returned `plan_ref`, dispatch via `subagent_type="dh:task-worker"`, then reclaim T1
+  with `plan reclaim --address "{qg_plan_address}/T1" --reason fixed --response "{what changed
+  and what this review can now distinguish}"`. Re-dispatch T1 only when
+  `dh:review-principles` admits the new information. If it does not, report `COMPLETION BLOCKED —
+  Blocking Code Review Findings Need New Evidence`, do not route the item to backlog, stop, and
+  do not apply `status:verified`. A blocked admitted fix task reports `COMPLETION BLOCKED —
+  Blocking Code Review Findings Not Resolved`, does not route to backlog, stops, and does not
+  apply `status:verified`.
+
+If verdict is `PASS`, the blocking section is empty, or no blocking entry is admitted, proceed to
+Step 2.
 
 A `NEEDS-WORK` or `FAIL` report names the follow-up plans the reviewer created. If it names none,
 search SAM for plans the reviewer created without recording them in the report:
@@ -582,14 +598,32 @@ to the parent `{slug}`. Store each retained result's opaque `plan_ref` for follo
 Execute the full follow-up routing procedure defined in [./references/recursive-follow-up-handling.md](./references/recursive-follow-up-handling.md).
 
 **Summary**:
-- Step 2: Derive a search slug from each follow-up plan's `feature`; search backlog by title then topic
-- Step 3: Classify scope (in-scope vs out-of-scope); route out-of-scope directly to backlog
-- Step 4: Link follow-up plan to matched backlog item, or create a new item if no match
-- Step 5: Recursion Gate — Guards (depth limit, RT-ICA BLOCKED) then Conditions (slug match + High priority)
+- Step 2: Derive a search slug from each follow-up plan's `feature`; search backlog by title then topic.
+- Step 3: Load `dh:review-principles` to admit the follow-up before classifying scope or creating
+  backlog work. An unestablished relation remains advisory in the existing report, not a completion
+  blocker. Once a material relation is admitted, determine scope from its label or existing evidence;
+  an unresolved admitted obligation remains pending attribution.
+- Step 4: Link the admitted follow-up plan to a matched backlog item, or create a new item if no match.
+- Step 5: Recursion Gate — Guards (admission/progress, depth limit, RT-ICA BLOCKED) then Conditions
+  (slug match + High priority).
 
 ---
 
 ## Apply status:verified Label
+
+Before applying the label, confirm that `{pending_followup_plan_addresses}` contains no unresolved,
+admitted material obligation. Unadmitted advisory concerns remain in the existing report and do not
+enter this blocking set. An admitted pending follow-up is not disposed merely because routing reached
+its end. If this set is non-empty, preserve its plan references through the caller's existing output,
+then output:
+
+```text
+COMPLETION BLOCKED — Follow-up Attribution Pending
+Follow-up plans: {pending_followup_plan_addresses}
+Required: task-owner attribution or disposition through the caller's existing contract
+```
+
+Stop. Do not apply `status:verified` or resolve the parent work item.
 
 After all phases and follow-up routing complete, apply verified status to the parent work item.
 
