@@ -176,3 +176,4 @@ This is an article, not a software package. Key actionable patterns derived from
 | [meta-harness](../ai-research-tools/meta-harness.md) | ai-research-tools | referenced by meta-harness (ai-research-tools) |
 | [agent-skills-eval](./agent-skills-eval.md) | evaluation-testing | referenced by agent-skills-eval (evaluation-testing) |
 | [TheAlgorithms-Python](../learning-resources/TheAlgorithms-Python.md) | learning-resources | referenced by TheAlgorithms-Python (learning-resources) |
+| [Task-intent drift prevention for agent workflows](../agent-orchestration/task-intent-drift-prevention.md) | agent-orchestration | referenced by Task-intent drift prevention for agent workflows (agent-orchestration) |

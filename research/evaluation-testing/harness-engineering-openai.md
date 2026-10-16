@@ -238,3 +238,4 @@ Design these tasks so their output PRs are reviewable in under one minute and el
 | [merly-mentor](../ai-research-tools/merly-mentor.md) | ai-research-tools | referenced by merly-mentor (ai-research-tools) |
 | [meta-harness](../ai-research-tools/meta-harness.md) | ai-research-tools | referenced by meta-harness (ai-research-tools) |
 | [agent-skills-eval](./agent-skills-eval.md) | evaluation-testing | referenced by agent-skills-eval (evaluation-testing) |
+| [Task-intent drift prevention for agent workflows](../agent-orchestration/task-intent-drift-prevention.md) | agent-orchestration | referenced by Task-intent drift prevention for agent workflows (agent-orchestration) |

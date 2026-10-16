@@ -6,13 +6,14 @@ metadata:
   topic: task-intent-drift-prevention
   category: agent-orchestration
   resource_type: research-synthesis
-  source_url: https://www.anthropic.com/engineering/building-effective-agents
-  version: N/A
-  research_date: "2026-10-14"
+source_url: https://www.anthropic.com/engineering/building-effective-agents
+research_date: "2026-10-14"
+version_at_research: "Unversioned research synthesis; the reviewed sources are articles and papers, not one software release. Source access dates are recorded in References."
+freshness_tracking:
   last_verified: "2026-10-14"
-  verified: "2026-10-14"
   version_at_verification: source pages accessed 2026-10-14
   next_review: "2027-01-14"
+  confidence_map: "Overview: medium, Evidence Status: medium, Problem Addressed: low (illustrative), Key Features: low (proposed), Technical Architecture: low (proposed), Limitations and Caveats: high, Installation & Usage: low (untested), Compact Acceptance Scenarios: low (untested)"
 ---
 
 ## Overview
@@ -92,6 +93,13 @@ No new task-charter command, runtime gate, or quota tool is proposed by this ent
 
 Mechanical schemas can require these references and fields, but they cannot decide semantic relevance or prove alignment. Human or task-owner judgment remains necessary for conflicts between the requested outcome and an applicable contract.
 
+## Limitations and Caveats
+
+- No durable first-party record accompanies the reported local incident; it is motivation, not a reproduced causal finding.
+- The cited studies and case studies concern their own settings. They do not measure this repository or establish the effectiveness of the proposed safeguards here.
+- The procedures and acceptance scenarios below are proposals, not observed runtime results. This entry neither implements enforcement nor establishes cost, resource, or correctness guarantees.
+- Resource containment depends on the actual host and harness boundaries. Cleanup handlers do not cover every termination mode, and no containment implementation is validated by this research.
+
 ## Installation & Usage
 
 Use the pattern on the next task without new infrastructure:
@@ -127,5 +135,7 @@ The last scenario describes an untested mitigation target. A future implementati
 
 ## Cross-References
 
-- [Harness Engineering (Martin Fowler / Birgitta Böckeler)](../evaluation-testing/harness-engineering-martin-fowler.md) distinguishes deterministic and inferential controls.
-- [Harness Engineering: Leveraging Codex in an Agent-First World](../evaluation-testing/harness-engineering-openai.md) describes repository-local plans and human steering at a much larger operating scale.
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Harness Engineering (Martin Fowler / Birgitta Böckeler)](../evaluation-testing/harness-engineering-martin-fowler.md) | evaluation-testing | distinguishes deterministic enforcement from inferential review and their limits |
+| [Harness Engineering: Leveraging Codex in an Agent-First World](../evaluation-testing/harness-engineering-openai.md) | evaluation-testing | supplies the human-steering and repository-harness case study cited in the scope discussion |
