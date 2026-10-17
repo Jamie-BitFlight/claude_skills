@@ -846,3 +846,52 @@ class TestCanonicalizePatchKeys:
         result = _canonicalize_patch_keys(Task, {"totally-unknown-field": "value"})
 
         assert result == {"totally-unknown-field": "value"}
+
+
+# ---------------------------------------------------------------------------
+# update_plan_fields — plan fields whose wire name differs from the Python name
+# ---------------------------------------------------------------------------
+
+
+class TestUpdatePlanAliasedFields:
+    """A plan field with a kebab-case wire alias persists under either spelling.
+
+    The S4 planner records its criterion coverage map in the plan-level
+    ``acceptance_criteria`` field because later steps replace ``context`` wholesale;
+    the map is lost if the update drops the field.
+    """
+
+    @pytest.mark.parametrize(
+        ("field_name", "attribute"),
+        [
+            ("acceptance_criteria", "acceptance_criteria"),
+            ("acceptance-criteria", "acceptance_criteria"),
+            ("feature_context", "feature_context"),
+            ("feature-context", "feature_context"),
+            ("codebase_patterns", "codebase_patterns"),
+            ("codebase-patterns", "codebase_patterns"),
+        ],
+    )
+    def test_aliased_plan_field_persists_through_content_provider(self, field_name: str, attribute: str) -> None:
+        """Setting an aliased plan field writes it, and a reloaded provider reads it back."""
+        content = InMemoryBackend()
+        task = Task(id="T1", title="Implement thing", status=TaskStatus.NOT_STARTED)
+        created = create_plan(ContentTaskProvider(content), slug="aliased-field", goal="Do the work", tasks=[task])
+
+        update_plan_fields(ContentTaskProvider(content), created.plan_id, set_fields={field_name: "recorded value"})
+
+        assert getattr(read_plan(ContentTaskProvider(content), created.plan_id).plan, attribute) == "recorded value"
+
+    def test_context_replacement_leaves_acceptance_criteria_intact(self) -> None:
+        """Replacing the plan context, as the context-gathering step does, keeps acceptance_criteria."""
+        task_provider = ContentTaskProvider(InMemoryBackend())
+        task = Task(id="T1", title="Implement thing", status=TaskStatus.NOT_STARTED)
+        created = create_plan(task_provider, slug="coverage-survives", goal="Do the work", tasks=[task])
+        coverage = "## Criterion Coverage\n\n- S2-AT1 -> AC1"
+        update_plan_fields(task_provider, created.plan_id, set_fields={"acceptance_criteria": coverage})
+
+        update_plan_fields(task_provider, created.plan_id, context="Context Manifest")
+
+        plan = read_plan(task_provider, created.plan_id).plan
+        assert plan.context == "Context Manifest"
+        assert plan.acceptance_criteria == coverage

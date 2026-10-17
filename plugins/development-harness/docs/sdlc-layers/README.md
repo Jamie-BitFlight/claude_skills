@@ -35,7 +35,8 @@ Layered architecture separating SDLC-agnostic framework/process from language-sp
 │   ├── workflow-pattern-taxonomy.md
 │   └── harness-role-mapping.md
 ├── arl-meta-layer.md   # ARL Observation Layer flow
-└── arl-human-probing-design.md  # Human-probing flow design (to be implemented)
+├── arl-human-probing-design.md  # Human-probing flow design (to be implemented)
+└── ai-driven-sdlc-alignment.md  # Google AI-Driven SDLC mapping, gaps, adoption decisions
 ```
 
 ---
@@ -62,5 +63,6 @@ Flow experiments run in [sam-flow-experiments](https://github.com/Jamie-BitFligh
 ## References
 
 - [SAM definition](../../skills/work-backlog-item/references/sam-definition.md)
+- [AI-Driven SDLC alignment](./ai-driven-sdlc-alignment.md) — how the pipeline maps onto Google's AI-Driven SDLC figure, and the adoption decision for each gap
 - Development harness documentation: activate the `dh:dh-meta-docs` skill.
 - [ARL PROVENANCE](https://github.com/bitflight-devops/stateless-agent-methodology/blob/main/research/arl/PROVENANCE.md) (external repo)

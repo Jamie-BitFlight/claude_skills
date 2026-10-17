@@ -643,9 +643,10 @@ def _plan_fields_for_update(backend: TaskBackend, plan: str, set_fields: dict[st
         errors = BookendValidator(validated).validate()
         if errors:
             raise BookendValidationError(validated.plan_id or plan, errors)
-    # by_alias=True: set_fields uses kebab-case keys (wire convention);
-    # alias keys must match so we extract only the requested keys.
-    plan_fields = {k: v for k, v in validated.model_dump(by_alias=True, mode="json").items() if k in set_fields}
+    # Backends receive kebab-case wire keys (by_alias=True). The requested fields are matched by
+    # canonical name, so a caller spelling a field snake_case or kebab-case selects it either way.
+    requested = set(_canonicalize_patch_keys(Plan, set_fields)) & set(Plan.model_fields)
+    plan_fields = validated.model_dump(by_alias=True, mode="json", include=requested)
     if "acceptance-criteria-structured" in plan_fields:
         plan_fields["acceptance-criteria-structured"] = [
             criterion.model_dump(mode="json", by_alias=False) for criterion in validated.acceptance_criteria_structured

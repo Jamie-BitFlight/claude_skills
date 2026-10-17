@@ -154,7 +154,9 @@ class PlanFieldsUpdate(TypedDict, total=False):
     description: str
     goal: str
     context: str
-    acceptance_criteria: str
+    acceptance_criteria: Annotated[
+        str, Field(validation_alias=AliasChoices("acceptance-criteria", "acceptance_criteria"))
+    ]
     acceptance_criteria_structured: Annotated[
         list[dict[str, str]],
         Field(validation_alias=AliasChoices("acceptance-criteria-structured", "acceptance_criteria_structured")),
@@ -163,9 +165,11 @@ class PlanFieldsUpdate(TypedDict, total=False):
     source_path: str | None
     state: PlanState
     architecture: str | None
-    feature_context: str | None
-    codebase_patterns: str | None
-    backend_ref: str | None
+    feature_context: Annotated[str | None, Field(validation_alias=AliasChoices("feature-context", "feature_context"))]
+    codebase_patterns: Annotated[
+        str | None, Field(validation_alias=AliasChoices("codebase-patterns", "codebase_patterns"))
+    ]
+    backend_ref: Annotated[str | None, Field(validation_alias=AliasChoices("backend-ref", "backend_ref"))]
     autonomy: str
 
 
