@@ -369,8 +369,10 @@ connect — adds `milestone_number`, backfills it from the deprecated
 `item_milestones` join table, then drops that table, all in one transaction.
 If any item has more than one legacy link, opening fails closed with a
 non-retryable `BacklogError` naming each such item and its milestones, before
-any schema change; the check repeats under the migration's write lock, so a
-link added concurrently is caught too. Reduce each listed item to one row in
+any schema change. The check repeats under the migration's write lock, so a
+link another connection adds after the first check is caught too; in that case
+the idempotent schema setup (missing tables, WAL journal mode) has already
+committed, but the legacy table and every link in it are kept. Reduce each listed item to one row in
 `item_milestones`, then reopen. `sqlite`/`memory` order
 `list_milestones` by `due_on` then `number`; neither has a priority-ordering
 concept.
