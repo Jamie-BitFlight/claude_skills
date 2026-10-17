@@ -191,9 +191,9 @@ import sys, json
 try:
     d = json.load(open(sys.argv[1]))
 except (OSError, ValueError) as e:
-    print('FAILED (unparsable result JSON: %s)' % e); sys.exit(1)
+    print('unparsable result JSON: %s' % e); sys.exit(1)
 if d.get('is_error') is not False:
-    print('FAILED (is_error=%s, subtype=%s): %s' % (d.get('is_error'), d.get('subtype'), d.get('result', '')))
+    print('is_error=%s, subtype=%s: %s' % (d.get('is_error'), d.get('subtype'), d.get('result', '')))
     sys.exit(1)
 print(d.get('result', '')[:200])
 " "$RESULT_FILE")
@@ -203,7 +203,7 @@ print(d.get('result', '')[:200])
     echo "$VERDICT"
   else
     ERROR_FILE=$(echo "$INFO" | python3 -c "import sys,json; print(json.load(sys.stdin)['error_file'])")
-    echo "FAILED (exit ${EXIT_CODE}): ${VERDICT}$(tail -5 "$ERROR_FILE")"
+    echo "FAILED (exit ${EXIT_CODE}): ${VERDICT} | stderr: $(tail -5 "$ERROR_FILE")"
   fi
 done
 ```
