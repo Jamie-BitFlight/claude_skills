@@ -431,29 +431,16 @@ def _discover_project_fields(owner: str, project_number: int) -> tuple[str, str,
     """
     owner_literal = json.dumps(owner)
     query = (
-        "{ user(login: "
+        "{ repositoryOwner(login: "
         + owner_literal
-        + ") { projectV2(number: "
+        + ") { ... on ProjectV2Owner { projectV2(number: "
         + str(project_number)
         + ") { id fields(first: 30) { nodes { ... on ProjectV2SingleSelectField {"
-        " id name options { id name } } } } } } organization(login: "
-        + owner_literal
-        + ") { projectV2(number: "
-        + str(project_number)
-        + ") { id fields(first: 30) { nodes { ... on ProjectV2SingleSelectField {"
-        " id name options { id name } } } } } } }"
+        " id name options { id name } } } } } } } }"
     )
     resp = _gh_graphql(query)
 
-    data = resp.get("data", {})
-    project = next(
-        (
-            owner_data["projectV2"]
-            for owner_kind in ("user", "organization")
-            if (owner_data := data.get(owner_kind)) and owner_data.get("projectV2")
-        ),
-        None,
-    )
+    project = resp.get("data", {}).get("repositoryOwner", {}).get("projectV2")
     if not project:
         typer.echo(f"ERROR: Project #{project_number} not found for owner '{owner}'.", err=True)
         raise typer.Exit(1)

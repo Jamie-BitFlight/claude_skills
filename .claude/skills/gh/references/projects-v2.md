@@ -85,37 +85,25 @@ gh project item-edit \
 
 ## GraphQL — Get Node IDs
 
-The `user` and `organization` root fields each expose `projectV2`; request both for an explicit
-owner login and select the populated response. This supports user- and organization-owned projects
+The `repositoryOwner(login:)` query field resolves a user or organization. Request `projectV2`
+through its `ProjectV2Owner` interface fragment so the same query supports either owner kind
 without inferring the project owner from the repository.
 
 ```bash
 # Get project node ID and field option IDs for either owner kind
 gh api graphql -f query='
 {
-  user(login: "OWNER") {
-    projectV2(number: 1) {
-      id
-      fields(first: 20) {
-        nodes {
-          ... on ProjectV2SingleSelectField {
-            id
-            name
-            options { id name }
-          }
-        }
-      }
-    }
-  }
-  organization(login: "OWNER") {
-    projectV2(number: 1) {
-      id
-      fields(first: 20) {
-        nodes {
-          ... on ProjectV2SingleSelectField {
-            id
-            name
-            options { id name }
+  repositoryOwner(login: "OWNER") {
+    ... on ProjectV2Owner {
+      projectV2(number: 1) {
+        id
+        fields(first: 20) {
+          nodes {
+            ... on ProjectV2SingleSelectField {
+              id
+              name
+              options { id name }
+            }
           }
         }
       }

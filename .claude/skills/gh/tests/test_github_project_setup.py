@@ -19,14 +19,10 @@ from __future__ import annotations
 import importlib.util
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
+import pytest
 from typer.testing import CliRunner
-
-if TYPE_CHECKING:
-    import pytest
-
 
 # ---------------------------------------------------------------------------
 # Load github_project_setup as a module (filename contains underscores so
@@ -863,7 +859,7 @@ class TestProjectV2Status:
         """A user-owned project maps the configured Status options by name."""
         response = {
             "data": {
-                "user": {
+                "repositoryOwner": {
                     "projectV2": {
                         "id": "PVT_user",
                         "fields": {
@@ -879,14 +875,16 @@ class TestProjectV2Status:
                             ]
                         },
                     }
-                },
-                "organization": None,
+                }
             }
         }
 
-        with patch("github_project_setup._gh_graphql", return_value=response):
+        with patch("github_project_setup._gh_graphql", return_value=response) as graphql:
             project_id, field_id, options = _gps._discover_project_fields("octocat", 7)
 
+        query = graphql.call_args.args[0]
+        assert 'repositoryOwner(login: "octocat")' in query
+        assert "... on ProjectV2Owner" in query
         assert (project_id, field_id) == ("PVT_user", "PVTF_status")
         assert options == {"Triage": "opt_triage", "Shipped": "opt_shipped"}
 
@@ -894,8 +892,7 @@ class TestProjectV2Status:
         """An organization-owned project maps the configured Status options by name."""
         response = {
             "data": {
-                "user": None,
-                "organization": {
+                "repositoryOwner": {
                     "projectV2": {
                         "id": "PVT_org",
                         "fields": {
@@ -908,7 +905,7 @@ class TestProjectV2Status:
                             ]
                         },
                     }
-                },
+                }
             }
         }
 
@@ -917,6 +914,26 @@ class TestProjectV2Status:
 
         assert (project_id, field_id) == ("PVT_org", "PVTF_status")
         assert options == {"Ready for release": "opt_ready"}
+
+    def test_graphql_errors_fail_closed_when_gh_returns_partial_data(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """A gh GraphQL error does not expose its partial data as a successful response."""
+        from subprocess import CalledProcessError
+
+        failure = CalledProcessError(
+            1,
+            ["gh", "api", "graphql"],
+            output='{"data":{"repositoryOwner":{"projectV2":{"id":"PVT_1"}}}}',
+            stderr="graphql: Could not resolve to a User with the login of 'octo-org'.",
+        )
+
+        with (
+            patch("github_project_setup._find_gh_cli", return_value="gh"),
+            patch("github_project_setup.subprocess.run", side_effect=failure),
+            pytest.raises(_gps.typer.Exit),
+        ):
+            _gps._gh_graphql('{ repositoryOwner(login: "octo-org") { id } }')
+
+        assert "GraphQL query failed" in capsys.readouterr().err
 
     def test_updates_a_discovered_custom_status_option(self) -> None:
         """A configured custom Status option is selected and applied to the project item."""
