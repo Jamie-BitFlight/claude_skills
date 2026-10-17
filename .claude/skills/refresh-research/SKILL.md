@@ -85,15 +85,21 @@ filter), no entries are excluded by staleness, so this block does not appear.
 RT-ICA: Research Refresh
 Goal: Refresh {N} research entries with current data from primary sources
 Conditions:
-1. mcp__Ref and mcp__exa available in session  (primary data gathering)
-2. gh CLI authenticated                         (GitHub repo metadata)
-3. Outbound network access                      (fetch fresh data)
-4. ./research/ writable                         (update entry files)
-5. Entry files parseable markdown               (determine what changed)
+1. At least one primary-source search/read route is available in this session
+   (for example Ref-local search/read, another authenticated documentation reader, or an
+   accessible upstream repository clone). Do not require Exa when it is unavailable.
+2. Outbound network access is available for the selected route, or the worker can report the
+   exact unavailable source without inventing content.
+3. ./research/ is writable and entry files are parseable markdown.
+4. GitHub metadata is gathered only when needed and an authenticated route is available;
+   repository-clone content remains the documented fallback.
 Decision: {APPROVED | BLOCKED}
 ```
 
-If BLOCKED: report missing tools/access, suggest workarounds, stop.
+If no primary-source search/read route is available, report `BLOCKED` with every unavailable route
+and stop before spawning workers. Otherwise approve the available route and let the curator's
+native source-access fallback govern individual inaccessible sources; never use training-data
+knowledge as a fallback.
 
 ### Step 4: Baseline, Then Spawn Curators in Waves
 

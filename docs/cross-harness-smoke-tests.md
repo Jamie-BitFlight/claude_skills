@@ -109,8 +109,11 @@ API-key variable through `env_vars` independently of shell inheritance; `env` an
 `args` do not expand `$VAR`. Export `REF_API_KEY` and `CONTEXT7_API_KEY` in the
 launching environment, and trust the project before checking its effective config.
 
-For a local check, run `codex --strict-config mcp list`. An isolated Codex app-server
-can additionally exercise `config/read` and `skills/list` without a model call.
+For a strict local configuration/discovery check, use the installed Codex app-server route:
+start `codex --strict-config app-server` in an isolated project and issue `config/read` followed by
+`skills/list` through its JSON-RPC protocol. Do not use `codex --strict-config mcp list`: the
+installed CLI rejects `--strict-config` for that subcommand. The app-server check exercises
+configuration and skill discovery without a model call.
 The 2026-10-16 check with Codex 0.163.0 loaded the shared skills without discovery
 errors and both MCP entries with their named `env_vars`. This establishes config
 and skill discovery only: API keys were unavailable, so authenticated MCP calls

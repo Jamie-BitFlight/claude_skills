@@ -23,12 +23,13 @@ The rubric reviews the entry itself ([scope](./entry-quality-standards.md#scope)
 
 Run the formatter. The orchestrator runs the validator after every pass, appending its remaining issues to the scratch document as `D` lines, and repairs cross-reference reciprocity before review; an orchestrated review (it names a scratch document) skips those two commands, and a standalone `--review` runs all three. Report output as **exact counts per severity and the verbatim issue lines** — "mostly clean", "a few warnings", and "passes validation" are not review output.
 
-Run these packaged commands from the active research-curator skill directory:
+Use the absolute command paths resolved by `research-curator`'s Command Path Resolution section.
+Keep the target project as cwd; do not `cd` into the skill directory:
 
 ```bash
-uv run --script scripts/fix_research_formatting.py --check ./research/{category}/{name}.md
-uv run --script scripts/validate_research.py main --json ./research/{category}/{name}.md
-uv run --script scripts/validate_research.py check-backlinks ./research
+uv run --script "$CURATOR_FORMATTER_ABS" --check ./research/{category}/{name}.md
+uv run --script "$CURATOR_VALIDATOR_ABS" main --json ./research/{category}/{name}.md
+uv run --script "$CURATOR_VALIDATOR_ABS" check-backlinks ./research
 ```
 
 | Command | What a defect looks like | Record |

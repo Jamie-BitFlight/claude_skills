@@ -1,6 +1,6 @@
 # Validation Rules
 
-Checks performed by `./scripts/validate_research.py` and severity mapping for the `/research-curator` skill. The JSON is `{summary, entries[{file, format, status, issues[{check, severity, message, line}]}]}`, keyed by entry; severity is `error` or `warning` only. Severity is fixed and mode-independent; *handling* differs by mode — [Validation Gate for New/Refreshed Entries](#validation-gate-for-newrefreshed-entries) below for an entry a `@research-curator` agent just created or rewrote this invocation, Validate Mode's Issue Handling in `SKILL.md` for pre-existing entries.
+Checks performed by `CURATOR_VALIDATOR_ABS` from the `/research-curator` Command Path Resolution procedure and severity mapping for the skill. The JSON is `{summary, entries[{file, format, status, issues[{check, severity, message, line}]}]}`, keyed by entry; severity is `error` or `warning` only. Severity is fixed and mode-independent; *handling* differs by mode — [Validation Gate for New/Refreshed Entries](#validation-gate-for-newrefreshed-entries) below for an entry a `@research-curator` agent just created or rewrote this invocation, Validate Mode's Issue Handling in `SKILL.md` for pre-existing entries.
 
 ---
 

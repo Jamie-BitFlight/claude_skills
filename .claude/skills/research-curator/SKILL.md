@@ -29,6 +29,27 @@ Use the host's available-agent mechanism; do not reproduce a harness-specific to
 
 The Codex roles are defined in `.codex/agents/` and inherit the parent session's model, tools, permissions, and MCP configuration. Do not supply a Claude model identifier as a Codex role model. If the named role is unavailable in the active host, stop before mutation and report that exact unavailable route; do not substitute a generic worker.
 
+## Command Path Resolution
+
+Keep the current working directory at the target project root for every lifecycle command so
+`./research/` and baseline paths continue to name that project's vault. Before running a packaged
+formatter or validator, resolve the active `research-curator` skill directory to an absolute path
+reported by the host's skill loader; do not infer it from the target project and do not `cd` into it.
+Resolve these absolute paths once per invocation:
+
+```bash
+CURATOR_SKILL_DIR_ABS={absolute directory reported for the active research-curator skill}
+CURATOR_FORMATTER_ABS="$CURATOR_SKILL_DIR_ABS/scripts/fix_research_formatting.py"
+CURATOR_VALIDATOR_ABS="$CURATOR_SKILL_DIR_ABS/scripts/validate_research.py"
+PROJECT_ROOT_ABS="$(git rev-parse --show-toplevel)"
+BOUNDED_RUNNER_ABS="$PROJECT_ROOT_ABS/scripts/run_bounded.py"
+```
+
+If the active skill directory or target project root cannot be resolved, report that exact missing
+path and stop before running a command. Use `CURATOR_FORMATTER_ABS` and `CURATOR_VALIDATOR_ABS`
+with the target project still as cwd; use `BOUNDED_RUNNER_ABS` for the project infrastructure
+runner. Never assume either packaged script is under the target project's `scripts/` directory.
+
 ---
 
 ## Mode Routing
@@ -161,7 +182,7 @@ Trigger: supplied invocation text contains `--rerun`.
 flowchart TD
     Start(["Parse --rerun argument value"]) --> Q{"What is the --rerun target value?"}
     Q -->|"category/name — single entry path"| VerifyFile{"Does ./research/category/name.md exist?"}
-    Q -->|"all — re-research every entry"| FindAll["Run scripts/validate_research.py main --json ./research; collect entries[].file"]
+    Q -->|"all — re-research every entry"| FindAll["Run CURATOR_VALIDATOR_ABS main --json ./research; collect entries[].file"]
     VerifyFile -->|"No — file not found"| Missing(["Report error: entry not found at path. Stop."])
     VerifyFile -->|"Yes — file exists"| Spawn1["Launch research-curator with --rerun ./research/category/name.md"]
     Spawn1 --> RelayCheck1["Apply the Agent Result Relay Rules"]
@@ -202,8 +223,8 @@ Trigger: supplied invocation text contains `--validate`.
 ```mermaid
 flowchart TD
     Start(["Parse --validate argument value"]) --> Q{"What is the --validate target value?"}
-    Q -->|"category/name — single entry path"| RunScript["Run scripts/validate_research.py main --json on ./research/category/name.md"]
-    Q -->|"all — validate every entry"| RunScriptAll["Run scripts/validate_research.py main --json on ./research/"]
+    Q -->|"category/name — single entry path"| RunScript["Run CURATOR_VALIDATOR_ABS main --json on ./research/category/name.md"]
+    Q -->|"all — validate every entry"| RunScriptAll["Run CURATOR_VALIDATOR_ABS main --json on ./research/"]
     RunScript --> ParseJSON["Parse JSON output; group entries[].issues[] by severity; count totals"]
     RunScriptAll --> ParseJSON
     ParseJSON --> Zero{"summary.total is 0?"}
@@ -219,11 +240,11 @@ flowchart TD
 
 ### Script Invocation
 
-Run packaged scripts from the active research-curator skill directory, not from an assumed project path:
+Keep the target project as cwd and use the absolute paths from [Command Path Resolution](#command-path-resolution):
 
 ```bash
-uv run scripts/validate_research.py main --json ./research/{target}.md   # single entry
-uv run scripts/validate_research.py main --json ./research/              # all
+uv run --script "$CURATOR_VALIDATOR_ABS" main --json ./research/{target}.md   # single entry
+uv run --script "$CURATOR_VALIDATOR_ABS" main --json ./research/              # all
 ```
 
 ### Issue Handling
@@ -378,8 +399,8 @@ in [Mode Routing](#mode-routing).
    commit; `--exclude` is what keeps them unmodified on disk in the first place.
 
    ```bash
-   uv run scripts/run_bounded.py --timeout-seconds 180 -- \
-     uv run scripts/validate_research.py check-backlinks ./research --fix \
+   uv run "$BOUNDED_RUNNER_ABS" --timeout-seconds 180 -- \
+     uv run --script "$CURATOR_VALIDATOR_ABS" check-backlinks ./research --fix \
        --exclude {baseline-dirty-path} ...
    ```
 
