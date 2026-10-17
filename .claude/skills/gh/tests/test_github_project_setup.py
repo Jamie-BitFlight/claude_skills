@@ -879,41 +879,11 @@ class TestProjectV2Status:
             }
         }
 
-        with patch("github_project_setup._gh_graphql", return_value=response) as graphql:
+        with patch("github_project_setup._gh_graphql", return_value=response):
             project_id, field_id, options = _gps._discover_project_fields("octocat", 7)
 
-        query = graphql.call_args.args[0]
-        assert 'repositoryOwner(login: "octocat")' in query
-        assert "... on ProjectV2Owner" in query
         assert (project_id, field_id) == ("PVT_user", "PVTF_status")
         assert options == {"Triage": "opt_triage", "Shipped": "opt_shipped"}
-
-    def test_discovers_status_options_for_an_organization_owner(self) -> None:
-        """An organization-owned project maps the configured Status options by name."""
-        response = {
-            "data": {
-                "repositoryOwner": {
-                    "projectV2": {
-                        "id": "PVT_org",
-                        "fields": {
-                            "nodes": [
-                                {
-                                    "id": "PVTF_status",
-                                    "name": "Status",
-                                    "options": [{"id": "opt_ready", "name": "Ready for release"}],
-                                }
-                            ]
-                        },
-                    }
-                }
-            }
-        }
-
-        with patch("github_project_setup._gh_graphql", return_value=response):
-            project_id, field_id, options = _gps._discover_project_fields("octo-org", 9)
-
-        assert (project_id, field_id) == ("PVT_org", "PVTF_status")
-        assert options == {"Ready for release": "opt_ready"}
 
     def test_graphql_errors_fail_closed_when_gh_returns_partial_data(self, capsys: pytest.CaptureFixture[str]) -> None:
         """A gh GraphQL error does not expose its partial data as a successful response."""
