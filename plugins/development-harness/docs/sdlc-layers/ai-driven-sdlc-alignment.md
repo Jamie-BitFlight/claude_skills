@@ -69,7 +69,9 @@ Each row was checked against the files it cites.
 check 13 now require that:
 
 1. Each `acceptance-criteria-structured` entry derives from an S2 Given/When/Then acceptance test
-   (`S2-AT{n}`) or a groomed acceptance criterion (`GROOM-AC{n}`) and names its source.
+   (`S2-AT{n}`), a groomed acceptance criterion (`GROOM-AC{n}`), or — for a direct invocation with
+   no backlog item or S2 artifact — a criterion in the supplied spec (`SPEC-AC{n}`), and names its
+   source.
 2. A check that no upstream criterion supports is reported as a specification gap instead of being
    added.
 3. Every upstream entry is mapped to the criterion IDs derived from it in a `## Criterion Coverage`
