@@ -270,3 +270,4 @@ codex:
 | [hyperagents](./hyperagents.md) | coding-agents | referenced by hyperagents (coding-agents) |
 | [maverick](./maverick.md) | coding-agents | referenced by maverick (coding-agents) |
 | [msgspec](../serialization-libraries/msgspec.md) | serialization-libraries | referenced by msgspec (serialization-libraries) |
+| [itsaplan](../task-management/itsaplan.md) | task-management | referenced by itsaplan (task-management) |

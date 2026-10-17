@@ -260,3 +260,4 @@ SOURCE: [INSTALLING.md](https://github.com/steveyegge/beads/blob/main/docs/INSTA
 | [honker](../data-infrastructure/honker.md) | data-infrastructure | referenced by honker (data-infrastructure) |
 | [tessera](../security-tools/tessera.md) | security-tools | referenced by tessera (security-tools) |
 | [xyops](./xyops.md) | task-management | referenced by xyops (task-management) |
+| [itsaplan](./itsaplan.md) | task-management | referenced by itsaplan (task-management) |
