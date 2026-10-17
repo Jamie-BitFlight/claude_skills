@@ -1026,6 +1026,42 @@ def _configure_repo_if_requested(configure_repo: bool) -> None:
         _apply_repo_detection(configure=True)
 
 
+def _find_installed_gh() -> tuple[str | None, str | None]:
+    """Locate gh, determine its version, and report the detected state.
+
+    Returns:
+        The resolved executable path and installed version, each when available.
+    """
+    gh_which = shutil.which(BINARY_NAME)
+    installed_version = get_installed_version()
+    if gh_which:
+        console.print(
+            f":floppy_disk: gh found at [cyan]{gh_which}[/cyan]"
+            + (f" (v{installed_version})" if installed_version else "")
+        )
+    else:
+        console.print(":floppy_disk: gh is not currently installed")
+    return gh_which, installed_version
+
+
+def _configure_installed_cli_if_requested(
+    *, gh_which: str | None, configure_repo: bool, force: bool, dry_run: bool
+) -> bool:
+    """Configure an installed CLI locally when explicitly requested.
+
+    Returns:
+        ``True`` when the configuration-only path handled the invocation.
+    """
+    if not (gh_which and configure_repo and not force):
+        return False
+    if dry_run:
+        console.print(":white_check_mark: [green]Dry-run: configuration was not written[/green]")
+    else:
+        _configure_repo_if_requested(configure_repo)
+        console.print(":white_check_mark: [green]Configured repository for installed gh[/green]")
+    return True
+
+
 def _run_detect_only() -> bool:
     """Execute side-effect-free detection and print rendered examples.
 
@@ -1096,18 +1132,12 @@ def main(
         success = _run_detect_only()
         raise typer.Exit(code=0 if success else 1)
 
-    # 1. Check if gh is already installed
-    gh_which = shutil.which(BINARY_NAME)
-    installed_version = get_installed_version()
+    gh_which, installed_version = _find_installed_gh()
 
-    if gh_which:
-        console.print(
-            f":floppy_disk: gh found at [cyan]{gh_which}[/cyan]"
-            + (f" (v{installed_version})" if installed_version else "")
-        )
-    else:
-        console.print(":floppy_disk: gh is not currently installed")
-
+    if _configure_installed_cli_if_requested(
+        gh_which=gh_which, configure_repo=configure_repo, force=force, dry_run=dry_run
+    ):
+        raise typer.Exit(code=0)
     # 2. Detect platform
     try:
         os_key, arch = detect_platform()

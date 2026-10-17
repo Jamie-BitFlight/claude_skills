@@ -27,7 +27,7 @@ Resolve `GH_SETUP_SCRIPT` to the absolute `scripts/setup_gh.py` path beneath thi
 uv run "$GH_SETUP_SCRIPT" --detect-only
 ```
 
-`--detect-only` reads `GITHUB_REPO` or the target project's current Git remote and prints rendered examples. It does not install `gh`, contact the network, or write configuration. To install or update the CLI, run `uv run "$GH_SETUP_SCRIPT"`. Add `--configure-repo` only when the detected repository should be written to the target project's `.dh/config.yaml`.
+`--detect-only` reads `GITHUB_REPO` or the target project's current Git remote and prints rendered examples. It does not install `gh`, contact the network, or write configuration. To install or update the CLI, run `uv run "$GH_SETUP_SCRIPT"`. Add `--configure-repo` only when the detected repository should be written to the target project's `.dh/config.yaml`. When `gh` is already installed, `--configure-repo` without `--force` performs this local configuration directly: it does not resolve releases, require platform/install-directory discovery, download, or reinstall. `--dry-run` never writes configuration; `--force` retains installation behavior.
 
 ```text
 --force             Reinstall even if already at latest version

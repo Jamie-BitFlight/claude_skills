@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -89,3 +90,53 @@ def test_configure_repo_dry_run_does_not_write_when_gh_is_current(runner: CliRun
 
     assert result.exit_code == 0, result.output
     configure.assert_not_called()
+
+
+def test_configure_repo_persists_config_without_release_lookup_when_gh_is_installed(
+    runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Explicit local configuration does not depend on release metadata."""
+    config_path = tmp_path / ".dh" / "config.yaml"
+    config_path.parent.mkdir()
+    config_path.write_text("backend:\n  name: github\ncustom: preserved\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GITHUB_REPO", "octo/example")
+
+    with (
+        patch.object(setup_gh.shutil, "which", return_value="/isolated/bin/gh"),
+        patch.object(setup_gh, "get_installed_version", return_value="9.0.0"),
+        patch.object(setup_gh, "resolve_release", side_effect=AssertionError("release lookup must not run")),
+        patch.object(setup_gh, "detect_platform", side_effect=AssertionError("platform detection must not run")),
+    ):
+        result = runner.invoke(app, ["--configure-repo"])
+
+    assert result.exit_code == 0, result.output
+    config = config_path.read_text(encoding="utf-8")
+    assert "name: github" in config
+    assert "custom: preserved" in config
+    assert "repo: octo/example" in config
+
+
+def test_configure_repo_dry_run_leaves_existing_config_unchanged(
+    runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Dry-run remains non-mutating even when a repository can be detected."""
+    config_path = tmp_path / ".dh" / "config.yaml"
+    config_path.parent.mkdir()
+    before = "backend:\n  name: github\ncustom: preserved\n"
+    config_path.write_text(before, encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GITHUB_REPO", "octo/example")
+    asset = setup_gh.ReleaseAsset(name="gh.tar.gz", url="https://example.invalid/gh.tar.gz", size=1)
+
+    with (
+        patch.object(setup_gh.shutil, "which", return_value="/isolated/bin/gh"),
+        patch.object(setup_gh, "get_installed_version", return_value="9.0.0"),
+        patch.object(setup_gh, "detect_platform", return_value=("linux", "amd64")),
+        patch.object(setup_gh, "find_install_dir", return_value=tmp_path / "bin"),
+        patch.object(setup_gh, "resolve_release", return_value=("v1.0.0", asset, "checksum")),
+    ):
+        result = runner.invoke(app, ["--configure-repo", "--dry-run"])
+
+    assert result.exit_code == 0, result.output
+    assert config_path.read_text(encoding="utf-8") == before
