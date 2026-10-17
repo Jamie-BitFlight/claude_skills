@@ -26,6 +26,19 @@ plan validate --address Pc7d8e9f0
 plan migrate --plan-address tasks-3-integrate-sam-schema.md
 ```
 
+```text
+backlog create-milestone --title "Release"
+backlog list-milestone-members --milestone-number 7
+backlog assign-milestone --issue-number 42 --milestone-number 7
+backlog assign-milestone --issue-number 42 --clear
+backlog close-milestone --milestone-number 7
+```
+
+`backlog close-milestone` calls the configured backend's `close_milestone` operation and returns the closed milestone with its title, state, due date, and live member counts. GitHub, SQLite, and Memory implement the integer milestone contract; Beads does not, so its typed milestone-capability refusal is the result rather than a fallback store. Use the returned logical/provider data directly; do not replace it with raw provider or filesystem writes.
+
+`backlog list-milestone-members --milestone-number N` returns every native member the configured provider counts for milestone `N`, including ordinary provider issues without DH sections. Each member contains `issue_number`, `title`, native `OPEN`/`CLOSED` `state`, and `milestone_number`; use this result to reconcile a completion audit rather than deriving totals from `backlog list`.
+
+
 For a zero-attempt direct completion, append one complete `Direct Completion Record`, read it
 back, then move state. The record must include non-empty `TASK:`, `FILES_CHANGED:`, `COMMITS:`,
 `REUSE DECISION:`, `VERIFICATION:`, and `NOTES:` fields; `--force` does not bypass this evidence

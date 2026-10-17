@@ -85,19 +85,25 @@ gh project item-edit \
 
 ## GraphQL — Get Node IDs
 
+The `repositoryOwner(login:)` query field resolves a user or organization. Request `projectV2`
+through its `ProjectV2Owner` interface fragment so the same query supports either owner kind
+without inferring the project owner from the repository.
+
 ```bash
-# Get project node ID and field option IDs
+# Get project node ID and field option IDs for either owner kind
 gh api graphql -f query='
 {
-  user(login: "Jamie-BitFlight") {
-    projectV2(number: 1) {
-      id
-      fields(first: 20) {
-        nodes {
-          ... on ProjectV2SingleSelectField {
-            id
-            name
-            options { id name }
+  repositoryOwner(login: "OWNER") {
+    ... on ProjectV2Owner {
+      projectV2(number: 1) {
+        id
+        fields(first: 20) {
+          nodes {
+            ... on ProjectV2SingleSelectField {
+              id
+              name
+              options { id name }
+            }
           }
         }
       }
@@ -159,6 +165,9 @@ uv run .claude/skills/gh/scripts/github_project_setup.py setup \
 ---
 
 ## Standard Project Structure
+
+Project Status options are configured per board. The helper discovers them before each status
+update; supply the exact configured option name rather than assuming the example values below.
 
 ```text
 Project: "claude_skills Backlog"

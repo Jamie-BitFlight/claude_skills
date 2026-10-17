@@ -162,6 +162,15 @@ class MilestoneFullNode(TypedDict):
     closedIssueCount: int
 
 
+class MilestoneMemberNode(TypedDict):
+    """One provider-native issue attached to a numeric milestone."""
+
+    issue_number: int
+    title: str
+    state: Literal["OPEN", "CLOSED"]
+    milestone_number: int
+
+
 # ---------------------------------------------------------------------------
 # Layered protocol subsets (T-P6-PROTOCOL)
 #
@@ -302,12 +311,15 @@ class WorkItemBackend(Protocol):
     def render_groomed_section(self, groomed: GroomedData) -> str: ...
     def section_display_title(self, key: str, groomed_date: str = "") -> str: ...
 
-    # Milestones (generic — gate via require_milestone_support())
+    # Milestones (generic — gate via require_milestone_support()). A null milestone
+    # explicitly clears the current assignment; omitted transport fields never reach here.
     def list_milestones(self, states: list[str] | None = None, repo: str = "") -> list[MilestoneFullNode]: ...
+    def list_milestone_members(self, milestone_number: int, repo: str = "") -> list[MilestoneMemberNode]: ...
     def create_milestone(
         self, title: str, description: str = "", due_on: datetime | None = None, repo: str = ""
     ) -> MilestoneFullNode: ...
-    def assign_item_to_milestone(self, issue_number: int, milestone_number: int, repo: str = "") -> None: ...
+    def close_milestone(self, milestone_number: int, repo: str = "") -> MilestoneFullNode: ...
+    def assign_item_to_milestone(self, issue_number: int, milestone_number: int | None, repo: str = "") -> None: ...
 
 
 @runtime_checkable

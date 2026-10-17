@@ -108,6 +108,7 @@ from .tool_responses import (
     ArtifactsListResponse,
     BacklogAddResponse,
     BacklogAssignItemToMilestoneResponse,
+    BacklogCloseMilestoneResponse,
     BacklogCloseResponse,
     BacklogCommentIssueResponse,
     BacklogCreateMilestoneResponse,
@@ -122,6 +123,7 @@ from .tool_responses import (
     BacklogListIssuesResponse,
     BacklogListLabelsResponse,
     BacklogListMergedPrsResponse,
+    BacklogListMilestoneMembersResponse,
     BacklogListMilestonesResponse,
     BacklogListProjectsResponse,
     BacklogListResponse,
@@ -3735,6 +3737,29 @@ async def backlog_list_milestones(
 
 @mcp.tool(
     annotations=ToolAnnotations(
+        title="List Milestone Members",
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
+    )
+)
+async def backlog_list_milestone_members(
+    milestone_number: Annotated[int, Field(description="Numeric milestone identity")],
+) -> Annotated[dict[str, object], _wire_schema(BacklogListMilestoneMembersResponse)]:
+    """List every provider-native issue attached to a configured-backend milestone."""
+    out = Output()
+    try:
+        result = await asyncio.to_thread(
+            operations.list_milestone_members, milestone_number=milestone_number, output=out
+        )
+        return _respond(BacklogListMilestoneMembersResponse, {**result, **out.to_dict()})
+    except BacklogError as e:
+        return _respond(BacklogListMilestoneMembersResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
+
+
+@mcp.tool(
+    annotations=ToolAnnotations(
         title="Get Soonest Milestone",
         read_only_hint=True,
         destructive_hint=False,
@@ -3818,11 +3843,14 @@ async def backlog_create_milestone(
 )
 async def backlog_assign_item_to_milestone(
     issue_number: Annotated[int, Field(description="Issue number to assign")],
-    milestone_number: Annotated[int, Field(description="Milestone number to assign the issue to")],
+    milestone_number: Annotated[
+        int | None, Field(description="Milestone number to assign, or null to explicitly clear the assignment")
+    ],
 ) -> Annotated[dict[str, object], _wire_schema(BacklogAssignItemToMilestoneResponse)]:
-    """Assign a backlog item to a milestone.
+    """Assign a backlog item to a milestone or explicitly clear its assignment.
 
-    Requires a backend with milestone support — errors otherwise.
+    Requires a backend with milestone support — errors otherwise. The
+    ``milestone_number`` argument is required; pass null only to clear.
     """
     out = Output()
     try:
@@ -3832,15 +3860,41 @@ async def backlog_assign_item_to_milestone(
             milestone_number=milestone_number,
             output=out,
         )
-    except BacklogError as e:
+    except BacklogError as exc:
         return BacklogAssignItemToMilestoneResponse.model_validate({
-            "error": str(e),
-            **_failure_verdict(e),
+            "error": str(exc),
+            **_failure_verdict(exc),
             **out.to_dict(),
         }).model_dump(exclude_none=True)
-    return BacklogAssignItemToMilestoneResponse.model_validate({**result, **out.to_dict()}).model_dump(
-        exclude_none=True
+    response = BacklogAssignItemToMilestoneResponse.model_validate({**result, **out.to_dict()})
+    dump = response.model_dump(exclude_none=True)
+    dump["milestone_number"] = response.milestone_number
+    return dump
+
+
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Close Milestone",
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     )
+)
+async def backlog_close_milestone(
+    milestone_number: Annotated[int, Field(description="Milestone number to close")],
+) -> Annotated[dict[str, object], _wire_schema(BacklogCloseMilestoneResponse)]:
+    """Close a milestone after its member dispositions have completed."""
+    out = Output()
+    try:
+        result = await asyncio.to_thread(operations.close_milestone, milestone_number=milestone_number, output=out)
+    except BacklogError as exc:
+        return _respond(BacklogCloseMilestoneResponse, {"error": str(exc), **_failure_verdict(exc), **out.to_dict()})
+    response = BacklogCloseMilestoneResponse.model_validate({**result, **out.to_dict()})
+    dump = response.model_dump(exclude_none=True)
+    if response.milestone is not None:
+        dump["milestone"] = response.milestone.model_dump()
+    return dump
 
 
 @mcp.tool(

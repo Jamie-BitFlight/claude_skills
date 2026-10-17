@@ -415,6 +415,7 @@ class WorkItemDecisionContext:
                     label for label in item.labels if label.startswith(STATUS_LABEL_PREFIX)
                 ]),
                 milestone=item.milestone,
+                milestone_number=item.milestone_number,
                 state=item.state,
             )
             for item in existing

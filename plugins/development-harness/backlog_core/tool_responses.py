@@ -53,6 +53,7 @@ __all__ = [
     "ArtifactsListResponse",
     "BacklogAddResponse",
     "BacklogAssignItemToMilestoneResponse",
+    "BacklogCloseMilestoneResponse",
     "BacklogCloseResponse",
     "BacklogCommentIssueResponse",
     "BacklogCreateMilestoneResponse",
@@ -166,6 +167,15 @@ class Milestone(BaseModel):
 
     closed_issues: int
     """Count of closed issues attached to this milestone."""
+
+
+class MilestoneMember(BaseModel):
+    """One provider-native issue attached to a milestone."""
+
+    issue_number: int
+    title: str
+    state: Literal["OPEN", "CLOSED"]
+    milestone_number: int
 
 
 # Mirrors backlog_core.models.ArtifactEntry's model_dump(mode="json") shape --
@@ -292,6 +302,13 @@ class BacklogCreateMilestoneResponse(FallibleToolResponse):
 
     milestone: Milestone | None = None
     """The created milestone. Absent only on the ``BacklogError`` arm."""
+
+
+class BacklogCloseMilestoneResponse(FallibleToolResponse):
+    """Response for ``backlog_close_milestone``."""
+
+    milestone: Milestone | None = None
+    """The closed milestone. Absent only on the error arm."""
 
 
 class BacklogCreateProjectResponse(FallibleToolResponse):
@@ -712,6 +729,19 @@ class BacklogListMilestonesResponse(FallibleToolResponse):
 
     count: int | None = None
     """Number of milestones returned; ``0`` alongside an empty ``milestones``. Absent on the error arm."""
+
+
+class BacklogListMilestoneMembersResponse(FallibleToolResponse):
+    """Response for ``backlog_list_milestone_members``."""
+
+    milestone_number: int | None = None
+    """Numeric milestone identity queried. Absent on the error arm."""
+
+    members: list[MilestoneMember] | None = None
+    """Every provider-native issue attached to the milestone. Absent on the error arm."""
+
+    count: int | None = None
+    """Number of returned members. Absent on the error arm."""
 
 
 class ProjectEntry(BaseModel):

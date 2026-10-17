@@ -459,3 +459,46 @@ class TestBacklogViewCliCarriesStatusSourceFields:
         payload = json.loads(result.stdout)
         assert payload["status_source"] == "unavailable"
         assert payload["unavailable_capabilities"] == ["live_enrichment"]
+
+
+class TestMilestoneAssignmentCli:
+    """``backlog assign-milestone`` performs explicit assignment or unassignment only."""
+
+    def test_clear_unassigns_through_the_configured_backend(self) -> None:
+        backend = InMemoryBackend()
+        set_config(BacklogConfig(backend=backend))
+        try:
+            milestone = operations.create_milestone(title="Release")["milestone"]
+            milestone_number = cast("int", cast("dict[str, object]", milestone)["number"])
+            item = BacklogItem(
+                title="Open release item",
+                metadata=BacklogItemMetadata(source="test", added="2026-01-01", priority="P1", status="open"),
+            )
+            issue_number = backend.create_issue_for_item(None, item)
+            assert issue_number is not None
+            operations.assign_item_to_milestone(issue_number=issue_number, milestone_number=milestone_number)
+
+            result = runner.invoke(
+                app, ["backlog", "assign-milestone", "--issue-number", str(issue_number), "--clear"], env=_CLI_ENV
+            )
+            listed = operations.list_milestones(state="all")
+        finally:
+            reset_config()
+
+        assert result.exit_code == 0, result.stderr
+        assert json.loads(result.stdout)["milestone_number"] is None
+        cleared_milestone = next(
+            entry
+            for entry in cast("list[dict[str, object]]", listed["milestones"])
+            if entry["number"] == milestone_number
+        )
+        assert cleared_milestone["open_issues"] == 0
+
+    @pytest.mark.parametrize(
+        "args", [["--issue-number", "1"], ["--issue-number", "1", "--milestone-number", "1", "--clear"]]
+    )
+    def test_requires_exactly_one_assignment_disposition(self, args: list[str]) -> None:
+        result = runner.invoke(app, ["backlog", "assign-milestone", *args], env=_CLI_ENV)
+
+        assert result.exit_code == 1
+        assert "exactly one" in json.loads(result.stdout)["error"]

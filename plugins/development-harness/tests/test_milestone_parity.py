@@ -83,7 +83,7 @@ def _make_item(title: str) -> BacklogItem:
 
 
 def _force_milestone_closed(backend: WorkItemBackend, number: int) -> None:
-    """Directly close a milestone at the backend layer (no generic close-milestone op exists)."""
+    """Seed a closed milestone independently of the operation exercised by list tests."""
     if isinstance(backend, InMemoryBackend):
         backend._milestones[number]["state"] = "CLOSED"
     elif isinstance(backend, SQLiteBackend):
@@ -179,6 +179,42 @@ def test_state_filter_excludes_closed_includes_all(backend: WorkItemBackend) -> 
     assert {open_ms["number"], closed_ms["number"]} <= all_numbers
 
 
+def test_close_milestone_preserves_member_counts_and_states(backend: WorkItemBackend) -> None:
+    """close_milestone returns live member counts without changing member states."""
+    _skip_github_shared_state(backend)
+    created = cast("dict[str, object]", operations.create_milestone(title="release")["milestone"])
+    number = cast("int", created["number"])
+    open_item = _make_item("Open member")
+    closed_item = _make_item("Closed member")
+    repo = _repo_for_create_issue(backend)
+    open_number = backend.create_issue_for_item(repo, open_item)
+    closed_number = backend.create_issue_for_item(repo, closed_item)
+    assert open_number is not None
+    assert closed_number is not None
+    open_item.metadata.issue = str(open_number)
+    closed_item.metadata.issue = str(closed_number)
+    operations.assign_item_to_milestone(issue_number=open_number, milestone_number=number)
+    operations.assign_item_to_milestone(issue_number=closed_number, milestone_number=number)
+    backend.close_github_issue(str(closed_number), "done")
+
+    before = next(
+        milestone
+        for milestone in cast("list[dict[str, object]]", operations.list_milestones(state="open")["milestones"])
+        if milestone["number"] == number
+    )
+    closed = cast("dict[str, object]", operations.close_milestone(milestone_number=number)["milestone"])
+    after = next(
+        milestone
+        for milestone in cast("list[dict[str, object]]", operations.list_milestones(state="closed")["milestones"])
+        if milestone["number"] == number
+    )
+
+    assert before["open_issues"] == closed["open_issues"] == after["open_issues"] == 1
+    assert before["closed_issues"] == closed["closed_issues"] == after["closed_issues"] == 1
+    assert backend.fetch_item_status(open_item) == "open"
+    assert backend.fetch_item_status(closed_item) == "closed"
+
+
 # ---------------------------------------------------------------------------
 # 4. Ordering
 # ---------------------------------------------------------------------------
@@ -248,6 +284,7 @@ def test_create_milestone_empty_title_raises_validation_error_before_dispatch(ba
         pytest.param("list_milestones", {}, id="list_milestones"),
         pytest.param("get_soonest_milestone", {}, id="get_soonest_milestone"),
         pytest.param("create_milestone", {"title": "x"}, id="create_milestone"),
+        pytest.param("close_milestone", {"milestone_number": 1}, id="close_milestone"),
         pytest.param(
             "assign_item_to_milestone", {"issue_number": 1, "milestone_number": 1}, id="assign_item_to_milestone"
         ),
@@ -301,6 +338,58 @@ def test_membership_counts_after_assign_and_close(backend: WorkItemBackend) -> N
     assert match["closed_issues"] == 1
 
 
+def test_list_items_exposes_native_assigned_milestone_only(backend: WorkItemBackend) -> None:
+    """Native status hydration exposes an assigned milestone number despite duplicate titles."""
+    _skip_github_shared_state(backend)
+    duplicate = cast("dict[str, object]", operations.create_milestone(title="selected milestone")["milestone"])
+    milestone = cast("dict[str, object]", operations.create_milestone(title="selected milestone")["milestone"])
+    number = cast("int", milestone["number"])
+    assigned = _make_item("Assigned item")
+    nonmember = _make_item("Nonmember item")
+    repo = _repo_for_create_issue(backend)
+    assigned_number = backend.create_issue_for_item(repo, assigned)
+    nonmember_number = backend.create_issue_for_item(repo, nonmember)
+    assert assigned_number is not None
+    assert nonmember_number is not None
+    assigned.metadata.issue = str(assigned_number)
+    nonmember.metadata.issue = str(nonmember_number)
+    backend.put_work_item(assigned)
+    backend.put_work_item(nonmember)
+    operations.assign_item_to_milestone(issue_number=assigned_number, milestone_number=number)
+
+    entries = cast("list[dict[str, object]]", operations.list_items(include_closed=True)["items"])
+    by_title = {str(entry["title"]): entry for entry in entries}
+
+    assert by_title["Assigned item"]["milestone"] == "selected milestone"
+    assert by_title["Assigned item"]["milestone_number"] == str(number)
+    assert by_title["Assigned item"]["milestone_number"] != str(duplicate["number"])
+    assert by_title["Nonmember item"]["milestone"] == ""
+
+
+@pytest.mark.parametrize(("native_state", "expected_status"), [("OPEN", "in-progress"), ("CLOSED", "closed")])
+def test_list_items_preserves_workflow_status_and_native_lifecycle(
+    backend: WorkItemBackend, native_state: str, expected_status: str
+) -> None:
+    """Native lifecycle remains visible even when logical metadata requests in-progress."""
+    _skip_github_shared_state(backend)
+    item = _make_item("Workflow status item")
+    issue_number = backend.create_issue_for_item(_repo_for_create_issue(backend), item)
+    assert issue_number is not None
+    item.metadata.issue = str(issue_number)
+    item.reference = f"#{issue_number}"
+    backend.put_work_item(item)
+    if native_state == "CLOSED":
+        backend.close_github_issue(str(issue_number), "done")
+
+    operations.update_item(selector=item.reference, status="in-progress")
+    entries = cast("list[dict[str, object]]", operations.list_items(include_closed=True)["items"])
+    entry = next(candidate for candidate in entries if candidate["title"] == item.title)
+
+    assert entry["status"] == expected_status
+    assert entry["state"] == native_state
+    assert backend.fetch_item_status(item) == native_state.lower()
+
+
 # ---------------------------------------------------------------------------
 # 10. assign_item_to_milestone via operations
 # ---------------------------------------------------------------------------
@@ -320,6 +409,55 @@ def test_assign_item_to_milestone_via_operations(backend: WorkItemBackend) -> No
     listed = cast("list[dict[str, object]]", operations.list_milestones(state="all")["milestones"])
     match = next(m for m in listed if m["number"] == ms_number)
     assert match["open_issues"] == 1
+
+
+def test_unassign_item_preserves_native_lifecycle_and_other_milestone_membership(backend: WorkItemBackend) -> None:
+    """Clearing one assignment updates native counts without changing item lifecycle or other members."""
+    _skip_github_shared_state(backend)
+    source = cast("dict[str, object]", operations.create_milestone(title="Source")["milestone"])
+    destination = cast("dict[str, object]", operations.create_milestone(title="Destination")["milestone"])
+    source_number = cast("int", source["number"])
+    destination_number = cast("int", destination["number"])
+    repo = _repo_for_create_issue(backend)
+
+    open_item = _make_item("Open source member")
+    closed_item = _make_item("Closed source member")
+    unrelated_item = _make_item("Destination member")
+    open_number = backend.create_issue_for_item(repo, open_item)
+    closed_number = backend.create_issue_for_item(repo, closed_item)
+    unrelated_number = backend.create_issue_for_item(repo, unrelated_item)
+    assert open_number is not None
+    assert closed_number is not None
+    assert unrelated_number is not None
+    open_item.metadata.issue = str(open_number)
+    closed_item.metadata.issue = str(closed_number)
+    unrelated_item.metadata.issue = str(unrelated_number)
+    backend.put_work_item(open_item)
+    backend.put_work_item(closed_item)
+    backend.put_work_item(unrelated_item)
+
+    operations.assign_item_to_milestone(issue_number=open_number, milestone_number=source_number)
+    operations.assign_item_to_milestone(issue_number=closed_number, milestone_number=source_number)
+    operations.assign_item_to_milestone(issue_number=unrelated_number, milestone_number=destination_number)
+    backend.close_github_issue(str(closed_number), "done")
+
+    result = operations.assign_item_to_milestone(issue_number=open_number, milestone_number=None)
+
+    assert result["issue_number"] == open_number
+    assert result["milestone_number"] is None
+    milestones = cast("list[dict[str, object]]", operations.list_milestones(state="all")["milestones"])
+    source_after = next(entry for entry in milestones if entry["number"] == source_number)
+    destination_after = next(entry for entry in milestones if entry["number"] == destination_number)
+    assert source_after["open_issues"] == 0
+    assert source_after["closed_issues"] == 1
+    assert destination_after["open_issues"] == 1
+    items = cast("list[dict[str, object]]", operations.list_items(include_closed=True)["items"])
+    by_title = {str(item["title"]): item for item in items}
+    assert by_title[open_item.title]["state"] == "OPEN"
+    assert "milestone_number" not in by_title[open_item.title]
+    assert by_title[closed_item.title]["state"] == "CLOSED"
+    assert by_title[closed_item.title]["milestone_number"] == str(source_number)
+    assert by_title[unrelated_item.title]["milestone_number"] == str(destination_number)
 
 
 def test_assign_unknown_issue_raises_backlog_error(backend: WorkItemBackend) -> None:

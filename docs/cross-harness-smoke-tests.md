@@ -97,11 +97,9 @@ The curator routes Claude Code through its available project agents and Codex th
 `.claude/skills/research-curator/`; no mirrored skill body is needed. They inherit the parent
 session's model, tools, permissions, and MCP configuration.
 
-Only workflows usable without load-time preprocessing are linked. The git-history workflow's
-zero-exclusion fallback would lose its packaged default filtering, so it is not exposed here.
-Script workflows with unresolved project-root commands or invalid CLI arguments are likewise not
-added until repaired. Harness-specific tool names and optional integrations alone do not exclude an
-otherwise portable workflow.
+Only workflows usable without Claude load-time preprocessing are linked. The shared discovery root exposes `commit-staged`, `gh`, `create-merge-request-changelog`, `git-history-recon`, `start-milestone`, `group-items-to-milestone`, and `complete-milestone` through relative directory symlinks. Their packaged scripts/assets resolve from the loaded skill while Git operations retain the target-project cwd. Milestone workflows keep configured-backend authority, and their explicit Project V2 projection invokes the packaged helper separately with owner, project, repository, issue, and status arguments. Native tool names and authenticated mutation behavior remain harness-dependent and require the workflow's explicit confirmations.
+
+Harness-specific tool names and optional integrations alone do not exclude an otherwise portable workflow.
 
 The trusted project's `.codex/config.toml` enables Ref and Context7 stdio MCP servers
 and retains core-only shell environment inheritance. Each MCP entry forwards its

@@ -38,6 +38,7 @@ from .backend_types import (
     IssueNode,
     ListPageRequest,
     MilestoneFullNode,
+    MilestoneMemberNode,
     SnapshotCheckpointProvider,
     SnapshotCompletenessProvider,
     SyncProvider,
@@ -2364,10 +2365,7 @@ def _build_list_entry(
     """Build the result dict for a single backlog item.
 
     Returns:
-        Dict with section, title, issue, plan, type, topic, body, state,
-        status, milestone, and optional file_path and groomed fields.
-        The ``body`` field contains the full searchable text (description
-        plus all section entry content) for use by the search filter.
+        Consumer list fields, including string-form milestone identity when assigned.
     """
     entry: dict[str, str | bool] = {
         "section": item.section,
@@ -2390,19 +2388,16 @@ def _build_list_entry(
             if info is not None:
                 entry["status"] = normalize_live_github_status(info.status)
                 entry["milestone"] = info.milestone
+                entry["state"] = info.state
+                if info.milestone_number is not None:
+                    entry["milestone_number"] = str(info.milestone_number)
             else:
                 entry["status"] = "" if status_live else normalize_cached_github_status(item.status)
                 entry["milestone"] = ""
         else:
-            # Non-integer issue ref (e.g. beads nanoid "bd-a3f8"): status_map
-            # cannot be keyed by int, so use the locally cached status field.
-            # Milestone is not tracked locally for string-ID backends.
             entry["status"] = item.status or ""
             entry["milestone"] = ""
     elif item.status:
-        # No issue reference at all (e.g. beads item never linked to a backend
-        # issue).  Expose the locally cached status so consumers and filters
-        # can see the real state rather than finding no ``status`` key.
         entry["status"] = item.status
     return entry
 
@@ -2465,6 +2460,7 @@ def _page_status_map(provider: ProviderItem) -> dict[int, IssueStatus]:
                 label for label in provider.labels if label.startswith(STATUS_LABEL_PREFIX)
             ]),
             milestone=provider.milestone,
+            milestone_number=provider.milestone_number,
             state=provider.state,
         )
     }
@@ -6025,6 +6021,22 @@ def _milestone_dict(ms: MilestoneFullNode) -> dict[str, object]:
     }
 
 
+def list_milestone_members(milestone_number: int, repo: str = "", output: Output | None = None) -> dict[str, object]:
+    """Return every provider-native issue attached to a numeric milestone.
+
+    This deliberately bypasses logical DH item parsing: milestone counts and
+    membership are provider-native facts, so an ordinary provider issue without
+    DH sections remains visible to completion audits.
+
+    Returns:
+        The queried milestone number, all native members, their count, and output fields.
+    """
+    out = output or Output()
+    backend = require_milestone_support(get_config().backend, "list_milestone_members")
+    members: list[MilestoneMemberNode] = backend.list_milestone_members(milestone_number=milestone_number, repo=repo)
+    return {"milestone_number": milestone_number, "members": members, "count": len(members), **out.to_dict()}
+
+
 def list_milestones(
     repo: str = "", state: str = "open", output: Output | None = None
 ) -> dict[str, list[dict[str, object]] | int | list[str]]:
@@ -6142,24 +6154,45 @@ def create_milestone(
     return {"milestone": _milestone_dict(ms), **out.to_dict()}
 
 
+def close_milestone(milestone_number: int, repo: str = "", output: Output | None = None) -> dict[str, object]:
+    """Close an open milestone on the configured backend.
+
+    Returns:
+        The backend-owned closed milestone and collected output.
+
+    Raises:
+        UnsupportedBackendCapabilityError: If the active backend has no generic milestones.
+        BacklogError: If the milestone cannot be found or closed.
+    """
+    out = output or Output()
+    backend = require_milestone_support(get_config().backend, "close_milestone")
+    try:
+        milestone = backend.close_milestone(milestone_number, repo=repo)
+    except KeyError as exc:
+        raise BacklogError(str(exc.args[0])) from exc
+    except GithubException as exc:
+        raise BacklogError(f"GitHub API error closing milestone: {exc}") from exc
+    out.info(f"Closed milestone #{milestone_number}: {milestone['title']}")
+    return {"milestone": _milestone_dict(milestone), **out.to_dict()}
+
+
 def assign_item_to_milestone(
-    issue_number: int, milestone_number: int, repo: str = "", output: Output | None = None
+    issue_number: int, milestone_number: int | None, repo: str = "", output: Output | None = None
 ) -> dict[str, object]:
-    """Assign a backlog item to a milestone on the active backend.
+    """Assign a backlog item to a milestone or explicitly clear its assignment.
 
     Args:
-        issue_number: Issue number to assign.
-        milestone_number: Milestone number to assign the issue to.
+        issue_number: Issue number to assign or unassign.
+        milestone_number: Target milestone number, or ``None`` to explicitly clear it.
         repo: Repository slug (``owner/name``). Ignored by non-GitHub backends.
         output: Optional Output collector.
 
     Returns:
-        Dict with ``issue_number``, ``milestone_number``, and output
-        messages/warnings.
+        Dict with ``issue_number``, ``milestone_number``, and output messages/warnings.
 
     Raises:
         UnsupportedBackendCapabilityError: If the active backend does not support milestones.
-        BacklogError: If ``issue_number`` or ``milestone_number`` is unknown to the
+        BacklogError: If ``issue_number`` or a non-null ``milestone_number`` is unknown to the
             backend, or on other GitHub API failures.
         GitHubUnavailableError: On the GitHub backend, if GITHUB_TOKEN is not
             set or GitHub is unreachable.
@@ -6168,12 +6201,15 @@ def assign_item_to_milestone(
     backend = require_milestone_support(get_config().backend, "assign_item_to_milestone")
     try:
         backend.assign_item_to_milestone(issue_number, milestone_number, repo=repo)
-    except KeyError as e:
-        raise BacklogError(str(e.args[0])) from e
-    except GithubException as e:
-        msg = f"GitHub API error assigning issue to milestone: {e}"
-        raise BacklogError(msg) from e
-    out.info(f"Assigned issue #{issue_number} to milestone #{milestone_number}")
+    except KeyError as exc:
+        raise BacklogError(str(exc.args[0])) from exc
+    except GithubException as exc:
+        action = "clearing issue milestone" if milestone_number is None else "assigning issue to milestone"
+        raise BacklogError(f"GitHub API error {action}: {exc}") from exc
+    if milestone_number is None:
+        out.info(f"Cleared milestone assignment for issue #{issue_number}")
+    else:
+        out.info(f"Assigned issue #{issue_number} to milestone #{milestone_number}")
     return {"issue_number": issue_number, "milestone_number": milestone_number, **out.to_dict()}
 
 

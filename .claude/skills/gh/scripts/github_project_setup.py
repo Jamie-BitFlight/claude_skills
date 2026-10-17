@@ -82,7 +82,6 @@ LABELS: list[dict[str, str]] = [
 
 PRIORITY_LABEL_MAP = {"P0": "priority:p0", "P1": "priority:p1", "P2": "priority:p2", "IDEAS": "priority:idea"}
 
-VALID_STATUSES = ("Backlog", "Grooming", "In Progress", "In Review", "Done")
 
 # Label-to-status mapping for milestone transitions
 _LABEL_TO_PROJECT_STATUS = {
@@ -430,16 +429,20 @@ def _discover_project_fields(owner: str, project_number: int) -> tuple[str, str,
     Raises:
         typer.Exit: If project or Status field not found.
     """
+    owner_literal = json.dumps(owner)
     query = (
-        '{ user(login: "' + owner + '") { projectV2(number: ' + str(project_number) + ") { id fields(first: 30) {"
-        " nodes { ... on ProjectV2SingleSelectField {"
-        " id name options { id name } } } } } } }"
+        "{ repositoryOwner(login: "
+        + owner_literal
+        + ") { ... on ProjectV2Owner { projectV2(number: "
+        + str(project_number)
+        + ") { id fields(first: 30) { nodes { ... on ProjectV2SingleSelectField {"
+        " id name options { id name } } } } } } } }"
     )
     resp = _gh_graphql(query)
 
-    project = resp.get("data", {}).get("user", {}).get("projectV2")
+    project = resp.get("data", {}).get("repositoryOwner", {}).get("projectV2")
     if not project:
-        typer.echo(f"ERROR: Project #{project_number} not found for user '{owner}'.", err=True)
+        typer.echo(f"ERROR: Project #{project_number} not found for owner '{owner}'.", err=True)
         raise typer.Exit(1)
 
     project_id = project["id"]
@@ -514,17 +517,13 @@ def _update_project_status(
         owner: GitHub user or organization login.
         project_number: The project number.
         issue_node_id: GraphQL node ID of the issue.
-        status: Target status value (must be in VALID_STATUSES).
+        status: Target Status field option configured on the project.
         dry_run: If True, report what would happen without mutating.
         issue_label: Optional label for dry-run output (e.g. "#42 title").
 
     Returns:
         True if the update succeeded (or would succeed in dry-run).
     """
-    if status not in VALID_STATUSES:
-        typer.echo(f"ERROR: Invalid status '{status}'. Valid values: {', '.join(VALID_STATUSES)}", err=True)
-        return False
-
     project_id, field_id, option_map = _discover_project_fields(owner, project_number)
 
     option_id = option_map.get(status)
@@ -564,10 +563,6 @@ def _bulk_update_project_status(
     Returns:
         Tuple of (succeeded, failed) counts.
     """
-    if status not in VALID_STATUSES:
-        typer.echo(f"ERROR: Invalid status '{status}'. Valid values: {', '.join(VALID_STATUSES)}", err=True)
-        return 0, len(issues)
-
     project_id, field_id, option_map = _discover_project_fields(owner, project_number)
     option_id = option_map.get(status)
     if not option_id:
@@ -658,12 +653,8 @@ def project_update_status(
     Discovers field IDs dynamically via GraphQL, then updates the Status
     single-select field. The issue is added to the project if not already present.
 
-    Valid statuses: Backlog, Grooming, In Progress, In Review, Done
+    The available Status values are discovered from the selected project.
     """
-    if status not in VALID_STATUSES:
-        typer.echo(f"ERROR: Invalid status '{status}'. Valid values: {', '.join(VALID_STATUSES)}", err=True)
-        raise typer.Exit(1)
-
     gh = get_github()
     repository = get_repo(gh, repo)
 

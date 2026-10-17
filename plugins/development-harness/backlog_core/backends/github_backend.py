@@ -33,7 +33,7 @@ from github import GithubException, GithubObject
 
 from backlog_core import gh_client, github_branches, github_sync, rendering
 from backlog_core.artifact_provider import ArtifactBackend, GitHubGistArtifactProvider
-from backlog_core.backend_types import ListPageRequest, ListPageResult, MilestoneFullNode
+from backlog_core.backend_types import ListPageRequest, ListPageResult, MilestoneFullNode, MilestoneMemberNode
 from backlog_core.backends.github_content_migration import (
     _GitHubContentCache,
     _GitHubContentMigration,
@@ -961,6 +961,16 @@ class GitHubBackend:
         owner, repo_name = repository.full_name.split("/", 1)
         return self._fetch_milestones_graphql(repository, owner, repo_name, states)
 
+    def list_milestone_members(self, milestone_number: int, repo: str = "") -> list[MilestoneMemberNode]:
+        """List every provider-native issue assigned to a milestone.
+
+        Returns:
+            Every member from the provider's paginated milestone issue connection.
+        """
+        repository = self.get_github(repo)
+        owner, repo_name = repository.full_name.split("/", 1)
+        return gh_client.fetch_milestone_members_graphql(repository, owner, repo_name, milestone_number)
+
     def create_milestone(
         self, title: str, description: str = "", due_on: datetime | None = None, repo: str = ""
     ) -> MilestoneFullNode:
@@ -987,11 +997,32 @@ class GitHubBackend:
             closedIssueCount=ms.closed_issues,
         )
 
-    def assign_item_to_milestone(self, issue_number: int, milestone_number: int, repo: str = "") -> None:
-        """Assign a GitHub issue to a milestone via PyGithub's issue.edit call."""
+    def close_milestone(self, milestone_number: int, repo: str = "") -> MilestoneFullNode:
+        """Close a GitHub milestone and return its updated provider node.
+
+        Returns:
+            The closed milestone.
+        """
         repository = self.get_github(repo)
-        milestone_obj = repository.get_milestone(milestone_number)
-        repository.get_issue(issue_number).edit(milestone=milestone_obj)
+        milestone = repository.get_milestone(milestone_number)
+        milestone.edit(title=milestone.title, state="closed")
+        return MilestoneFullNode(
+            id=str(getattr(milestone, "node_id", f"github-milestone-{milestone.number}")),
+            number=milestone.number,
+            title=milestone.title,
+            state=str(milestone.state).upper(),
+            description=milestone.description or "",
+            dueOn=milestone.due_on.strftime("%Y-%m-%dT%H:%M:%SZ") if milestone.due_on else None,
+            openIssueCount=milestone.open_issues,
+            closedIssueCount=milestone.closed_issues,
+        )
+
+    def assign_item_to_milestone(self, issue_number: int, milestone_number: int | None, repo: str = "") -> None:
+        """Assign or explicitly unassign a GitHub issue's milestone via PyGithub."""
+        repository = self.get_github(repo)
+        issue = repository.get_issue(issue_number)
+        milestone = repository.get_milestone(milestone_number) if milestone_number is not None else None
+        issue.edit(milestone=milestone)
 
     # ------------------------------------------------------------------
     # Task issues

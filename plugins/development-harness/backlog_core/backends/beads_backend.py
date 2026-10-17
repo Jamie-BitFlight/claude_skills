@@ -93,7 +93,7 @@ from backlog_core.models import (
 if TYPE_CHECKING:
     from github.Repository import Repository
 
-    from backlog_core.backend_types import IssueNode, MilestoneFullNode, MilestoneNode
+    from backlog_core.backend_types import IssueNode, MilestoneFullNode, MilestoneMemberNode, MilestoneNode
     from backlog_core.models import Output
 
 __all__ = ["BeadsBackend"]
@@ -852,6 +852,11 @@ class BeadsBackend:
         """
         raise NotImplementedError(_MILESTONE_ID_NOTE)
 
+    def list_milestone_members(self, milestone_number: int, repo: str = "") -> list[MilestoneMemberNode]:
+        """Raise because generic milestones cannot represent Beads identifiers."""
+        del milestone_number, repo
+        raise NotImplementedError(_MILESTONE_ID_NOTE)
+
     def create_milestone(
         self, title: str, description: str = "", due_on: datetime | None = None, repo: str = ""
     ) -> MilestoneFullNode:
@@ -861,11 +866,17 @@ class BeadsBackend:
         """
         raise NotImplementedError(_MILESTONE_ID_NOTE)
 
-    def assign_item_to_milestone(self, issue_number: int, milestone_number: int, repo: str = "") -> None:
+    def close_milestone(self, milestone_number: int, repo: str = "") -> MilestoneFullNode:
+        """Raise because generic milestones cannot represent Beads identifiers."""
+        del milestone_number, repo
+        raise NotImplementedError(_MILESTONE_ID_NOTE)
+
+    def assign_item_to_milestone(self, issue_number: int, milestone_number: int | None, repo: str = "") -> None:
         """Raise NotImplementedError — beads milestone IDs are strings.
 
         Use :meth:`assign_beads_item_to_milestone` for beads-native assignment.
         """
+        del issue_number, milestone_number, repo
         raise NotImplementedError(_MILESTONE_ID_NOTE)
 
     def list_beads_milestones(self, states: list[str] | None = None) -> list[dict[str, object]]:

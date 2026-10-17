@@ -19,30 +19,22 @@ Ensures the GitHub CLI (`gh`) is available and provides correct usage patterns f
 
 ---
 
-## Installation
+## Installation and detection
 
-If `gh` is not installed, run the setup script:
+Resolve `GH_SETUP_SCRIPT` to the absolute `scripts/setup_gh.py` path beneath this loaded skill. Run it from the target project directory; resolving the packaged executable does not change that directory.
 
 ```bash
-uv run .claude/skills/gh/scripts/setup_gh.py
+uv run "$GH_SETUP_SCRIPT" --detect-only
 ```
 
-The script:
-
-1. Checks if `gh` is already installed via `shutil.which`
-2. Detects platform (Linux, macOS, Windows) and architecture
-3. Fetches the latest release from `https://github.com/cli/cli/releases/latest`
-4. Downloads the correct archive with SHA256 verification from checksums file
-5. Extracts and installs the binary to a writable PATH directory
-6. Uses `GITHUB_TOKEN` for authenticated requests; falls back to anonymous if auth fails (401/403)
-
-**CLI options:**
+`--detect-only` reads `GITHUB_REPO` or the target project's current Git remote and prints rendered examples. It does not install `gh`, contact the network, or write configuration. To install or update the CLI, run `uv run "$GH_SETUP_SCRIPT"`. Add `--configure-repo` only when the detected repository should be written to the target project's `.dh/config.yaml`; it exits nonzero when detection or persistence fails. When `gh` is already installed, `--configure-repo` without `--force` performs this local configuration directly: it does not resolve releases, require platform/install-directory discovery, download, or reinstall. `--dry-run` never writes configuration; `--force` retains installation behavior.
 
 ```text
---force          Reinstall even if already at latest version
---dry-run        Show what would happen without installing
---bin-dir        Override install directory (default: auto-detect from PATH)
---detect-only    Detect owner/repo, refresh .dh/config.yaml and gh-examples.md, print examples to stdout. No network calls.
+--force             Reinstall even if already at latest version
+--dry-run           Show installation actions without installing or writing configuration
+--bin-dir PATH      Override install directory (default: auto-detect from PATH)
+--detect-only       Detect owner/repo and print command examples without side effects
+--configure-repo    Explicitly write the detected owner/repo to .dh/config.yaml
 ```
 
 ---
@@ -64,52 +56,48 @@ If `GITHUB_TOKEN` is set, `gh` authenticates automatically for all API calls.
 
 <repo_detection>
 
-Git remote points to a local proxy (`127.0.0.1`), NOT `github.com`. Every `gh` command fails without explicit repo specification:
-
-```text
-failed to determine base repo: none of the git remotes configured for this
-repository point to a known GitHub host.
-```
-
-**RULE: Pass `-R` (or `--repo`) on EVERY `gh` command:**
+Git remotes can point to a local proxy (`127.0.0.1`) rather than `github.com`, so a repository-scoped command that supports `-R` or `--repo` must receive an explicit repository:
 
 ```bash
-gh <command> -R <owner/repo>
+gh issue list -R OWNER/REPO
+gh pr list --repo OWNER/REPO
 ```
 
-This applies to ALL `gh` subcommands: `pr`, `issue`, `run`, `api`, `release`, `project`, etc.
+Do not pass `-R` to verbs that do not support it:
+
+- REST API calls embed the target in the endpoint: `gh api repos/OWNER/REPO/issues`.
+- GraphQL calls supply explicit `owner` and `name` variables in the query/request.
+- Projects V2 uses `--owner OWNER` and the project number where required.
+- `gh auth` and `gh version` are not repository-scoped.
+
+Use `gh <verb> --help` when adding a command; pass an explicit repository only through that verb's supported interface.
 
 </repo_detection>
 
 ---
 
-## Common Commands
+## Common commands
 
-!`uv run --script .claude/skills/gh/scripts/setup_gh.py --detect-only 2>/dev/null`
+Use the detected or explicitly supplied `OWNER/REPO` on every `gh` command when the remote is a proxy:
 
----
+```bash
+gh issue list -R OWNER/REPO
+gh pr list -R OWNER/REPO
+```
 
 ## Automation — Python Script
 
-For multi-step operations (label setup, milestone creation, project init, issue import), use:
+Resolve `GH_PROJECT_HELPER` to the absolute `scripts/github_project_setup.py` path beneath this loaded skill and invoke it without leaving the target project directory. It uses PyGithub for repository, issue, label, and milestone operations; its Projects V2 status update uses the installed `gh` CLI for GraphQL.
 
 ```bash
-# Full project setup
-uv run .claude/skills/gh/scripts/github_project_setup.py setup
-
-# Labels only
-uv run .claude/skills/gh/scripts/github_project_setup.py labels
-
-# Milestone management
-uv run .claude/skills/gh/scripts/github_project_setup.py milestone list
-uv run .claude/skills/gh/scripts/github_project_setup.py milestone create --title "v1.0" --due 2026-03-31
-
-# Issue management
-uv run .claude/skills/gh/scripts/github_project_setup.py issue list --priority p1
-uv run .claude/skills/gh/scripts/github_project_setup.py issue create --title "feat: X" --priority-label priority:p1
+uv run "$GH_PROJECT_HELPER" labels --repo OWNER/REPO
+uv run "$GH_PROJECT_HELPER" milestone list --repo OWNER/REPO
+uv run "$GH_PROJECT_HELPER" milestone create --repo OWNER/REPO --title "v1.0" --due 2026-03-31
+uv run "$GH_PROJECT_HELPER" issue list --repo OWNER/REPO --priority p1
+uv run "$GH_PROJECT_HELPER" issue create --repo OWNER/REPO --title "feat: X" --priority-label priority:p1
 ```
 
-The script delegates all GitHub operations to the authenticated `gh` CLI — no separate API tokens or Python HTTP clients needed.
+Use the configured DH backend for durable backlog lifecycle operations; this administration helper is not a second backlog store.
 
 ---
 

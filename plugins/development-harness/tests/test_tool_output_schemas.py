@@ -48,8 +48,16 @@ EXCLUDED_TOOLS = {"profile_list", "profile_load"}  # different ownership, out of
 # Raised 14000->15000 when every error arm that carries ``retryable`` gained ``retry_after``:
 # measured 13,865 -> 14,905, 26 tokens per tool across the same 40 tools. It carries GitHub's
 # Retry-After hint, which ``retryable: true`` alone cannot: without it a caller retries on its own
-# schedule and is refused again until the rate limit lifts.
-_MAX_TOTAL_SCHEMA_TOKENS = 15000
+# schedule and is refused again until the rate limit lifts. Raised 15000->15500 for the typed
+# ``backlog_close_milestone`` public operation: CI measured 15,211 total tokens, a 306-token
+# increase over the recorded 14,905 baseline. The new ceiling retains headroom while preserving
+# its distinct typed closure response and all per-tool guards.
+# Raised 15500->16000 for ``backlog_list_milestone_members``: measured 15,537 total,
+# 326 above the recorded 15,211 baseline. The authoritative native-membership read
+# needs its distinct typed member rows to audit ordinary provider issues omitted
+# from the DH work-item list. No response fields, descriptions, or per-tool guards
+# were removed to fit the former total.
+_MAX_TOTAL_SCHEMA_TOKENS = 16000
 _MAX_SINGLE_TOOL_SCHEMA_TOKENS = 700
 
 # backlog_view (#3368) is the deliberate multi-mode outlier: one tool

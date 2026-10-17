@@ -344,20 +344,21 @@ def test_render_template_returns_none_when_template_missing(tmp_path: Path) -> N
 # ---------------------------------------------------------------------------
 
 
-def test_apply_repo_detection_returns_slug_when_detected(tmp_path: Path) -> None:
-    """Arrange: detection succeeds. Assert: returns the slug."""
+def test_apply_repo_detection_returns_slug_without_writing_by_default(tmp_path: Path) -> None:
+    """Detection is safe to use for informational commands."""
     with (
         patch("setup_gh.detect_owner_repo", return_value="my-org/my-repo"),
-        patch("setup_gh.write_gh_config", return_value=True),
+        patch("setup_gh.write_gh_config") as mock_write,
         patch("setup_gh.Path.cwd", return_value=tmp_path),
     ):
         result = _setup_gh._apply_repo_detection()
 
     assert result == "my-org/my-repo"
+    mock_write.assert_not_called()
 
 
 def test_apply_repo_detection_returns_none_when_detection_fails() -> None:
-    """Arrange: detection returns None. Assert: returns None and skips config write."""
+    """Detection failure has no configuration side effect."""
     with patch("setup_gh.detect_owner_repo", return_value=None), patch("setup_gh.write_gh_config") as mock_write:
         result = _setup_gh._apply_repo_detection()
 
@@ -365,15 +366,15 @@ def test_apply_repo_detection_returns_none_when_detection_fails() -> None:
     mock_write.assert_not_called()
 
 
-def test_apply_repo_detection_calls_write_gh_config(tmp_path: Path) -> None:
-    """Arrange: detection succeeds. Assert: write_gh_config called with correct path and slug."""
+def test_apply_repo_detection_writes_only_when_requested(tmp_path: Path) -> None:
+    """Explicit configuration writes the detected slug to the project config."""
     config_path = tmp_path / ".dh" / "config.yaml"
     with (
         patch("setup_gh.detect_owner_repo", return_value="my-org/my-repo"),
         patch("setup_gh.write_gh_config", return_value=True) as mock_write,
         patch("setup_gh.Path.cwd", return_value=tmp_path),
     ):
-        _setup_gh._apply_repo_detection()
+        _setup_gh._apply_repo_detection(configure=True)
 
     mock_write.assert_called_once_with(config_path, "my-org/my-repo")
 

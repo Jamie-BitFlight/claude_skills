@@ -51,6 +51,7 @@ from backlog_core.backend_types import (
     IssueNode,
     LabelNode,
     MilestoneFullNode,
+    MilestoneMemberNode,
     MilestoneNode,
 )
 from backlog_core.models import (
@@ -856,14 +857,14 @@ class SQLiteBackend:
 
     @_serialized_connection_operation
     def batch_fetch_statuses(self, items: list[BacklogItem], repo: str = "") -> StatusFetchResult:
-        """Return statuses for items that have issue numbers.
+        """Return statuses and assigned milestone titles for items with issue numbers.
 
         Args:
             items: BacklogItems to query (must have issue_number set).
             repo: Ignored.
 
         Returns:
-            Dict mapping issue_number to IssueStatus.
+            Status records carrying the native milestone title when assigned.
         """
         result: dict[int, IssueStatus] = {}
         for item in items:
@@ -871,9 +872,21 @@ class SQLiteBackend:
             if not raw_issue:
                 continue
             num = int(str(raw_issue).lstrip("#"))
-            row = self._conn.execute("SELECT status FROM items WHERE issue_number = ?", (num,)).fetchone()
+            row = self._conn.execute(
+                "SELECT items.status, items.milestone_number, milestones.title AS milestone_title FROM items "
+                "LEFT JOIN milestones ON milestones.number = items.milestone_number WHERE items.issue_number = ?",
+                (num,),
+            ).fetchone()
             if row is not None:
-                result[num] = IssueStatus(status=str(row["status"]))
+                native_status = str(row["status"])
+                status = item.status if native_status == "open" and item.status == "in-progress" else native_status
+                milestone_number = row["milestone_number"]
+                result[num] = IssueStatus(
+                    status=status,
+                    state=native_status.upper(),
+                    milestone=str(row["milestone_title"] or ""),
+                    milestone_number=int(milestone_number) if milestone_number is not None else None,
+                )
         return StatusFetchResult(statuses=result, attempted=True)
 
     @_serialized_connection_operation
@@ -1161,6 +1174,24 @@ class SQLiteBackend:
         return self._fetch_milestones_graphql(cast("Repository", None), "", "", states)
 
     @_serialized_connection_operation
+    def list_milestone_members(self, milestone_number: int, repo: str = "") -> list[MilestoneMemberNode]:
+        """Return every stored issue assigned to the requested milestone."""
+        del repo
+        rows = self._conn.execute(
+            "SELECT issue_number, title, status FROM items WHERE milestone_number = ? ORDER BY issue_number",
+            (milestone_number,),
+        ).fetchall()
+        return [
+            MilestoneMemberNode(
+                issue_number=int(row["issue_number"]),
+                title=str(row["title"]),
+                state="OPEN" if str(row["status"]).lower() == "open" else "CLOSED",
+                milestone_number=milestone_number,
+            )
+            for row in rows
+        ]
+
+    @_serialized_connection_operation
     def create_milestone(
         self, title: str, description: str = "", due_on: datetime | None = None, repo: str = ""
     ) -> MilestoneFullNode:
@@ -1194,25 +1225,45 @@ class SQLiteBackend:
         return self._row_to_milestone_full(row)
 
     @_serialized_connection_operation
-    def assign_item_to_milestone(self, issue_number: int, milestone_number: int, repo: str = "") -> None:
-        """Set an item's ``milestone_number`` FK.
+    def close_milestone(self, milestone_number: int, repo: str = "") -> MilestoneFullNode:
+        """Close a stored milestone and return its updated node.
+
+        Returns:
+            The closed milestone.
+        """
+        del repo
+        row = self._conn.execute("SELECT * FROM milestones WHERE number = ?", (milestone_number,)).fetchone()
+        if row is None:
+            raise KeyError(f"SQLiteBackend: milestone #{milestone_number} not found")
+        self._conn.execute("UPDATE milestones SET state = 'closed' WHERE number = ?", (milestone_number,))
+        self._conn.commit()
+        closed = self._conn.execute("SELECT * FROM milestones WHERE number = ?", (milestone_number,)).fetchone()
+        if closed is None:
+            raise RuntimeError(f"SQLiteBackend: milestone #{milestone_number} disappeared while closing")
+        return self._row_to_milestone_full(closed)
+
+    @_serialized_connection_operation
+    def assign_item_to_milestone(self, issue_number: int, milestone_number: int | None, repo: str = "") -> None:
+        """Assign an item to a milestone or clear its nullable ``milestone_number`` FK.
 
         Args:
-            issue_number: Item to assign.
-            milestone_number: Milestone to assign it to.
+            issue_number: Item to assign or unassign.
+            milestone_number: Target milestone, or ``None`` to explicitly clear it.
             repo: Ignored — SQLite has no GitHub connection.
 
         Raises:
-            KeyError: When ``issue_number`` or ``milestone_number`` is unknown.
+            KeyError: When ``issue_number`` or a non-null ``milestone_number`` is unknown.
                 SQLite foreign keys are never enforced (``PRAGMA foreign_keys``
                 defaults off), so an unchecked ``UPDATE`` would silently accept
-                a nonexistent milestone or update zero rows for an unknown
-                issue.
+                a nonexistent milestone or update zero rows for an unknown issue.
         """
         if self._conn.execute("SELECT 1 FROM items WHERE issue_number = ?", (issue_number,)).fetchone() is None:
             msg = f"SQLiteBackend: issue #{issue_number} not found"
             raise KeyError(msg)
-        if self._conn.execute("SELECT 1 FROM milestones WHERE number = ?", (milestone_number,)).fetchone() is None:
+        if (
+            milestone_number is not None
+            and self._conn.execute("SELECT 1 FROM milestones WHERE number = ?", (milestone_number,)).fetchone() is None
+        ):
             msg = f"SQLiteBackend: milestone #{milestone_number} not found"
             raise KeyError(msg)
         self._conn.execute(

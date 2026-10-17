@@ -999,25 +999,84 @@ def _render_template(owner_repo: str) -> str | None:
     return content.replace("<owner/repo>", owner_repo).replace("<owner>", owner).replace("<repo>", repo)
 
 
-def _apply_repo_detection() -> str | None:
-    """Detect owner/repo from git remote and write to .dh/config.yaml.
+def _apply_repo_detection(*, configure: bool = False) -> str | None:
+    """Detect owner/repo and optionally persist it only on explicit request.
+
+    Args:
+        configure: Write the detected slug to ``.dh/config.yaml`` when true.
 
     Returns:
-        The detected owner/repo slug, or None if detection failed.
+        The detected owner/repo slug when detection succeeds and, when
+        requested, configuration is persisted. Returns ``None`` when detection
+        or requested persistence fails.
     """
     owner_repo = detect_owner_repo()
-    if owner_repo is not None and not write_gh_config(Path.cwd() / ".dh" / "config.yaml", owner_repo):
+    if owner_repo is None:
+        return None
+    if configure and not write_gh_config(Path.cwd() / ".dh" / "config.yaml", owner_repo):
         error_console.print(
             ":warning: [yellow]Warning: write_gh_config returned False — config may not have been persisted[/yellow]"
         )
+        return None
     return owner_repo
 
 
-def _run_detect_only() -> bool:
-    """Execute --detect-only mode: refresh config and print rendered examples to stdout.
+def _configure_repo_if_requested(configure_repo: bool) -> bool:
+    """Persist a detected repository only for an explicit setup request.
+
+    Args:
+        configure_repo: Whether configuration was requested.
 
     Returns:
-        True if detection and rendering succeeded, False if owner/repo could not be determined.
+        ``True`` when configuration was not requested or it persisted.
+        ``False`` when requested detection or persistence fails.
+    """
+    return not configure_repo or _apply_repo_detection(configure=True) is not None
+
+
+def _find_installed_gh() -> tuple[str | None, str | None]:
+    """Locate gh, determine its version, and report the detected state.
+
+    Returns:
+        The resolved executable path and installed version, each when available.
+    """
+    gh_which = shutil.which(BINARY_NAME)
+    installed_version = get_installed_version()
+    if gh_which:
+        console.print(
+            f":floppy_disk: gh found at [cyan]{gh_which}[/cyan]"
+            + (f" (v{installed_version})" if installed_version else "")
+        )
+    else:
+        console.print(":floppy_disk: gh is not currently installed")
+    return gh_which, installed_version
+
+
+def _configure_installed_cli_if_requested(
+    *, gh_which: str | None, configure_repo: bool, force: bool, dry_run: bool
+) -> bool | None:
+    """Configure an installed CLI locally when explicitly requested.
+
+    Returns:
+        ``None`` when the configuration-only path does not apply; otherwise
+        whether requested configuration succeeded.
+    """
+    if not (gh_which and configure_repo and not force):
+        return None
+    if dry_run:
+        console.print(":white_check_mark: [green]Dry-run: configuration was not written[/green]")
+        return True
+    if not _configure_repo_if_requested(configure_repo):
+        return False
+    console.print(":white_check_mark: [green]Configured repository for installed gh[/green]")
+    return True
+
+
+def _run_detect_only() -> bool:
+    """Execute side-effect-free detection and print rendered examples.
+
+    Returns:
+        True when detection and template rendering both succeed.
     """
     owner_repo = _apply_repo_detection()
     if owner_repo is None:
@@ -1050,14 +1109,18 @@ def main(
     bin_dir: Annotated[
         Path | None, typer.Option("--bin-dir", help="Override install directory (default: auto-detect from PATH)")
     ] = None,
+    configure_repo: Annotated[
+        bool,
+        typer.Option(
+            "--configure-repo",
+            help="Write the detected owner/repo to .dh/config.yaml after a successful non-dry-run invocation.",
+        ),
+    ] = False,
     detect_only: Annotated[
         bool,
         typer.Option(
             "--detect-only",
-            help="Detect owner/repo from git remote, write .dh/config.yaml, "
-            "then render and print gh command examples to stdout. "
-            "Skips all network calls and gh install logic. "
-            "Designed for use with the skill !-notation: !`uv run --script setup_gh.py --detect-only`.",
+            help="Detect owner/repo from git remote, render and print gh command examples to stdout, and make no writes or network calls.",
         ),
     ] = False,
 ) -> None:
@@ -1071,31 +1134,23 @@ def main(
     Falls back to anonymous requests if authentication fails (e.g. expired
     token).
 
-    Args:
-        force: Reinstall even if the installed version matches the latest.
-        dry_run: Print planned actions without performing them.
-        no_cache: Disable local release metadata cache reads/writes.
-        cache_ttl_seconds: Cache freshness TTL in seconds.
-        bin_dir: Override the default install directory.
-        detect_only: Skip install; detect repo, update config, print examples.
+        configure_repo: Persist the detected repository only after an explicit request.
+        detect_only: Skip install; detect repo and print examples without mutation.
     """
-    # --detect-only: no network calls, no install — refresh config and emit examples to stdout.
+    # --detect-only: no network calls, no install, and no configuration writes.
     if detect_only:
         success = _run_detect_only()
         raise typer.Exit(code=0 if success else 1)
 
-    # 1. Check if gh is already installed
-    gh_which = shutil.which(BINARY_NAME)
-    installed_version = get_installed_version()
+    gh_which, installed_version = _find_installed_gh()
 
-    if gh_which:
-        console.print(
-            f":floppy_disk: gh found at [cyan]{gh_which}[/cyan]"
-            + (f" (v{installed_version})" if installed_version else "")
-        )
-    else:
-        console.print(":floppy_disk: gh is not currently installed")
-
+    match _configure_installed_cli_if_requested(
+        gh_which=gh_which, configure_repo=configure_repo, force=force, dry_run=dry_run
+    ):
+        case True:
+            raise typer.Exit(code=0)
+        case False:
+            raise typer.Exit(code=1)
     # 2. Detect platform
     try:
         os_key, arch = detect_platform()
@@ -1103,8 +1158,7 @@ def main(
         error_console.print(f":cross_mark: {exc}")
         raise typer.Exit(code=1) from exc
 
-    platform_label = f"{os_key}/{arch}"
-    console.print(f":magnifying_glass_tilted_left: Detected platform: [cyan]{platform_label}[/cyan]")
+    console.print(f":magnifying_glass_tilted_left: Detected platform: [cyan]{os_key}/{arch}[/cyan]")
 
     # 3. Resolve install directory
     install_dir = bin_dir if bin_dir is not None else find_install_dir()
@@ -1115,14 +1169,12 @@ def main(
         os_key, arch, use_cache=not no_cache, cache_ttl_seconds=cache_ttl_seconds
     )
 
-    # 5. Auto-detect owner/repo — runs on every invocation so "already installed"
-    #    exits still refresh .dh/config.yaml.
-    _apply_repo_detection()
-
-    # 6. Check if update is needed
+    # Repository detection is read-only unless the caller explicitly asks to configure it.
     needs_update = installed_version is None or parse_version(installed_version) < parse_version(latest_version)
 
     if not needs_update and not force:
+        if not dry_run and not _configure_repo_if_requested(configure_repo):
+            raise typer.Exit(code=1)
         console.print(":white_check_mark: [green]gh is already up to date[/green]")
         raise typer.Exit(code=0)
 
@@ -1156,6 +1208,8 @@ def main(
     except (subprocess.SubprocessError, OSError) as exc:
         error_console.print(f":warning: [yellow]Could not verify installation: {exc}[/yellow]")
 
+    if not _configure_repo_if_requested(configure_repo):
+        raise typer.Exit(code=1)
     raise typer.Exit(code=0)
 
 

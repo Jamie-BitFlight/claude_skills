@@ -30,6 +30,8 @@ if TYPE_CHECKING:
 
     from backlog_core.models import Output, SamTask
 
+import operator
+
 from backlog_core import rendering
 from backlog_core.backend_types import (
     AddedCommentNode,
@@ -37,6 +39,7 @@ from backlog_core.backend_types import (
     IssueNode,
     LabelNode,
     MilestoneFullNode,
+    MilestoneMemberNode,
     MilestoneNode,
 )
 from backlog_core.models import (
@@ -459,7 +462,11 @@ class InMemoryBackend:
         return []
 
     def batch_fetch_statuses(self, items: list[BacklogItem], repo: str = "") -> StatusFetchResult:
-        """Return statuses for items that have issue numbers."""
+        """Return statuses and assigned milestone titles for items with issue numbers.
+
+        Returns:
+            Status records with native milestone identity.
+        """
         result: dict[int, IssueStatus] = {}
         for item in items:
             raw_issue = getattr(item.metadata, "issue", "") or ""
@@ -468,7 +475,15 @@ class InMemoryBackend:
             num = int(str(raw_issue).lstrip("#"))
             issue = self._issues.get(num)
             if issue is not None:
-                result[num] = IssueStatus(status=issue["state"].lower())
+                milestone = issue["milestone"]
+                native_status = issue["state"].lower()
+                status = item.status if native_status == "open" and item.status == "in-progress" else native_status
+                result[num] = IssueStatus(
+                    status=status,
+                    state=native_status.upper(),
+                    milestone=milestone["title"] if milestone is not None else "",
+                    milestone_number=milestone["number"] if milestone is not None else None,
+                )
         return StatusFetchResult(statuses=result, attempted=True)
 
     def fetch_item_status(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> str:
@@ -633,6 +648,21 @@ class InMemoryBackend:
         """
         return self._fetch_milestones_graphql(cast("Repository", None), "", "", states)
 
+    def list_milestone_members(self, milestone_number: int, repo: str = "") -> list[MilestoneMemberNode]:
+        """Return every stored issue assigned to the requested milestone."""
+        del repo
+        members = [
+            MilestoneMemberNode(
+                issue_number=issue["number"],
+                title=issue["title"],
+                state="OPEN" if issue["state"] == "OPEN" else "CLOSED",
+                milestone_number=milestone_number,
+            )
+            for issue in self._issues.values()
+            if issue["milestone"] is not None and issue["milestone"]["number"] == milestone_number
+        ]
+        return sorted(members, key=operator.itemgetter("issue_number"))
+
     def create_milestone(
         self, title: str, description: str = "", due_on: datetime | None = None, repo: str = ""
     ) -> MilestoneFullNode:
@@ -667,21 +697,42 @@ class InMemoryBackend:
         self._milestones[number] = node
         return node
 
-    def assign_item_to_milestone(self, issue_number: int, milestone_number: int, repo: str = "") -> None:
-        """Set an issue's embedded milestone reference.
+    def close_milestone(self, milestone_number: int, repo: str = "") -> MilestoneFullNode:
+        """Close an in-memory milestone and return its live-counted node.
+
+        Returns:
+            The closed milestone with current member counts.
+        """
+        del repo
+        milestone = self._milestones.get(milestone_number)
+        if milestone is None:
+            raise KeyError(f"InMemoryBackend: milestone #{milestone_number} not found")
+        milestone["state"] = "CLOSED"
+        return next(
+            node
+            for node in self._fetch_milestones_graphql(cast("Repository", None), "", "", states=["CLOSED"])
+            if node["number"] == milestone_number
+        )
+
+    def assign_item_to_milestone(self, issue_number: int, milestone_number: int | None, repo: str = "") -> None:
+        """Assign an issue to a milestone or clear its native milestone reference.
 
         Args:
-            issue_number: Issue to assign.
-            milestone_number: Milestone to assign it to.
+            issue_number: Issue to assign or unassign.
+            milestone_number: Target milestone, or ``None`` to explicitly clear it.
             repo: Ignored — InMemoryBackend has no GitHub connection.
 
         Raises:
-            KeyError: When ``issue_number`` or ``milestone_number`` is unknown.
+            KeyError: When ``issue_number`` or a non-null ``milestone_number`` is unknown.
         """
+        del repo
         issue = self._issues.get(issue_number)
         if issue is None:
             msg = f"InMemoryBackend: issue #{issue_number} not found"
             raise KeyError(msg)
+        if milestone_number is None:
+            issue["milestone"] = None
+            return
         milestone = self._milestones.get(milestone_number)
         if milestone is None:
             msg = f"InMemoryBackend: milestone #{milestone_number} not found"

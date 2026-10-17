@@ -1,150 +1,18 @@
 ---
 name: complete-milestone
-description: 'Close a completed GitHub milestone. Args: {milestone-number}. Audits open and closed issues, offers to carry forward open items to a new or existing milestone, closes the GitHub milestone, updates Project V2 Status to Done for closed issues, and generates a completion summary. Use when a sprint or release is finished and needs to be officially closed.'
+description: Audit and close an open configured-backend milestone after explicitly resolving every open item. Use when a release or theme is ready for closure.
 argument-hint: '{milestone-number}'
 user-invocable: true
 ---
 
-<milestone_number>$ARGUMENTS</milestone_number>
-
 # Complete Milestone
 
-Verify completion state, handle stragglers, close the milestone, and generate a summary.
+Resolve the backend with `dh:backend-resolution`. Require a numeric milestone number; do not treat literal unsubstituted `$ARGUMENTS` as input.
 
-## Arguments
-
-`<milestone_number/>` — milestone number (required).
-
-```text
-/dh:complete-milestone 3
-```
-
-## Workflow
-
-### Step 1: Resolve and Audit
-
-Call `backlog_list_milestones(state="open")` and filter the returned list for the entry where `number == <milestone_number/>`. If not found in open milestones, call `backlog_list_milestones(state="all")` and filter again. Extract: `title`, `state`, `open_issues`, `closed_issues`, `due_on`.
-
-If milestone already closed, report closed date and stop.
-
-Fetch all issues:
-
-```text
-backlog_list_issues(milestone="{title}", state="open")
-backlog_list_issues(milestone="{title}", state="closed")
-```
-
-### Step 2: Show State
-
-```text
-Milestone #{N}: {title}
-Due: {due_on or "not set"}
-
-  Closed: {closed_count} issues ✓
-  Open:   {open_count} issues ✗
-
-Closed:
-  #12  SAM: Error Recovery      (closed 2026-02-20)
-  #8   gitlab-skill: Remove URL (closed 2026-02-19)
-
-Open (incomplete):
-  #14  create-backlog-item skill  [status:in-progress]
-  #17  start-milestone skill      [status:needs-grooming]
-```
-
-If `open_count == 0`: skip to Step 4.
-
-### Step 3: Handle Open Issues
-
-Ask: "What should happen to the {open_count} open issues?"
-
-```text
-A) Carry forward to a new milestone (create it now)
-B) Carry forward to an existing open milestone
-C) Remove from milestone (leave open, unassigned)
-D) Close them as incomplete
-```
-
-**Option A — new milestone:**
-
-Prompt for new milestone title and optional due date. Create via:
-
-```text
-backlog_create_milestone(title="{new title}", due_on="{YYYY-MM-DD or empty}", description="")
-```
-
-Reassign open issues one at a time:
-
-```bash
-uv run .claude/skills/gh/scripts/github_project_setup.py issue set-milestone --issue N --milestone {new_number}
-```
-
-**Option B — existing milestone:**
-
-Call `backlog_list_milestones(state="open")` to list open milestones. User picks one; reassign open issues:
-
-```bash
-uv run .claude/skills/gh/scripts/github_project_setup.py issue set-milestone --issue N --milestone {chosen_number}
-```
-
-**Option C — unassign:**
-
-```bash
-uv run .claude/skills/gh/scripts/github_project_setup.py issue remove-milestone --issue N
-```
-
-**Option D — close:**
-
-```bash
-uv run .claude/skills/gh/scripts/github_project_setup.py issue close --number N --comment "Closed incomplete as part of milestone #{M} completion."
-```
-
-### Step 4: Close Milestone
-
-Use the Python automation script (preferred — handles label transitions and milestone close atomically):
-
-```bash
-uv run .claude/skills/gh/scripts/github_project_setup.py milestone close \
-  --number {number}
-```
-
-Or, to preview changes without applying them:
-
-```bash
-uv run .claude/skills/gh/scripts/github_project_setup.py milestone close \
-  --number {number} --dry-run
-```
-
-The script transitions all remaining open issues to `status:done`, closes the milestone, and prints a completion summary. It exits non-zero if any issue label update fails.
-
-### Step 5: Update Project V2
-
-For all closed issues, update Project V2 Status to `Done`:
-
-```bash
-uv run .claude/skills/gh/scripts/github_project_setup.py project update-status \
-  --issue N --status Done
-```
-
-### Step 6: Completion Report
-
-```text
-Milestone #{N} "{title}" — CLOSED
-
-  Completed:       {closed_count}/{total_count} ({pct}%)
-  Carried forward: {count} → milestone #{new_N} "{new_title}"
-  Removed:         {count}
-  Closed incomplete: {count}
-
-{if carry_forward_count > 0}
-Next steps:
-  /dh:group-items-to-milestone {new_N}  (add more items)
-  /start-milestone {new_N}           (begin the new sprint)
-```
-
-## Error Handling
-
-- Milestone not found: call `backlog_list_milestones(state="open")` to list open milestones and stop.
-- Milestone already closed: report and stop.
-- Issue reassignment fails: log per-item error, continue with remaining.
-- No open milestones for Option B: fall back to Option A automatically.
+1. Resolve the milestone by numeric `number`, using `state="all"` only to report missing/closed state.
+2. Read every configured-provider member with `backlog_list_milestone_members(milestone_number=<requested number>)` and reconcile its native `OPEN`/`CLOSED` states against the milestone's reported open/closed counts before audit, projection, or close. This read is authoritative and includes ordinary provider issues without DH sections; it follows provider pagination. Without MCP, load `dh:dh-cli-usage` and run its absolute `<sam_cli/> backlog list-milestone-members --milestone-number <requested number>` from the target cwd. An ordinary `backlog_list(include_closed=true)` may map returned members to managed logical references for normal DH close, but must not define the audit population or its totals.
+3. Present every returned member grouped by native lifecycle state. If native-open members remain, ask the user to carry each to a selected/new milestone or leave it unassigned where supported. For a managed member, normal `backlog_close` lifecycle with a valid reason remains available; do not invent a DH reference or unsupported close path for an unmanaged member. Do not silently mark incomplete work done or use a raw helper.
+4. Assign carried items with `backlog_assign_item_to_milestone` only after the target milestone exists and each assignment is confirmed. For an approved supported-backend unassignment, call it with that member's `issue_number` and explicit `milestone_number=null`; without MCP use `<sam_cli/> backlog assign-milestone --issue-number <issue> --clear`. Carrying requires the numeric target; use `<sam_cli/> backlog assign-milestone --issue-number <issue> --milestone-number <number>`. Stop closure on any unresolved disposition or count mismatch.
+5. After all dispositions, immediately before closure, repeat the milestone lookup and the authoritative `backlog_list_milestone_members` read from step 2 with fresh provider counts; do not reuse the pre-confirmation snapshot. Require the milestone still open, reconcile current native `OPEN`/`CLOSED` membership counts, and require zero open members with no unresolved disposition, pending write, or count mismatch. If new/open members or inconsistent results remain, stop closure and return to steps 3–4 for audit and confirmation, then refresh again. Only after this fresh audit succeeds, call `backlog_close_milestone(milestone_number=<requested number>)` (CLI: `<sam_cli/> backlog close-milestone --milestone-number <requested number>`). Retain the refreshed native-`CLOSED` membership for step 6. Preserve the backend result; unsupported is a stop, never a fallback.
+6. Project V2 Done is an optional GitHub projection, separate from the configured-backend closure. Run it only after the successful milestone close and only when the resolved backend is `github`. Retain each backend-returned GitHub issue number in the final native-`CLOSED` membership. Establish its canonical source repository from that resolved backend's effective repository, honoring its own override/discovery precedence rather than assuming the target cwd's origin; verify the issue in that repository through a read-only GitHub lookup or authoritative source identity when available. Ordinary list/assignment responses need not contain a repository field. Never derive a GitHub target from a logical reference, selector, or numeric `issue` field on a SQLite/Memory/local item. If the resolved backend is not `github`, report projection as inapplicable and do not ask for projection configuration or invoke a helper. For GitHub candidates, ask for the Project V2 owner, project number, repository, and exact status value. The supplied `--repo` must exactly equal the verified canonical source repository; the Project V2 owner may differ. On absent or unverifiable source identity, or a repository mismatch, stop and report that candidate's projection as inapplicable; do not invoke the helper or substitute another same-number issue. Resolve `GH_PROJECT_HELPER` to the absolute `github_project_setup.py` path in the loaded `gh` skill without changing the target project's cwd, then run `uv run "$GH_PROJECT_HELPER" project update-status --issue-number <authoritative GitHub issue number> --status "<status>" --project-number <project-number> --owner <owner> --repo <authoritative source repository>` once for every eligible final native-`CLOSED` GitHub issue. Report each helper result separately from the backend closure.
+7. Report backend, milestone number, complete audit/count reconciliation, every disposition, closure result, and retained warnings/pending writes.
