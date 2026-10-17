@@ -88,23 +88,20 @@ through relative directory symlinks. Either direction is supported; do not copy 
 synchronize skill bodies. Codex follows the `.agents/skills/` links for discovery.
 The project also exposes native custom roles through `.codex/agents/*.toml`.
 
-The research roles can run independently of the Claude-only research orchestration
-skill. They read maintained references under `.claude/skills/research-curator/`;
-those references do not require an additional Codex skill copy. Native roles inherit
-the parent session's model, tools and permissions. The language specialists use the
-repository's configured checks and do not claim automatic agent-memory injection.
+The four research workflow skills (`research-curator`, `refresh-research`,
+`skill-research-process`, and `external-pattern-integrator`) are shared through relative
+directory links. They parse supplied invocation text rather than rely on load-time expansion.
+The curator routes Claude Code through its available project agents and Codex through the native
+`research-curator`, `research-cross-referencer`, `research-insight-extractor`, and
+`research-utilization-assessor` roles. The native roles read maintained references under
+`.claude/skills/research-curator/`; no mirrored skill body is needed. They inherit the parent
+session's model, tools, permissions, and MCP configuration.
 
-Only workflows usable without Claude load-time preprocessing are linked. Skills
-requiring injected arguments, command output, or skill-directory macros remain at
-their canonical Claude paths without a Codex discovery link. The git-history
-workflow's zero-exclusion fallback would lose its packaged default filtering, so
-it is not exposed here. Script workflows with unresolved project-root commands
-or invalid CLI arguments are likewise not added; their canonical sources remain
-unchanged. Harness-specific tool names and optional integrations alone do not
-exclude an otherwise portable workflow.
-The research-process skill's literal Claude `Skill`/`Task`/`Agent` call templates
-are not adopted as a Codex surface without an explicit native handoff; its Claude
-source is unchanged.
+Only workflows usable without load-time preprocessing are linked. The git-history workflow's
+zero-exclusion fallback would lose its packaged default filtering, so it is not exposed here.
+Script workflows with unresolved project-root commands or invalid CLI arguments are likewise not
+added until repaired. Harness-specific tool names and optional integrations alone do not exclude an
+otherwise portable workflow.
 
 The trusted project's `.codex/config.toml` enables Ref and Context7 stdio MCP servers
 and retains core-only shell environment inheritance. Each MCP entry forwards its

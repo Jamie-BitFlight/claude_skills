@@ -5,15 +5,9 @@ argument-hint: <url-or-file> [url-or-file...]
 user-invocable: true
 ---
 
-<source_refs>$ARGUMENTS</source_refs>
+## Invocation Input
 
-# External Pattern Integrator
-
-Systematically analyze external agent/skill definitions and integrate their strengths into local skills while maintaining workflow coherence.
-
-## Arguments
-
-<source_refs/>
+Read the source references supplied by the active harness. Parse one or more URLs or readable local paths. If none are supplied, or an unsubstituted argument placeholder is supplied, ask for at least one source before creating scratch output, fetching, editing, or creating a durable backlog item.
 
 ## Workflow Overview
 
@@ -38,9 +32,9 @@ Phase 3: Validation
 
 ## Phase 1: Parallel Candidate Mapping
 
-### Step 1.1: Create Tracking Document
+### Step 1.1: Create Scratch Tracking Document
 
-Create a tracking file at `.claude/external-pattern-integration-{date}.md`:
+Create a task-local tracking document at `.tmp/scratch/analysis/external-pattern-integration-{date}.md`. It is an intermediate analysis record, not a durable backlog item:
 
 ```markdown
 # External Pattern Integration
@@ -69,10 +63,10 @@ Create a tracking file at `.claude/external-pattern-integration-{date}.md`:
 
 ### Step 1.2: Fetch External Sources
 
-For each URL/file in <source_refs/>:
+For each supplied URL or local path:
 
-**If URL**: Use WebFetch or curl to download to `/tmp/external-pattern-{slug}.md`
-**If local file**: Read directly
+**If URL**: Fetch through the available documentation or web-reading capability and save only transient extracts under `.tmp/scratch/` when a file is needed.
+**If local file**: Read directly.
 
 ### Step 1.3: Analyze External Source
 
@@ -207,9 +201,9 @@ uv run prek run --files {all modified files}
 
 Fix any issues before proceeding.
 
-### Step 3.2: Update Tracking Document
+### Step 3.2: Finalize Scratch Tracking
 
-Update the tracking file with:
+Update the scratch tracking document with:
 
 ```markdown
 ## Results
@@ -227,28 +221,9 @@ Update the tracking file with:
 **Status**: COMPLETE
 ```
 
-### Step 3.3: Add Deferred Items to Backlog
+### Step 3.3: Record Deferred Work in the Configured Backend
 
-If there are deferred enhancements, create per-item files in `.claude/backlog/` via the backlog script:
-
-1. For each deferred enhancement, invoke the backlog script with appropriate priority:
-   - **P1 (Should Have)**: Patterns that would significantly improve workflows
-   - **P2 (Could Have)**: Nice-to-have patterns or minor improvements
-   - **Ideas**: Patterns worth exploring but unclear fit
-
-Entry format:
-
-```markdown
-### {Enhancement title}
-
-**Source**: [{tracking-document}]({path-to-tracking-document})
-**Added**: {YYYY-MM-DD}
-**Description**: {What needs to be done}
-**Patterns from**: {external-source-name}
-**Suggested location**: {path/to/file.md}
-```
-
-2. Note in tracking document: "Deferred items added to `.claude/backlog/` as per-item files"
+If an enhancement is deferred, create or match one logical work item through the configured development-harness backlog backend. Do not create filesystem backlog files or another local state store. The work item description must include the source reference, the exact pattern, why it does not fit the current workflow stage, and the suggested destination. Link the resulting durable record identifier in the scratch tracking document.
 
 ### Step 3.4: Commit Changes
 
@@ -275,7 +250,7 @@ Sources:
 - [ ] Cross-file changes coordinated
 - [ ] External artifact recognition added for interoperability
 - [ ] All modified files pass linting
-- [ ] Deferred enhancements added as per-item files in `.claude/backlog/` with priority
+- [ ] Deferred enhancements recorded as logical items in the configured backend, with their scratch tracking reference
 - [ ] Changes committed with source attribution
 
 ## Example Usage

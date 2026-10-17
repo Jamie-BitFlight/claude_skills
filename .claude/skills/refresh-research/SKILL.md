@@ -5,7 +5,9 @@ argument-hint: '[--all | --stale | --category <name> | --layer <0|1|2> | --dry-r
 user-invocable: true
 ---
 
-<scope_args>$ARGUMENTS</scope_args>
+## Invocation Input
+
+Read arguments supplied by the active harness. If none were supplied, use `--stale`. If the host supplied an unsubstituted argument placeholder, ask for one supported scope before inventorying, spawning workers, or writing.
 
 # Refresh Research
 
@@ -13,7 +15,7 @@ Orchestrate parallel research-curator agents to bulk-refresh research entries in
 
 ## Arguments
 
-`<scope_args/>` controls scope:
+Supplied arguments control scope:
 
 - `--all` — Refresh every entry regardless of staleness
 - `--stale` (default) — Refresh entries past their review date
@@ -95,7 +97,7 @@ If BLOCKED: report missing tools/access, suggest workarounds, stop.
 
 ### Step 4: Baseline, Then Spawn Curators in Waves
 
-Activate `/research-curator` before spawning any curator and capture its Mode Routing baseline (the status snapshot of `./research/` and a hash per target) while no write has happened yet. Then route the refresh through its Rerun Mode: split the targets into sequential waves of 5, spawn one `@research-curator` per entry with `--rerun ./research/{category}/{name}.md` in parallel within a wave, and wait for each wave before the next. Apply the curator's [Failure Recovery](../research-curator/references/batch-mode.md#failure-recovery) to every failed, timed-out, or unchanged agent result before it enters Step 5.
+Capture the curator's Mode Routing baseline before any write. Then route the refresh through its Rerun Mode: split targets into sequential waves of five, launch the available `research-curator` role once per entry with `--rerun ./research/{category}/{name}.md`, and wait for every result before starting the next wave. On Claude Code select the available project agent; on Codex select the native `research-curator` role. Preserve the exact prompt and structured result. Apply the curator's [Failure Recovery](../research-curator/references/batch-mode.md#failure-recovery) to every failed, timed-out, or unchanged worker result before it enters Step 5.
 
 After each wave, log results:
 
@@ -162,5 +164,5 @@ Append the curator's [Rerun Mode Output](../research-curator/SKILL.md#rerun-mode
 
 ## Related
 
-- `/research-curator` — single-entry and batch research operations; this skill wraps it with staleness detection and RT-ICA
-- `@research-curator` agent — `.claude/agents/research-curator.md` — executes individual entry reruns
+- `research-curator` — single-entry and batch research operations; this skill reuses its Rerun Mode, validation, review, relay, and post-actions.
+- Research execution route — Claude Code selects the available `research-curator` project agent; Codex selects `.codex/agents/research-curator.toml`. The selected role inherits the parent session's model, tools, permissions, and MCP configuration.
