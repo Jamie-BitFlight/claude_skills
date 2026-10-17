@@ -19,14 +19,29 @@ The rubric reviews the entry itself ([scope](./entry-quality-standards.md#scope)
 
 ---
 
+### Standalone Command Bootstrap
+
+A standalone `--review` invocation has no parent orchestrator shell to initialize command paths.
+Before Gate 1, use the explicit absolute command-path record supplied in the review prompt when it
+is complete and every path exists. When that record is absent, independently resolve the active
+`research-curator` skill directory through the host skill loader and the target project root with
+`git rev-parse --show-toplevel`, then derive the formatter, validator, and bounded-runner absolute
+paths exactly as [Command Path Resolution](../SKILL.md#command-path-resolution) specifies. Keep the
+target project as cwd. Do not assume `CURATOR_*` values are inherited environment variables, and
+report `VERDICT: FAIL -- NOT RUN: {exact missing or invalid path}` if bootstrap cannot resolve a
+required path.
+
 ## Gate 1 — Mechanical Checks
 
 Run the formatter. The orchestrator runs the validator after every pass, appending its remaining issues to the scratch document as `D` lines, and repairs cross-reference reciprocity before review; an orchestrated review (it names a scratch document) skips those two commands, and a standalone `--review` runs all three. Report output as **exact counts per severity and the verbatim issue lines** — "mostly clean", "a few warnings", and "passes validation" are not review output.
 
+Use the absolute command paths resolved by `research-curator`'s Command Path Resolution section.
+Keep the target project as cwd; do not `cd` into the skill directory:
+
 ```bash
-uv run --script .claude/skills/research-curator/scripts/fix_research_formatting.py --check ./research/{category}/{name}.md
-uv run --script .claude/skills/research-curator/scripts/validate_research.py main --json ./research/{category}/{name}.md
-uv run --script .claude/skills/research-curator/scripts/validate_research.py check-backlinks ./research
+uv run --script "$CURATOR_FORMATTER_ABS" --check ./research/{category}/{name}.md
+uv run --script "$CURATOR_VALIDATOR_ABS" main --json ./research/{category}/{name}.md
+uv run --script "$CURATOR_VALIDATOR_ABS" check-backlinks ./research
 ```
 
 | Command | What a defect looks like | Record |
@@ -109,7 +124,7 @@ One per entry, at the path the invocation names, kept across rounds; the reviewe
 
 `D` marks a defect, `R` a repair; ids stay fixed across rounds. The reviewer edits no tracked file except the entry; this document and temp files are unrestricted.
 
-**Loop**: a sonnet reviewer and a haiku worker share this document. The orchestrator runs at most 5 review rounds and stops early when a round's unchecked `D` ids equal the previous round's (`R` lines are excluded from the comparison). After either stop, a `FAIL` with an unchecked line in gate 1 or 4 (mechanical) or a `NOT RUN` gate is reported `UNRESOLVED`, a process defect of the instructions, not of the entry. A `FAIL` with unchecked lines in gates 2 and 3 only (semantic) is `ACCEPTED` as best effort, and the source is the truth.
+**Loop**: a review pass and a repair pass share this document. The orchestrator runs at most 5 review rounds and stops early when a round's unchecked `D` ids equal the previous round's (`R` lines are excluded). Select `research-curator` through the cross-harness handoff for both passes, with `--review` for review and `--fix` for repair; the active host supplies its configured role model. After either stop, a `FAIL` with an unchecked line in gate 1 or 4 (mechanical) or a `NOT RUN` gate is reported `UNRESOLVED`, a process defect of the instructions, not of the entry. A `FAIL` with unchecked lines in gates 2 and 3 only (semantic) is `ACCEPTED` as best effort, and the source is the truth.
 
 **Fix with no additional research:** reword; restructure; add a missing section from material already in the entry or in files already cited or opened; fix a quote re-found in a file already available; remove a claim that cannot be sourced. Re-running a recorded command to check it is verification, not research.
 

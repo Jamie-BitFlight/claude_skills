@@ -10,21 +10,21 @@ The following diagram is the authoritative procedure for batch wave spawning. Ex
 
 ```mermaid
 flowchart TD
-    Start(["Parse deduplicated URLs from --batch"]) --> Wave["Spawn the next 5 URLs, or all that remain<br>up to 5 parallel @research-curator agents via Agent tool"]
-    Wave --> WaveDone["Wait for all agents in the wave to complete"]
+    Start(["Parse deduplicated URLs from --batch"]) --> Wave["Launch the next 5 URLs, or all that remain, through the Cross-Harness Role Handoff"]
+    Wave --> WaveDone["Wait for all workers in the wave to complete"]
     WaveDone --> QMore{"More URLs remaining?"}
     QMore -->|"Yes — advance to next batch of 5"| Wave
-    QMore -->|"No — all URLs processed"| Collect["Collect structured results from all agents<br>(status, file path, category, key findings)"]
-    Collect --> RelayCheck["Apply the Agent Result Relay Rules (SKILL.md)<br>to all collected agent results"]
-    RelayCheck --> Gate["For each entry with status: succeeded<br>run the Validation Gate for New/Refreshed Entries<br>(validation-rules.md): fix_research_formatting.py<br>+ validate_research.py --json; on any gated warning<br>(the set is listed in validation-rules.md, not here)<br>spawn @research-curator --fix and retry once"]
-    Gate --> Results{"Per entry: did the curator agent fail,<br>or do errors / gated warnings remain<br>after the validation gate retry?"}
-    Results -->|"No for an entry — clean"| SpawnXref["For each clean entry (up to 5 entries concurrently —<br>separate from the 5-agent curator wave cap)<br>spawn @research-cross-referencer 'Add cross-references to {file-path}'"]
-    Results -->|"Yes for an entry — curator failure, or validation issues remain"| SkipPartial["Mark that entry failed, created with issues,<br>or refreshed with issues<br>Skip cross-referencing, review, and scan for it<br>Relay the exact failure or issue text to user"]
-    SpawnXref --> WaitXref["Wait for all cross-referencers to complete<br>Collect CROSS_REFERENCES_ADDED counts<br>Report total cross-references added"]
+    QMore -->|"No — all URLs processed"| Collect["Collect structured results from all workers: status, file path, category, key findings"]
+    Collect --> RelayCheck["Apply the Agent Result Relay Rules (SKILL.md) to all collected worker results"]
+    RelayCheck --> Gate["For each succeeded entry run the Validation Gate; launch research-curator with --fix and exact gated warnings once"]
+    Gate --> Results{"Did the curator fail, or do errors / gated warnings remain after retry?"}
+    Results -->|"No for an entry — clean"| SpawnXref["Launch research-cross-referencer for each clean entry, up to 5 concurrently"]
+    Results -->|"Yes for an entry — failure or validation issues remain"| SkipPartial["Mark that entry failed, created with issues, or refreshed with issues; skip cross-referencing, review, and scan; relay exact failure or issue text"]
+    SpawnXref --> WaitXref["Wait for all cross-referencers; collect CROSS_REFERENCES_ADDED counts; report total"]
     SkipPartial --> WaitXref
-    WaitXref --> Review["Run Entry Review (SKILL.md) on each clean entry<br>backlink repair first, then one review loop per entry, in waves of 5<br>entries marked failed, created with issues, or refreshed with issues are not reviewed"]
-    Review --> Scan["Run the Overlap Scan (SKILL.md) on each created entry whose review returned PASS<br>relay per the Overlap Scan section there<br>refreshed, ACCEPTED and UNRESOLVED entries get no scan"]
-    Scan --> PostActions(["Execute Post-Actions — README rows for PASS entries, vault-wide backlink repair, then lint, commit, push (see SKILL.md for the authoritative step order)"])
+    WaitXref --> Review["Run Entry Review on each clean entry; backlink repair first, then one review loop per entry in waves of 5"]
+    Review --> Scan["Run the Overlap Scan on each created entry whose review returned PASS; refreshed, ACCEPTED, and UNRESOLVED entries get no scan"]
+    Scan --> PostActions(["Execute Post-Actions — README rows for PASS entries, vault-wide backlink repair, then lint, commit, push"])
 ```
 
 ---

@@ -1,226 +1,105 @@
 ---
 name: skill-research-process
-description: Builds comprehensive Claude Code skills using parallel research agents — categorization, parallel documentation gathering, anti-hallucination checkpoints, and final validation. Use when building a skill from official docs, when "research for skill" or "create comprehensive skill" is requested, or when extensive multi-source documentation gathering is needed before skill creation.
-argument-hint: <tool-or-library-name>
-model: sonnet
-context: fork
-agent: general-purpose
+description: Builds a skill from official documentation through categorized research, citation review, integration, and final validation. Use when researching a tool or library before creating a skill, when "research for skill" or "create comprehensive skill" is requested, or when extensive multi-source documentation gathering is needed.
+argument-hint: <tool-or-library-name> [target-skill-path]
 user-invocable: true
 ---
 
 # Skill Research Process
 
-Systematic, scalable approach for building comprehensive Claude Code skills using parallel research agents. Use this when a skill requires extensive documentation gathering from official sources.
+Build a skill from source-backed documentation. This is an authoring workflow, not a research-vault entry workflow: use `research-curator` only when the user also requests a durable `research/` entry.
+
+## Invocation and Preconditions
+
+Read the invocation text supplied by the active harness. It must identify the tool or library. Derive the target skill path only when the user supplied it or repository context makes it unambiguous; otherwise ask for the target path before creating files. Treat an unsubstituted argument placeholder as missing input.
+
+Before mutation, read the existing target skill when it exists, its relevant package instructions, and `plugin-creator:skill-creator`. Use its existing structure instead of inventing a second convention. Create a new skill only with that skill's initialization procedure.
+
+Use the host's available worker mechanism rather than literal harness-specific `Task`, `Agent`, or `Skill` calls. Give every worker a concrete file scope, source set, required output, and acceptance checks. Launch independent category workers concurrently when the host supports it; otherwise run the same category handoffs sequentially. Preserve each structured worker result and its exact failure reason for the final relay.
 
 ## Process Overview
 
 ```text
-Stage 1: Initialize → Categorization agent creates TODO checklist
+Stage 1: Categorize → scratch research plan
     ↓
-Gate 1: Verify categories are distinct and complete
+Gate 1: categories are distinct, complete, and sourceable
     ↓
-Stage 2: Research → Parallel agents populate references/{category}/
+Stage 2: Research → category references and indexes
     ↓
-Gate 2: Anti-hallucination checkpoint (verify all claims cited)
+Gate 2: citations, provenance, and gaps are verified
     ↓
-Stage 3: Integrate → Update SKILL.md, validate structure
+Stage 3: Integrate → target SKILL.md links and usage guidance
     ↓
-Gate 3: Final validation (links work, quality standards met)
+Gate 3: package-appropriate structural, link, and source validation
 ```
 
-## Pre-Requisites
+## Stage 1: Categorize
 
-1. Activate skill-creator for structure guidance:
+1. Create `.tmp/scratch/plans/{skill-name}-research-plan.md`; it is an intermediate plan, not durable backlog state.
+2. Launch one available research worker with the Categorization handoff in [Agent Prompts](./references/agent-prompts.md#categorization-handoff). It writes only that scratch plan.
+3. Review the plan before research:
+   - categories are distinct and each has a named boundary;
+   - all documented aspects of the target have a category or an explicit out-of-scope reason;
+   - each category names official sources to inspect;
+   - categories are narrow enough for one worker and broad enough to produce a useful index.
+4. Merge or redefine overlaps before Stage 2. A missing source or unclear target blocks only the affected category; record the exact gap in the scratch plan.
 
-   ```text
-   Skill(skill: "plugin-creator:skill-creator")
-   ```
+## Stage 2: Research
 
-2. Read CLAUDE.md for verification requirements
+1. Launch one available research worker per approved category with the [Research Handoff](./references/agent-prompts.md#research-handoff). Give each worker an exclusive `references/{category}/` directory under the target skill.
+2. Each worker creates an `index.md`, detailed reference files, and a structured result containing `STATUS`, `ARTIFACTS`, `SOURCES`, `GAPS`, and `WARNINGS`.
+3. Preserve exact worker counts, artifact paths, unavailable-source errors, and unresolved gaps. Do not convert a failed source fetch into a claim about the tool.
 
-## Stage 1: Initialize Skill Structure
+### Gate 2: Source and Citation Review
 
-**Objective**: Create base skill directory and identify documentation categories.
+For every category, confirm:
 
-### Steps
+- every factual claim is supported by a source the worker read during this run;
+- each citation records URL and access date, and source passages are attributable;
+- official documentation is the authority for API behavior; secondary sources are labeled as such;
+- examples are source-attributed or actually exercised before being presented as working;
+- a source gap is written as `NOT_VERIFIED: {claim}` or an explicit documentation gap, never filled from model knowledge;
+- the category index links to every reference file with relative paths.
 
-1. **Initialize skill directory**:
+Return a category with unsupported claims to the same worker with the exact claims, not a summary. Stop a category that cannot obtain a source after its documented fallback and relay the exact reason; do not silently substitute an uncited overview.
 
-   ```bash
-   plugins/plugin-creator/skills/skill-creator/scripts/init_skill.py <skill-name> --path <output-directory>
-   ```
+## Stage 3: Integrate
 
-2. **Launch categorization agent** - see [Agent Prompts](./references/agent-prompts.md#categorization-agent)
+1. Launch or perform the [Integration Handoff](./references/agent-prompts.md#integration-handoff) after every category has either passed Gate 2 or reported its explicit gaps.
+2. Read all category indexes, then update the target `SKILL.md` with concise links and routing instructions. Keep detailed source material in `references/`.
+3. Preserve the target skill's existing lifecycle and package conventions. Attribute external documentation where the target's existing convention requires it.
+4. Do not convert the scratch research plan into a durable backlog record. If a user-visible enhancement is deferred, create or match it through the configured backlog backend and record its logical identifier in the scratch plan.
 
-3. **Output**: `{skill-name}.TODO.md` with categorized checklist
+### Gate 3: Final Validation
 
-### Quality Gate 1: Category Verification
+Run the package-appropriate existing validator, then read every new or changed index and target-skill link to confirm it resolves. Verify that every approved category has an index, every index has only working relative links, and every Stage 1 category is represented or explicitly recorded as unavailable. Run the repository's changed-file checks once after the coherent change.
 
-Before proceeding, verify:
+## Failure Recovery
 
-- [ ] Categories are distinct (no overlap)
-- [ ] Each category is specific enough to guide focused research
-- [ ] 5-10 categories total (fewer for simple tools, more for complex)
-- [ ] Categories cover the tool's full scope
+- **Missing documentation tools**: use the available primary-source reader; if no primary source can be read, report the blocked source and do not make a claim from it.
+- **Worker failure or timeout**: inspect only the worker's assigned output path. Retain a complete, cited artifact that passes Gate 2; otherwise relay the exact failure and leave that category incomplete.
+- **Incomplete upstream documentation**: document what the source covers, label the gap, and keep the category's unsupported claims out of the target skill.
+- **Interrupted run**: resume from the scratch research plan and the category results already written; revalidate their citations before integration.
 
-**If categories overlap**: Merge or redefine boundaries before Stage 2.
+## Final Report
 
-## Stage 2: Parallel Category Research
-
-**Objective**: Launch concurrent research agents to build reference documentation.
-
-### Steps
-
-1. Read TODO categories from `{skill-name}.TODO.md`
-2. Launch concurrent Task agents (one per category) with `run_in_background: true`
-3. Each agent outputs to `./references/{category}/`
-
-See [Research Agent Prompt](./references/agent-prompts.md#research-agent) for template.
-
-### Parallel Execution
-
-Launch all agents in a **single message** with multiple Task calls:
+Relay worker results without interpretation:
 
 ```text
-Agent(subagent_type: "general-purpose", description: "Research Category A", run_in_background: true, ...)
-Agent(subagent_type: "general-purpose", description: "Research Category B", run_in_background: true, ...)
+## Skill Research Result
+
+Target: {target skill path}
+Categories: {passed}/{planned}
+Artifacts:
+- {path}
+Source gaps:
+- {exact gap or none}
+Validation: {exact command and result}
+Scratch plan: .tmp/scratch/plans/{skill-name}-research-plan.md
 ```
-
-### Quality Gate 2: Anti-Hallucination Checkpoint
-
-**MANDATORY before Stage 3.** For each category, verify:
-
-- [ ] Every factual claim has a cited source (URL + access date)
-- [ ] No claims based on training data knowledge
-- [ ] Sources are authoritative (official docs > blogs > forums)
-- [ ] Code examples are from official sources or tested
-- [ ] Uncertain information marked explicitly as "unverified"
-
-**Citation Format Required**:
-
-```markdown
-According to the official documentation (https://example.com/docs, accessed 2026-02-01), ...
-```
-
-**If citation missing**: Research agent must add source or mark as "NOT_VERIFIED: [claim]".
-
-## Stage 3: Integration
-
-**Objective**: Update SKILL.md with category links and finalize.
-
-### Steps
-
-1. Update `./SKILL.md` with links to each category's `index.md`
-2. Verify SKILL.md body ≤5k words
-3. Validate structure
-
-### Quality Gate 3: Final Validation
-
-Run validation:
-
-```bash
-plugins/plugin-creator/skills/skill-creator/scripts/package_skill.py <skill-path>
-```
-
-Verify:
-
-- [ ] All markdown links resolve (use Read tool to verify)
-- [ ] All index.md files contain working links
-- [ ] All TODO items from Stage 1 have corresponding reference files
-- [ ] Skill follows skill-creator guidelines
-
-## Error Recovery
-
-### MCP Tools Unavailable
-
-Fallback strategy when MCP tools not available:
-
-1. **WebFetch + WebSearch**: For discovery and overview
-2. **GitHub CLI (`gh`)**: For repository metadata, issues, releases
-3. **Clone + Read**: Clone repo locally, use Read tool for code analysis
-
-### Research Agent Fails
-
-If an agent fails or times out:
-
-1. Check output file with Read tool (background agents write to file)
-2. Resume with remaining work if partial results exist
-3. Re-launch with narrower scope if timeout
-
-### Incomplete Source Documentation
-
-If official docs are incomplete:
-
-1. Document what IS available with citations
-2. Mark gaps explicitly: "Official documentation does not cover [topic]"
-3. Use GitHub issues/discussions as secondary sources (with citation)
-4. Never fill gaps with training data assumptions
-
-## MCP Tool Selection
-
-| Tool         | Fidelity | Use When                                       |
-| ------------ | -------- | ---------------------------------------------- |
-| WebFetch     | Low      | Scoping only. NEVER for implementation details |
-| mcp**exa**\* | Medium   | Code snippets, documentation extraction        |
-| mcp**Ref**\* | High     | Authoritative, verbatim documentation          |
-
-See [MCP Tool Usage Guide](./references/mcp-tools.md) for details.
-
-## Key Principles
-
-| Principle              | Rule                                         |
-| ---------------------- | -------------------------------------------- |
-| Progressive Disclosure | SKILL.md ≤5k words; details in `references/` |
-| Parallel Execution     | Launch all category agents in single message |
-| Citation Required      | Every claim needs source + access date       |
-| No Training Data       | Only document what sources confirm           |
-| Relative Paths         | All links use `./` prefix                    |
-
-## Success Checklist
-
-Before finalizing:
-
-- [ ] All quality gates passed (1, 2, 3)
-- [ ] Every factual claim has citation with access date
-- [ ] No speculation or training-data-based claims
-- [ ] All links use `./` relative paths
-- [ ] Categories are distinct (no overlap)
-- [ ] SKILL.md ≤5k words
-- [ ] Each category has `index.md` with working links
-- [ ] Validation script passes
-
----
-
-## Agent Team Alternative for Stage 2
-
-When Stage 2 (category research) involves 3+ independent categories where findings from one category inform or challenge another, consider agent teams instead of sequential subagents.
-
-### When Agent Teams Apply
-
-A category research workflow is a candidate for agent teams when ALL of these are true:
-
-1. 3+ independent categories to research (enough parallelism to justify coordination overhead)
-2. Categories benefit from cross-communication (findings from one category inform or challenge another)
-3. No shared file mutations (each teammate owns different category files)
-4. Result is a synthesis, not a concatenation (value comes from combining, deduplicating, or reconciling findings across categories)
-
-### When Subagents Suffice
-
-A category research workflow is NOT a candidate for agent teams when:
-
-- Only 1-2 categories (subagent overhead is lower)
-- Categories are fully independent with no cross-communication need (subagents suffice)
-- Result is just collecting N outputs (no synthesis step)
-- Work is sequential (each step depends on the previous)
-
-### Reference
-
-See [Agent Teams Documentation](./../../../plugins/plugin-creator/skills/claude-skills-overview-2026/resources/agent-teams.md) for complete criteria, architecture, and usage patterns.
-
-SOURCE: Lines 27-39 of agent-teams.md (accessed 2026-02-06)
 
 ## References
 
 - [Agent Prompt Templates](./references/agent-prompts.md)
 - [MCP Tool Usage Guide](./references/mcp-tools.md)
-- [Gaps Analysis](./references/gaps-analysis.md) - Known limitations and improvement opportunities
+- [Gaps Analysis](./references/gaps-analysis.md)
