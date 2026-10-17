@@ -372,3 +372,4 @@ Task Master provides a Claude Code plugin for native integration:
 | [unblocked](../context-management/unblocked.md) | context-management | referenced by unblocked (context-management) |
 | [sidecar](../developer-tools/sidecar.md) | developer-tools | referenced by sidecar (developer-tools) |
 | [xyops](./xyops.md) | task-management | referenced by xyops (task-management) |
+| [itsaplan](./itsaplan.md) | task-management | referenced by itsaplan (task-management) |

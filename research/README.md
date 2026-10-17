@@ -1058,6 +1058,7 @@ AI-powered task management systems designed for AI-driven development workflows.
 | [xyops.md](./task-management/xyops.md)                                                             | xyOps - distributed job orchestration and fleet management platform with visual workflow editor, real-time monitoring, alerting, and remote satellite agent system | 2026-03-26   |
 | [beads.md](./task-management/beads.md) | Beads (bd) — Dolt-powered version-controlled issue tracker for distributed AI workflows: hash-based collision-free IDs, dependency DAG with 4 relationship types, semantic compaction for context window recovery, offline-first with S3/GCS/DoltHub sync (19,673 stars, v0.62.0) | 2026-03-25   |
 | [internal-comms-skill.md](./task-management/internal-comms-skill.md) | Internal-Comms Skill — Codex skill for six internal communication formats (3P updates, newsletters, FAQ, status reports, leadership updates, incident reports) via Composio CLI (Apache-2.0) | 2026-05-10   |
+| [itsaplan.md](./task-management/itsaplan.md) | It's a Plan - self-hosted issue tracker where external AI agents (claude, codex, opencode and others) run through a polling runner and a generated MCP endpoint (AGPL-3.0-only) | 2026-10-17   |
 
 **Key Topics**:
 
