@@ -92,6 +92,35 @@ def test_migrate_schema_item_in_two_milestones_fails_closed_and_keeps_legacy_dat
     assert journal_after == journal_before
 
 
+def test_migrate_schema_rechecks_links_added_after_first_check(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    db_path = tmp_path / "legacy.sqlite3"
+    _build_legacy_db(db_path, [(7, 1)])
+    original_check = SQLiteBackend._check_legacy_milestone_links
+    calls = 0
+
+    def check_then_race(self: SQLiteBackend) -> None:
+        nonlocal calls
+        original_check(self)
+        calls += 1
+        if calls == 1:
+            other = sqlite3.connect(db_path)
+            other.execute("INSERT INTO item_milestones (issue_number, milestone_number) VALUES (7, 2)")
+            other.commit()
+            other.close()
+
+    monkeypatch.setattr(SQLiteBackend, "_check_legacy_milestone_links", check_then_race)
+
+    with pytest.raises(BacklogError, match=r"#7"):
+        SQLiteBackend(str(db_path))
+
+    conn = sqlite3.connect(db_path)
+    kept = conn.execute(
+        "SELECT issue_number, milestone_number FROM item_milestones ORDER BY milestone_number"
+    ).fetchall()
+    conn.close()
+    assert kept == [(7, 1), (7, 2)]
+
+
 def test_migrate_schema_single_link_backfills_and_drops_legacy_table(tmp_path: Path) -> None:
     db_path = tmp_path / "legacy.sqlite3"
     _build_legacy_db(db_path, [(7, 2)])

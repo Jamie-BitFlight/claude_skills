@@ -263,7 +263,7 @@ class SQLiteBackend:
             msg = (
                 "Cannot migrate the legacy item_milestones table: items.milestone_number holds one "
                 f"milestone per item, and these items are linked to several: {affected}. "
-                "The database was left unchanged. Reduce each listed item to a single milestone "
+                "The legacy table and its links were left unchanged. Reduce each listed item to a single milestone "
                 "in item_milestones, then reopen the database."
             )
             raise BacklogError(msg, retryable=False)
@@ -281,7 +281,10 @@ class SQLiteBackend:
         legacy_table = self._conn.execute(
             "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'item_milestones'"
         ).fetchone()
-        self._conn.execute("BEGIN")
+        # IMMEDIATE takes the write lock now, and the link check repeats under
+        # it, so no other connection can add a legacy link between the check and
+        # the backfill-and-drop below.
+        self._conn.execute("BEGIN IMMEDIATE")
         try:
             columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(items)").fetchall()}
             if "milestone_number" not in columns:
@@ -292,6 +295,7 @@ class SQLiteBackend:
             # both a fresh database and a durable one migrated by this method.
             self._conn.execute("CREATE INDEX IF NOT EXISTS idx_items_milestone_number ON items(milestone_number)")
             if legacy_table is not None:
+                self._check_legacy_milestone_links()
                 self._conn.execute(
                     "UPDATE items SET milestone_number = ("
                     "  SELECT milestone_number FROM item_milestones"

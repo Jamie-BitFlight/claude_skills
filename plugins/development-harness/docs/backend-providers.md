@@ -366,8 +366,12 @@ Milestone assignment is one-per-item on every backend: `sqlite`'s
 scalar, so an item belongs to at most one milestone. Opening a durable
 `sqlite` database created before this contract existed self-migrates on
 connect — adds `milestone_number`, backfills it from the deprecated
-`item_milestones` join table (lowest milestone number wins when an item had
-more than one legacy link), then drops that table. `sqlite`/`memory` order
+`item_milestones` join table, then drops that table, all in one transaction.
+If any item has more than one legacy link, opening fails closed with a
+non-retryable `BacklogError` naming each such item and its milestones, before
+any schema change; the check repeats under the migration's write lock, so a
+link added concurrently is caught too. Reduce each listed item to one row in
+`item_milestones`, then reopen. `sqlite`/`memory` order
 `list_milestones` by `due_on` then `number`; neither has a priority-ordering
 concept.
 
