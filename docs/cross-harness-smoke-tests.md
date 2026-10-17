@@ -94,17 +94,9 @@ those references do not require an additional Codex skill copy. Native roles inh
 the parent session's model, tools and permissions. The language specialists use the
 repository's configured checks and do not claim automatic agent-memory injection.
 
-Only workflows usable without Claude load-time preprocessing are linked. Skills
-requiring injected arguments, command output, or skill-directory macros remain at
-their canonical Claude paths without a Codex discovery link. The git-history
-workflow's zero-exclusion fallback would lose its packaged default filtering, so
-it is not exposed here. Script workflows with unresolved project-root commands
-or invalid CLI arguments are likewise not added; their canonical sources remain
-unchanged. Harness-specific tool names and optional integrations alone do not
-exclude an otherwise portable workflow.
-The research-process skill's literal Claude `Skill`/`Task`/`Agent` call templates
-are not adopted as a Codex surface without an explicit native handoff; its Claude
-source is unchanged.
+Only workflows usable without Claude load-time preprocessing are linked. The shared discovery root exposes `commit-staged`, `gh`, `create-merge-request-changelog`, `git-history-recon`, `start-milestone`, `group-items-to-milestone`, and `complete-milestone` through relative directory symlinks. Their packaged scripts/assets resolve from the loaded skill while Git operations retain the target-project cwd. Milestone workflows keep configured-backend authority, and their explicit Project V2 projection invokes the packaged helper separately with owner, project, repository, issue, and status arguments. Native tool names and authenticated mutation behavior remain harness-dependent and require the workflow's explicit confirmations.
+
+The research-process skill's literal Claude `Skill`/`Task`/`Agent` call templates are not adopted as a Codex surface without an explicit native handoff; its Claude source is unchanged.
 
 The trusted project's `.codex/config.toml` enables Ref and Context7 stdio MCP servers
 and retains core-only shell environment inheritance. Each MCP entry forwards its

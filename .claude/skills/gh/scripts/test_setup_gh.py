@@ -73,3 +73,19 @@ class TestDetectOnlyExitCodes:
             result = runner.invoke(app, ["--detect-only"])
 
         assert result.exit_code == 1, f"Expected exit code 1, got {result.exit_code}. Output:\n{result.output}"
+
+
+def test_configure_repo_dry_run_does_not_write_when_gh_is_current(runner: CliRunner) -> None:
+    """--configure-repo --dry-run must not persist config on the up-to-date branch."""
+    with (
+        patch.object(setup_gh.shutil, "which", return_value="/usr/bin/gh"),
+        patch.object(setup_gh, "get_installed_version", return_value="9.0.0"),
+        patch.object(setup_gh, "detect_platform", return_value=("linux", "amd64")),
+        patch.object(setup_gh, "find_install_dir", return_value=setup_gh.Path("/tmp/bin")),
+        patch.object(setup_gh, "resolve_release", return_value=("v1.0.0", object(), "checksum")),
+        patch.object(setup_gh, "_configure_repo_if_requested") as configure,
+    ):
+        result = runner.invoke(app, ["--configure-repo", "--dry-run"])
+
+    assert result.exit_code == 0, result.output
+    configure.assert_not_called()

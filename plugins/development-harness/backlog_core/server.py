@@ -108,6 +108,7 @@ from .tool_responses import (
     ArtifactsListResponse,
     BacklogAddResponse,
     BacklogAssignItemToMilestoneResponse,
+    BacklogCloseMilestoneResponse,
     BacklogCloseResponse,
     BacklogCommentIssueResponse,
     BacklogCreateMilestoneResponse,
@@ -3841,6 +3842,27 @@ async def backlog_assign_item_to_milestone(
     return BacklogAssignItemToMilestoneResponse.model_validate({**result, **out.to_dict()}).model_dump(
         exclude_none=True
     )
+
+
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Close Milestone",
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
+    )
+)
+async def backlog_close_milestone(
+    milestone_number: Annotated[int, Field(description="Milestone number to close")],
+) -> Annotated[dict[str, object], _wire_schema(BacklogCloseMilestoneResponse)]:
+    """Close a milestone after its member dispositions have completed."""
+    out = Output()
+    try:
+        result = await asyncio.to_thread(operations.close_milestone, milestone_number=milestone_number, output=out)
+    except BacklogError as exc:
+        return _respond(BacklogCloseMilestoneResponse, {"error": str(exc), **_failure_verdict(exc), **out.to_dict()})
+    return _respond(BacklogCloseMilestoneResponse, {**result, **out.to_dict()})
 
 
 @mcp.tool(

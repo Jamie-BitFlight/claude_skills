@@ -30,34 +30,34 @@ Generate comprehensive, business-focused merge request descriptions by analyzing
 
 #### Step 1: Extract Git Data
 
-Run the skill-local CLI from the active skill directory. Its third argument is the output directory; it is not an option.
+Resolve each executable to its absolute path beneath this loaded skill's `scripts/` directory, then invoke it while retaining the target project's current working directory. Do not change into the skill directory.
 
 ```bash
-scripts/analyze_git_changes.py [base_ref] [head_ref] [output_dir]
+uv run "$CHANGELOG_SCRIPT/analyze_git_changes.py" [base_ref] [head_ref] [output_dir]
 ```
 
 ```bash
-# Current branch versus main; output defaults to the current directory.
-scripts/analyze_git_changes.py
+# Current target branch versus main; output defaults to the target project's current directory.
+uv run "$CHANGELOG_SCRIPT/analyze_git_changes.py"
 
-# Specific branch comparison written to a dedicated directory.
-scripts/analyze_git_changes.py develop feature/new-auth ./mr-analysis
+# Specific target-project branch comparison written to a dedicated directory.
+uv run "$CHANGELOG_SCRIPT/analyze_git_changes.py" develop feature/new-auth ./mr-analysis
 ```
 
 The analysis writes `commits_oneline.txt`, `commits_detailed.txt`, `changes.diff`, `changes_stat.txt`, `changed_files.txt`, `changes_numstat.txt`, `summary.json`, and `summary.txt` to the selected directory.
 
 ### Option B: From an Existing GitLab MR
 
-Fetch GitLab metadata with its required MR identifier and optional output path:
+Fetch GitLab metadata from the target repository with the absolute packaged executable:
 
 ```bash
-scripts/fetch_gitlab_mr.py <mr-id> [--output OUTPUT_FILE] [--include-diff|--no-diff]
+uv run "$CHANGELOG_SCRIPT/fetch_gitlab_mr.py" <mr-id> [--output OUTPUT_FILE] [--include-diff|--no-diff]
 ```
 
 ```bash
-scripts/fetch_gitlab_mr.py 123 --output ./mr-metadata.json
-scripts/fetch_gitlab_mr.py !123 --no-diff
-scripts/fetch_gitlab_mr.py https://gitlab.com/org/project/-/merge_requests/123
+uv run "$CHANGELOG_SCRIPT/fetch_gitlab_mr.py" 123 --output ./mr-metadata.json
+uv run "$CHANGELOG_SCRIPT/fetch_gitlab_mr.py" !123 --no-diff
+uv run "$CHANGELOG_SCRIPT/fetch_gitlab_mr.py" https://gitlab.com/org/project/-/merge_requests/123
 ```
 
 ### Step 2: Analyze Changes with AI
@@ -69,11 +69,11 @@ Read `references/analysis_prompts.md`, provide the selected extraction output, a
 The formatter requires the analysis JSON as a positional argument. It writes `mr_description.md` by default; use `--output` to select a file and `--no-preview` to omit the JSON result's description field.
 
 ```bash
-scripts/format_mr_description.py <analysis-json> [--output OUTPUT_FILE] [--preview|--no-preview]
+uv run "$CHANGELOG_SCRIPT/format_mr_description.py" <analysis-json> [--output OUTPUT_FILE] [--preview|--no-preview]
 ```
 
 ```bash
-scripts/format_mr_description.py ./mr-analysis/categorized.json --output ./MR_DESCRIPTION.md --no-preview
+uv run "$CHANGELOG_SCRIPT/format_mr_description.py" ./mr-analysis/categorized.json --output ./MR_DESCRIPTION.md --no-preview
 ```
 
 The formatter preserves every supplied file path in its output.
@@ -337,27 +337,27 @@ git diff <base>..<head> -- . ':(exclude)dist/*' ':(exclude)*.lock'
 ## Complete Workflow Example
 
 ```bash
-# Extract into a dedicated directory; OUTPUT_DIR is positional.
-scripts/analyze_git_changes.py main feature/auth-system /tmp/analysis
+# Keep the target repository cwd; the packaged path is absolute.
+uv run "$CHANGELOG_SCRIPT/analyze_git_changes.py" main feature/auth-system /tmp/analysis
 
 # Analyze /tmp/analysis with references/analysis_prompts.md and save categorized JSON.
 
 # Format the categorized JSON and create a GitLab MR.
-scripts/format_mr_description.py /tmp/analysis/categorized.json --output /tmp/mr-desc.md --no-preview
+uv run "$CHANGELOG_SCRIPT/format_mr_description.py" /tmp/analysis/categorized.json --output /tmp/mr-desc.md --no-preview
 glab mr create --fill --description "$(cat /tmp/mr-desc.md)"
 ```
 
 ## CLI Scripts Reference
 
-All paths below are relative to the active skill directory.
+Resolve `CHANGELOG_SCRIPT` to this loaded skill's absolute `scripts` directory; retain the target project's cwd for every invocation.
 
 | Script | Invocation |
 | --- | --- |
-| `scripts/analyze_git_changes.py` | `[BASE_REF] [HEAD_REF] [OUTPUT_DIR]`; defaults: `main`, `HEAD`, current directory |
-| `scripts/fetch_gitlab_mr.py` | `MR_ID [--output OUTPUT_FILE] [--include-diff|--no-diff]`; default output: `mr_data.json` |
-| `scripts/format_mr_description.py` | `ANALYSIS_JSON [--output OUTPUT_FILE] [--preview|--no-preview]`; default output: `mr_description.md` |
+| `analyze_git_changes.py` | `[BASE_REF] [HEAD_REF] [OUTPUT_DIR]`; defaults: `main`, `HEAD`, current directory |
+| `fetch_gitlab_mr.py` | `MR_ID [--output OUTPUT_FILE] [--include-diff|--no-diff]`; default output: `mr_data.json` |
+| `format_mr_description.py` | `ANALYSIS_JSON [--output OUTPUT_FILE] [--preview|--no-preview]`; default output: `mr_description.md` |
 
-Run each script with `--help` to inspect the installed CLI before using an uncommon option. No root forwarding shim is required or supported.
+Run each absolute script path with `--help` to inspect the installed CLI before using an uncommon option. No root forwarding shim is required or supported.
 
 ## Resources
 

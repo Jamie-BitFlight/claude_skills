@@ -21,13 +21,13 @@ Ensures the GitHub CLI (`gh`) is available and provides correct usage patterns f
 
 ## Installation and detection
 
-Run the packaged script from this skill's active directory; `scripts/` is skill-local on every supported harness. Do not substitute a target-project `.claude/skills` path.
+Resolve `GH_SETUP_SCRIPT` to the absolute `scripts/setup_gh.py` path beneath this loaded skill. Run it from the target project directory; resolving the packaged executable does not change that directory.
 
 ```bash
-scripts/setup_gh.py --detect-only
+uv run "$GH_SETUP_SCRIPT" --detect-only
 ```
 
-`--detect-only` reads `GITHUB_REPO` or the current Git remote and prints rendered examples. It does not install `gh`, contact the network, or write configuration. To install or update the CLI, run `scripts/setup_gh.py`. Add `--configure-repo` only when the detected repository should be written to `.dh/config.yaml`.
+`--detect-only` reads `GITHUB_REPO` or the target project's current Git remote and prints rendered examples. It does not install `gh`, contact the network, or write configuration. To install or update the CLI, run `uv run "$GH_SETUP_SCRIPT"`. Add `--configure-repo` only when the detected repository should be written to the target project's `.dh/config.yaml`.
 
 ```text
 --force             Reinstall even if already at latest version
@@ -86,14 +86,14 @@ gh pr list -R OWNER/REPO
 
 ## Automation — Python Script
 
-For multi-step GitHub administration, run the packaged `scripts/github_project_setup.py` with an explicit repository. It uses PyGithub for repository, issue, label, and milestone operations; its Projects V2 status update uses the installed `gh` CLI for GraphQL.
+Resolve `GH_PROJECT_HELPER` to the absolute `scripts/github_project_setup.py` path beneath this loaded skill and invoke it without leaving the target project directory. It uses PyGithub for repository, issue, label, and milestone operations; its Projects V2 status update uses the installed `gh` CLI for GraphQL.
 
 ```bash
-scripts/github_project_setup.py labels --repo OWNER/REPO
-scripts/github_project_setup.py milestone list --repo OWNER/REPO
-scripts/github_project_setup.py milestone create --repo OWNER/REPO --title "v1.0" --due 2026-03-31
-scripts/github_project_setup.py issue list --repo OWNER/REPO --priority p1
-scripts/github_project_setup.py issue create --repo OWNER/REPO --title "feat: X" --priority-label priority:p1
+uv run "$GH_PROJECT_HELPER" labels --repo OWNER/REPO
+uv run "$GH_PROJECT_HELPER" milestone list --repo OWNER/REPO
+uv run "$GH_PROJECT_HELPER" milestone create --repo OWNER/REPO --title "v1.0" --due 2026-03-31
+uv run "$GH_PROJECT_HELPER" issue list --repo OWNER/REPO --priority p1
+uv run "$GH_PROJECT_HELPER" issue create --repo OWNER/REPO --title "feat: X" --priority-label priority:p1
 ```
 
 Use the configured DH backend for durable backlog lifecycle operations; this administration helper is not a second backlog store.

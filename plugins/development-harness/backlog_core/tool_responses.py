@@ -53,6 +53,7 @@ __all__ = [
     "ArtifactsListResponse",
     "BacklogAddResponse",
     "BacklogAssignItemToMilestoneResponse",
+    "BacklogCloseMilestoneResponse",
     "BacklogCloseResponse",
     "BacklogCommentIssueResponse",
     "BacklogCreateMilestoneResponse",
@@ -292,6 +293,13 @@ class BacklogCreateMilestoneResponse(FallibleToolResponse):
 
     milestone: Milestone | None = None
     """The created milestone. Absent only on the ``BacklogError`` arm."""
+
+
+class BacklogCloseMilestoneResponse(FallibleToolResponse):
+    """Response for ``backlog_close_milestone``."""
+
+    milestone: Milestone | None = None
+    """The closed milestone. Absent only on the error arm."""
 
 
 class BacklogCreateProjectResponse(FallibleToolResponse):

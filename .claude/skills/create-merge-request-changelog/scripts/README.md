@@ -181,10 +181,10 @@ Markdown following the template in `references/output_template.md` with:
 
 ## Dependencies
 
-Each executable declares its PEP 723 dependencies. Run the packaged scripts directly from this directory; if direct execution is unavailable, use `uv run <script-path>`. Do not install dependencies into the target project.
+Each executable declares its PEP 723 dependencies. Resolve its absolute packaged path from the loaded skill, run it while retaining the target repository cwd, and use `uv run <absolute-script-path>` when direct execution is unavailable. Do not install dependencies into the target project.
 
 Additional requirements:
-- **analyze_git_changes.py**: Git installed and repository context
+- **analyze_git_changes.py**: Git installed and target repository context
 - **fetch_gitlab_mr.py**: `GITLAB_TOKEN` or `GITLAB_PRIVATE_TOKEN` for live retrieval
 - **format_mr_description.py**: valid analysis JSON input
 
@@ -238,7 +238,7 @@ Alternative workflow with GitLab MR:
 
 ## Testing
 
-Run each packaged executable with `--help` from this directory to inspect its current contract. The GitLab retrieval command requires `GITLAB_TOKEN` or `GITLAB_PRIVATE_TOKEN` for a live request; use its help command for a network-free check.
+Run each absolute packaged executable with `--help` while retaining the target repository cwd to inspect its current contract. The GitLab retrieval command requires `GITLAB_TOKEN` or `GITLAB_PRIVATE_TOKEN` for a live request; use its help command for a network-free check.
 
 ## Common Patterns
 

@@ -1194,6 +1194,24 @@ class SQLiteBackend:
         return self._row_to_milestone_full(row)
 
     @_serialized_connection_operation
+    def close_milestone(self, milestone_number: int, repo: str = "") -> MilestoneFullNode:
+        """Close a stored milestone and return its updated node.
+
+        Returns:
+            The closed milestone.
+        """
+        del repo
+        row = self._conn.execute("SELECT * FROM milestones WHERE number = ?", (milestone_number,)).fetchone()
+        if row is None:
+            raise KeyError(f"SQLiteBackend: milestone #{milestone_number} not found")
+        self._conn.execute("UPDATE milestones SET state = 'closed' WHERE number = ?", (milestone_number,))
+        self._conn.commit()
+        closed = self._conn.execute("SELECT * FROM milestones WHERE number = ?", (milestone_number,)).fetchone()
+        if closed is None:
+            raise RuntimeError(f"SQLiteBackend: milestone #{milestone_number} disappeared while closing")
+        return self._row_to_milestone_full(closed)
+
+    @_serialized_connection_operation
     def assign_item_to_milestone(self, issue_number: int, milestone_number: int, repo: str = "") -> None:
         """Set an item's ``milestone_number`` FK.
 

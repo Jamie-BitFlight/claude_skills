@@ -667,6 +667,15 @@ class InMemoryBackend:
         self._milestones[number] = node
         return node
 
+    def close_milestone(self, milestone_number: int, repo: str = "") -> MilestoneFullNode:
+        """Close an in-memory milestone and return its updated node."""
+        del repo
+        milestone = self._milestones.get(milestone_number)
+        if milestone is None:
+            raise KeyError(f"InMemoryBackend: milestone #{milestone_number} not found")
+        milestone["state"] = "CLOSED"
+        return milestone
+
     def assign_item_to_milestone(self, issue_number: int, milestone_number: int, repo: str = "") -> None:
         """Set an issue's embedded milestone reference.
 

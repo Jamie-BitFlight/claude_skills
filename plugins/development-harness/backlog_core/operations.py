@@ -6142,6 +6142,28 @@ def create_milestone(
     return {"milestone": _milestone_dict(ms), **out.to_dict()}
 
 
+def close_milestone(milestone_number: int, repo: str = "", output: Output | None = None) -> dict[str, object]:
+    """Close an open milestone on the configured backend.
+
+    Returns:
+        The backend-owned closed milestone and collected output.
+
+    Raises:
+        UnsupportedBackendCapabilityError: If the active backend has no generic milestones.
+        BacklogError: If the milestone cannot be found or closed.
+    """
+    out = output or Output()
+    backend = require_milestone_support(get_config().backend, "close_milestone")
+    try:
+        milestone = backend.close_milestone(milestone_number, repo=repo)
+    except KeyError as exc:
+        raise BacklogError(str(exc.args[0])) from exc
+    except GithubException as exc:
+        raise BacklogError(f"GitHub API error closing milestone: {exc}") from exc
+    out.info(f"Closed milestone #{milestone_number}: {milestone['title']}")
+    return {"milestone": _milestone_dict(milestone), **out.to_dict()}
+
+
 def assign_item_to_milestone(
     issue_number: int, milestone_number: int, repo: str = "", output: Output | None = None
 ) -> dict[str, object]:

@@ -620,3 +620,26 @@ async def test_backlog_assign_item_to_milestone_backlog_error_returns_error_key(
     # Assert
     assert "error" in result
     assert "issue #999 not found" in result["error"]
+
+
+async def test_backlog_close_milestone_returns_closed_milestone() -> None:
+    """backlog_close_milestone exposes the configured backend closure result."""
+    fake_result = {
+        "milestone": {
+            "number": 5,
+            "title": "v3.0",
+            "state": "closed",
+            "description": "",
+            "due_on": _DUE_ON_STR,
+            "open_issues": 0,
+            "closed_issues": 7,
+        },
+        "messages": [],
+        "warnings": [],
+    }
+
+    with patch("dh_core.operations.close_milestone", return_value=fake_result):
+        result = await _call("backlog_close_milestone", {"milestone_number": 5})
+
+    assert result["milestone"]["number"] == 5
+    assert result["milestone"]["state"] == "closed"

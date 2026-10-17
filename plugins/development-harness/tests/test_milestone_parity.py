@@ -179,6 +179,24 @@ def test_state_filter_excludes_closed_includes_all(backend: WorkItemBackend) -> 
     assert {open_ms["number"], closed_ms["number"]} <= all_numbers
 
 
+def test_close_milestone_moves_it_to_closed(backend: WorkItemBackend) -> None:
+    """close_milestone closes a configured-backend milestone without changing its members."""
+    _skip_github_shared_state(backend)
+    created = cast("dict[str, object]", operations.create_milestone(title="release")["milestone"])
+
+    closed = cast(
+        "dict[str, object]", operations.close_milestone(milestone_number=cast("int", created["number"]))["milestone"]
+    )
+
+    assert closed["number"] == created["number"]
+    assert closed["state"] == "closed"
+    closed_numbers = {
+        milestone["number"]
+        for milestone in cast("list[dict[str, object]]", operations.list_milestones(state="closed")["milestones"])
+    }
+    assert created["number"] in closed_numbers
+
+
 # ---------------------------------------------------------------------------
 # 4. Ordering
 # ---------------------------------------------------------------------------
@@ -248,6 +266,7 @@ def test_create_milestone_empty_title_raises_validation_error_before_dispatch(ba
         pytest.param("list_milestones", {}, id="list_milestones"),
         pytest.param("get_soonest_milestone", {}, id="get_soonest_milestone"),
         pytest.param("create_milestone", {"title": "x"}, id="create_milestone"),
+        pytest.param("close_milestone", {"milestone_number": 1}, id="close_milestone"),
         pytest.param(
             "assign_item_to_milestone", {"issue_number": 1, "milestone_number": 1}, id="assign_item_to_milestone"
         ),

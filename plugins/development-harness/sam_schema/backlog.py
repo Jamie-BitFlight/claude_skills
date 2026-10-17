@@ -507,6 +507,20 @@ def assign_milestone(
     _emit(result, output)
 
 
+@app.command("close-milestone")
+def close_milestone(
+    milestone_number: Annotated[int, typer.Option("--milestone-number", min=1, help="Milestone number to close")],
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+) -> None:
+    """Close a configured-backend milestone."""
+    output = Output()
+    try:
+        result = operations.close_milestone(milestone_number=milestone_number, repo=repo, output=output)
+    except BacklogError as exc:
+        cli_output.exit_with_json_error({"error": str(exc)})
+    _emit(result, output)
+
+
 @app.command("issues")
 def issues(
     repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",

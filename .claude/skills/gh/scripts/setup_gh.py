@@ -1130,9 +1130,9 @@ def main(
     # Repository detection is read-only unless the caller explicitly asks to configure it.
     needs_update = installed_version is None or parse_version(installed_version) < parse_version(latest_version)
 
-    # 6. Check if update is needed
     if not needs_update and not force:
-        _configure_repo_if_requested(configure_repo)
+        if not dry_run:
+            _configure_repo_if_requested(configure_repo)
         console.print(":white_check_mark: [green]gh is already up to date[/green]")
         raise typer.Exit(code=0)
 

@@ -987,6 +987,26 @@ class GitHubBackend:
             closedIssueCount=ms.closed_issues,
         )
 
+    def close_milestone(self, milestone_number: int, repo: str = "") -> MilestoneFullNode:
+        """Close a GitHub milestone and return its updated provider node.
+
+        Returns:
+            The closed milestone.
+        """
+        repository = self.get_github(repo)
+        milestone = repository.get_milestone(milestone_number)
+        milestone.edit(title=milestone.title, state="closed")
+        return MilestoneFullNode(
+            id=str(getattr(milestone, "node_id", f"github-milestone-{milestone.number}")),
+            number=milestone.number,
+            title=milestone.title,
+            state=str(milestone.state).upper(),
+            description=milestone.description or "",
+            dueOn=milestone.due_on.strftime("%Y-%m-%dT%H:%M:%SZ") if milestone.due_on else None,
+            openIssueCount=milestone.open_issues,
+            closedIssueCount=milestone.closed_issues,
+        )
+
     def assign_item_to_milestone(self, issue_number: int, milestone_number: int, repo: str = "") -> None:
         """Assign a GitHub issue to a milestone via PyGithub's issue.edit call."""
         repository = self.get_github(repo)

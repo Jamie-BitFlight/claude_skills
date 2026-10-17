@@ -861,6 +861,11 @@ class BeadsBackend:
         """
         raise NotImplementedError(_MILESTONE_ID_NOTE)
 
+    def close_milestone(self, milestone_number: int, repo: str = "") -> MilestoneFullNode:
+        """Raise because generic milestones cannot represent Beads identifiers."""
+        del milestone_number, repo
+        raise NotImplementedError(_MILESTONE_ID_NOTE)
+
     def assign_item_to_milestone(self, issue_number: int, milestone_number: int, repo: str = "") -> None:
         """Raise NotImplementedError — beads milestone IDs are strings.
 
