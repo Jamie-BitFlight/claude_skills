@@ -48,7 +48,7 @@ flowchart TD
     CommitCheck -->|"0 commits — window too narrow"| WindowFallback["WARN: No commits in window.<br>Override: Window = all history, N = 20.<br>Emit warning in report header.<br>Rerun CommitCheck (all history)."]
     WindowFallback --> ExcludeLoad
 
-    ExcludeLoad{"Load Skill-Local Exclusions<br>Read: ${CLAUDE_SKILL_DIR}/assets/exclude-patterns<br>File exists and has ≥1 non-blank, non-comment line?"}
+    ExcludeLoad{"Load Skill-Local Exclusions<br>Read: assets/exclude-patterns beside this loaded SKILL.md<br>File exists and has ≥1 non-blank, non-comment line?"}
     ExcludeLoad -->|"Yes"| ExcludeParse["Parse one glob pattern per line<br>Skip blank lines and # comments<br>Build EXCLUDE_PATHSPECS =<br>':(glob,exclude)PATTERN' per line"]
     ExcludeLoad -->|"No — missing, or 0 non-blank/non-comment lines (EC-7)"| ExcludeNone["EXCLUDE_PATHSPECS = empty<br>0 patterns loaded"]
     ExcludeParse --> ExcludeReport["Report: 'Excluded via skill-local<br>ignore file: N patterns loaded'<br>Record N for report header"]
@@ -93,7 +93,7 @@ Run all 7 pipelines concurrently. Do not wait for one to complete before startin
 
 ### Skill-Local Exclusions (Pipelines 1, 2, and 7)
 
-Before Phase 1 dispatch, read `${CLAUDE_SKILL_DIR}/assets/exclude-patterns` — a gitignore-style file that ships inside this skill's own directory, not the target repository. It excludes files whose git-history signal is mechanical noise (auto-bumped plugin manifests, auto-generated lockfiles) rather than genuine defect-proneness. See the file's own header and per-pattern comments for the verified rationale behind each shipped default.
+Before Phase 1 dispatch, read `assets/exclude-patterns` relative to this loaded skill directory — never from the target repository and never through a harness-specific environment variable. It excludes files whose git-history signal is mechanical noise (auto-bumped plugin manifests, auto-generated lockfiles) rather than genuine defect-proneness. See the file's own header and per-pattern comments for the verified rationale behind each shipped default.
 
 Parse the file: one glob pattern per line, blank lines and lines starting with `#` ignored. Build `EXCLUDE_PATHSPECS` by wrapping each pattern in git's `:(glob,exclude)` pathspec magic (one pathspec argument per pattern):
 
@@ -477,7 +477,7 @@ All other sections are written normally. The report is valid and complete. The s
 
 ### EC-7: Skill-Local Exclusion File Missing or Empty
 
-**Detection**: `${CLAUDE_SKILL_DIR}/assets/exclude-patterns` does not exist, or exists but contains zero non-blank, non-comment lines.
+**Detection**: the active skill's sibling `assets/exclude-patterns` file does not exist, or exists but contains zero non-blank, non-comment lines.
 
 **Behavior**: Degrade gracefully — do not fail. Set `EXCLUDE_PATHSPECS` to empty and omit the `-- . EXCLUDE_PATHSPECS` argument entirely from Pipelines 1, 2, and 7 (run them exactly as documented before this exclusion mechanism existed). Record 0 patterns loaded and write the `**Exclusions**` header line with N=0, per the Report Header template above — same template, same wording, N substituted with 0. This keeps the skill fully functional on an older install of this skill's assets, or if the file is intentionally emptied.
 

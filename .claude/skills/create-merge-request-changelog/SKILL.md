@@ -30,140 +30,61 @@ Generate comprehensive, business-focused merge request descriptions by analyzing
 
 #### Step 1: Extract Git Data
 
-Run the Python CLI to gather commits, diffs, and statistics:
+Run the skill-local CLI from the active skill directory. Its third argument is the output directory; it is not an option.
 
 ```bash
-uv run scripts/analyze_git_changes.py [base_ref] [head_ref] --output-dir /tmp/mr-analysis
+scripts/analyze_git_changes.py [base_ref] [head_ref] [output_dir]
 ```
-
-**Examples:**
 
 ```bash
-# Current branch vs main (default)
-uv run scripts/analyze_git_changes.py
+# Current branch versus main; output defaults to the current directory.
+scripts/analyze_git_changes.py
 
-# Specific branch vs develop
-uv run scripts/analyze_git_changes.py develop feature/new-auth
-
-# Specific commit range
-uv run scripts/analyze_git_changes.py abc123f def456g
-
-# Custom output directory
-uv run scripts/analyze_git_changes.py main HEAD --output-dir ./analysis-output
+# Specific branch comparison written to a dedicated directory.
+scripts/analyze_git_changes.py develop feature/new-auth ./mr-analysis
 ```
 
-**Output files created:**
-- `commits_oneline.txt` - Concise commit list
-- `commits_detailed.txt` - Full commit messages with metadata
-- `changes.diff` - Complete unified diff
-- `changes_stat.txt` - Diffstat summary
-- `changed_files.txt` - File list with change status (A/M/D)
-- `changes_numstat.txt` - Per-file line changes
-- `summary.json` - Machine-readable statistics
+The analysis writes `commits_oneline.txt`, `commits_detailed.txt`, `changes.diff`, `changes_stat.txt`, `changed_files.txt`, `changes_numstat.txt`, `summary.json`, and `summary.txt` to the selected directory.
 
-### Option B: From Existing GitLab MR
+### Option B: From an Existing GitLab MR
 
-#### Step 1: Fetch MR Data
-
-Use the GitLab CLI integration to fetch existing MR data:
+Fetch GitLab metadata with its required MR identifier and optional output path:
 
 ```bash
-uv run scripts/fetch_gitlab_mr.py <mr-id> --output /tmp/mr-data.json
+scripts/fetch_gitlab_mr.py <mr-id> [--output OUTPUT_FILE] [--include-diff|--no-diff]
 ```
-
-**Examples:**
 
 ```bash
-# By MR ID
-uv run scripts/fetch_gitlab_mr.py 123
-
-# By !notation
-uv run scripts/fetch_gitlab_mr.py !123
-
-# By full URL
-uv run scripts/fetch_gitlab_mr.py https://gitlab.com/org/project/-/merge_requests/123
-
-# Without diff (faster)
-uv run scripts/fetch_gitlab_mr.py 123 --no-diff
-
-# Custom output file
-uv run scripts/fetch_gitlab_mr.py 123 --output ./mr-metadata.json
+scripts/fetch_gitlab_mr.py 123 --output ./mr-metadata.json
+scripts/fetch_gitlab_mr.py !123 --no-diff
+scripts/fetch_gitlab_mr.py https://gitlab.com/org/project/-/merge_requests/123
 ```
-
-**Output:** JSON file with MR metadata, commits, and diffs
 
 ### Step 2: Analyze Changes with AI
 
-Load the analysis prompts and use them to categorize changes:
-
-1. **Read the primary analysis prompt** from `references/analysis_prompts.md`
-2. **Load the extracted git data** from Step 1 output files
-3. **Run the analysis** using the prompt template with your git data
-4. **Get structured JSON** with categorized changes
-
-The AI analysis will:
-- Categorize changes into domains (bug fixes, enhancements, tech debt, docs, testing, build/CI, non-functional)
-- Extract intent from commit messages and diff patterns
-- Identify breaking changes and migration requirements
-- Determine affected components
-- Assess impact on users and developers
+Read `references/analysis_prompts.md`, provide the selected extraction output, and save the categorized JSON for the formatter.
 
 ### Step 3: Format MR Description
 
-Use the Python formatter to generate polished markdown from AI analysis:
+The formatter requires the analysis JSON as a positional argument. It writes `mr_description.md` by default; use `--output` to select a file and `--no-preview` to omit the JSON result's description field.
 
 ```bash
-uv run scripts/format_mr_description.py <analysis-json> --output /tmp/mr-description.md
+scripts/format_mr_description.py <analysis-json> [--output OUTPUT_FILE] [--preview|--no-preview]
 ```
-
-**Examples:**
 
 ```bash
-# With markdown preview (default)
-python scripts/format_mr_description.py analysis.json
-
-# Without preview
-python scripts/format_mr_description.py analysis.json --no-preview
-
-# Custom output file
-python scripts/format_mr_description.py analysis.json --output ./MR_DESCRIPTION.md
-
-# With custom title
-python scripts/format_mr_description.py analysis.json --title "feat: Add authentication system"
+scripts/format_mr_description.py ./mr-analysis/categorized.json --output ./MR_DESCRIPTION.md --no-preview
 ```
 
-The formatter automatically:
-- Applies templates from `references/output_template.md`
-- Formats each category (bug fixes, enhancements, tech debt, etc.)
-- Truncates long file lists (>5 files)
-- Highlights breaking changes
-- Generates deployment notes if needed
-- Renders markdown preview with Rich
+The formatter preserves every supplied file path in its output.
 
 ### Step 4: Use the Description
 
-The final MR description is ready to:
-- Copy to clipboard (from preview or file)
-- Paste into GitLab/GitHub MR/PR
-- Save as documentation
-- Use in release notes
-
-**Integration examples:**
+Use the generated Markdown file with the hosting CLI:
 
 ```bash
-# GitLab MR creation
-python scripts/format_mr_description.py analysis.json --output /tmp/mr.md --no-preview
-glab mr create --fill --description "$(cat /tmp/mr.md)"
-
-# GitHub PR creation
-python scripts/format_mr_description.py analysis.json --output /tmp/pr.md --no-preview
-gh pr create --fill --body-file /tmp/pr.md
-
-# Copy to clipboard (macOS)
-python scripts/format_mr_description.py analysis.json --no-preview --output - | pbcopy
-
-# Copy to clipboard (Linux)
-python scripts/format_mr_description.py analysis.json --no-preview --output - | xclip -selection clipboard
+glab mr create --fill --description "$(cat ./MR_DESCRIPTION.md)"
+gh pr create --fill --body-file ./MR_DESCRIPTION.md
 ```
 
 ## Change Categorization Guide
@@ -413,135 +334,40 @@ git diff <base>..<head> -- . ':(exclude)dist/*' ':(exclude)*.lock'
 - Improve commit messages for future MRs
 - Add project-specific detection patterns to the prompts
 
-## Complete Workflow Examples
-
-### Example 1: New MR from Git Branch
+## Complete Workflow Example
 
 ```bash
-# 1. Extract git data
-python scripts/analyze_git_changes.py main feature/auth-system --output-dir /tmp/analysis
+# Extract into a dedicated directory; OUTPUT_DIR is positional.
+scripts/analyze_git_changes.py main feature/auth-system /tmp/analysis
 
-# 2. Analyze with AI (using prompts from references/analysis_prompts.md)
-# - Read commits and diffs from /tmp/analysis
-# - Categorize changes using the primary analysis prompt
-# - Save categorized JSON to /tmp/analysis/categorized.json
+# Analyze /tmp/analysis with references/analysis_prompts.md and save categorized JSON.
 
-# 3. Format into MR description
-python scripts/format_mr_description.py /tmp/analysis/categorized.json --output /tmp/mr-desc.md
-
-# 4. Create GitLab MR
+# Format the categorized JSON and create a GitLab MR.
+scripts/format_mr_description.py /tmp/analysis/categorized.json --output /tmp/mr-desc.md --no-preview
 glab mr create --fill --description "$(cat /tmp/mr-desc.md)"
 ```
 
-### Example 2: Update Existing GitLab MR
-
-```bash
-# 1. Fetch existing MR data
-python scripts/fetch_gitlab_mr.py 123 --output /tmp/mr-data.json
-
-# 2. Analyze with AI (enhance existing description)
-# - Read MR metadata from /tmp/mr-data.json
-# - Re-analyze commits/diffs with updated prompts
-# - Save enhanced JSON to /tmp/enhanced.json
-
-# 3. Format improved description
-python scripts/format_mr_description.py /tmp/enhanced.json --output /tmp/updated-mr.md
-
-# 4. Update MR description
-glab mr update 123 --description "$(cat /tmp/updated-mr.md)"
-```
-
-### Example 3: Quick Analysis for Review
-
-```bash
-# Quick preview without saving files
-python scripts/analyze_git_changes.py | \
-  python scripts/format_mr_description.py --preview
-```
-
 ## CLI Scripts Reference
 
-### analyze_git_changes.py
+All paths below are relative to the active skill directory.
 
-Extracts git data between two references.
+| Script | Invocation |
+| --- | --- |
+| `scripts/analyze_git_changes.py` | `[BASE_REF] [HEAD_REF] [OUTPUT_DIR]`; defaults: `main`, `HEAD`, current directory |
+| `scripts/fetch_gitlab_mr.py` | `MR_ID [--output OUTPUT_FILE] [--include-diff|--no-diff]`; default output: `mr_data.json` |
+| `scripts/format_mr_description.py` | `ANALYSIS_JSON [--output OUTPUT_FILE] [--preview|--no-preview]`; default output: `mr_description.md` |
 
-**Usage:** `python scripts/analyze_git_changes.py [BASE_REF] [HEAD_REF] [OPTIONS]`
-
-**Options:**
-- `--output-dir PATH`: Output directory (default: current directory)
-
-**Defaults:** BASE_REF=main, HEAD_REF=HEAD
-
-### fetch_gitlab_mr.py
-
-Fetches GitLab MR data using the python-gitlab API.
-
-**Usage:** `python scripts/fetch_gitlab_mr.py MR_ID [OPTIONS]`
-
-**Options:**
-- `--output PATH`: Output JSON file (default: stdout)
-- `--no-diff`: Skip diff fetching (faster)
-
-**MR ID formats:** `123`, `!123`, or full URL
-
-### format_mr_description.py
-
-Formats AI analysis into markdown MR description.
-
-**Usage:** `python scripts/format_mr_description.py ANALYSIS_JSON [OPTIONS]`
-
-**Options:**
-- `--output PATH`: Output file (default: stdout, `-` for explicit stdout)
-- `--title TEXT`: Custom MR title
-- `--no-preview`: Skip markdown preview
-- `--max-files INT`: Max files to show per change (default: 5)
-
-## CLI Scripts Reference
-
-### analyze_git_changes.py
-
-Extracts git data between two references.
-
-**Usage:** `python scripts/analyze_git_changes.py [BASE_REF] [HEAD_REF] [OPTIONS]`
-
-**Options:**
-- `--output-dir PATH`: Output directory (default: current directory)
-
-**Defaults:** BASE_REF=main, HEAD_REF=HEAD
-
-### fetch_gitlab_mr.py
-
-Fetches GitLab MR data using the python-gitlab API.
-
-**Usage:** `python scripts/fetch_gitlab_mr.py MR_ID [OPTIONS]`
-
-**Options:**
-- `--output PATH`: Output JSON file (default: stdout)
-- `--no-diff`: Skip diff fetching (faster)
-
-**MR ID formats:** `123`, `!123`, or full URL
-
-### format_mr_description.py
-
-Formats AI analysis into markdown MR description.
-
-**Usage:** `python scripts/format_mr_description.py ANALYSIS_JSON [OPTIONS]`
-
-**Options:**
-- `--output PATH`: Output file (default: stdout, `-` for explicit stdout)
-- `--title TEXT`: Custom MR title
-- `--no-preview`: Skip markdown preview
-- `--max-files INT`: Max files to show per change (default: 5)
+Run each script with `--help` to inspect the installed CLI before using an uncommon option. No root forwarding shim is required or supported.
 
 ## Resources
 
-- **scripts/analyze_git_changes.py**: Python CLI to extract git data
-- **scripts/fetch_gitlab_mr.py**: Python CLI to fetch GitLab MR data via python-gitlab API
-- **scripts/format_mr_description.py**: Python CLI to format AI analysis into markdown
-- **scripts/README.md**: Comprehensive CLI documentation and examples
-- **references/analysis_prompts.md**: AI prompts for categorization and formatting
-- **references/output_template.md**: MR description template structure
+- `scripts/analyze_git_changes.py` — Git extraction CLI
+- `scripts/fetch_gitlab_mr.py` — GitLab MR retrieval CLI
+- `scripts/format_mr_description.py` — Markdown formatter CLI
+- `scripts/README.md` — complete CLI reference
+- `references/analysis_prompts.md` — categorization and formatting prompts
+- `references/output_template.md` — output structure
 
 ## Daily Releases
 
-Use the `/daily-releases` skill to create AI-analyzed GitHub Releases for every day with commits. It uses this skill's `analyze_git_changes.py`, `analysis_prompts.md`, and `format_mr_description.py` as the rendering pipeline.
+Use `/daily-releases` to create AI-analyzed GitHub Releases with this extraction and formatting pipeline.

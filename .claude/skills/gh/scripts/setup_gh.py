@@ -999,25 +999,38 @@ def _render_template(owner_repo: str) -> str | None:
     return content.replace("<owner/repo>", owner_repo).replace("<owner>", owner).replace("<repo>", repo)
 
 
-def _apply_repo_detection() -> str | None:
-    """Detect owner/repo from git remote and write to .dh/config.yaml.
+def _apply_repo_detection(*, configure: bool = False) -> str | None:
+    """Detect owner/repo and optionally persist it only on explicit request.
+
+    Args:
+        configure: Write the detected slug to ``.dh/config.yaml`` when true.
 
     Returns:
-        The detected owner/repo slug, or None if detection failed.
+        The detected owner/repo slug, or ``None`` when detection failed.
     """
     owner_repo = detect_owner_repo()
-    if owner_repo is not None and not write_gh_config(Path.cwd() / ".dh" / "config.yaml", owner_repo):
+    if configure and owner_repo is not None and not write_gh_config(Path.cwd() / ".dh" / "config.yaml", owner_repo):
         error_console.print(
             ":warning: [yellow]Warning: write_gh_config returned False — config may not have been persisted[/yellow]"
         )
     return owner_repo
 
 
+def _configure_repo_if_requested(configure_repo: bool) -> None:
+    """Persist a detected repository only for an explicit setup request.
+
+    Args:
+        configure_repo: Whether configuration was requested.
+    """
+    if configure_repo:
+        _apply_repo_detection(configure=True)
+
+
 def _run_detect_only() -> bool:
-    """Execute --detect-only mode: refresh config and print rendered examples to stdout.
+    """Execute side-effect-free detection and print rendered examples.
 
     Returns:
-        True if detection and rendering succeeded, False if owner/repo could not be determined.
+        True when detection and template rendering both succeed.
     """
     owner_repo = _apply_repo_detection()
     if owner_repo is None:
@@ -1050,14 +1063,18 @@ def main(
     bin_dir: Annotated[
         Path | None, typer.Option("--bin-dir", help="Override install directory (default: auto-detect from PATH)")
     ] = None,
+    configure_repo: Annotated[
+        bool,
+        typer.Option(
+            "--configure-repo",
+            help="Write the detected owner/repo to .dh/config.yaml after a successful non-dry-run invocation.",
+        ),
+    ] = False,
     detect_only: Annotated[
         bool,
         typer.Option(
             "--detect-only",
-            help="Detect owner/repo from git remote, write .dh/config.yaml, "
-            "then render and print gh command examples to stdout. "
-            "Skips all network calls and gh install logic. "
-            "Designed for use with the skill !-notation: !`uv run --script setup_gh.py --detect-only`.",
+            help="Detect owner/repo from git remote, render and print gh command examples to stdout, and make no writes or network calls.",
         ),
     ] = False,
 ) -> None:
@@ -1071,15 +1088,10 @@ def main(
     Falls back to anonymous requests if authentication fails (e.g. expired
     token).
 
-    Args:
-        force: Reinstall even if the installed version matches the latest.
-        dry_run: Print planned actions without performing them.
-        no_cache: Disable local release metadata cache reads/writes.
-        cache_ttl_seconds: Cache freshness TTL in seconds.
-        bin_dir: Override the default install directory.
-        detect_only: Skip install; detect repo, update config, print examples.
+        configure_repo: Persist the detected repository only after an explicit request.
+        detect_only: Skip install; detect repo and print examples without mutation.
     """
-    # --detect-only: no network calls, no install — refresh config and emit examples to stdout.
+    # --detect-only: no network calls, no install, and no configuration writes.
     if detect_only:
         success = _run_detect_only()
         raise typer.Exit(code=0 if success else 1)
@@ -1115,14 +1127,12 @@ def main(
         os_key, arch, use_cache=not no_cache, cache_ttl_seconds=cache_ttl_seconds
     )
 
-    # 5. Auto-detect owner/repo — runs on every invocation so "already installed"
-    #    exits still refresh .dh/config.yaml.
-    _apply_repo_detection()
-
-    # 6. Check if update is needed
+    # Repository detection is read-only unless the caller explicitly asks to configure it.
     needs_update = installed_version is None or parse_version(installed_version) < parse_version(latest_version)
 
+    # 6. Check if update is needed
     if not needs_update and not force:
+        _configure_repo_if_requested(configure_repo)
         console.print(":white_check_mark: [green]gh is already up to date[/green]")
         raise typer.Exit(code=0)
 
@@ -1156,6 +1166,7 @@ def main(
     except (subprocess.SubprocessError, OSError) as exc:
         error_console.print(f":warning: [yellow]Could not verify installation: {exc}[/yellow]")
 
+    _configure_repo_if_requested(configure_repo)
     raise typer.Exit(code=0)
 
 

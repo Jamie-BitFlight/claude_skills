@@ -118,8 +118,8 @@ Formats AI-analyzed change data into polished merge request descriptions.
 - Parse structured analysis JSON from AI processing
 - Apply standardized markdown templates
 - Format changes by category (bug fixes, enhancements, etc.)
+- Preserve every supplied file path
 - Rich markdown preview in terminal
-- Truncate long file lists automatically
 
 **Usage:**
 ```bash
@@ -181,20 +181,12 @@ Markdown following the template in `references/output_template.md` with:
 
 ## Dependencies
 
-All scripts require:
-```bash
-pip install typer rich
-```
-
-Or with uv (recommended):
-```bash
-uv pip install typer rich
-```
+Each executable declares its PEP 723 dependencies. Run the packaged scripts directly from this directory; if direct execution is unavailable, use `uv run <script-path>`. Do not install dependencies into the target project.
 
 Additional requirements:
 - **analyze_git_changes.py**: Git installed and repository context
-- **fetch_gitlab_mr.py**: `GITLAB_TOKEN` or `GITLAB_PRIVATE_TOKEN` env var set
-- **format_mr_description.py**: Valid analysis JSON input
+- **fetch_gitlab_mr.py**: `GITLAB_TOKEN` or `GITLAB_PRIVATE_TOKEN` for live retrieval
+- **format_mr_description.py**: valid analysis JSON input
 
 ## Design Principles
 
@@ -246,38 +238,21 @@ Alternative workflow with GitLab MR:
 
 ## Testing
 
-Test each script individually:
-
-```bash
-# Test analyze_git_changes.py in a git repository
-cd /path/to/git/repo
-/path/to/analyze_git_changes.py --help
-/path/to/analyze_git_changes.py main HEAD /tmp/test-analysis
-
-# Test fetch_gitlab_mr.py (requires GITLAB_TOKEN env var)
-export GITLAB_TOKEN=your-token-here
-/path/to/fetch_gitlab_mr.py 123 --output /tmp/test-mr.json
-
-# Test format_mr_description.py with sample data
-echo '{"title": "Test MR", "summary": "Test", "statistics": {}, "change_categories": {}}' > /tmp/test-analysis.json
-/path/to/format_mr_description.py /tmp/test-analysis.json --output /tmp/test-mr.md
-```
+Run each packaged executable with `--help` from this directory to inspect its current contract. The GitLab retrieval command requires `GITLAB_TOKEN` or `GITLAB_PRIVATE_TOKEN` for a live request; use its help command for a network-free check.
 
 ## Common Patterns
 
-### Piping Workflow
 ```bash
-# Generate analysis
+# Generate analysis. The output directory is positional.
 ./analyze_git_changes.py main feature-branch /tmp/analysis
 
-# Process with AI (pseudocode)
+# Process with AI (pseudocode).
 ai-analyze --input /tmp/analysis/commits_detailed.txt \
            --diff /tmp/analysis/changes.diff \
            --output /tmp/ai-analysis.json
 
-# Format final description
-./format_mr_description.py /tmp/ai-analysis.json \
-                           --output mr_description.md
+# Format final description.
+./format_mr_description.py /tmp/ai-analysis.json --output mr_description.md
 ```
 
 ### Error Handling

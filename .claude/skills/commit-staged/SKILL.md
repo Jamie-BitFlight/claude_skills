@@ -8,11 +8,15 @@ context: fork
 user-invocable: true
 ---
 
-Analyze these staged changes and generate commit message, then commit the changes:
-!`uv run prek run >/dev/null 2>&1 || git add -u`
-!`git --no-pager status || true`
-!`git --no-pager diff --cached || true`
-!`git --no-pager diff --cached --stat || true`
+Analyze the already staged changes, generate a scoped Conventional Commit message, then commit exactly that staged selection.
+
+## Runtime preflight
+
+1. Run `git diff --cached --quiet`. If it exits 0, stop: no changes are staged.
+2. Inspect `git status --short`, `git diff --cached`, and `git diff --cached --stat`.
+3. Run the repository's normal pre-commit command without redirecting its output. If it fails, stop; do not stage, modify, or suppress anything to continue.
+
+Never run `git add -u`, `git add -A`, `git add .`, or any other staging command in this skill. The caller owns the explicit staged selection.
 
 <user_notes>
 $ARGUMENTS
@@ -118,10 +122,10 @@ The scope is a module, component, or directory name - never a description of the
 
    - Changes to `skills/python3-dev/assets/*.py` → `assets` or `python3-dev`
 
-3. **Cross-cutting changes**: Use the primary affected area OR omit scope
+3. **Cross-cutting changes**: Use the primary affected area.
 
    - Config + code changes → use primary area: `feat(auth): add OAuth support`
-   - Truly scattered changes → omit: `chore: update dependencies across modules`
+   - Truly scattered changes → use the area that owns the change; do not omit scope.
 
 4. **Root config files**: Use the config type
    - `pyproject.toml` linting rules → `lint` or `ruff`
@@ -226,18 +230,18 @@ git commit --amend --no-edit
 ## Commit message checklist
 
 - [ ] Type is appropriate (feat/fix/docs/etc.)
-- [ ] Scope identifies WHERE (module/directory), NOT what type of change
-- [ ] Scope is NOT a banned word: `docs`, `tests`, `types`, `refactor`, `bugfix`
+- [ ] Scope is present and identifies WHERE (module/directory), not what type of change
+- [ ] Scope is not a banned word: `docs`, `tests`, `types`, `refactor`, `bugfix`
 - [ ] Summary is under 50 characters
 - [ ] Summary uses imperative mood
-- [ ] Body explains WHY not just WHAT
+- [ ] Body explains WHY, not just WHAT
 - [ ] Breaking changes are clearly marked
 - [ ] Related issue numbers are included
 
-Finally, you will commit the changes with the generated commit message, without using `--no-verify`:
+Finally, commit the reviewed staged selection with the generated message, without `--no-verify`:
 
 ```sh
-git commit -m "<commit-message>"
+git commit -m "<type>(<scope>): <description>"
 ```
 
-If you are blocked by a pre-commit or prek hook, you should stop, and announce your intended commit message, and that it was blocked, and requires a linting-agent to be run against the issues found.
+If a pre-commit or prek hook fails, stop and report the intended commit message and full observed failure. Do not alter staging as a fallback.

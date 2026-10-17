@@ -69,26 +69,13 @@ def load_analysis_file(analysis_file: Path) -> dict[str, Any]:
     return data
 
 
-def format_file_list(files: list[str], max_files: int = 5) -> str:
-    """Format file list with code ticks and truncation.
-
-    Args:
-        files: List of file paths
-        max_files: Maximum files to show before truncating
+def format_file_list(files: list[str]) -> str:
+    """Format every file path with code ticks.
 
     Returns:
-        Formatted file list string
+        Comma-separated Markdown paths.
     """
-    if not files:
-        return ""
-
-    formatted_files = [f"`{file}`" for file in files[:max_files]]
-
-    if len(files) > max_files:
-        remaining = len(files) - max_files
-        formatted_files.append(f"*...and {remaining} more*")
-
-    return ", ".join(formatted_files)
+    return ", ".join(f"`{file}`" for file in files)
 
 
 def format_bug_fixes(bug_fixes: list[dict[str, Any]]) -> str:
@@ -329,7 +316,7 @@ def format_non_functional(non_functional: list[dict[str, Any]]) -> str:
         description = item.get("description", "Minor changes")
         files = item.get("files_affected", [])
 
-        files_str = format_file_list(files, max_files=3)
+        files_str = format_file_list(files)
         if files_str:
             lines.append(f"- **{item_type}**: {description} ({files_str})")
         else:
