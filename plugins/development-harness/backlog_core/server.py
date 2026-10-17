@@ -3862,7 +3862,11 @@ async def backlog_close_milestone(
         result = await asyncio.to_thread(operations.close_milestone, milestone_number=milestone_number, output=out)
     except BacklogError as exc:
         return _respond(BacklogCloseMilestoneResponse, {"error": str(exc), **_failure_verdict(exc), **out.to_dict()})
-    return _respond(BacklogCloseMilestoneResponse, {**result, **out.to_dict()})
+    response = BacklogCloseMilestoneResponse.model_validate({**result, **out.to_dict()})
+    dump = response.model_dump(exclude_none=True)
+    if response.milestone is not None:
+        dump["milestone"] = response.milestone.model_dump()
+    return dump
 
 
 @mcp.tool(
