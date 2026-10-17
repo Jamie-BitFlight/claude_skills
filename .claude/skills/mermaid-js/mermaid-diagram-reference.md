@@ -1,8 +1,8 @@
 # Mermaid.js Diagram Types — Comprehensive Reference
 
 **Source**: Official Mermaid.js documentation (<https://mermaid.js.org>)
-**Last Verified**: 2026-03-07
-**Mermaid Version**: v11.12.3+
+**Snapshot verified**: 2026-03-07
+**Mermaid snapshot version**: v11.12.3+
 
 ---
 
@@ -1955,6 +1955,6 @@ All syntax and features documented above are sourced from the official Mermaid.j
 - Main site: <https://mermaid.js.org/intro/>
 - GitHub repository: <https://github.com/mermaid-js/mermaid>
 
-**Accessed**: 2026-03-07
-**Mermaid Version**: v11.12.3+
-**Status**: Current as of March 2026
+**Snapshot accessed**: 2026-03-07
+**Mermaid snapshot version**: v11.12.3+
+**Status**: Historical v11 reference; verify current syntax and renderer support against the official documentation
