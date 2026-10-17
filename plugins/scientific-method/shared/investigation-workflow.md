@@ -307,6 +307,10 @@ sequenceDiagram
 
 ## Investigation Template
 
+Use the [Unified Investigation Template](./investigation-template.md) for all investigation output.
+
+The outline below summarizes the scientific stages; it is not an alternative output template.
+
 ```text
 ## Observation
 [Exact symptoms, reproduction steps, environment]

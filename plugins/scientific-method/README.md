@@ -43,7 +43,7 @@ All skills in this plugin share a template (`shared/investigation-template.md`) 
 - `11 CONCLUSION` — reject or fail-to-reject H0, citing evidence IDs
 - `12 CHANGES` — diff summary
 - `13 VERIFICATION` — verification command and result
-- `14 EVIDENCE LOG` — complete evidence inventory
+- `14 STATUS` — choose exactly one status from the [Unified Investigation Template](shared/investigation-template.md#14-status)
 
 ### Hard evidence rules
 
@@ -163,6 +163,7 @@ flowchart TD
     Done{Status?}
     Done -->|"resolved-verified"| Retro["Invoke retrospective-analyst\nTimeline + retrospective"]
     Done -->|"unresolved or mitigated"| S0
+    Done -->|"unknown"| Gap["Verification missing or inconclusive\nSection 11: record the gap,\nclaim it prevents verifying,\nand next step"]
 ```
 
 ---
