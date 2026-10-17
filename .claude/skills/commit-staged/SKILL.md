@@ -191,34 +191,6 @@ Migration guide: Update client code to handle new response structure
 5. **Add body**: Explain why and what impact
 6. **Note breaking changes**: If applicable
 
-## Interactive commit helper
-
-Use `git add -p` for selective staging:
-
-```bash
-# Stage changes interactively
-git add -p
-
-# Review what's staged
-git diff --staged
-
-# Commit with message
-git commit -m "type(scope): description"
-```
-
-## Amending commits
-
-Fix the last commit message:
-
-```bash
-# Amend commit message only
-git commit --amend
-
-# Amend and add more changes
-git add forgotten-file.js
-git commit --amend --no-edit
-```
-
 ## Best practices
 
 1. **Atomic commits** - One logical change per commit
