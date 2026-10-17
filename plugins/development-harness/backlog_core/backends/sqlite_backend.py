@@ -53,6 +53,7 @@ from backlog_core.backend_types import (
     MilestoneFullNode,
     MilestoneNode,
 )
+from backlog_core.errors import BacklogError
 from backlog_core.models import (
     BackendAvailability,
     BackendStatus,
@@ -225,9 +226,47 @@ class SQLiteBackend:
         self._conn = sqlite3.connect(db_path, check_same_thread=False, detect_types=sqlite3.PARSE_DECLTYPES)
         self._conn.row_factory = sqlite3.Row
         self._content_lock = RLock()
-        self._conn.executescript(_SCHEMA_SQL)
-        self._migrate_schema()
+        try:
+            # Validate before any DDL: executescript commits on its own (and
+            # switches the journal mode), so nothing after it can be undone.
+            self._check_legacy_milestone_links()
+            self._conn.executescript(_SCHEMA_SQL)
+            self._migrate_schema()
+        except BaseException:
+            self._conn.close()
+            raise
         self._conn.commit()
+
+    def _check_legacy_milestone_links(self) -> None:
+        """Refuse to open a database whose legacy links cannot be migrated.
+
+        The ``items.milestone_number`` column holds one milestone per item, so
+        an item linked to several milestones in the legacy ``item_milestones``
+        table cannot be migrated without losing links. Runs before any schema
+        DDL, so the database is read but never written in that case.
+
+        Raises:
+            BacklogError: If any item has more than one legacy milestone link.
+        """
+        legacy_table = self._conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'item_milestones'"
+        ).fetchone()
+        if legacy_table is None:
+            return
+        multi_linked = self._conn.execute(
+            "SELECT issue_number, group_concat(milestone_number, ', ') AS milestones"
+            " FROM (SELECT issue_number, milestone_number FROM item_milestones ORDER BY milestone_number)"
+            " GROUP BY issue_number HAVING count(*) > 1 ORDER BY issue_number"
+        ).fetchall()
+        if multi_linked:
+            affected = "; ".join(f"#{row['issue_number']} (milestones {row['milestones']})" for row in multi_linked)
+            msg = (
+                "Cannot migrate the legacy item_milestones table: items.milestone_number holds one "
+                f"milestone per item, and these items are linked to several: {affected}. "
+                "The legacy table and its links were left unchanged. Reduce each listed item to a single milestone "
+                "in item_milestones, then reopen the database."
+            )
+            raise BacklogError(msg, retryable=False)
 
     def _migrate_schema(self) -> None:
         """Add columns introduced after a durable database's original schema.
@@ -235,27 +274,40 @@ class SQLiteBackend:
         ``CREATE TABLE IF NOT EXISTS`` is a no-op on a table that already
         exists, so a pre-existing durable ``items`` table never gains new
         columns on its own. Backfills from the legacy ``item_milestones``
-        join table when present, then drops it.
+        join table when present, then drops it. ``_check_legacy_milestone_links``
+        has already ruled out items with several links. All writes run in one
+        transaction, so a failure part-way leaves the database as it was.
         """
-        columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(items)").fetchall()}
-        if "milestone_number" not in columns:
-            self._conn.execute("ALTER TABLE items ADD COLUMN milestone_number INTEGER REFERENCES milestones(number)")
-        # Runs after the column above is guaranteed present, so this is safe on
-        # both a fresh database and a durable one migrated by this method.
-        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_items_milestone_number ON items(milestone_number)")
         legacy_table = self._conn.execute(
             "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'item_milestones'"
         ).fetchone()
-        if legacy_table is not None:
-            self._conn.execute(
-                "UPDATE items SET milestone_number = ("
-                "  SELECT milestone_number FROM item_milestones"
-                "  WHERE item_milestones.issue_number = items.issue_number"
-                "  ORDER BY milestone_number LIMIT 1"
-                ") WHERE milestone_number IS NULL"
-                "  AND issue_number IN (SELECT issue_number FROM item_milestones)"
-            )
-            self._conn.execute("DROP TABLE item_milestones")
+        # IMMEDIATE takes the write lock now, and the link check repeats under
+        # it, so no other connection can add a legacy link between the check and
+        # the backfill-and-drop below.
+        self._conn.execute("BEGIN IMMEDIATE")
+        try:
+            columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(items)").fetchall()}
+            if "milestone_number" not in columns:
+                self._conn.execute(
+                    "ALTER TABLE items ADD COLUMN milestone_number INTEGER REFERENCES milestones(number)"
+                )
+            # Runs after the column above is guaranteed present, so this is safe on
+            # both a fresh database and a durable one migrated by this method.
+            self._conn.execute("CREATE INDEX IF NOT EXISTS idx_items_milestone_number ON items(milestone_number)")
+            if legacy_table is not None:
+                self._check_legacy_milestone_links()
+                self._conn.execute(
+                    "UPDATE items SET milestone_number = ("
+                    "  SELECT milestone_number FROM item_milestones"
+                    "  WHERE item_milestones.issue_number = items.issue_number"
+                    ") WHERE milestone_number IS NULL"
+                    "  AND issue_number IN (SELECT issue_number FROM item_milestones)"
+                )
+                self._conn.execute("DROP TABLE item_milestones")
+        except BaseException:
+            self._conn.rollback()
+            raise
+        self._conn.commit()
 
     @_serialized_connection_operation
     def list_work_items(self) -> list[BacklogItem]:
