@@ -179,22 +179,40 @@ def test_state_filter_excludes_closed_includes_all(backend: WorkItemBackend) -> 
     assert {open_ms["number"], closed_ms["number"]} <= all_numbers
 
 
-def test_close_milestone_moves_it_to_closed(backend: WorkItemBackend) -> None:
-    """close_milestone closes a configured-backend milestone without changing its members."""
+def test_close_milestone_preserves_member_counts_and_states(backend: WorkItemBackend) -> None:
+    """close_milestone returns live member counts without changing member states."""
     _skip_github_shared_state(backend)
     created = cast("dict[str, object]", operations.create_milestone(title="release")["milestone"])
+    number = cast("int", created["number"])
+    open_item = _make_item("Open member")
+    closed_item = _make_item("Closed member")
+    repo = _repo_for_create_issue(backend)
+    open_number = backend.create_issue_for_item(repo, open_item)
+    closed_number = backend.create_issue_for_item(repo, closed_item)
+    assert open_number is not None
+    assert closed_number is not None
+    open_item.metadata.issue = str(open_number)
+    closed_item.metadata.issue = str(closed_number)
+    operations.assign_item_to_milestone(issue_number=open_number, milestone_number=number)
+    operations.assign_item_to_milestone(issue_number=closed_number, milestone_number=number)
+    backend.close_github_issue(str(closed_number), "done")
 
-    closed = cast(
-        "dict[str, object]", operations.close_milestone(milestone_number=cast("int", created["number"]))["milestone"]
+    before = next(
+        milestone
+        for milestone in cast("list[dict[str, object]]", operations.list_milestones(state="open")["milestones"])
+        if milestone["number"] == number
+    )
+    closed = cast("dict[str, object]", operations.close_milestone(milestone_number=number)["milestone"])
+    after = next(
+        milestone
+        for milestone in cast("list[dict[str, object]]", operations.list_milestones(state="closed")["milestones"])
+        if milestone["number"] == number
     )
 
-    assert closed["number"] == created["number"]
-    assert closed["state"] == "closed"
-    closed_numbers = {
-        milestone["number"]
-        for milestone in cast("list[dict[str, object]]", operations.list_milestones(state="closed")["milestones"])
-    }
-    assert created["number"] in closed_numbers
+    assert before["open_issues"] == closed["open_issues"] == after["open_issues"] == 1
+    assert before["closed_issues"] == closed["closed_issues"] == after["closed_issues"] == 1
+    assert backend.fetch_item_status(open_item) == "open"
+    assert backend.fetch_item_status(closed_item) == "closed"
 
 
 # ---------------------------------------------------------------------------

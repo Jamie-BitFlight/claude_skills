@@ -668,13 +668,21 @@ class InMemoryBackend:
         return node
 
     def close_milestone(self, milestone_number: int, repo: str = "") -> MilestoneFullNode:
-        """Close an in-memory milestone and return its updated node."""
+        """Close an in-memory milestone and return its live-counted node.
+
+        Returns:
+            The closed milestone with current member counts.
+        """
         del repo
         milestone = self._milestones.get(milestone_number)
         if milestone is None:
             raise KeyError(f"InMemoryBackend: milestone #{milestone_number} not found")
         milestone["state"] = "CLOSED"
-        return milestone
+        return next(
+            node
+            for node in self._fetch_milestones_graphql(cast("Repository", None), "", "", states=["CLOSED"])
+            if node["number"] == milestone_number
+        )
 
     def assign_item_to_milestone(self, issue_number: int, milestone_number: int, repo: str = "") -> None:
         """Set an issue's embedded milestone reference.
