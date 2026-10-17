@@ -87,6 +87,13 @@ Project skills share one directory body between `.agents/skills/` and `.claude/s
 through relative directory symlinks. Either direction is supported; do not copy or
 synchronize skill bodies. Codex follows the `.agents/skills/` links for discovery.
 The project also exposes native custom roles through `.codex/agents/*.toml`.
+
+The research roles can run independently of the Claude-only research orchestration
+skill. They read maintained references under `.claude/skills/research-curator/`;
+those references do not require an additional Codex skill copy. Native roles inherit
+the parent session's model, tools and permissions. The language specialists use the
+repository's configured checks and do not claim automatic agent-memory injection.
+
 Only workflows usable without Claude load-time preprocessing are linked. Skills
 requiring injected arguments, command output, or skill-directory macros remain at
 their canonical Claude paths without a Codex discovery link. The git-history
@@ -111,6 +118,13 @@ The 2026-10-16 check with Codex 0.163.0 loaded the shared skills without discove
 errors and both MCP entries with their named `env_vars`. This establishes config
 and skill discovery only: API keys were unavailable, so authenticated MCP calls
 and native-role execution were not verified.
+
+The 2026-10-17 check also captured the installed 0.163.0 CLI's first model request
+and confirmed the adopted native roles appear in the `spawn_agent` role selector
+with MultiAgentV2 enabled. The loopback capture rejected the request before model
+execution. This proves role discovery and selection metadata, not child execution.
+The release-pinned loading and selection sources are in the
+[claims register](../plugins/development-harness/CLAIMS-REGISTER.md#codex-project-roles-verified-2026-10-17).
 
 Official interfaces: <https://developers.openai.com/codex/skills>,
 <https://developers.openai.com/codex/mcp>, and
