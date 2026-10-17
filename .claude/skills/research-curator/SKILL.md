@@ -29,6 +29,26 @@ Use the host's available-agent mechanism; do not reproduce a harness-specific to
 
 The Codex roles are defined in `.codex/agents/` and inherit the parent session's model, tools, permissions, and MCP configuration. Do not supply a Claude model identifier as a Codex role model. If the named role is unavailable in the active host, stop before mutation and report that exact unavailable route; do not substitute a generic worker.
 
+### Review Model and Command Handoff
+
+For an Entry Review launch, use the `research-curator` role with the `--review` prompt and the
+resolved absolute command-path record from [Command Path Resolution](#command-path-resolution).
+On Claude Code only, override that project's agent invocation to model `sonnet`: the agent's
+frontmatter default remains the `haiku` repair-worker default. On Codex, select the native
+`research-curator` role without a model override; it inherits the parent session's configured
+model, tools, permissions, and MCP configuration.
+
+Pass these resolved values in every orchestrated review prompt so the child never depends on an
+inherited shell environment:
+
+```text
+CURATOR_SKILL_DIR_ABS: {resolved absolute active skill directory}
+CURATOR_FORMATTER_ABS: {resolved absolute formatter path}
+CURATOR_VALIDATOR_ABS: {resolved absolute validator path}
+PROJECT_ROOT_ABS: {resolved absolute target project root}
+BOUNDED_RUNNER_ABS: {resolved absolute project bounded-runner path}
+```
+
 ## Command Path Resolution
 
 Keep the current working directory at the target project root for every lifecycle command so
@@ -315,13 +335,22 @@ flowchart TD
     Gate2 --> Review
 ```
 
-Use [Cross-Harness Role Handoff](#cross-harness-role-handoff) for both launches. Preserve review quality in the reviewer prompt and give the worker the exact unchecked `D` lines; let the active host select the role's configured model.
+Use [Cross-Harness Role Handoff](#cross-harness-role-handoff) for both launches. For the reviewer,
+apply [Review Model and Command Handoff](#review-model-and-command-handoff): Claude Code uses the
+`sonnet` override and passes the resolved command-path record; Codex selects its native role with
+no Claude model value. Give the worker the exact unchecked `D` lines.
 
 ```text
 Reviewer prompt:
 --review ./research/{category}/{name}.md
 Round: {N}
 Scratch document: .tmp/scratch/reports/{category}-{name}-review.md
+Command paths:
+CURATOR_SKILL_DIR_ABS: {resolved absolute active skill directory}
+CURATOR_FORMATTER_ABS: {resolved absolute formatter path}
+CURATOR_VALIDATOR_ABS: {resolved absolute validator path}
+PROJECT_ROOT_ABS: {resolved absolute target project root}
+BOUNDED_RUNNER_ABS: {resolved absolute project bounded-runner path}
 
 Worker prompt:
 --fix ./research/{category}/{name}.md

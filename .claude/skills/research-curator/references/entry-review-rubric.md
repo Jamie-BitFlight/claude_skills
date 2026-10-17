@@ -19,6 +19,18 @@ The rubric reviews the entry itself ([scope](./entry-quality-standards.md#scope)
 
 ---
 
+### Standalone Command Bootstrap
+
+A standalone `--review` invocation has no parent orchestrator shell to initialize command paths.
+Before Gate 1, use the explicit absolute command-path record supplied in the review prompt when it
+is complete and every path exists. When that record is absent, independently resolve the active
+`research-curator` skill directory through the host skill loader and the target project root with
+`git rev-parse --show-toplevel`, then derive the formatter, validator, and bounded-runner absolute
+paths exactly as [Command Path Resolution](../SKILL.md#command-path-resolution) specifies. Keep the
+target project as cwd. Do not assume `CURATOR_*` values are inherited environment variables, and
+report `VERDICT: FAIL -- NOT RUN: {exact missing or invalid path}` if bootstrap cannot resolve a
+required path.
+
 ## Gate 1 — Mechanical Checks
 
 Run the formatter. The orchestrator runs the validator after every pass, appending its remaining issues to the scratch document as `D` lines, and repairs cross-reference reciprocity before review; an orchestrated review (it names a scratch document) skips those two commands, and a standalone `--review` runs all three. Report output as **exact counts per severity and the verbatim issue lines** — "mostly clean", "a few warnings", and "passes validation" are not review output.
