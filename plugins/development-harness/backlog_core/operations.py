@@ -2387,6 +2387,7 @@ def _build_list_entry(
             if info is not None:
                 entry["status"] = normalize_live_github_status(info.status)
                 entry["milestone"] = info.milestone
+                entry["state"] = info.state
                 if info.milestone_number is not None:
                     entry["milestone_number"] = str(info.milestone_number)
             else:
@@ -2458,6 +2459,7 @@ def _page_status_map(provider: ProviderItem) -> dict[int, IssueStatus]:
                 label for label in provider.labels if label.startswith(STATUS_LABEL_PREFIX)
             ]),
             milestone=provider.milestone,
+            milestone_number=provider.milestone_number,
             state=provider.state,
         )
     }

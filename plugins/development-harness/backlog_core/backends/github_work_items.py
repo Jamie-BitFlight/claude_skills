@@ -795,6 +795,7 @@ class _GitHubWorkItemSync:
             labels=[label["name"] for label in issue["labels"]],
             revision=version.revision,
             milestone=issue["milestone"]["title"] if issue["milestone"] else "",
+            milestone_number=issue["milestone"]["number"] if issue["milestone"] else None,
             fields=fields,
             created_at=issue["createdAt"],
         )
