@@ -338,6 +338,31 @@ def test_membership_counts_after_assign_and_close(backend: WorkItemBackend) -> N
     assert match["closed_issues"] == 1
 
 
+def test_list_items_exposes_native_assigned_milestone_only(backend: WorkItemBackend) -> None:
+    """Native status hydration exposes an assigned milestone title without tagging nonmembers."""
+    _skip_github_shared_state(backend)
+    milestone = cast("dict[str, object]", operations.create_milestone(title="selected milestone")["milestone"])
+    number = cast("int", milestone["number"])
+    assigned = _make_item("Assigned item")
+    nonmember = _make_item("Nonmember item")
+    repo = _repo_for_create_issue(backend)
+    assigned_number = backend.create_issue_for_item(repo, assigned)
+    nonmember_number = backend.create_issue_for_item(repo, nonmember)
+    assert assigned_number is not None
+    assert nonmember_number is not None
+    assigned.metadata.issue = str(assigned_number)
+    nonmember.metadata.issue = str(nonmember_number)
+    backend.put_work_item(assigned)
+    backend.put_work_item(nonmember)
+    operations.assign_item_to_milestone(issue_number=assigned_number, milestone_number=number)
+
+    entries = cast("list[dict[str, object]]", operations.list_items(include_closed=True)["items"])
+    by_title = {str(entry["title"]): entry for entry in entries}
+
+    assert by_title["Assigned item"]["milestone"] == "selected milestone"
+    assert by_title["Nonmember item"]["milestone"] == ""
+
+
 # ---------------------------------------------------------------------------
 # 10. assign_item_to_milestone via operations
 # ---------------------------------------------------------------------------

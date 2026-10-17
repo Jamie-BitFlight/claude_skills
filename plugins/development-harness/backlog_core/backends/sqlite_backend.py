@@ -856,14 +856,14 @@ class SQLiteBackend:
 
     @_serialized_connection_operation
     def batch_fetch_statuses(self, items: list[BacklogItem], repo: str = "") -> StatusFetchResult:
-        """Return statuses for items that have issue numbers.
+        """Return statuses and assigned milestone titles for items with issue numbers.
 
         Args:
             items: BacklogItems to query (must have issue_number set).
             repo: Ignored.
 
         Returns:
-            Dict mapping issue_number to IssueStatus.
+            Status records carrying the native milestone title when assigned.
         """
         result: dict[int, IssueStatus] = {}
         for item in items:
@@ -871,9 +871,13 @@ class SQLiteBackend:
             if not raw_issue:
                 continue
             num = int(str(raw_issue).lstrip("#"))
-            row = self._conn.execute("SELECT status FROM items WHERE issue_number = ?", (num,)).fetchone()
+            row = self._conn.execute(
+                "SELECT items.status, milestones.title AS milestone_title FROM items "
+                "LEFT JOIN milestones ON milestones.number = items.milestone_number WHERE items.issue_number = ?",
+                (num,),
+            ).fetchone()
             if row is not None:
-                result[num] = IssueStatus(status=str(row["status"]))
+                result[num] = IssueStatus(status=str(row["status"]), milestone=str(row["milestone_title"] or ""))
         return StatusFetchResult(statuses=result, attempted=True)
 
     @_serialized_connection_operation

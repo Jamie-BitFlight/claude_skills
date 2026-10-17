@@ -459,7 +459,7 @@ class InMemoryBackend:
         return []
 
     def batch_fetch_statuses(self, items: list[BacklogItem], repo: str = "") -> StatusFetchResult:
-        """Return statuses for items that have issue numbers."""
+        """Return statuses and assigned milestone titles for items with issue numbers."""
         result: dict[int, IssueStatus] = {}
         for item in items:
             raw_issue = getattr(item.metadata, "issue", "") or ""
@@ -468,7 +468,10 @@ class InMemoryBackend:
             num = int(str(raw_issue).lstrip("#"))
             issue = self._issues.get(num)
             if issue is not None:
-                result[num] = IssueStatus(status=issue["state"].lower())
+                milestone = issue["milestone"]
+                result[num] = IssueStatus(
+                    status=issue["state"].lower(), milestone=milestone["title"] if milestone is not None else ""
+                )
         return StatusFetchResult(statuses=result, attempted=True)
 
     def fetch_item_status(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> str:
