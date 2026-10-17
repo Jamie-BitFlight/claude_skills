@@ -56,20 +56,21 @@ If `GITHUB_TOKEN` is set, `gh` authenticates automatically for all API calls.
 
 <repo_detection>
 
-Git remote points to a local proxy (`127.0.0.1`), NOT `github.com`. Every `gh` command fails without explicit repo specification:
-
-```text
-failed to determine base repo: none of the git remotes configured for this
-repository point to a known GitHub host.
-```
-
-**RULE: Pass `-R` (or `--repo`) on EVERY `gh` command:**
+Git remotes can point to a local proxy (`127.0.0.1`) rather than `github.com`, so a repository-scoped command that supports `-R` or `--repo` must receive an explicit repository:
 
 ```bash
-gh <command> -R <owner/repo>
+gh issue list -R OWNER/REPO
+gh pr list --repo OWNER/REPO
 ```
 
-This applies to ALL `gh` subcommands: `pr`, `issue`, `run`, `api`, `release`, `project`, etc.
+Do not pass `-R` to verbs that do not support it:
+
+- REST API calls embed the target in the endpoint: `gh api repos/OWNER/REPO/issues`.
+- GraphQL calls supply explicit `owner` and `name` variables in the query/request.
+- Projects V2 uses `--owner OWNER` and the project number where required.
+- `gh auth` and `gh version` are not repository-scoped.
+
+Use `gh <verb> --help` when adding a command; pass an explicit repository only through that verb's supported interface.
 
 </repo_detection>
 
