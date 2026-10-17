@@ -1006,24 +1006,32 @@ def _apply_repo_detection(*, configure: bool = False) -> str | None:
         configure: Write the detected slug to ``.dh/config.yaml`` when true.
 
     Returns:
-        The detected owner/repo slug, or ``None`` when detection failed.
+        The detected owner/repo slug when detection succeeds and, when
+        requested, configuration is persisted. Returns ``None`` when detection
+        or requested persistence fails.
     """
     owner_repo = detect_owner_repo()
-    if configure and owner_repo is not None and not write_gh_config(Path.cwd() / ".dh" / "config.yaml", owner_repo):
+    if owner_repo is None:
+        return None
+    if configure and not write_gh_config(Path.cwd() / ".dh" / "config.yaml", owner_repo):
         error_console.print(
             ":warning: [yellow]Warning: write_gh_config returned False — config may not have been persisted[/yellow]"
         )
+        return None
     return owner_repo
 
 
-def _configure_repo_if_requested(configure_repo: bool) -> None:
+def _configure_repo_if_requested(configure_repo: bool) -> bool:
     """Persist a detected repository only for an explicit setup request.
 
     Args:
         configure_repo: Whether configuration was requested.
+
+    Returns:
+        ``True`` when configuration was not requested or it persisted.
+        ``False`` when requested detection or persistence fails.
     """
-    if configure_repo:
-        _apply_repo_detection(configure=True)
+    return not configure_repo or _apply_repo_detection(configure=True) is not None
 
 
 def _find_installed_gh() -> tuple[str | None, str | None]:
@@ -1046,19 +1054,21 @@ def _find_installed_gh() -> tuple[str | None, str | None]:
 
 def _configure_installed_cli_if_requested(
     *, gh_which: str | None, configure_repo: bool, force: bool, dry_run: bool
-) -> bool:
+) -> bool | None:
     """Configure an installed CLI locally when explicitly requested.
 
     Returns:
-        ``True`` when the configuration-only path handled the invocation.
+        ``None`` when the configuration-only path does not apply; otherwise
+        whether requested configuration succeeded.
     """
     if not (gh_which and configure_repo and not force):
-        return False
+        return None
     if dry_run:
         console.print(":white_check_mark: [green]Dry-run: configuration was not written[/green]")
-    else:
-        _configure_repo_if_requested(configure_repo)
-        console.print(":white_check_mark: [green]Configured repository for installed gh[/green]")
+        return True
+    if not _configure_repo_if_requested(configure_repo):
+        return False
+    console.print(":white_check_mark: [green]Configured repository for installed gh[/green]")
     return True
 
 
@@ -1134,10 +1144,13 @@ def main(
 
     gh_which, installed_version = _find_installed_gh()
 
-    if _configure_installed_cli_if_requested(
+    match _configure_installed_cli_if_requested(
         gh_which=gh_which, configure_repo=configure_repo, force=force, dry_run=dry_run
     ):
-        raise typer.Exit(code=0)
+        case True:
+            raise typer.Exit(code=0)
+        case False:
+            raise typer.Exit(code=1)
     # 2. Detect platform
     try:
         os_key, arch = detect_platform()
@@ -1145,8 +1158,7 @@ def main(
         error_console.print(f":cross_mark: {exc}")
         raise typer.Exit(code=1) from exc
 
-    platform_label = f"{os_key}/{arch}"
-    console.print(f":magnifying_glass_tilted_left: Detected platform: [cyan]{platform_label}[/cyan]")
+    console.print(f":magnifying_glass_tilted_left: Detected platform: [cyan]{os_key}/{arch}[/cyan]")
 
     # 3. Resolve install directory
     install_dir = bin_dir if bin_dir is not None else find_install_dir()
@@ -1161,8 +1173,8 @@ def main(
     needs_update = installed_version is None or parse_version(installed_version) < parse_version(latest_version)
 
     if not needs_update and not force:
-        if not dry_run:
-            _configure_repo_if_requested(configure_repo)
+        if not dry_run and not _configure_repo_if_requested(configure_repo):
+            raise typer.Exit(code=1)
         console.print(":white_check_mark: [green]gh is already up to date[/green]")
         raise typer.Exit(code=0)
 
@@ -1196,7 +1208,8 @@ def main(
     except (subprocess.SubprocessError, OSError) as exc:
         error_console.print(f":warning: [yellow]Could not verify installation: {exc}[/yellow]")
 
-    _configure_repo_if_requested(configure_repo)
+    if not _configure_repo_if_requested(configure_repo):
+        raise typer.Exit(code=1)
     raise typer.Exit(code=0)
 
 

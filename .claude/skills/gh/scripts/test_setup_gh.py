@@ -117,6 +117,48 @@ def test_configure_repo_persists_config_without_release_lookup_when_gh_is_instal
     assert "repo: octo/example" in config
 
 
+def test_configure_repo_fails_without_detectable_repository(
+    runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Installed configuration refuses success when no repository can be detected."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("GITHUB_REPO", raising=False)
+
+    with (
+        patch.object(setup_gh.shutil, "which", return_value="/isolated/bin/gh"),
+        patch.object(setup_gh, "get_installed_version", return_value="9.0.0"),
+        patch.object(setup_gh, "resolve_release", side_effect=AssertionError("release lookup must not run")),
+        patch.object(setup_gh, "detect_platform", side_effect=AssertionError("platform detection must not run")),
+    ):
+        result = runner.invoke(app, ["--configure-repo"])
+
+    assert result.exit_code == 1, result.output
+    assert not (tmp_path / ".dh" / "config.yaml").exists()
+    assert "Configured repository for installed gh" not in result.output
+
+
+def test_configure_repo_fails_when_configuration_cannot_be_persisted(
+    runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Installed configuration refuses success when the target cannot be written."""
+    config_parent = tmp_path / ".dh"
+    config_parent.write_text("not a directory", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GITHUB_REPO", "octo/example")
+
+    with (
+        patch.object(setup_gh.shutil, "which", return_value="/isolated/bin/gh"),
+        patch.object(setup_gh, "get_installed_version", return_value="9.0.0"),
+        patch.object(setup_gh, "resolve_release", side_effect=AssertionError("release lookup must not run")),
+        patch.object(setup_gh, "detect_platform", side_effect=AssertionError("platform detection must not run")),
+    ):
+        result = runner.invoke(app, ["--configure-repo"])
+
+    assert result.exit_code == 1, result.output
+    assert config_parent.read_text(encoding="utf-8") == "not a directory"
+    assert "Configured repository for installed gh" not in result.output
+
+
 def test_configure_repo_dry_run_leaves_existing_config_unchanged(
     runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
