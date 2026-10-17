@@ -244,27 +244,29 @@ zenuml
 
 ---
 
-## Version Status
+## Snapshot Feature History
 
-### Latest Features (v11.12.3+)
+These headings describe features recorded in the v11.12.3+ snapshot; they do not establish current Mermaid support.
+
+### Features recorded at v11.12.3+
 - Venn Diagrams — Set relationships
 - Half-arrows in Sequence — Directional message variations
 - Central connections in Sequence — Central hub messaging
 - Enhanced Packet Diagram — Simplified `+N` bits syntax
 
-### Recent Features (v11.6.0+)
+### Features recorded from v11.6.0+
 - Radar Charts — Multi-dimensional metrics
 - Treemap Diagrams — Hierarchical visualization
 
-### Current Features (v11.1.0+)
+### Features recorded from v11.1.0+
 - Architecture Diagrams — Infrastructure visualization
 - Kanban Diagrams — Task board workflow
 
-### Stable Features (v10.3.0+)
+### Features recorded from v10.3.0+
 - Sankey Diagrams (experimental) — Flow visualization
 - Packet Diagrams — Network structures
 
-### Core Features (v9.4.0+)
+### Features recorded from v9.4.0+
 - Mindmaps — Default inclusion
 
 ---
