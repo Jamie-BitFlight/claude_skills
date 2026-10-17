@@ -22,7 +22,7 @@ File: `.claude/retrospectives/{YYYY-MM-DD}-{slug}-timeline.md`
 
 A `sequenceDiagram` showing the sequence of hypotheses formed, experiments run, and outcomes observed. Each node labels the action and its result (`PASS` / `FAIL` / `UNEXPECTED`).
 
-```markdown
+````markdown
 # Investigation Timeline — {title}
 
 ```mermaid
@@ -37,7 +37,7 @@ sequenceDiagram
     I->>S: Hypothesis 2 — [label]
     S-->>I: PASS — [brief outcome]
 ```
-```
+````
 
 Rules for the diagram:
 
@@ -55,16 +55,18 @@ File: `.claude/retrospectives/{YYYY-MM-DD}-{slug}-analysis.md`
 
 ## What Worked
 
-[Actions that produced `causal-supported` causal links. For each: what was done, what evidence it produced, why it was effective.]
+[Actions that advanced the investigation through evidence, a changed hypothesis decision or next step, or verified improvement within the claimed scope. For each: what was done, what evidence it produced, and how that evidence established the contribution.]
 
 ## What Did Not Work
 
-[Actions with no causal link established, or iterations that regressed. For each: what was attempted, what the outcome was, and why it failed to advance the investigation.]
+[Actions that failed to advance the investigation or iterations that regressed, as evidenced by the investigation input. For each: what was attempted, what the outcome was, and what evidence shows the lack of progress or regression.]
 
 ## Patterns Observed
 
 [Recurring failure modes across iterations. Confounds that were missed initially. Any systematic bias in hypothesis formation or experiment design.]
 ```
+
+For every action-result link discussed, report the input's Causality Gate classification separately from its contribution to the investigation. An informative probe or a verified scoped improvement can advance the investigation while its causal explanation remains unknown.
 
 Each section must contain at least one entry derived from the investigation input. If a section has no content (e.g., no regressions occurred), write `None observed in this investigation.`
 
@@ -91,7 +93,7 @@ If none were observed, write `No anti-patterns identified in this investigation.
 
 ## One-Sentence Summary
 
-[A single sentence suitable for a git commit message or backlog note. Format: "Investigation: {finding} — root cause was {cause}." ]
+[A single sentence suitable for a git commit message or backlog note. When the input establishes a root cause: "Investigation: {finding} — root cause was {cause}." Otherwise: "Investigation: {finding} — root cause remains unknown."]
 ```
 
 ## Procedure

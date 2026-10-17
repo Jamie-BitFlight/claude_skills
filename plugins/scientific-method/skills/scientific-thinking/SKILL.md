@@ -56,6 +56,7 @@ flowchart TD
     Done{status?}
     Done -->|resolved-verified| Retro[Notify user: retrospective-analyst<br>agent can produce mermaid timeline<br>and retrospective from iteration log]
     Done -->|unresolved or mitigated| S0
+    Done -->|unknown| Gap["Verification missing or inconclusive<br>Section 11: record the gap,<br>claim it prevents verifying,<br>and next step"]
 ```
 
 ### Stage Rules
