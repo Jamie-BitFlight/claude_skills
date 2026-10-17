@@ -282,11 +282,23 @@ upstream criterion executable; it does not change what that criterion requires.
 
 A check that no upstream criterion supports is a specification gap, not a criterion: leave it out
 of the list and report it. Then, for every upstream acceptance test and groomed criterion, record
-which criterion IDs derive from it in a `## Criterion Coverage` section of the plan's `context`
-field. Any upstream entry with no derived criterion is a coverage gap. List each coverage gap and
-each specification gap, by its reference and its text, in the plan's `context` and in the report
-returned to the dispatcher. When none of the upstream sources holds a criterion, write no
-`acceptance-criteria-structured` entries and report that absence as a coverage gap.
+which criterion IDs derive from it in a `## Criterion Coverage` section. Any upstream entry with no
+derived criterion is a coverage gap. List each coverage gap and each specification gap, by its
+reference and its text, in that section and in the report returned to the dispatcher. When none of
+the upstream sources holds a criterion, write no `acceptance-criteria-structured` entries, and
+state that absence in the section and report it as a coverage gap.
+
+Store the `## Criterion Coverage` section in the plan-level `acceptance_criteria` field, never in
+`context`. Later pipeline steps set `context` as a whole (`dh:dh-context-gathering` replaces it with
+the Context Manifest), so a section written there is erased before execution; `acceptance_criteria`
+is written by no other step and carries through `plan import` to the ledger, where `plan status`
+returns it as `row.acceptance_criteria` beside `row.context`. The `create` action does not accept the field,
+so write it with one `update` call once the plan exists (after `create` on Path A, after `finalize`
+on Path B), then read the plan back and confirm the section is present:
+
+```text
+mcp__plugin_dh_sam__sam_plan(plan="{plan_id}", config={"action": "update", "set_fields_json": {"acceptance_criteria": "## Criterion Coverage\n\n..."}})
+```
 
 `issue` and `owner_reference` associate the plan with an existing owner and are mutually
 exclusive — passing both in the same `create` call is rejected. Add at most one, matching the
@@ -630,8 +642,9 @@ Add these validations:
 
 - Every criterion's `description` starts with `Derives from:` and names at least one `S2-AT{n}`,
   `GROOM-AC{n}`, or `SPEC-AC{n}` that exists upstream
-- The plan's `context` has a `## Criterion Coverage` section that maps every upstream entry to
-  criterion IDs and lists each coverage gap, or states that no upstream source holds a criterion
+- A `## Criterion Coverage` section is drafted for the plan-level `acceptance_criteria` field, not
+  for `context`, and it maps every upstream entry to criterion IDs and lists each coverage gap, or
+  states that no upstream source holds a criterion
 - If any check fails, correct the criteria or the coverage section before registering the plan
 
 ### Phase 5: Plan Creation
@@ -641,7 +654,11 @@ Steps (in order):
 1. Register the plan: call `sam_plan`'s `create` action with the task objects validated in
    Phase 4, choosing the monolithic or incremental path by task count. Record the returned plan ID.
 
-2. Sync checkpoints reference task acceptance criteria and verification outputs.
+2. Write the `## Criterion Coverage` section to the plan's `acceptance_criteria` field with the
+   `update` call shown in Criterion Traceability, then read the plan and confirm
+   `acceptance_criteria` holds the section.
+
+3. Sync checkpoints reference task acceptance criteria and verification outputs.
 
 ## Success Metrics
 

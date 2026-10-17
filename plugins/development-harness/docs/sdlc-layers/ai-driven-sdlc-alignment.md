@@ -75,11 +75,22 @@ check 13 now require that:
 2. A check that no upstream criterion supports is reported as a specification gap instead of being
    added.
 3. Every upstream entry is mapped to the criterion IDs derived from it in a `## Criterion Coverage`
-   section of the plan's `context`, and an upstream entry with no derived criterion is reported as
-   a coverage gap.
+   section of the plan-level `acceptance_criteria` field, and an upstream entry with no derived
+   criterion is reported as a coverage gap.
 
 **No schema change.** `AcceptanceCriterion` has no field for the upstream link
 ([models.py](../../sam_schema/core/models.py)). Adding one would change the plan wire contract
 that T0 and TN read, so the link is a prose convention in the existing free-text `description`
-field (`Derives from: {ref}.`), and coverage is prose in the existing plan-level `context` field.
-A typed field is a candidate once the convention has been exercised on real plans.
+field (`Derives from: {ref}.`). A typed field is a candidate once the convention has been
+exercised on real plans.
+
+Coverage is prose in the existing plan-level `acceptance_criteria` field, not in `context`.
+`context` is shared and set as a whole: `add-new-feature` Phase 6 runs
+[dh-context-gathering.md](../../agents/dh-context-gathering.md) after the planner, and its write
+replaces the field with the Context Manifest, so a coverage section stored there was erased before
+execution. No other step writes `acceptance_criteria`; `plan import` copies it to the ledger, and
+`plan status` returns it as `row.acceptance_criteria`. `sam_plan`'s `create` action does not accept
+the field, so the planner sets it with an `update` call. That call had silently dropped every plan
+field whose wire name differs from its Python name (`acceptance_criteria`, `feature_context`,
+`codebase_patterns`, `backend_ref`) on the content store; `dh_core/operations.py` and
+`PlanFieldsUpdate` in `sam_schema/core/task_backend_types.py` now accept either spelling.
