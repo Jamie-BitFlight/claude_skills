@@ -1,10 +1,11 @@
-# Mermaid.js — Comprehensive Diagram Reference
+# Mermaid.js — Dated v11 Diagram Reference
 
-Complete reference documentation for all 24+ Mermaid.js diagram types with syntax, examples, and practical patterns.
+This is a versioned reference snapshot for Mermaid.js diagram syntax, examples, and practical patterns. Start with [SKILL.md](./SKILL.md) to route a request to the appropriate reference.
 
-**Last Updated**: 2026-03-07
+**Snapshot date**: 2026-03-07
 **Source**: Official Mermaid.js documentation (<https://mermaid.js.org>)
-**Version**: v11.12.3+
+**Snapshot version**: v11.12.3+
+**Current syntax**: This snapshot does not establish current Mermaid behavior. Verify current or renderer-specific syntax in the official Mermaid documentation and the target renderer's documentation.
 
 ---
 
@@ -284,7 +285,8 @@ See [QUICK_REFERENCE.md](./QUICK_REFERENCE.md#troubleshooting-reference) for mor
 
 ```
 mermaid-js/
-├── README.md                              # This file
+├── SKILL.md                               # Canonical request router
+├── README.md                              # Dated snapshot overview
 ├── QUICK_REFERENCE.md                     # One-page reference (printable)
 ├── DIAGRAM_INDEX.md                       # Diagram selector guide
 ├── mermaid-diagram-reference.md           # Complete syntax reference
@@ -350,4 +352,4 @@ All documentation sourced from official Mermaid.js documentation:
 
 ---
 
-**Last verified**: 2026-03-07 | **Mermaid version**: v11.12.3+ | **Status**: Current
+**Snapshot verified**: 2026-03-07 | **Mermaid version**: v11.12.3+ | **Status**: Historical reference; verify current syntax against official documentation

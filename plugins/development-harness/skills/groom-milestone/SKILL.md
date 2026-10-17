@@ -50,7 +50,7 @@ flowchart TD
     GroomGate -->|"Ungroomed items exist"| BatchGroom["Step 4a: Batch Groom via Kage-Bunshin<br>Actor: Parallel kage-bunshin sessions<br>Action: For each ungroomed item, spawn:<br>claude -p --model sonnet --permission-mode auto<br>--output-format json --no-session-persistence<br>'Load /dh:work-backlog-item groom {title}'<br>All sessions run in same directory (no worktree —<br>grooming writes go through backlog MCP, not filesystem).<br>Wait for all PIDs to exit."]
     GroomGate -->|"All groomed"| DepAnalysis
 
-    BatchGroom --> GroomResults{"Step 4b: Check Groom Results<br>Read each /tmp/kb-groom-{issue}.json<br>Any sessions failed?"}
+    BatchGroom --> GroomResults{"Step 4b: Check Groom Results<br>Read each /tmp/kb-groom-{issue}.json<br>Any sessions failed? Failed = non-zero exit,<br>unparsable JSON, or is_error not false<br>(a denied or errored run can still exit 0)"}
     GroomResults -->|"All succeeded"| DepAnalysis
     GroomResults -->|"Some failed"| GroomFix{"Fixable without<br>user direction?"}
     GroomFix -->|"Yes"| GroomRetry["Re-spawn failed items only"]

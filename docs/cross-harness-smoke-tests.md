@@ -88,15 +88,18 @@ through relative directory symlinks. Either direction is supported; do not copy 
 synchronize skill bodies. Codex follows the `.agents/skills/` links for discovery.
 The project also exposes native custom roles through `.codex/agents/*.toml`.
 
-The research roles can run independently of the Claude-only research orchestration
-skill. They read maintained references under `.claude/skills/research-curator/`;
-those references do not require an additional Codex skill copy. Native roles inherit
-the parent session's model, tools and permissions. The language specialists use the
-repository's configured checks and do not claim automatic agent-memory injection.
+The four research workflow skills (`research-curator`, `refresh-research`,
+`skill-research-process`, and `external-pattern-integrator`) are shared through relative
+directory links. They parse supplied invocation text rather than rely on load-time expansion.
+The curator routes Claude Code through its available project agents and Codex through the native
+`research-curator`, `research-cross-referencer`, `research-insight-extractor`, and
+`research-utilization-assessor` roles. The native roles read maintained references under
+`.claude/skills/research-curator/`; no mirrored skill body is needed. They inherit the parent
+session's model, tools, permissions, and MCP configuration.
 
 Only workflows usable without Claude load-time preprocessing are linked. The shared discovery root exposes `commit-staged`, `gh`, `create-merge-request-changelog`, `git-history-recon`, `start-milestone`, `group-items-to-milestone`, and `complete-milestone` through relative directory symlinks. Their packaged scripts/assets resolve from the loaded skill while Git operations retain the target-project cwd. Milestone workflows keep configured-backend authority, and their explicit Project V2 projection invokes the packaged helper separately with owner, project, repository, issue, and status arguments. Native tool names and authenticated mutation behavior remain harness-dependent and require the workflow's explicit confirmations.
 
-The research-process skill's literal Claude `Skill`/`Task`/`Agent` call templates are not adopted as a Codex surface without an explicit native handoff; its Claude source is unchanged.
+Harness-specific tool names and optional integrations alone do not exclude an otherwise portable workflow.
 
 The trusted project's `.codex/config.toml` enables Ref and Context7 stdio MCP servers
 and retains core-only shell environment inheritance. Each MCP entry forwards its
@@ -104,8 +107,11 @@ API-key variable through `env_vars` independently of shell inheritance; `env` an
 `args` do not expand `$VAR`. Export `REF_API_KEY` and `CONTEXT7_API_KEY` in the
 launching environment, and trust the project before checking its effective config.
 
-For a local check, run `codex --strict-config mcp list`. An isolated Codex app-server
-can additionally exercise `config/read` and `skills/list` without a model call.
+For a strict local configuration/discovery check, use the installed Codex app-server route:
+start `codex --strict-config app-server` in an isolated project and issue `config/read` followed by
+`skills/list` through its JSON-RPC protocol. Do not use `codex --strict-config mcp list`: the
+installed CLI rejects `--strict-config` for that subcommand. The app-server check exercises
+configuration and skill discovery without a model call.
 The 2026-10-16 check with Codex 0.163.0 loaded the shared skills without discovery
 errors and both MCP entries with their named `env_vars`. This establishes config
 and skill discovery only: API keys were unavailable, so authenticated MCP calls

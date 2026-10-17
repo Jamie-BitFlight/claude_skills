@@ -250,3 +250,4 @@ tracker_dashboard({})
 | [honker](../data-infrastructure/honker.md) | data-infrastructure | referenced by honker (data-infrastructure) |
 | [tabularis](../developer-tools/tabularis.md) | developer-tools | referenced by tabularis (developer-tools) |
 | [openspec-mcp](./openspec-mcp.md) | mcp-ecosystem | shares hierarchical task tracking (Projects>Epics>Tasks) and immutable activity log audit trail (bidirectional) |
+| [itsaplan](../task-management/itsaplan.md) | task-management | referenced by itsaplan (task-management) |

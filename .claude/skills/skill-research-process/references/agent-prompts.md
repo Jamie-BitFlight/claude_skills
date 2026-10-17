@@ -1,142 +1,66 @@
-# Agent Prompt Templates
+# Research Worker Handoffs
 
-Templates for research agents used in the skill research process.
+Use these plain handoffs with the active host's available worker mechanism. Do not paste a harness-specific tool call into a worker prompt. Give each worker only the paths it owns and retain its structured result for the orchestrator's final report.
 
-## Categorization Agent
-
-Use this prompt to launch the initial categorization agent that explores documentation and creates a TODO checklist.
+## Categorization Handoff
 
 ```markdown
-## Identity
+## Task
 
-You are a Technical Architect specializing in knowledge base organization.
+Inspect official documentation for {TOOL_OR_LIBRARY} and write a category plan at `.tmp/scratch/plans/{skill-name}-research-plan.md`.
 
-## Task Directive
+## Required plan
 
-Explore the official {TOOL/LIBRARY} documentation and create a comprehensive categorized list of documentation topics for building a complete knowledge base.
+- One bounded category per checklist item, with its documentation boundary.
+- Official source URLs to inspect for each category.
+- Explicit overlap resolutions and any known documentation gaps.
+- A `STATUS: complete | blocked` line, then `ARTIFACTS`, `SOURCES`, `GAPS`, and `WARNINGS` sections.
 
-**Required Output**: Create a file at `./{skill-name}/{skill-name}.TODO.md` containing:
+## Constraints
 
-- Markdown checklist of documentation categories
-- Each category representing a major area of {TOOL/LIBRARY} functionality
-
-**Constraints**:
-
-- Ensure categories are distinct and non-overlapping
-- Make each category specific enough to guide a focused research agent
-- Aim for 5-10 categories (fewer if simple tool, more if complex)
-
-## Reference Context
-
-**About {TOOL/LIBRARY}**: {Brief description of what the tool does}
-
-**Research Sources** (use concurrently for comprehensive coverage):
-
-- WebFetch: For initial scoping and finding documentation structure
-- mcp__Ref__ref_search_documentation: Search for official docs
-- mcp__Ref__ref_read_url: Read specific documentation pages
-- mcp__exa__web_search_exa: Find code examples and tutorials
-- mcp__exa__get_code_context_exa: Extract code patterns
-
-**Strategy**: Start by finding the official documentation site, then analyze its structure (table of contents, navigation) to identify logical categories.
+- Do not create the target skill or reference files.
+- Do not infer undocumented behavior.
+- If a source cannot be read, record its exact URL and access error in `GAPS`.
 ```
 
-## Research Agent
-
-Use this prompt for each category research agent. Launch multiple agents in parallel (one per category).
+## Research Handoff
 
 ```markdown
-## Identity
+## Task
 
-You are a Technical Researcher responsible for documenting {CATEGORY NAME} of {TOOL/LIBRARY}.
+Research the `{CATEGORY_NAME}` category of {TOOL_OR_LIBRARY} for `{target-skill-path}`.
 
-## Pre-Task Requirements
+## File scope
 
-1. Activate skill-creator: `Skill(skill: "plugin-creator:skill-creator")`
-2. Read the project's CLAUDE.md for local development guidelines
+Write only under `{target-skill-path}/references/{category}/`. Create a lowercase `index.md` that links with relative paths to every detailed reference file in that directory.
 
-## Task Directive
+## Required evidence
 
-Research and document the **{CATEGORY NAME}** aspect of {TOOL/LIBRARY} for the {skill-name} skill.
+- Attribute every factual claim to a source URL and access date.
+- Prefer official documentation for API behavior and mark secondary sources as secondary.
+- Record unsupported claims as `NOT_VERIFIED: {claim}`; do not fill gaps from model knowledge.
+- Attribute examples to their source, or exercise them before calling them working.
 
-**Output Requirements**:
+## Result
 
-1. Create files in: `./{skill-name}/references/{category}/`
-2. Create `index.md` (lowercase) in that directory containing:
-   - Overview of the category
-   - Markdown links to all reference files using `./` relative paths
-   - Example: `[Topic Name](./topic-name.md) - Brief description`
-3. Create detailed reference files (`.md`) covering all topics
-
-**Success Criteria**:
-
-- All topics in the assigned category are documented
-- `index.md` contains working links to all created files
-- Reference files cite authoritative sources with access dates
-- No speculation - only document what sources confirm
-
-## Reference Context
-
-**Category Topics**: {List specific topics from the TODO checklist}
-
-**Research Sources** (use concurrently):
-
-- mcp__Ref__ref_read_url: For official documentation (high fidelity)
-- mcp__exa__get_code_context_exa: For code examples (medium fidelity)
-- WebFetch: For overviews only (low fidelity - never for implementation details)
-
-**Citation Format**: Include source URL and access date for all claims.
+Return `STATUS: complete | blocked | failed`, followed by `ARTIFACTS`, `SOURCES`, `GAPS`, and `WARNINGS`. Preserve exact access errors and do not modify another category's files.
 ```
 
-## Agent Launch Pattern
-
-To launch research agents in parallel, use a single message with multiple Agent tool calls:
-
-```text
-# In a single response, include multiple Agent tool uses:
-
-Agent(
-  subagent_type: "general-purpose",
-  description: "Research {Category A} for {skill-name}",
-  run_in_background: true,
-  prompt: "{Research agent prompt with Category A details}"
-)
-
-Agent(
-  subagent_type: "general-purpose",
-  description: "Research {Category B} for {skill-name}",
-  run_in_background: true,
-  prompt: "{Research agent prompt with Category B details}"
-)
-
-# ... continue for all categories
-```
-
-**Important**: All Task calls must be in the same message to run truly in parallel. Sequential messages will run sequentially.
-
-## Integration Agent
-
-After all research agents complete, use this prompt to integrate the results.
+## Integration Handoff
 
 ```markdown
-## Identity
+## Task
 
-You are a Technical Editor responsible for integrating research into a cohesive skill.
+Integrate the completed category indexes into `{target-skill-path}/SKILL.md`.
 
-## Task Directive
+## Steps
 
-Integrate the researched categories into the {skill-name} skill's SKILL.md.
+1. Read every `references/{category}/index.md` named by the approved research plan.
+2. Add concise relative links and usage routing to SKILL.md; keep source detail in `references/`.
+3. Check every new or changed Markdown link and report the exact paths checked.
+4. Preserve the target skill's existing frontmatter, lifecycle, and package conventions.
 
-**Steps**:
+## Result
 
-1. Read all `references/{category}/index.md` files
-2. Update `SKILL.md` to include links to each category index
-3. Ensure SKILL.md body is ≤5k words (move details to references if needed)
-4. Verify all links use `./references/{category}/index.md` format
-
-**Validation**:
-
-1. Run: `python3 plugins/plugin-creator/skills/skill-creator/scripts/package_skill.py ./{skill-name}/`
-2. Fix any reported issues
-3. Verify the skill follows skill-creator guidelines
+Return `STATUS: complete | blocked | failed`, `ARTIFACTS`, `SOURCES`, `GAPS`, and `WARNINGS`. Do not hide an unavailable category or a broken link.
 ```

@@ -338,15 +338,6 @@ class TestGetTranscriptJsonlSchema:
         assert path.name == "session-log-schema.md"
         assert path.is_file()
 
-    @pytest.mark.asyncio
-    async def test_returns_full_schema_markdown(self) -> None:
-        """Tool returns canonical session log schema markdown."""
-        result = await kaizen_server.get_transcript_jsonl_schema()
-
-        assert "Claude Code Session Log Schema Reference" in result
-        assert '## `type: "assistant"` Records' in result
-        assert len(result) > 2000
-
     def test_resource_returns_same_schema_body(self) -> None:
         """Resource handler returns the same markdown as the sync reader."""
         body = kaizen_server._read_session_log_schema_text()

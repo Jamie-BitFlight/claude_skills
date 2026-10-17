@@ -239,4 +239,5 @@ xyOps provides a comprehensive reference implementation for building distributed
 | [Everything Claude Code](../agent-frameworks/everything-claude-code.md) | agent-frameworks | Comprehensive agent automation framework with hook-based session persistence and multi-service orchestration |
 | [Fly.io](../agent-infrastructure/fly-io.md) | agent-infrastructure | Cloud platform with Firecracker isolation and Sprites for distributed agent execution and stateful sandboxes |
 | [OpenHands](../coding-agents/openhands.md) | coding-agents | Cloud infrastructure for scaling AI agents with model-agnostic SDK and orchestration patterns |
+| [itsaplan](./itsaplan.md) | task-management | referenced by itsaplan (task-management) |
 

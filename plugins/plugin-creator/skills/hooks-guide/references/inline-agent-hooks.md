@@ -1,6 +1,6 @@
 # Inline Agent Frontmatter — Hooks, MCP, Skills, Memory
 
-SOURCE: [Create custom subagents](https://code.claude.com/docs/en/sub-agents.md) (accessed 2026-03-01)
+SOURCE: [Create custom subagents](https://code.claude.com/docs/en/sub-agents) — “Inherited tools” and “mcpServers field” (accessed 2026-10-17)
 
 ## Table of Contents
 
@@ -149,9 +149,13 @@ Example — setup script fires only when `db-agent` starts; cleanup fires when a
 
 ## mcpServers Field
 
-Declare MCP servers available to a specific subagent. Each entry is either:
+Subagents inherit the built-in and MCP tools available in the parent session, subject to the
+documented foreground/background tool filters. Use `mcpServers` only to add an MCP server that is
+unavailable in the parent session, or to reference an existing parent connection explicitly.
 
-- A string referencing an already-configured server by name (e.g., `"slack"`)
+Each entry is either:
+
+- A string referencing an already-configured server by name (for example, `"slack"`)
 - An inline definition with the server name as key and a full MCP server config object as value
 
 Example referencing a pre-configured server:
@@ -178,14 +182,14 @@ mcpServers:
 ---
 ```
 
-Subagents do not inherit MCP servers from the parent session unless listed in `mcpServers`.
+Inline servers connect when the subagent starts and disconnect when it finishes. String references
+share the parent session's connection.
 
 > **Plugin Agent Restriction**: For plugin agents (agents bundled in a plugin's `agents/` directory), the `mcpServers`, `hooks`, and `permissionMode` frontmatter fields are **silently ignored** at runtime. Claude Code strips these fields for security reasons. If you need these fields to take effect, copy the agent file to `.claude/agents/` (project-level) or `~/.claude/agents/` (user-level), where these fields ARE honored.
 >
-> SOURCE: [Create custom subagents](https://code.claude.com/docs/en/sub-agents.md) — "For security reasons, plugin subagents do not support the hooks, mcpServers, or permissionMode frontmatter fields. These fields are ignored when loading agents from a plugin." (accessed 2026-03-17)
+> SOURCE: [Create custom subagents](https://code.claude.com/docs/en/sub-agents) — “Plugin subagents do not support the hooks, mcpServers, or permissionMode frontmatter fields.” (accessed 2026-10-17)
 
 ---
-
 ## skills Field
 
 Use the `skills` field to inject skill content into a subagent's context at startup. The full content of each named skill is injected — not just made available for invocation.

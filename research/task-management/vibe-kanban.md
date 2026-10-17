@@ -200,3 +200,4 @@ pnpm run format     # Prettier + cargo fmt
 |-------|----------|--------------|
 | [the-delegation](../research-agent-patterns/the-delegation.md) | research-agent-patterns | referenced by the-delegation (research-agent-patterns) |
 | [xyops](./xyops.md) | task-management | referenced by xyops (task-management) |
+| [itsaplan](./itsaplan.md) | task-management | referenced by itsaplan (task-management) |
