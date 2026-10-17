@@ -35,6 +35,7 @@ from .backend_types import (
     IssueNode,
     LabelNode,
     MilestoneFullNode,
+    MilestoneMemberNode,
     MilestoneNode,
 )
 from .entry_blocks import wrap_entry
@@ -494,6 +495,20 @@ query ListMilestones($owner: String!, $repo: String!, $states: [MilestoneState!]
         dueOn
         issues(states: [OPEN]) { totalCount }
         closedIssues: issues(states: [CLOSED]) { totalCount }
+      }
+    }
+  }
+}
+"""
+
+
+_LIST_MILESTONE_MEMBERS_QUERY = """
+query ListMilestoneMembers($owner: String!, $repo: String!, $number: Int!, $after: String) {
+  repository(owner: $owner, name: $repo) {
+    milestone(number: $number) {
+      issues(first: 100, after: $after) {
+        nodes { number title state }
+        pageInfo { hasNextPage endCursor }
       }
     }
   }
@@ -1842,6 +1857,64 @@ def _fetch_milestones_graphql(
         return []
     nodes = milestones_conn.get("nodes") or []
     return [_parse_milestone_node(n) for n in nodes if isinstance(n, dict)]
+
+
+def fetch_milestone_members_graphql(
+    repo: Repository, owner: str, repo_name: str, milestone_number: int
+) -> list[MilestoneMemberNode]:
+    """Fetch every provider-native issue attached to a numeric milestone.
+
+    Uses the same ``Milestone.issues`` connection as the provider's milestone
+    counts, rather than repository issue listing or DH parsing, and follows
+    every cursor until the provider reports completion.
+
+    Returns:
+        Every provider-native issue from the milestone's paginated issue connection.
+    """
+    members: list[MilestoneMemberNode] = []
+    after: str | None = None
+    while True:
+        data = _graphql_request(
+            repo,
+            _LIST_MILESTONE_MEMBERS_QUERY,
+            {"owner": owner, "repo": repo_name, "number": milestone_number, "after": after},
+        )
+        repo_data = data.get("repository")
+        milestone = repo_data.get("milestone") if isinstance(repo_data, dict) else None
+        if milestone is None:
+            msg = f"Milestone #{milestone_number} was not found in {owner}/{repo_name}"
+            raise BacklogError(msg)
+        issues = milestone.get("issues") if isinstance(milestone, dict) else None
+        if not isinstance(issues, dict):
+            msg = f"Milestone #{milestone_number} returned no issues connection"
+            raise BacklogError(msg)
+        nodes = issues.get("nodes")
+        if not isinstance(nodes, list):
+            msg = f"Milestone #{milestone_number} returned invalid issue nodes"
+            raise BacklogError(msg)
+        for node in nodes:
+            if not isinstance(node, dict):
+                continue
+            number = node.get("number")
+            if not isinstance(number, int):
+                msg = f"Milestone #{milestone_number} returned an issue without a numeric number"
+                raise BacklogError(msg)
+            members.append(
+                MilestoneMemberNode(
+                    issue_number=number,
+                    title=str(node.get("title") or ""),
+                    state="CLOSED" if str(node.get("state")).upper() == "CLOSED" else "OPEN",
+                    milestone_number=milestone_number,
+                )
+            )
+        page_info = issues.get("pageInfo")
+        if not isinstance(page_info, dict) or not page_info.get("hasNextPage"):
+            return members
+        end_cursor = page_info.get("endCursor")
+        if not isinstance(end_cursor, str) or not end_cursor:
+            msg = f"Milestone #{milestone_number} pagination did not provide an end cursor"
+            raise BacklogError(msg)
+        after = end_cursor
 
 
 # ---------------------------------------------------------------------------

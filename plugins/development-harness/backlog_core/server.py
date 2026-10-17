@@ -123,6 +123,7 @@ from .tool_responses import (
     BacklogListIssuesResponse,
     BacklogListLabelsResponse,
     BacklogListMergedPrsResponse,
+    BacklogListMilestoneMembersResponse,
     BacklogListMilestonesResponse,
     BacklogListProjectsResponse,
     BacklogListResponse,
@@ -3732,6 +3733,29 @@ async def backlog_list_milestones(
     if response.milestones is not None:
         dump["milestones"] = [m.model_dump() for m in response.milestones]
     return dump
+
+
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="List Milestone Members",
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
+    )
+)
+async def backlog_list_milestone_members(
+    milestone_number: Annotated[int, Field(description="Numeric milestone identity")],
+) -> Annotated[dict[str, object], _wire_schema(BacklogListMilestoneMembersResponse)]:
+    """List every provider-native issue attached to a configured-backend milestone."""
+    out = Output()
+    try:
+        result = await asyncio.to_thread(
+            operations.list_milestone_members, milestone_number=milestone_number, output=out
+        )
+        return _respond(BacklogListMilestoneMembersResponse, {**result, **out.to_dict()})
+    except BacklogError as e:
+        return _respond(BacklogListMilestoneMembersResponse, {"error": str(e), **_failure_verdict(e), **out.to_dict()})
 
 
 @mcp.tool(

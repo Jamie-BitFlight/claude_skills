@@ -51,6 +51,7 @@ from backlog_core.backend_types import (
     IssueNode,
     LabelNode,
     MilestoneFullNode,
+    MilestoneMemberNode,
     MilestoneNode,
 )
 from backlog_core.models import (
@@ -1171,6 +1172,24 @@ class SQLiteBackend:
             List of ``MilestoneFullNode`` TypedDicts.
         """
         return self._fetch_milestones_graphql(cast("Repository", None), "", "", states)
+
+    @_serialized_connection_operation
+    def list_milestone_members(self, milestone_number: int, repo: str = "") -> list[MilestoneMemberNode]:
+        """Return every stored issue assigned to the requested milestone."""
+        del repo
+        rows = self._conn.execute(
+            "SELECT issue_number, title, status FROM items WHERE milestone_number = ? ORDER BY issue_number",
+            (milestone_number,),
+        ).fetchall()
+        return [
+            MilestoneMemberNode(
+                issue_number=int(row["issue_number"]),
+                title=str(row["title"]),
+                state="OPEN" if str(row["status"]).lower() == "open" else "CLOSED",
+                milestone_number=milestone_number,
+            )
+            for row in rows
+        ]
 
     @_serialized_connection_operation
     def create_milestone(

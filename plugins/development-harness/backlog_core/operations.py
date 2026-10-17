@@ -38,6 +38,7 @@ from .backend_types import (
     IssueNode,
     ListPageRequest,
     MilestoneFullNode,
+    MilestoneMemberNode,
     SnapshotCheckpointProvider,
     SnapshotCompletenessProvider,
     SyncProvider,
@@ -6018,6 +6019,22 @@ def _milestone_dict(ms: MilestoneFullNode) -> dict[str, object]:
         "open_issues": ms["openIssueCount"],
         "closed_issues": ms["closedIssueCount"],
     }
+
+
+def list_milestone_members(milestone_number: int, repo: str = "", output: Output | None = None) -> dict[str, object]:
+    """Return every provider-native issue attached to a numeric milestone.
+
+    This deliberately bypasses logical DH item parsing: milestone counts and
+    membership are provider-native facts, so an ordinary provider issue without
+    DH sections remains visible to completion audits.
+
+    Returns:
+        The queried milestone number, all native members, their count, and output fields.
+    """
+    out = output or Output()
+    backend = require_milestone_support(get_config().backend, "list_milestone_members")
+    members: list[MilestoneMemberNode] = backend.list_milestone_members(milestone_number=milestone_number, repo=repo)
+    return {"milestone_number": milestone_number, "members": members, "count": len(members), **out.to_dict()}
 
 
 def list_milestones(

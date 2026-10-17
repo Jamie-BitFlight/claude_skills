@@ -33,7 +33,7 @@ from github import GithubException, GithubObject
 
 from backlog_core import gh_client, github_branches, github_sync, rendering
 from backlog_core.artifact_provider import ArtifactBackend, GitHubGistArtifactProvider
-from backlog_core.backend_types import ListPageRequest, ListPageResult, MilestoneFullNode
+from backlog_core.backend_types import ListPageRequest, ListPageResult, MilestoneFullNode, MilestoneMemberNode
 from backlog_core.backends.github_content_migration import (
     _GitHubContentCache,
     _GitHubContentMigration,
@@ -960,6 +960,16 @@ class GitHubBackend:
         repository = self.get_github(repo)
         owner, repo_name = repository.full_name.split("/", 1)
         return self._fetch_milestones_graphql(repository, owner, repo_name, states)
+
+    def list_milestone_members(self, milestone_number: int, repo: str = "") -> list[MilestoneMemberNode]:
+        """List every provider-native issue assigned to a milestone.
+
+        Returns:
+            Every member from the provider's paginated milestone issue connection.
+        """
+        repository = self.get_github(repo)
+        owner, repo_name = repository.full_name.split("/", 1)
+        return gh_client.fetch_milestone_members_graphql(repository, owner, repo_name, milestone_number)
 
     def create_milestone(
         self, title: str, description: str = "", due_on: datetime | None = None, repo: str = ""

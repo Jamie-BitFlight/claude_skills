@@ -342,7 +342,7 @@ exception:
 | `supports_branches` | Backend can satisfy `BranchBackend` — integration branch create/merge/delete. | `True` | `False` | `True` | `False` |
 | `supports_batch_status_fetch` | Backend implements a real batched status fetch. | `True` | `True` | `True` | `False` |
 | `supports_batch_issue_update` | Backend implements a real batched GraphQL update. | `True` | `False` | `False` | `False` |
-| `supports_milestones` | Backend implements real `list_milestones`/`create_milestone`/`assign_item_to_milestone`/`close_milestone` (`require_milestone_support()`, `backlog_core/_capability_gates.py`). Native `batch_fetch_statuses` returns an assigned milestone title so configured-backend listings can select members. Beads has no int-keyed milestone concept; use its beads-native shadow methods (`list_beads_milestones` etc.) instead. | `True` | `True` | `True` | `False` |
+| `supports_milestones` | Backend implements real `list_milestones`/`list_milestone_members`/`create_milestone`/`assign_item_to_milestone`/`close_milestone` (`require_milestone_support()`, `backlog_core/_capability_gates.py`). `list_milestone_members` returns the full native provider population counted by a milestone, independently of DH parsing. Native `batch_fetch_statuses` returns an assigned milestone title so configured-backend listings can select members. Beads has no int-keyed milestone concept; use its beads-native shadow methods (`list_beads_milestones` etc.) instead. | `True` | `True` | `True` | `False` |
 | `supports_cached_listing` | Backend's `list_work_items()` reads a provider-private cache (GitHub's `FileCache`) rather than the backend's own authoritative storage directly. Read by `operations.list_items` to compute the `from_cache` provenance bit on every listing response; see "Listing provenance" below. | `True` | `False` | `False` | `False` |
 
 **Flag-first gating rule:** `GitHubExtras` and `BranchBackend` are both
@@ -373,6 +373,9 @@ before this contract existed self-migrates on connect — adds
 table (lowest milestone number wins when an item had more than one legacy
 link), then drops that table. `sqlite`/`memory` order `list_milestones` by
 `due_on` then `number`; neither has a priority-ordering concept.
+
+Use `backlog_list_milestone_members` (CLI: `backlog list-milestone-members --milestone-number N`) to audit a milestone. It returns every native provider issue with its numeric issue number, title, native `OPEN`/`CLOSED` state, and milestone number, including issues that have no DH sections. It is the population for reconciliation with milestone counts; `backlog_list` remains a logical DH listing and is not a substitute for this audit.
+
 
 `beads` sets `supports_milestones = False` — its milestone IDs are
 string nanoids, `MilestoneFullNode.number` is `int`. Use its beads-native

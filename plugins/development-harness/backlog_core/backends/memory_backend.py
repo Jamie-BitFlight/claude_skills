@@ -30,6 +30,8 @@ if TYPE_CHECKING:
 
     from backlog_core.models import Output, SamTask
 
+import operator
+
 from backlog_core import rendering
 from backlog_core.backend_types import (
     AddedCommentNode,
@@ -37,6 +39,7 @@ from backlog_core.backend_types import (
     IssueNode,
     LabelNode,
     MilestoneFullNode,
+    MilestoneMemberNode,
     MilestoneNode,
 )
 from backlog_core.models import (
@@ -644,6 +647,21 @@ class InMemoryBackend:
             List of ``MilestoneFullNode`` TypedDicts.
         """
         return self._fetch_milestones_graphql(cast("Repository", None), "", "", states)
+
+    def list_milestone_members(self, milestone_number: int, repo: str = "") -> list[MilestoneMemberNode]:
+        """Return every stored issue assigned to the requested milestone."""
+        del repo
+        members = [
+            MilestoneMemberNode(
+                issue_number=issue["number"],
+                title=issue["title"],
+                state="OPEN" if issue["state"] == "OPEN" else "CLOSED",
+                milestone_number=milestone_number,
+            )
+            for issue in self._issues.values()
+            if issue["milestone"] is not None and issue["milestone"]["number"] == milestone_number
+        ]
+        return sorted(members, key=operator.itemgetter("issue_number"))
 
     def create_milestone(
         self, title: str, description: str = "", due_on: datetime | None = None, repo: str = ""

@@ -93,7 +93,7 @@ from backlog_core.models import (
 if TYPE_CHECKING:
     from github.Repository import Repository
 
-    from backlog_core.backend_types import IssueNode, MilestoneFullNode, MilestoneNode
+    from backlog_core.backend_types import IssueNode, MilestoneFullNode, MilestoneMemberNode, MilestoneNode
     from backlog_core.models import Output
 
 __all__ = ["BeadsBackend"]
@@ -850,6 +850,11 @@ class BeadsBackend:
 
         Use :meth:`list_beads_milestones` for beads-native milestone listing.
         """
+        raise NotImplementedError(_MILESTONE_ID_NOTE)
+
+    def list_milestone_members(self, milestone_number: int, repo: str = "") -> list[MilestoneMemberNode]:
+        """Raise because generic milestones cannot represent Beads identifiers."""
+        del milestone_number, repo
         raise NotImplementedError(_MILESTONE_ID_NOTE)
 
     def create_milestone(

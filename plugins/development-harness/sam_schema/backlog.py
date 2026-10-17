@@ -469,6 +469,17 @@ def milestones(
     _emit(result, output)
 
 
+@app.command("list-milestone-members")
+def list_milestone_members(
+    milestone_number: Annotated[int, typer.Option("--milestone-number", help="Numeric milestone identity")],
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+) -> None:
+    """List every provider-native issue attached to a milestone."""
+    output = Output()
+    result = operations.list_milestone_members(milestone_number=milestone_number, repo=repo, output=output)
+    _emit(result, output)
+
+
 @app.command("soonest-milestone")
 def soonest_milestone(repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "") -> None:
     """Get the soonest open milestone for a repository."""
