@@ -93,7 +93,7 @@ If none were observed, write `No anti-patterns identified in this investigation.
 
 ## One-Sentence Summary
 
-[A single sentence suitable for a git commit message or backlog note. Format: "Investigation: {finding} — root cause was {cause}." ]
+[A single sentence suitable for a git commit message or backlog note. When the input establishes a root cause: "Investigation: {finding} — root cause was {cause}." Otherwise: "Investigation: {finding} — root cause remains unknown."]
 ```
 
 ## Procedure
