@@ -234,3 +234,21 @@ entries separate what it establishes from what it does not.
   and on the `$node["Name"].json` expression form reading the same structure. Read 2026-09-07.
   Confidence: **reported** at the level of the field list; the import itself is source. Re-check:
   read `run-execution-data.ts` directly.
+
+## Codex project roles (verified 2026-10-17)
+
+- **Discovery:** Codex 0.163.0 loads project role TOMLs from `.codex/agents/`.
+  Release-pinned sources: [role loader](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/agent-roles/src/loader.rs)
+  and [discovery](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/agent-roles/src/discovery.rs).
+- **Selection:** MultiAgentV2 passes `spawn_agent`'s `agent_type` into the child
+  spawn request. Source: [V2 spawn handler](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/tools/handlers/multi_agents_v2/spawn.rs).
+- **Direct observation:** the installed 0.163.0 CLI, using this repository's
+  MultiAgentV2 configuration and an isolated home, rendered the adopted project
+  roles in the model-visible `spawn_agent` role selector. A loopback request
+  capture rejected the request before any model executed; the role catalog came
+  from Codex, not the capture endpoint. Strict app-server `config/read` and
+  `skills/list` also completed with empty stderr.
+- **Limits:** this establishes discovery and selection metadata, not model-driven
+  child execution or authenticated MCP access. Roles inherit parent permissions,
+  providers and MCP configuration; see the [custom-agent contract](https://developers.openai.com/codex/subagents#custom-agents).
+
