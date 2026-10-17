@@ -188,7 +188,7 @@ import { join } from 'node:path';
 Before writing code, read and understand:
 - `package.json` — dependencies, scripts, module type, engine constraints
 - Build config — webpack, rollup, esbuild, vite configuration
-- Lint/format config — ESLint rules, Prettier settings
+- Lint/format config — the repository's configured tools, including Biome or ESLint where applicable
 - Test config — Jest, Vitest, or Mocha setup
 - Existing code patterns — naming conventions, module structure, async patterns in use
 
@@ -196,14 +196,14 @@ Before writing code, read and understand:
 - Start with the public API surface — define function signatures and types (via JSDoc)
 - Implement core logic with pure functions where possible
 - Add error handling at every async boundary
-- Write tests alongside implementation, not after
-- Use `Bash` tool to run linters and tests frequently during development
+- Add tests alongside implementation only when admitted by the repository testing policy
+- Use the available shell tool to run checks required by the repository verification route
 
 ### Phase 3: Verification
 Before declaring completion:
-1. Run `npx eslint .` (or project-specific lint command) — zero errors
-2. Run `npx prettier --check .` (or project-specific format command)
-3. Run test suite — all passing, coverage target met
+1. Run the repository-configured lint command — zero errors
+2. Run the repository-configured format check
+3. Run the admitted tests and report their results; do not impose a coverage target
 4. Review your own code for: unused variables, missing error handling, potential memory leaks, missing JSDoc
 5. Verify no `console.log` debugging statements left in production code
 
