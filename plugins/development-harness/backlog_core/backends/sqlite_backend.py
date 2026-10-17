@@ -227,6 +227,9 @@ class SQLiteBackend:
         self._conn.row_factory = sqlite3.Row
         self._content_lock = RLock()
         try:
+            # Validate before any DDL: executescript commits on its own (and
+            # switches the journal mode), so nothing after it can be undone.
+            self._check_legacy_milestone_links()
             self._conn.executescript(_SCHEMA_SQL)
             self._migrate_schema()
         except BaseException:
@@ -234,19 +237,13 @@ class SQLiteBackend:
             raise
         self._conn.commit()
 
-    def _migrate_schema(self) -> None:
-        """Add columns introduced after a durable database's original schema.
-
-        ``CREATE TABLE IF NOT EXISTS`` is a no-op on a table that already
-        exists, so a pre-existing durable ``items`` table never gains new
-        columns on its own. Backfills from the legacy ``item_milestones``
-        join table when present, then drops it.
+    def _check_legacy_milestone_links(self) -> None:
+        """Refuse to open a database whose legacy links cannot be migrated.
 
         The ``items.milestone_number`` column holds one milestone per item, so
-        an item linked to several milestones cannot be migrated without losing
-        links. That case fails closed before any write; the legacy table and
-        every link in it are left untouched. All writes run in one transaction,
-        so a failure part-way leaves the database as it was.
+        an item linked to several milestones in the legacy ``item_milestones``
+        table cannot be migrated without losing links. Runs before any schema
+        DDL, so the database is read but never written in that case.
 
         Raises:
             BacklogError: If any item has more than one legacy milestone link.
@@ -254,21 +251,36 @@ class SQLiteBackend:
         legacy_table = self._conn.execute(
             "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'item_milestones'"
         ).fetchone()
-        if legacy_table is not None:
-            multi_linked = self._conn.execute(
-                "SELECT issue_number, group_concat(milestone_number, ', ') AS milestones"
-                " FROM (SELECT issue_number, milestone_number FROM item_milestones ORDER BY milestone_number)"
-                " GROUP BY issue_number HAVING count(*) > 1 ORDER BY issue_number"
-            ).fetchall()
-            if multi_linked:
-                affected = "; ".join(f"#{row['issue_number']} (milestones {row['milestones']})" for row in multi_linked)
-                msg = (
-                    "Cannot migrate the legacy item_milestones table: items.milestone_number holds one "
-                    f"milestone per item, and these items are linked to several: {affected}. "
-                    "The database was left unchanged. Reduce each listed item to a single milestone "
-                    "in item_milestones, then reopen the database."
-                )
-                raise BacklogError(msg, retryable=False)
+        if legacy_table is None:
+            return
+        multi_linked = self._conn.execute(
+            "SELECT issue_number, group_concat(milestone_number, ', ') AS milestones"
+            " FROM (SELECT issue_number, milestone_number FROM item_milestones ORDER BY milestone_number)"
+            " GROUP BY issue_number HAVING count(*) > 1 ORDER BY issue_number"
+        ).fetchall()
+        if multi_linked:
+            affected = "; ".join(f"#{row['issue_number']} (milestones {row['milestones']})" for row in multi_linked)
+            msg = (
+                "Cannot migrate the legacy item_milestones table: items.milestone_number holds one "
+                f"milestone per item, and these items are linked to several: {affected}. "
+                "The database was left unchanged. Reduce each listed item to a single milestone "
+                "in item_milestones, then reopen the database."
+            )
+            raise BacklogError(msg, retryable=False)
+
+    def _migrate_schema(self) -> None:
+        """Add columns introduced after a durable database's original schema.
+
+        ``CREATE TABLE IF NOT EXISTS`` is a no-op on a table that already
+        exists, so a pre-existing durable ``items`` table never gains new
+        columns on its own. Backfills from the legacy ``item_milestones``
+        join table when present, then drops it. ``_check_legacy_milestone_links``
+        has already ruled out items with several links. All writes run in one
+        transaction, so a failure part-way leaves the database as it was.
+        """
+        legacy_table = self._conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'item_milestones'"
+        ).fetchone()
         self._conn.execute("BEGIN")
         try:
             columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(items)").fetchall()}

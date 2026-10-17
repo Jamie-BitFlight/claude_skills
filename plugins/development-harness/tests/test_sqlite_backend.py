@@ -72,6 +72,10 @@ def _build_legacy_db(path: Path, links: list[tuple[int, int]]) -> None:
 def test_migrate_schema_item_in_two_milestones_fails_closed_and_keeps_legacy_data(tmp_path: Path) -> None:
     db_path = tmp_path / "legacy.sqlite3"
     _build_legacy_db(db_path, [(7, 1), (7, 2)])
+    conn = sqlite3.connect(db_path)
+    schema_before = conn.execute("SELECT type, name, sql FROM sqlite_master ORDER BY name").fetchall()
+    journal_before = conn.execute("PRAGMA journal_mode").fetchone()
+    conn.close()
 
     with pytest.raises(BacklogError, match=r"#7"):
         SQLiteBackend(str(db_path))
@@ -80,10 +84,12 @@ def test_migrate_schema_item_in_two_milestones_fails_closed_and_keeps_legacy_dat
     kept = conn.execute(
         "SELECT issue_number, milestone_number FROM item_milestones ORDER BY milestone_number"
     ).fetchall()
-    columns = {row[1] for row in conn.execute("PRAGMA table_info(items)")}
+    schema_after = conn.execute("SELECT type, name, sql FROM sqlite_master ORDER BY name").fetchall()
+    journal_after = conn.execute("PRAGMA journal_mode").fetchone()
     conn.close()
     assert kept == [(7, 1), (7, 2)]
-    assert "milestone_number" not in columns
+    assert schema_after == schema_before
+    assert journal_after == journal_before
 
 
 def test_migrate_schema_single_link_backfills_and_drops_legacy_table(tmp_path: Path) -> None:
