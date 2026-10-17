@@ -255,7 +255,7 @@ tasks: []                     # list of task objects — shape below
 context: ""                   # optional, str — plan-level markdown prose
 acceptance-criteria-structured:   # optional, list of criterion objects
   - criterion-id: "AC1"       # required, str
-    description: "..."        # optional, str
+    description: "Derives from: S2-AT1. ..."  # str — starts with the upstream source; see Criterion Traceability
     check-command: "uv run pytest tests/test_auth.py"   # required, str
     expected-baseline: "any"  # optional, str — defaults to "any"
     expected-final: "pass"    # optional, str — defaults to "pass"
@@ -264,6 +264,27 @@ acceptance-criteria-structured:   # optional, list of criterion objects
 Acceptance criteria are accepted only as `acceptance-criteria-structured` criterion objects.
 A plain list of criterion strings is not a plan field; unrecognized plan-level keys are dropped
 silently, so criteria written that way never reach the plan.
+
+### Criterion Traceability
+
+Derive each `acceptance-criteria-structured` entry from a criterion that already exists upstream;
+do not write criteria from scratch. The upstream sources are:
+
+- `S2-AT{n}` — the n-th Given/When/Then acceptance test in ARTIFACT:PLAN
+  (`artifact_read(item_id={issue}, artifact_type="architect")`), counted in document order
+- `GROOM-AC{n}` — the n-th entry in the backlog item's groomed "Acceptance Criteria" section
+
+The schema has no field for this link, so carry it in `description`: start it with
+`Derives from: {ref}[, {ref}].` followed by what the check proves. The `check-command` makes the
+upstream criterion executable; it does not change what that criterion requires.
+
+A check that no upstream criterion supports is a specification gap, not a criterion: leave it out
+of the list and report it. Then, for every upstream acceptance test and groomed criterion, record
+which criterion IDs derive from it in a `## Criterion Coverage` section of the plan's `context`
+field. Any upstream entry with no derived criterion is a coverage gap. List each coverage gap and
+each specification gap, by its reference and its text, in the plan's `context` and in the report
+returned to the dispatcher. When no upstream source exists, write no
+`acceptance-criteria-structured` entries and report that absence as a coverage gap.
 
 `issue` and `owner_reference` associate the plan with an existing owner and are mutually
 exclusive — passing both in the same `create` call is rejected. Add at most one, matching the
@@ -602,6 +623,14 @@ Add these validations:
 - The TN task's `dependencies` list includes all non-bookend task IDs
 - Every non-bookend task includes `T0` in its `dependencies`
 - If any check fails, add or correct the bookend tasks before registering the plan
+
+13. Criterion traceability check (when `acceptance-criteria-structured` is non-empty)
+
+- Every criterion's `description` starts with `Derives from:` and names at least one `S2-AT{n}` or
+  `GROOM-AC{n}` that exists upstream
+- The plan's `context` has a `## Criterion Coverage` section that maps every upstream acceptance
+  test and groomed criterion to criterion IDs, and lists each coverage gap
+- If any check fails, correct the criteria or the coverage section before registering the plan
 
 ### Phase 5: Plan Creation
 
