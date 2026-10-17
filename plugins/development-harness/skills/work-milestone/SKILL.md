@@ -184,11 +184,26 @@ for i in "${!PIDS[@]}"; do
   INFO="${SPAWN_INFO[$i]}"
   RESULT_FILE=$(echo "$INFO" | python3 -c "import sys,json; print(json.load(sys.stdin)['result_file'])")
 
-  if [ $EXIT_CODE -eq 0 ] && [ -s "$RESULT_FILE" ]; then
-    echo "$(python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('result','')[:200])" < "$RESULT_FILE")"
+  # Success = exit 0 AND parsable result JSON AND is_error false. A session that
+  # exits 0 with is_error true (denied tool, error_during_execution) is FAILED.
+  VERDICT=$(python3 -c "
+import sys, json
+try:
+    d = json.load(open(sys.argv[1]))
+except (OSError, ValueError) as e:
+    print('FAILED (unparsable result JSON: %s)' % e); sys.exit(1)
+if d.get('is_error') is not False:
+    print('FAILED (is_error=%s, subtype=%s): %s' % (d.get('is_error'), d.get('subtype'), d.get('result', '')))
+    sys.exit(1)
+print(d.get('result', '')[:200])
+" "$RESULT_FILE")
+  VERDICT_CODE=$?
+
+  if [ $EXIT_CODE -eq 0 ] && [ $VERDICT_CODE -eq 0 ]; then
+    echo "$VERDICT"
   else
     ERROR_FILE=$(echo "$INFO" | python3 -c "import sys,json; print(json.load(sys.stdin)['error_file'])")
-    echo "FAILED (exit ${EXIT_CODE}): $(tail -5 "$ERROR_FILE")"
+    echo "FAILED (exit ${EXIT_CODE}): ${VERDICT}$(tail -5 "$ERROR_FILE")"
   fi
 done
 ```
