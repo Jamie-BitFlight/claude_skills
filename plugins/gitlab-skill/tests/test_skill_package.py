@@ -694,7 +694,7 @@ def test_python_semantic_release_runtime_config_leaves_git_auth_to_process_scope
         env={
             **os.environ,
             "CI_DEFAULT_BRANCH": "release/1.x",
-            "RELEASE_TAG_PREFIX": "v",
+            "RELEASE_TAG_PREFIX": "consumer-release-",
             "RELEASE_GIT_REMOTE_NAME": "upstream",
             "RELEASE_VERSION_TOML": "pyproject.toml:project.version",
         },
@@ -705,6 +705,7 @@ def test_python_semantic_release_runtime_config_leaves_git_auth_to_process_scope
 
     assert result.returncode == 0, result.stderr
     config = tomllib.loads(tmp_path.joinpath(".release-component.toml").read_text(encoding="utf-8"))
+    assert config["semantic_release"]["tag_format"] == "consumer-release-{version}"
     remote = config["semantic_release"]["remote"]
     assert "token" not in remote
     assert remote["ignore_token_for_push"] is True

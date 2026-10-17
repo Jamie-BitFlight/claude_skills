@@ -36,6 +36,11 @@ result with Node, then observes a distinctive consumer prefix. This is a configu
 boundary, not a source-string denylist. CI already provisions Node for plugin pytest shards.
 No other permanent test is added; disposable controls do not join the maintained suite.
 
+The existing Python-adapter configuration test also observes a distinctive consumer-selected
+`tag_format` in the generated TOML. PR review identified that the Node-only replacement left this
+adapter's prefix unprotected. A disposable hardcoded-prefix fault passed before that assertion and
+failed at the `tag_format` assertion afterward, after successful generation and TOML parsing.
+
 Standalone GitLab test-runner users need Bash and Node on `PATH` for the shipped configuration's
 execution check; no release package installation or network publication is performed.
 
@@ -70,7 +75,7 @@ unchanged surfaces must remain explicitly unexercised rather than described as p
 | GitLab fast cases | 107 | 99 |
 | Kaizen fast cases | 74 | 73 |
 | Tracked test modules | 368 | 367 |
-| Tracked test-source lines | 148177 | 147837 |
+| Tracked test-source lines | 148177 | 147838 |
 
 Every executed before/after selection above finished without failures or errors. The root fast
 result after reduction was 784 passed and one expected xfail; integration was 55 passed. Before
