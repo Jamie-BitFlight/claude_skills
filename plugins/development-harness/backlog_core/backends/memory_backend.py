@@ -477,6 +477,7 @@ class InMemoryBackend:
                 status = item.status if native_status == "open" and item.status == "in-progress" else native_status
                 result[num] = IssueStatus(
                     status=status,
+                    state=native_status.upper(),
                     milestone=milestone["title"] if milestone is not None else "",
                     milestone_number=milestone["number"] if milestone is not None else None,
                 )

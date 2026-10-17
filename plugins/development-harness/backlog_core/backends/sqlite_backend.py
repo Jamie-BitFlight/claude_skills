@@ -882,6 +882,7 @@ class SQLiteBackend:
                 milestone_number = row["milestone_number"]
                 result[num] = IssueStatus(
                     status=status,
+                    state=native_status.upper(),
                     milestone=str(row["milestone_title"] or ""),
                     milestone_number=int(milestone_number) if milestone_number is not None else None,
                 )

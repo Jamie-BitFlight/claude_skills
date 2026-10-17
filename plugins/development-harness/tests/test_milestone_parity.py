@@ -83,7 +83,7 @@ def _make_item(title: str) -> BacklogItem:
 
 
 def _force_milestone_closed(backend: WorkItemBackend, number: int) -> None:
-    """Directly close a milestone at the backend layer (no generic close-milestone op exists)."""
+    """Seed a closed milestone independently of the operation exercised by list tests."""
     if isinstance(backend, InMemoryBackend):
         backend._milestones[number]["state"] = "CLOSED"
     elif isinstance(backend, SQLiteBackend):
@@ -366,8 +366,11 @@ def test_list_items_exposes_native_assigned_milestone_only(backend: WorkItemBack
     assert by_title["Nonmember item"]["milestone"] == ""
 
 
-def test_list_items_preserves_local_in_progress_over_native_open(backend: WorkItemBackend) -> None:
-    """A logical in-progress update remains visible without changing native issue lifecycle state."""
+@pytest.mark.parametrize(("native_state", "expected_status"), [("OPEN", "in-progress"), ("CLOSED", "closed")])
+def test_list_items_preserves_workflow_status_and_native_lifecycle(
+    backend: WorkItemBackend, native_state: str, expected_status: str
+) -> None:
+    """Native lifecycle remains visible even when logical metadata requests in-progress."""
     _skip_github_shared_state(backend)
     item = _make_item("Workflow status item")
     issue_number = backend.create_issue_for_item(_repo_for_create_issue(backend), item)
@@ -375,13 +378,16 @@ def test_list_items_preserves_local_in_progress_over_native_open(backend: WorkIt
     item.metadata.issue = str(issue_number)
     item.reference = f"#{issue_number}"
     backend.put_work_item(item)
+    if native_state == "CLOSED":
+        backend.close_github_issue(str(issue_number), "done")
 
     operations.update_item(selector=item.reference, status="in-progress")
     entries = cast("list[dict[str, object]]", operations.list_items(include_closed=True)["items"])
     entry = next(candidate for candidate in entries if candidate["title"] == item.title)
 
-    assert entry["status"] == "in-progress"
-    assert backend.fetch_item_status(item) == "open"
+    assert entry["status"] == expected_status
+    assert entry["state"] == native_state
+    assert backend.fetch_item_status(item) == native_state.lower()
 
 
 # ---------------------------------------------------------------------------
