@@ -76,8 +76,16 @@ every FastMCP command with `scripts/run_bounded.py`.
 3. **Use existing hermetic coverage.** `plugins/development-harness/tests/test_backlog_core_server.py`
    exercises server dispatch through the in-memory FastMCP client. For a supported CLI/MCP contract,
    `tests/test_frontend_parity_ops.py::test_backlog_list_parity` uses its own temporary SQLite
-   fixture. Run only the focused existing test(s) relevant to the requested behavior through
-   `plugins/development-harness/run_pytests.py`; do not create a parallel forwarding suite.
+   fixture. The runner excludes integration tests by default, so invoke this parity contract with:
+
+   ```bash
+   uv run --locked --script plugins/development-harness/run_pytests.py \
+   -p no:xdist -m "integration and not research_vault" \
+   tests/test_frontend_parity_ops.py::test_backlog_list_parity
+   ```
+
+   Run only the focused existing test(s) relevant to the requested behavior; do not create a
+   parallel forwarding suite.
 
 4. **Compare only supported semantics.** Compare a CLI and MCP result only where both expose the
    same documented operation and an isolated fixture can make the comparison meaningful. MCP-only
