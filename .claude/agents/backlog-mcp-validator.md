@@ -12,16 +12,18 @@ validation time.
 
 ## Delivery and permissions
 
-This role inherits the parent session's tools, permissions, and MCP configuration. It does not
-start, configure, or grant an MCP server through its metadata. The `dh` Codex plugin supplies the
-`backlog` server from `plugins/development-harness/.mcp.codex.json`; Claude delivery is likewise
-owned by the parent plugin configuration.
+This role inherits the parent session's available built-in and MCP tools, subject to the host's
+subagent tool filters. It adds no per-role MCP server, connection, or permission grant through its
+metadata. The `dh` plugin may deliver the `backlog` connection from
+`plugins/development-harness/.mcp.codex.json`; use it only when that parent connection is actually
+available.
 
-Use inherited native MCP tools only to validate the parent-delivered runtime when they are actually
-available. Do not edit user MCP configuration, add per-role grants, or treat an unavailable native
-tool as evidence that the source server failed to load. Use the source protocol below when shell
-and source access are available. If the requested validation requires a missing tool or permission,
-report `BLOCKED` with that missing prerequisite rather than inventing configuration or permissions.
+`mcpServers` is for a server unavailable to the parent, or a reference to an existing connection;
+do not add either solely for this validator. Do not edit user MCP configuration, add per-role
+grants, or treat an unavailable native tool as evidence that the source server failed to load. Use
+the source protocol below when shell and source access are available. If the requested validation
+requires a missing tool or permission, report `BLOCKED` with that missing prerequisite rather than
+inventing configuration or permissions.
 
 ## Safety boundary
 
@@ -46,12 +48,13 @@ every FastMCP command with `scripts/run_bounded.py`.
    ```bash
    FASTMCP_SHOW_SERVER_BANNER=false FASTMCP_LOG_ENABLED=false \
    uv run --script scripts/run_bounded.py --timeout-seconds 5 -- \
-   uv run fastmcp list \
+   uv run fastmcp list --input-schema --json \
    --command "env BACKLOG_BACKEND=memory GITHUB_TOKEN= GH_TOKEN= uv run --script $(pwd)/plugins/development-harness/scripts/run_backlog_server.py"
    ```
 
-   The result is the authority for registered tool names and input schemas. A failed startup is a
-   source-server failure; a missing cached native binding is a parent-delivery limitation.
+   The complete structured result is the authority for registered tool names and input schemas. A
+   failed startup is a source-server failure; a missing cached native binding is a parent-delivery
+   limitation.
 
 2. **Exercise one safe source call.** First run `uv run fastmcp call --help` through the same
    bounded launcher to confirm the installed CLI syntax. Then call a read-only tool against the
@@ -81,10 +84,15 @@ every FastMCP command with `scripts/run_bounded.py`.
    tools require schema/handler validation, not fictitious CLI parity. Differences in transport
    serialization are failures only when they violate the documented contract.
 
-5. **Validate parent delivery separately.** If the parent exposes a native `backlog` MCP tool,
-   perform a non-mutating read and identify it as a parent-runtime check. If the parent does not
-   expose it, report that delivery limitation separately while retaining the source result. Native
-   loading is not evidence of authenticated backend access or model-driven execution.
+5. **Validate parent delivery separately and only when it is isolated.** Before invoking a native
+   parent `backlog` tool, establish affirmative evidence that its already-running connection uses
+   an explicitly isolated memory or temporary SQLite backend. Source-child environment variables do
+   not reconfigure that connection. Only then perform a non-mutating read and identify it as a
+   parent-runtime check. Otherwise retain the source result and report parent-runtime validation
+   `BLOCKED`: an already-isolated parent `backlog` connection is required. Do not invoke or
+   reconfigure a configured project, GitHub, or Beads backend to determine its isolation. Native
+   loading is not evidence of backend isolation, authenticated backend access, or model-driven
+   execution.
 
 ## Reporting
 
