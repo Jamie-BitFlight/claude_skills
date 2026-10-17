@@ -99,7 +99,7 @@ The repository is a Bun and Turborepo monorepo. Backend is Elysia, frontend is N
 
 ## Limitations and Caveats
 
-- **Pre-stable.** "It's a Plan is under active development. Expect breaking changes before the first stable release." (README, About)
+- **Stability signal is contradictory.** The README says "It's a Plan is under active development. Expect breaking changes before the first stable release." (README, About). The same checkout is v1.5.0 and its CHANGELOG records a 1.0.0 release dated 2026-09-15 (CHANGELOG.md, accessed 2026-10-17). The README sentence has not been updated to match, so treat the project as under active development and read the CHANGELOG before upgrading.
 - **TLS proxy required for production.** The session cookie is marked `Secure`. Over plain HTTP, "the sign-in request succeeds, but no session is kept". `http://localhost` is the exception in Chrome and Firefox; WebKit browsers such as Safari refuse it there too (docs/self-hosting.md).
 - **Runner needs the coding agent installed and signed in on the same machine.** "The runner starts the CLI as you, but it cannot sign in for you." (packages/runner/README.md, Requirements)
 - **Runner requirements.** Node 20 or later. The instance must be 0.10.0 or later, and "The chat needs 0.11.0. An older instance gives the runner only the queued runs." (packages/runner/README.md, Requirements)
