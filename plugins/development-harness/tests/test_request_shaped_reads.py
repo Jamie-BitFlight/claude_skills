@@ -113,6 +113,7 @@ class FakeIssue:
     raw_body: str = ""
     labels: list[str] = field(default_factory=lambda: ["priority:p1"])
     updated_at: str = ""
+    milestone: dict[str, object] | None = None
 
     def as_node(self) -> dict[str, Any]:
         return {
@@ -124,7 +125,7 @@ class FakeIssue:
             "createdAt": self.updated_at,
             "updatedAt": self.updated_at,
             "labels": {"nodes": [{"name": name, "id": f"L_{name}"} for name in self.labels]},
-            "milestone": None,
+            "milestone": self.milestone,
             "assignees": {"nodes": []},
         }
 
@@ -358,6 +359,7 @@ class FakeGitHubFixture:
         labels: list[str] | None = None,
         tracked_body: str = "",
         updated_at: str | None = None,
+        milestone: dict[str, object] | None = None,
     ) -> FakeIssue:
         """Register an issue with a real, resolvable work-item head + audit comment."""
         reference = f"#{number}"
@@ -383,6 +385,7 @@ class FakeGitHubFixture:
             raw_body=raw_body,
             labels=list(labels) if labels is not None else ["priority:p1"],
             updated_at=updated_at or f"2024-01-01T00:{number % 60:02d}:{number // 60:02d}Z",
+            milestone=milestone,
         )
         self.issues[number] = issue
         return issue
@@ -557,6 +560,42 @@ def test_t6_pushed_filters_match_local_semantics(fixture: FakeGitHubFixture) -> 
     assert list_calls, fixture.requester.log
     assert list_calls[0]["variables"]["states"] == ["OPEN", "CLOSED"]
     assert set(list_calls[0]["variables"]["labels"]) == {"type:bug", "status:in-progress"}
+
+
+def test_public_list_preserves_milestone_identity_and_native_lifecycle(fixture: FakeGitHubFixture) -> None:
+    """Raw GitHub fields survive normalization and live listing independently of workflow labels."""
+    from backlog_core import operations
+    from backlog_core.backend_protocol import reset_config, set_config
+    from backlog_core.backend_types import BacklogConfig
+
+    fixture.add_tracked_issue(
+        9,
+        "closed member",
+        state="CLOSED",
+        labels=["priority:p1", "status:in-progress"],
+        milestone={"id": "M_2", "number": 2, "title": "duplicate", "dueOn": None, "state": "OPEN"},
+    )
+    fixture.add_tracked_issue(
+        10,
+        "other member",
+        labels=["priority:p1", "status:groomed"],
+        milestone={"id": "M_1", "number": 1, "title": "duplicate", "dueOn": None, "state": "OPEN"},
+    )
+
+    set_config(BacklogConfig(backend=fixture.backend))
+    try:
+        result = operations.list_items(repo=f"{fixture.owner}/{fixture.name}", include_closed=True, limit=2)
+    finally:
+        reset_config()
+
+    entries = {entry["issue"]: entry for entry in _items(result)}
+    assert set(entries) == {"#9", "#10"}
+    assert entries["#9"]["milestone"] == entries["#10"]["milestone"] == "duplicate"
+    assert entries["#9"]["milestone_number"] == "2"
+    assert entries["#10"]["milestone_number"] == "1"
+    assert entries["#9"]["state"] == "CLOSED"
+    assert entries["#10"]["state"] == "OPEN"
+    assert entries["#9"]["status"] == "status:in-progress"
 
 
 # ---------------------------------------------------------------------------
