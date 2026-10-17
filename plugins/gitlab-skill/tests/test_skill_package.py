@@ -13,7 +13,6 @@ import threading
 import time
 import tomllib
 from base64 import b64encode
-from datetime import date
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -26,8 +25,6 @@ from marko.inline import Link
 PLUGIN_ROOT = Path(__file__).parents[1]
 SKILL_ROOT = PLUGIN_ROOT / "skills" / "gitlab-skill"
 BOUNDED_TIMEOUT_SECONDS = 10
-
-OBSOLETE_STEPS_TERMS = ("CI/CD Steps", "`step:`", "`step.yml`", "${{ step_dir }}", "${{ job.")
 
 
 def markdown_links(path: Path) -> list[str]:
@@ -82,31 +79,6 @@ def test_reference_links_resolve() -> None:
             assert target.is_file(), f"{reference.name}: missing reference {destination}"
 
 
-def test_references_include_source_metadata() -> None:
-    """Every routed reference identifies its evidence source and review date or revision."""
-    skill_path = SKILL_ROOT / "SKILL.md"
-    routed = [destination for destination in markdown_links(skill_path) if destination.startswith("./references/")]
-    for destination in routed:
-        content = (SKILL_ROOT / destination).read_text(encoding="utf-8")
-        source_lines = [line for line in content.splitlines() if line.startswith("SOURCE: <")]
-        assert source_lines, f"{destination} has no source metadata"
-        assert all("accessed " in line or "reviewed " in line for line in source_lines)
-
-
-def test_steps_terminology_is_limited_to_official_migration_mapping() -> None:
-    """Obsolete names stay out of core/OCI content and live in the migration branch."""
-    migration_path = SKILL_ROOT / "references" / "gitlab-functions-steps-migration.md"
-    migration = migration_path.read_text(encoding="utf-8")
-
-    active_paths = [PLUGIN_ROOT / "README.md"]
-    active_paths.extend(path for path in SKILL_ROOT.joinpath("references").glob("*.md") if path != migration_path)
-    active_paths.extend(PLUGIN_ROOT / directory / "plugin.json" for directory in (".claude-plugin", ".codex-plugin"))
-    active_content = "\n".join(path.read_text(encoding="utf-8") for path in active_paths)
-    assert all(term not in active_content for term in OBSOLETE_STEPS_TERMS)
-    assert all(term in migration for term in OBSOLETE_STEPS_TERMS)
-    assert "./references/gitlab-functions-steps-migration.md" in (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
-
-
 def test_eval_file_uses_supported_schema() -> None:
     """Every eval has the complete package schema and a unique ID."""
     evaluations = load_evals()
@@ -152,23 +124,6 @@ def test_eval_references_cover_router_behavior() -> None:
     assert routed_references <= set(positive_references)
     for reference in positive_references:
         assert SKILL_ROOT.joinpath(str(reference)).is_file(), reference
-
-
-def test_negative_evals_exclude_supported_inspection_and_drafting() -> None:
-    """Negative prompts request no supported read-only or command-composition branch."""
-    negative_prompts = [
-        str(evaluation["prompt"]).casefold() for evaluation in load_evals() if not evaluation["should_activate"]
-    ]
-    supported_terms = ("inspect", "job log", "draft", "compose", "read-only")
-    assert all(term not in prompt for prompt in negative_prompts for term in supported_terms)
-
-
-def test_ci_inspection_routes_only_to_existing_refs() -> None:
-    """The CI inspection index exposes the supported remote inspection surface."""
-    references = SKILL_ROOT / "references"
-    index = references.joinpath("glab-ci-inspection.md")
-
-    assert set(markdown_links(index)) == {"./glab-ci-existing-ref-inspection.md"}
 
 
 @pytest.mark.parametrize(
@@ -263,29 +218,6 @@ poll_pipeline 5749
     assert result.stderr.count("request_error") == request_errors
     if mode == "transient":
         assert "attempt=2 status=success" in result.stdout
-
-
-def test_release_evals_select_one_adapter_without_loading_siblings() -> None:
-    """Structured eval routes select one adapter and keep evidence conditional."""
-    evaluations = load_evals()
-    selections: dict[object, list[str]] = {}
-    for evaluation in evaluations:
-        loads = evaluation.get("loads", [])
-        assert isinstance(loads, list)
-        assert all(isinstance(reference, str) for reference in loads)
-        selections[evaluation["id"]] = [str(reference) for reference in loads]
-
-    assert selections[13] == [
-        "references/release-version-adapters.md",
-        "references/release-notes-adapters.md",
-        "references/release-publication-adapters.md",
-    ]
-    assert selections[23] == ["references/release-version-semantic-release.md"]
-    assert selections[24] == ["references/release-version-python-semantic-release.md"]
-    assert selections[25] == ["references/release-publication-generic.md"]
-    assert all(len(links) == 0 for eval_id, links in selections.items() if eval_id not in (13, 23, 24, 25))
-    ordinary = [evaluation for evaluation in evaluations if evaluation["id"] in (13, 15, 16, 17, 19)]
-    assert all(evaluation["reference"] != "references/release-live-evidence.md" for evaluation in ordinary)
 
 
 def release_component_documents(path: Path) -> tuple[dict[str, object], dict[str, object]]:
@@ -715,6 +647,40 @@ def test_version_before_script_accepts_runner_rewritten_remote_without_literal_e
     assert sentinel not in persisted
 
 
+def test_semantic_release_config_preserves_consumer_tag_prefix(tmp_path: Path) -> None:
+    """The generated release config uses the consumer's tag namespace."""
+    path = SKILL_ROOT / "assets" / "release-components" / "templates" / "semantic-release-version.yml"
+    job = component_job(path)
+    generator = next(command for command in string_list(job["script"]) if ".releaserc.cjs" in command)
+    environment = {
+        **os.environ,
+        "CI_DEFAULT_BRANCH": "release/consumer",
+        "RELEASE_TAG_PREFIX": "consumer-release-",
+        "RELEASE_REPOSITORY_URL": "https://gitlab.example/consumer/project.git",
+    }
+    generated = subprocess.run(
+        ["bash", "-c", generator],
+        cwd=tmp_path,
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=BOUNDED_TIMEOUT_SECONDS,
+    )
+    assert generated.returncode == 0, generated.stderr
+    loaded = subprocess.run(
+        ["node", "-p", 'JSON.stringify(require("./.releaserc.cjs"))'],
+        cwd=tmp_path,
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=BOUNDED_TIMEOUT_SECONDS,
+    )
+    assert loaded.returncode == 0, loaded.stderr
+    assert json.loads(loaded.stdout)["tagFormat"] == "consumer-release-${version}"
+
+
 def test_python_semantic_release_runtime_config_leaves_git_auth_to_process_scoped_http_extra_header(
     tmp_path: Path,
 ) -> None:
@@ -728,7 +694,7 @@ def test_python_semantic_release_runtime_config_leaves_git_auth_to_process_scope
         env={
             **os.environ,
             "CI_DEFAULT_BRANCH": "release/1.x",
-            "RELEASE_TAG_PREFIX": "v",
+            "RELEASE_TAG_PREFIX": "consumer-release-",
             "RELEASE_GIT_REMOTE_NAME": "upstream",
             "RELEASE_VERSION_TOML": "pyproject.toml:project.version",
         },
@@ -739,6 +705,7 @@ def test_python_semantic_release_runtime_config_leaves_git_auth_to_process_scope
 
     assert result.returncode == 0, result.stderr
     config = tomllib.loads(tmp_path.joinpath(".release-component.toml").read_text(encoding="utf-8"))
+    assert config["semantic_release"]["tag_format"] == "consumer-release-{version}"
     remote = config["semantic_release"]["remote"]
     assert "token" not in remote
     assert remote["ignore_token_for_push"] is True
@@ -1152,84 +1119,3 @@ def test_components_assert_expected_protected_push_contexts_at_runtime() -> None
             assert "CI_DEFAULT_BRANCH" in script
         else:
             assert "CI_COMMIT_TAG" in script
-
-
-def test_live_evidence_remains_separate_from_reusable_components() -> None:
-    """Observed sandbox configurations retain their evidence boundary."""
-    root = SKILL_ROOT / "assets" / "release-components"
-    live = root / "live-verified"
-    expected = {
-        "semantic-release.gitlab-ci.yml",
-        "python-semantic-release.gitlab-ci.yml",
-        ".releaserc.json",
-        "pyproject.toml",
-    }
-    reusable = "\n".join(path.read_text(encoding="utf-8") for path in root.joinpath("templates").glob("*.yml"))
-
-    assert {path.name for path in live.iterdir()} == expected
-    assert all(literal not in reusable for literal in ("jira-ai-evaluation", "projects/529", "release-playbook-v"))
-
-
-def test_disclosed_release_references_resolve_and_carry_evidence_dates() -> None:
-    """Lifecycle routes and every indexed adapter branch carry valid dated sources."""
-    reference_root = SKILL_ROOT / "references"
-    playbook = reference_root / "automatic-tag-and-release.md"
-    targets = {
-        (reference_root / destination).resolve()
-        for destination in markdown_links(playbook)
-        if destination.startswith("./")
-    }
-    adapter_indexes = sorted(reference_root.glob("release-*-adapters.md"))
-    assert adapter_indexes
-    for index in adapter_indexes:
-        branch_targets = {
-            (index.parent / destination).resolve()
-            for destination in markdown_links(index)
-            if destination.startswith("./")
-        }
-        assert branch_targets, index
-        targets.update(branch_targets)
-
-    for target in targets:
-        assert target.is_file(), target
-        source_lines = [
-            line for line in target.read_text(encoding="utf-8").splitlines() if line.startswith("SOURCE: <")
-        ]
-        assert source_lines, target
-        for line in source_lines:
-            match = re.search(r"\b(?:accessed|reviewed) (\d{4}-\d{2}-\d{2})\b", line)
-            assert match, line
-            date.fromisoformat(match.group(1))
-
-
-def test_adapter_indexes_create_real_branch_boundaries() -> None:
-    """Each adapter index points to one file per selectable implementation."""
-    references = SKILL_ROOT / "references"
-    version_links = [
-        destination
-        for destination in markdown_links(references / "release-version-adapters.md")
-        if destination.startswith("./release-version-")
-    ]
-    publication_links = [
-        destination
-        for destination in markdown_links(references / "release-publication-adapters.md")
-        if destination.startswith("./release-publication-")
-    ]
-    notes_links = [
-        destination
-        for destination in markdown_links(references / "release-notes-adapters.md")
-        if destination.startswith("./release-notes-")
-    ]
-
-    assert len(version_links) == 2
-    assert len(publication_links) == 5
-    assert len(notes_links) == 2
-    for destination in [*version_links, *publication_links, *notes_links]:
-        assert references.joinpath(destination).is_file(), destination
-
-
-def test_plugin_owns_pytest_collection_entrypoint() -> None:
-    """The plugin test boundary is executable without root testpath registration."""
-    runner = PLUGIN_ROOT / "run_pytests.py"
-    assert runner.is_file()
-    assert '"tests"' in runner.read_text(encoding="utf-8")

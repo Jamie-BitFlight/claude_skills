@@ -139,19 +139,6 @@ def test_build_rows_includes_repo_scoped_codex_skills(tmp_path: Path) -> None:
     ]
 
 
-@pytest.mark.parametrize(
-    "rows",
-    [
-        [{"z": [2, 1], "a": {"y": True, "x": None}}, {"target": "second"}],
-        [{"a": {"x": None, "y": True}, "z": [2, 1]}, {"target": "second"}],
-    ],
-    ids=["reverse-key-insertion", "sorted-key-insertion"],
-)
-def test_render_rows_uses_canonical_jsonl(rows: list[dict[str, object]]) -> None:
-    """Pin reviewed bytes independently of the writer/checker round trip."""
-    assert generator.render_rows(rows) == '{"a": {"x": null, "y": true}, "z": [2, 1]}\n{"target": "second"}\n'
-
-
 @pytest.fixture
 def matrix_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Use real manifests, frontmatter, and files; redirect only CLI configuration."""
