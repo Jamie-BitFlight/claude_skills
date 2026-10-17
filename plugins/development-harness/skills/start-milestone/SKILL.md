@@ -9,9 +9,9 @@ user-invocable: true
 
 Resolve the backend with `dh:backend-resolution`. Require a numeric milestone number; do not treat literal unsubstituted `$ARGUMENTS` as input.
 
-1. Call `backlog_list_milestones(state="open")`; match the requested number. If absent, call it with `state="all"`. Stop when absent or closed. Retain the resolved milestone's returned `title`.
-2. Call `backlog_list` through its offset/limit pagination until every applicable page has been consumed. Retain only returned items whose `milestone` equals the resolved milestone title and whose status is not `done` or `closed`. Preserve each logical reference; do not read or write local backlog files.
+1. Resolve the requested milestone by its returned numeric `number`; retain both its number and title. Do not identify members by title because titles may be duplicated.
+2. With MCP, exhaust `backlog_list(include_closed=true)` offset/limit pages. Select only entries whose `milestone_number` equals the resolved number; retain their logical references. Without the DH MCP, load `dh:dh-cli-usage`, resolve its absolute `<sam_cli/>` path while retaining target cwd, and run `backlog list --include-closed`; use its complete configured-backend result and the same numeric field. Stop with the reported prerequisite/error if neither transport is available.
 3. Present the exact selected item references and current statuses. Ask for confirmation before any mutation.
-4. For every confirmed item, call `backlog_update(selector=<returned reference>, status="in-progress")`. Preserve any returned warnings, pending state, or error; continue only with successful updates.
+4. For every confirmed item, call `backlog_update(selector=<returned reference>, status="in-progress")`; without MCP use `<sam_cli/> backlog update --selector <reference> --status in-progress`. Preserve every returned warning, pending state, or error.
 5. Project V2 is a separate GitHub projection. Ask for its owner, project number, repository, and exact status value. Resolve `GH_PROJECT_HELPER` to the absolute `github_project_setup.py` path in the loaded `gh` skill without changing the target project's cwd, then run `uv run "$GH_PROJECT_HELPER" project update-status --issue-number <issue> --status "<status>" --project-number <project-number> --owner <owner> --repo <repo>` once for every successfully transitioned numeric GitHub issue. Report each helper result separately from the backend update.
-6. Report the backend, milestone, transitioned item references, skipped items, and every backend/projection result.
+6. Report the backend, milestone number, transitioned item references, skipped items, and every backend/projection result.

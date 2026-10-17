@@ -872,14 +872,19 @@ class SQLiteBackend:
                 continue
             num = int(str(raw_issue).lstrip("#"))
             row = self._conn.execute(
-                "SELECT items.status, milestones.title AS milestone_title FROM items "
+                "SELECT items.status, items.milestone_number, milestones.title AS milestone_title FROM items "
                 "LEFT JOIN milestones ON milestones.number = items.milestone_number WHERE items.issue_number = ?",
                 (num,),
             ).fetchone()
             if row is not None:
                 native_status = str(row["status"])
                 status = item.status if native_status == "open" and item.status == "in-progress" else native_status
-                result[num] = IssueStatus(status=status, milestone=str(row["milestone_title"] or ""))
+                milestone_number = row["milestone_number"]
+                result[num] = IssueStatus(
+                    status=status,
+                    milestone=str(row["milestone_title"] or ""),
+                    milestone_number=int(milestone_number) if milestone_number is not None else None,
+                )
         return StatusFetchResult(statuses=result, attempted=True)
 
     @_serialized_connection_operation

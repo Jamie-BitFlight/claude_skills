@@ -1736,10 +1736,11 @@ class SamTasksResult(TypedDict):
 
 
 class IssueStatus(BaseModel):
-    """GitHub issue status and milestone from batch fetch."""
+    """GitHub issue status and milestone identity from batch fetch."""
 
     status: str = ""
     milestone: str = ""
+    milestone_number: int | None = None
     state: str = ""
 
 

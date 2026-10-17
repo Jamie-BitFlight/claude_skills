@@ -2302,6 +2302,7 @@ def batch_fetch_statuses(items: list[BacklogItem], repo: str = "") -> dict[int, 
             result[num] = IssueStatus(
                 status=pick_primary_status_label(status_labels),
                 milestone=ms["title"] if ms else "",
+                milestone_number=ms["number"] if ms else None,
                 state=str(gh_issue.get("state", "")),
             )
     return result

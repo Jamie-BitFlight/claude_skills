@@ -339,8 +339,9 @@ def test_membership_counts_after_assign_and_close(backend: WorkItemBackend) -> N
 
 
 def test_list_items_exposes_native_assigned_milestone_only(backend: WorkItemBackend) -> None:
-    """Native status hydration exposes an assigned milestone title without tagging nonmembers."""
+    """Native status hydration exposes an assigned milestone number despite duplicate titles."""
     _skip_github_shared_state(backend)
+    duplicate = cast("dict[str, object]", operations.create_milestone(title="selected milestone")["milestone"])
     milestone = cast("dict[str, object]", operations.create_milestone(title="selected milestone")["milestone"])
     number = cast("int", milestone["number"])
     assigned = _make_item("Assigned item")
@@ -360,6 +361,8 @@ def test_list_items_exposes_native_assigned_milestone_only(backend: WorkItemBack
     by_title = {str(entry["title"]): entry for entry in entries}
 
     assert by_title["Assigned item"]["milestone"] == "selected milestone"
+    assert by_title["Assigned item"]["milestone_number"] == str(number)
+    assert by_title["Assigned item"]["milestone_number"] != str(duplicate["number"])
     assert by_title["Nonmember item"]["milestone"] == ""
 
 

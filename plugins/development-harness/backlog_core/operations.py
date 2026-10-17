@@ -2364,10 +2364,7 @@ def _build_list_entry(
     """Build the result dict for a single backlog item.
 
     Returns:
-        Dict with section, title, issue, plan, type, topic, body, state,
-        status, milestone, and optional file_path and groomed fields.
-        The ``body`` field contains the full searchable text (description
-        plus all section entry content) for use by the search filter.
+        Consumer list fields, including string-form milestone identity when assigned.
     """
     entry: dict[str, str | bool] = {
         "section": item.section,
@@ -2390,19 +2387,15 @@ def _build_list_entry(
             if info is not None:
                 entry["status"] = normalize_live_github_status(info.status)
                 entry["milestone"] = info.milestone
+                if info.milestone_number is not None:
+                    entry["milestone_number"] = str(info.milestone_number)
             else:
                 entry["status"] = "" if status_live else normalize_cached_github_status(item.status)
                 entry["milestone"] = ""
         else:
-            # Non-integer issue ref (e.g. beads nanoid "bd-a3f8"): status_map
-            # cannot be keyed by int, so use the locally cached status field.
-            # Milestone is not tracked locally for string-ID backends.
             entry["status"] = item.status or ""
             entry["milestone"] = ""
     elif item.status:
-        # No issue reference at all (e.g. beads item never linked to a backend
-        # issue).  Expose the locally cached status so consumers and filters
-        # can see the real state rather than finding no ``status`` key.
         entry["status"] = item.status
     return entry
 

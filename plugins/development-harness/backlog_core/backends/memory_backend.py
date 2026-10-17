@@ -459,7 +459,11 @@ class InMemoryBackend:
         return []
 
     def batch_fetch_statuses(self, items: list[BacklogItem], repo: str = "") -> StatusFetchResult:
-        """Return statuses and assigned milestone titles for items with issue numbers."""
+        """Return statuses and assigned milestone titles for items with issue numbers.
+
+        Returns:
+            Status records with native milestone identity.
+        """
         result: dict[int, IssueStatus] = {}
         for item in items:
             raw_issue = getattr(item.metadata, "issue", "") or ""
@@ -471,7 +475,11 @@ class InMemoryBackend:
                 milestone = issue["milestone"]
                 native_status = issue["state"].lower()
                 status = item.status if native_status == "open" and item.status == "in-progress" else native_status
-                result[num] = IssueStatus(status=status, milestone=milestone["title"] if milestone is not None else "")
+                result[num] = IssueStatus(
+                    status=status,
+                    milestone=milestone["title"] if milestone is not None else "",
+                    milestone_number=milestone["number"] if milestone is not None else None,
+                )
         return StatusFetchResult(statuses=result, attempted=True)
 
     def fetch_item_status(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> str:
