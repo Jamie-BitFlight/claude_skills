@@ -1224,25 +1224,27 @@ class SQLiteBackend:
         return self._row_to_milestone_full(closed)
 
     @_serialized_connection_operation
-    def assign_item_to_milestone(self, issue_number: int, milestone_number: int, repo: str = "") -> None:
-        """Set an item's ``milestone_number`` FK.
+    def assign_item_to_milestone(self, issue_number: int, milestone_number: int | None, repo: str = "") -> None:
+        """Assign an item to a milestone or clear its nullable ``milestone_number`` FK.
 
         Args:
-            issue_number: Item to assign.
-            milestone_number: Milestone to assign it to.
+            issue_number: Item to assign or unassign.
+            milestone_number: Target milestone, or ``None`` to explicitly clear it.
             repo: Ignored — SQLite has no GitHub connection.
 
         Raises:
-            KeyError: When ``issue_number`` or ``milestone_number`` is unknown.
+            KeyError: When ``issue_number`` or a non-null ``milestone_number`` is unknown.
                 SQLite foreign keys are never enforced (``PRAGMA foreign_keys``
                 defaults off), so an unchecked ``UPDATE`` would silently accept
-                a nonexistent milestone or update zero rows for an unknown
-                issue.
+                a nonexistent milestone or update zero rows for an unknown issue.
         """
         if self._conn.execute("SELECT 1 FROM items WHERE issue_number = ?", (issue_number,)).fetchone() is None:
             msg = f"SQLiteBackend: issue #{issue_number} not found"
             raise KeyError(msg)
-        if self._conn.execute("SELECT 1 FROM milestones WHERE number = ?", (milestone_number,)).fetchone() is None:
+        if (
+            milestone_number is not None
+            and self._conn.execute("SELECT 1 FROM milestones WHERE number = ?", (milestone_number,)).fetchone() is None
+        ):
             msg = f"SQLiteBackend: milestone #{milestone_number} not found"
             raise KeyError(msg)
         self._conn.execute(

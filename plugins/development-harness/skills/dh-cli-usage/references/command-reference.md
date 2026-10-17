@@ -29,6 +29,7 @@ plan migrate --plan-address tasks-3-integrate-sam-schema.md
 ```text
 backlog create-milestone --title "Release"
 backlog assign-milestone --issue-number 42 --milestone-number 7
+backlog assign-milestone --issue-number 42 --clear
 backlog close-milestone --milestone-number 7
 ```
 

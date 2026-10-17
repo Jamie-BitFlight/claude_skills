@@ -3819,11 +3819,14 @@ async def backlog_create_milestone(
 )
 async def backlog_assign_item_to_milestone(
     issue_number: Annotated[int, Field(description="Issue number to assign")],
-    milestone_number: Annotated[int, Field(description="Milestone number to assign the issue to")],
+    milestone_number: Annotated[
+        int | None, Field(description="Milestone number to assign, or null to explicitly clear the assignment")
+    ],
 ) -> Annotated[dict[str, object], _wire_schema(BacklogAssignItemToMilestoneResponse)]:
-    """Assign a backlog item to a milestone.
+    """Assign a backlog item to a milestone or explicitly clear its assignment.
 
-    Requires a backend with milestone support — errors otherwise.
+    Requires a backend with milestone support — errors otherwise. The
+    ``milestone_number`` argument is required; pass null only to clear.
     """
     out = Output()
     try:
@@ -3833,15 +3836,16 @@ async def backlog_assign_item_to_milestone(
             milestone_number=milestone_number,
             output=out,
         )
-    except BacklogError as e:
+    except BacklogError as exc:
         return BacklogAssignItemToMilestoneResponse.model_validate({
-            "error": str(e),
-            **_failure_verdict(e),
+            "error": str(exc),
+            **_failure_verdict(exc),
             **out.to_dict(),
         }).model_dump(exclude_none=True)
-    return BacklogAssignItemToMilestoneResponse.model_validate({**result, **out.to_dict()}).model_dump(
-        exclude_none=True
-    )
+    response = BacklogAssignItemToMilestoneResponse.model_validate({**result, **out.to_dict()})
+    dump = response.model_dump(exclude_none=True)
+    dump["milestone_number"] = response.milestone_number
+    return dump
 
 
 @mcp.tool(

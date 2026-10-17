@@ -493,14 +493,21 @@ def create_milestone(
 @app.command("assign-milestone")
 def assign_milestone(
     issue_number: Annotated[int, typer.Option("--issue-number", help="Issue number to assign")],
-    milestone_number: Annotated[int, typer.Option("--milestone-number", help="Milestone number to assign to")],
+    milestone_number: Annotated[
+        int | None, typer.Option("--milestone-number", help="Milestone number to assign to")
+    ] = None,
+    clear: Annotated[bool, typer.Option("--clear", help="Explicitly clear the issue's milestone assignment")] = False,
     repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
 ) -> None:
-    """Assign a backlog item to a milestone."""
+    """Assign a backlog item to a milestone or explicitly clear its assignment."""
+    if (milestone_number is None) != clear:
+        cli_output.exit_with_json_error({"error": "Specify exactly one of --milestone-number or --clear"})
+    if milestone_number is not None and milestone_number < 1:
+        cli_output.exit_with_json_error({"error": "--milestone-number must be greater than zero"})
     output = Output()
     try:
         result = operations.assign_item_to_milestone(
-            issue_number=issue_number, milestone_number=milestone_number, repo=repo, output=output
+            issue_number=issue_number, milestone_number=None if clear else milestone_number, repo=repo, output=output
         )
     except BacklogError as exc:
         cli_output.exit_with_json_error({"error": str(exc)})

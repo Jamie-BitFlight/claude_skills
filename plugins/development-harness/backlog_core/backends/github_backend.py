@@ -1007,11 +1007,12 @@ class GitHubBackend:
             closedIssueCount=milestone.closed_issues,
         )
 
-    def assign_item_to_milestone(self, issue_number: int, milestone_number: int, repo: str = "") -> None:
-        """Assign a GitHub issue to a milestone via PyGithub's issue.edit call."""
+    def assign_item_to_milestone(self, issue_number: int, milestone_number: int | None, repo: str = "") -> None:
+        """Assign or explicitly unassign a GitHub issue's milestone via PyGithub."""
         repository = self.get_github(repo)
-        milestone_obj = repository.get_milestone(milestone_number)
-        repository.get_issue(issue_number).edit(milestone=milestone_obj)
+        issue = repository.get_issue(issue_number)
+        milestone = repository.get_milestone(milestone_number) if milestone_number is not None else None
+        issue.edit(milestone=milestone)
 
     # ------------------------------------------------------------------
     # Task issues

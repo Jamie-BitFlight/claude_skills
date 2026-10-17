@@ -363,13 +363,16 @@ treated as unsupported (the flag getter defaults `False`).
 
 Milestone assignment is one-per-item on every backend: `sqlite`'s
 `items.milestone_number` is a nullable FK, and beads' own `parent` field is a
-scalar, so an item belongs to at most one milestone. Opening a durable
-`sqlite` database created before this contract existed self-migrates on
-connect — adds `milestone_number`, backfills it from the deprecated
-`item_milestones` join table (lowest milestone number wins when an item had
-more than one legacy link), then drops that table. `sqlite`/`memory` order
-`list_milestones` by `due_on` then `number`; neither has a priority-ordering
-concept.
+scalar, so an item belongs to at most one milestone. The generic
+`assign_item_to_milestone` operation accepts an explicit `milestone_number=None`
+to clear that one assignment. MCP keeps that argument required-but-nullable;
+the CLI requires exactly one of `--milestone-number` or `--clear`. Omitting a
+disposition never clears an item. Opening a durable `sqlite` database created
+before this contract existed self-migrates on connect — adds
+`milestone_number`, backfills it from the deprecated `item_milestones` join
+table (lowest milestone number wins when an item had more than one legacy
+link), then drops that table. `sqlite`/`memory` order `list_milestones` by
+`due_on` then `number`; neither has a priority-ordering concept.
 
 `beads` sets `supports_milestones = False` — its milestone IDs are
 string nanoids, `MilestoneFullNode.number` is `int`. Use its beads-native

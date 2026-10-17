@@ -866,11 +866,12 @@ class BeadsBackend:
         del milestone_number, repo
         raise NotImplementedError(_MILESTONE_ID_NOTE)
 
-    def assign_item_to_milestone(self, issue_number: int, milestone_number: int, repo: str = "") -> None:
+    def assign_item_to_milestone(self, issue_number: int, milestone_number: int | None, repo: str = "") -> None:
         """Raise NotImplementedError — beads milestone IDs are strings.
 
         Use :meth:`assign_beads_item_to_milestone` for beads-native assignment.
         """
+        del issue_number, milestone_number, repo
         raise NotImplementedError(_MILESTONE_ID_NOTE)
 
     def list_beads_milestones(self, states: list[str] | None = None) -> list[dict[str, object]]:

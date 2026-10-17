@@ -19,8 +19,9 @@ from typing import cast
 from unittest.mock import MagicMock, patch
 
 import pytest
+from backlog_core import operations
 from backlog_core.backend_protocol import get_config
-from backlog_core.models import BacklogError, ValidationError
+from backlog_core.models import BacklogError, BacklogItem, BacklogItemMetadata, ValidationError
 from backlog_core.server import mcp
 
 from tests.graphql_factories import make_milestone_full_node
@@ -603,6 +604,30 @@ async def test_backlog_assign_item_to_milestone_success_returns_result() -> None
     assert result["issue_number"] == 12
     assert result["milestone_number"] == 5
     assert "error" not in result
+
+
+async def test_backlog_assign_item_to_milestone_accepts_explicit_null_to_clear_assignment() -> None:
+    """The MCP transport preserves an explicit null clear through the configured backend."""
+    backend = get_config().backend
+    milestone = cast("dict[str, object]", operations.create_milestone(title="Release")["milestone"])
+    milestone_number = cast("int", milestone["number"])
+    item = BacklogItem(
+        title="Open release item",
+        metadata=BacklogItemMetadata(source="test", added="2026-01-01", priority="P1", status="open"),
+    )
+    issue_number = backend.create_issue_for_item(None, item)
+    assert issue_number is not None
+    operations.assign_item_to_milestone(issue_number=issue_number, milestone_number=milestone_number)
+
+    result = await _call("backlog_assign_item_to_milestone", {"issue_number": issue_number, "milestone_number": None})
+    listed = operations.list_milestones(state="all")
+
+    assert result["issue_number"] == issue_number
+    assert result["milestone_number"] is None
+    cleared_milestone = next(
+        entry for entry in cast("list[dict[str, object]]", listed["milestones"]) if entry["number"] == milestone_number
+    )
+    assert cleared_milestone["open_issues"] == 0
 
 
 async def test_backlog_assign_item_to_milestone_backlog_error_returns_error_key() -> None:
