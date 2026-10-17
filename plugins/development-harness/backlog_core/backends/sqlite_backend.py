@@ -877,7 +877,9 @@ class SQLiteBackend:
                 (num,),
             ).fetchone()
             if row is not None:
-                result[num] = IssueStatus(status=str(row["status"]), milestone=str(row["milestone_title"] or ""))
+                native_status = str(row["status"])
+                status = item.status if native_status == "open" and item.status == "in-progress" else native_status
+                result[num] = IssueStatus(status=status, milestone=str(row["milestone_title"] or ""))
         return StatusFetchResult(statuses=result, attempted=True)
 
     @_serialized_connection_operation

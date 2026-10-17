@@ -469,9 +469,9 @@ class InMemoryBackend:
             issue = self._issues.get(num)
             if issue is not None:
                 milestone = issue["milestone"]
-                result[num] = IssueStatus(
-                    status=issue["state"].lower(), milestone=milestone["title"] if milestone is not None else ""
-                )
+                native_status = issue["state"].lower()
+                status = item.status if native_status == "open" and item.status == "in-progress" else native_status
+                result[num] = IssueStatus(status=status, milestone=milestone["title"] if milestone is not None else "")
         return StatusFetchResult(statuses=result, attempted=True)
 
     def fetch_item_status(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> str:

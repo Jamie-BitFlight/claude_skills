@@ -363,6 +363,24 @@ def test_list_items_exposes_native_assigned_milestone_only(backend: WorkItemBack
     assert by_title["Nonmember item"]["milestone"] == ""
 
 
+def test_list_items_preserves_local_in_progress_over_native_open(backend: WorkItemBackend) -> None:
+    """A logical in-progress update remains visible without changing native issue lifecycle state."""
+    _skip_github_shared_state(backend)
+    item = _make_item("Workflow status item")
+    issue_number = backend.create_issue_for_item(_repo_for_create_issue(backend), item)
+    assert issue_number is not None
+    item.metadata.issue = str(issue_number)
+    item.reference = f"#{issue_number}"
+    backend.put_work_item(item)
+
+    operations.update_item(selector=item.reference, status="in-progress")
+    entries = cast("list[dict[str, object]]", operations.list_items(include_closed=True)["items"])
+    entry = next(candidate for candidate in entries if candidate["title"] == item.title)
+
+    assert entry["status"] == "in-progress"
+    assert backend.fetch_item_status(item) == "open"
+
+
 # ---------------------------------------------------------------------------
 # 10. assign_item_to_milestone via operations
 # ---------------------------------------------------------------------------
