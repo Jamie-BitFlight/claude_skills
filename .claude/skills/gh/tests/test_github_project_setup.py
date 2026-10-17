@@ -19,9 +19,14 @@ from __future__ import annotations
 import importlib.util
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
+
+if TYPE_CHECKING:
+    import pytest
+
 
 # ---------------------------------------------------------------------------
 # Load github_project_setup as a module (filename contains underscores so
@@ -844,3 +849,105 @@ class TestIssueClose:
         issue_obj.create_comment.assert_called_once()
         issue_obj.edit.assert_not_called()  # issue must NOT be closed
         assert "ERROR" in result.stderr
+
+
+# ---------------------------------------------------------------------------
+# Projects V2 status updates
+# ---------------------------------------------------------------------------
+
+
+class TestProjectV2Status:
+    """Status selection follows the configured Project V2 field options."""
+
+    def test_discovers_status_options_for_a_user_owner(self) -> None:
+        """A user-owned project maps the configured Status options by name."""
+        response = {
+            "data": {
+                "user": {
+                    "projectV2": {
+                        "id": "PVT_user",
+                        "fields": {
+                            "nodes": [
+                                {
+                                    "id": "PVTF_status",
+                                    "name": "Status",
+                                    "options": [
+                                        {"id": "opt_triage", "name": "Triage"},
+                                        {"id": "opt_shipped", "name": "Shipped"},
+                                    ],
+                                }
+                            ]
+                        },
+                    }
+                },
+                "organization": None,
+            }
+        }
+
+        with patch("github_project_setup._gh_graphql", return_value=response):
+            project_id, field_id, options = _gps._discover_project_fields("octocat", 7)
+
+        assert (project_id, field_id) == ("PVT_user", "PVTF_status")
+        assert options == {"Triage": "opt_triage", "Shipped": "opt_shipped"}
+
+    def test_discovers_status_options_for_an_organization_owner(self) -> None:
+        """An organization-owned project maps the configured Status options by name."""
+        response = {
+            "data": {
+                "user": None,
+                "organization": {
+                    "projectV2": {
+                        "id": "PVT_org",
+                        "fields": {
+                            "nodes": [
+                                {
+                                    "id": "PVTF_status",
+                                    "name": "Status",
+                                    "options": [{"id": "opt_ready", "name": "Ready for release"}],
+                                }
+                            ]
+                        },
+                    }
+                },
+            }
+        }
+
+        with patch("github_project_setup._gh_graphql", return_value=response):
+            project_id, field_id, options = _gps._discover_project_fields("octo-org", 9)
+
+        assert (project_id, field_id) == ("PVT_org", "PVTF_status")
+        assert options == {"Ready for release": "opt_ready"}
+
+    def test_updates_a_discovered_custom_status_option(self) -> None:
+        """A configured custom Status option is selected and applied to the project item."""
+        with (
+            patch(
+                "github_project_setup._discover_project_fields",
+                return_value=("PVT_1", "PVTF_1", {"Ready for release": "opt_ready"}),
+            ),
+            patch("github_project_setup._find_project_item_id", return_value="PVTI_1"),
+            patch("github_project_setup._set_project_field") as set_field,
+        ):
+            updated = _gps._update_project_status("octo-org", 9, "I_1", "Ready for release")
+
+        assert updated is True
+        set_field.assert_called_once_with("PVT_1", "PVTI_1", "PVTF_1", "opt_ready")
+
+    def test_rejects_an_unknown_status_before_project_item_mutation(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """An unconfigured option reports discovered choices without adding or editing an item."""
+        with (
+            patch(
+                "github_project_setup._discover_project_fields",
+                return_value=("PVT_1", "PVTF_1", {"Triage": "opt_triage", "Shipped": "opt_shipped"}),
+            ) as discover,
+            patch("github_project_setup._find_project_item_id") as find_item,
+            patch("github_project_setup._set_project_field") as set_field,
+        ):
+            updated = _gps._update_project_status("octo-org", 9, "I_1", "Unknown")
+
+        captured = capsys.readouterr()
+        assert updated is False
+        discover.assert_called_once_with("octo-org", 9)
+        find_item.assert_not_called()
+        set_field.assert_not_called()
+        assert "Available: Triage, Shipped" in captured.err

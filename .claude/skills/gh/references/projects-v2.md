@@ -85,11 +85,29 @@ gh project item-edit \
 
 ## GraphQL — Get Node IDs
 
+The `user` and `organization` root fields each expose `projectV2`; request both for an explicit
+owner login and select the populated response. This supports user- and organization-owned projects
+without inferring the project owner from the repository.
+
 ```bash
-# Get project node ID and field option IDs
+# Get project node ID and field option IDs for either owner kind
 gh api graphql -f query='
 {
-  user(login: "Jamie-BitFlight") {
+  user(login: "OWNER") {
+    projectV2(number: 1) {
+      id
+      fields(first: 20) {
+        nodes {
+          ... on ProjectV2SingleSelectField {
+            id
+            name
+            options { id name }
+          }
+        }
+      }
+    }
+  }
+  organization(login: "OWNER") {
     projectV2(number: 1) {
       id
       fields(first: 20) {
@@ -159,6 +177,9 @@ uv run .claude/skills/gh/scripts/github_project_setup.py setup \
 ---
 
 ## Standard Project Structure
+
+Project Status options are configured per board. The helper discovers them before each status
+update; supply the exact configured option name rather than assuming the example values below.
 
 ```text
 Project: "claude_skills Backlog"
